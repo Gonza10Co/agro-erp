@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import * as ms from 'ms';
 import { UsersService } from '../users/users.service';
 import { HashingService } from '../common/hashing.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,13 +40,16 @@ export class AuthService {
     const accessSecret = this.config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
     const refreshSecret = this.config?.get<string>('JWT_REFRESH_SECRET') ?? process.env.JWT_REFRESH_SECRET;
 
+    const accessTtl = (process.env.JWT_ACCESS_TTL ?? '900s') as ms.StringValue;
+    const refreshTtl = (process.env.JWT_REFRESH_TTL ?? '7d') as ms.StringValue;
+
     const accessToken = await this.jwt.signAsync(payload, {
       secret: accessSecret,
-      expiresIn: (process.env.JWT_ACCESS_TTL ?? '900s') as any,
+      expiresIn: accessTtl,
     });
     const refreshToken = await this.jwt.signAsync(payload, {
       secret: refreshSecret,
-      expiresIn: (process.env.JWT_REFRESH_TTL ?? '7d') as any,
+      expiresIn: refreshTtl,
     });
 
     const tokenHash = await argon2.hash(refreshToken);
