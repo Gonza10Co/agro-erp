@@ -3,9 +3,15 @@
   "version": "0.0.1",
   "private": true,
   "description": "ERP + MES para Botas Agroindustrial S.A.S",
-  "workspaces": ["backend", "frontend"],
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
     "dev:back": "npm run start:dev --workspace backend",
     "dev:front": "npm run start --workspace frontend"
+  },
+  "dependencies": {
+    "@unrs/resolver-binding-win32-x64-msvc": "^1.12.2"
   }
 }
