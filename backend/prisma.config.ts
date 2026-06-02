@@ -2,6 +2,26 @@
 // npm install --save-dev prisma dotenv
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import * as fs from "fs";
+import * as path from "path";
+
+// Fallback: if DATABASE_URL was not loaded by dotenv (e.g. .env line has no KEY= prefix),
+// read the file manually and pick the first line that looks like a postgresql:// URL.
+if (!process.env["DATABASE_URL"]) {
+  try {
+    const envPath = path.resolve(__dirname, ".env");
+    const lines = fs.readFileSync(envPath, "utf8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("postgresql://") || trimmed.startsWith("postgres://")) {
+        process.env["DATABASE_URL"] = trimmed;
+        break;
+      }
+    }
+  } catch {
+    // silently ignore; prisma will report the missing url
+  }
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
