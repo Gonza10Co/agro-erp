@@ -1,0 +1,11 @@
+{
+  "name": "agro-erp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ERP + MES para Botas Agroindustrial S.A.S",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev:back": "npm run start:dev --workspace backend",
+    "dev:front": "npm run start --workspace frontend"
+  }
+}
