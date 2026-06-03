@@ -53,6 +53,9 @@ async function main() {
   const bomPlantilla = await prisma.bom.upsert({
     where: { materialId: plantillaPU.id }, update: {}, create: { materialId: plantillaPU.id },
   });
+  // Idempotencia: limpiar líneas previas de este BOM (y sus tallas) antes de recrear.
+  await prisma.bomLineaTalla.deleteMany({ where: { bomLinea: { bomId: bomPlantilla.id } } });
+  await prisma.bomLinea.deleteMany({ where: { bomId: bomPlantilla.id } });
   await prisma.bomLinea.create({
     data: { bomId: bomPlantilla.id, materialId: poliol.id, claseConsumo: 'FIJO', consumoFijo: 0.04 },
   });
@@ -68,6 +71,9 @@ async function main() {
   const bom101 = await prisma.bom.upsert({
     where: { referenciaId: ref.id }, update: {}, create: { referenciaId: ref.id },
   });
+  // Idempotencia: limpiar líneas previas de este BOM (y sus tallas) antes de recrear.
+  await prisma.bomLineaTalla.deleteMany({ where: { bomLinea: { bomId: bom101.id } } });
+  await prisma.bomLinea.deleteMany({ where: { bomId: bom101.id } });
   const lineaMicro = await prisma.bomLinea.create({
     data: { bomId: bom101.id, materialId: micropielNegra.id, claseConsumo: 'CURVA' },
   });

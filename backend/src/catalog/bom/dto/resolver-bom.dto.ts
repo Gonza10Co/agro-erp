@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsArray, IsInt, IsOptional } from 'class-validator';
 
 export class ResolverBomDto {
@@ -16,6 +16,7 @@ export class ResolverBomDto {
   marcaId?: number;
 
   @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   @IsArray()
   @Type(() => Number)
   @IsInt({ each: true })
