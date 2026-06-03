@@ -22,10 +22,10 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
     .bp-mark svg{width:26px;height:26px}
     .bp-logo b{font-size:18px;font-weight:700;letter-spacing:.02em;display:block;line-height:1}
     .bp-logo small{font-family:var(--font-mono);font-size:9px;letter-spacing:.22em;color:color-mix(in oklch,var(--neu-0) 60%,transparent);margin-top:4px;display:block}
-    .bp-headline{position:relative;z-index:1;max-width:18ch}
-    .bp-headline h1{font-size:38px;line-height:1.1;letter-spacing:-0.025em;font-weight:700}
+    .bp-headline{position:relative;z-index:1;max-width:min(90%,30ch)}
+    .bp-headline h1{font-size:clamp(38px,2.6vw,52px);line-height:1.12;letter-spacing:-0.022em;font-weight:700}
     .bp-headline .accent{color:var(--accent)}
-    .bp-headline p{margin-top:18px;color:color-mix(in oklch,var(--neu-0) 72%,transparent);font-size:15px;line-height:1.6;max-width:38ch}
+    .bp-headline p{margin-top:22px;color:color-mix(in oklch,var(--neu-0) 72%,transparent);font-size:clamp(15px,1.05vw,18px);line-height:1.6;max-width:min(90%,52ch)}
     .bp-stats{position:relative;z-index:1;display:flex;gap:var(--sp-8)}
     .bp-stat .v{font-family:var(--font-mono);font-size:26px;font-weight:600;letter-spacing:-0.02em}
     .bp-stat .l{font-size:12px;color:color-mix(in oklch,var(--neu-0) 58%,transparent);margin-top:3px}
