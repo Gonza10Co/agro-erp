@@ -34,11 +34,18 @@ export class BomLoaderService {
     const bom = await this.prisma.bom.findFirst({
       where: { referenciaId: sel.referenciaId, activo: true },
       orderBy: { version: 'desc' },
-      include: { lineas: { include: { lineasTalla: { include: { talla: true } } } } },
+      include: {
+        lineas: { include: { lineasTalla: { include: { talla: true } } } },
+      },
     });
-    if (!bom) throw new NotFoundException(`Referencia ${sel.referenciaId} sin BOM activo`);
+    if (!bom)
+      throw new NotFoundException(
+        `Referencia ${sel.referenciaId} sin BOM activo`,
+      );
 
-    const lineasBase: LineaBase[] = bom.lineas.map((l: any) => this.mapLinea(l));
+    const lineasBase: LineaBase[] = bom.lineas.map((l: any) =>
+      this.mapLinea(l),
+    );
 
     const overrides = await this.cargarOverrides(sel);
     const materiales = await this.cargarMateriales(lineasBase, overrides);
@@ -48,7 +55,8 @@ export class BomLoaderService {
 
   private mapLinea(l: LineaRaw): LineaBase {
     const consumoPorTalla: Record<number, number> = {};
-    for (const lt of l.lineasTalla ?? []) consumoPorTalla[lt.talla.valor] = num(lt.consumo) as number;
+    for (const lt of l.lineasTalla ?? [])
+      consumoPorTalla[lt.talla.valor] = num(lt.consumo) as number;
     return {
       materialId: l.materialId,
       claseConsumo: l.claseConsumo,
@@ -61,19 +69,25 @@ export class BomLoaderService {
   private async cargarOverrides(sel: SeleccionBom): Promise<Override[]> {
     const disparadores: any[] = [];
     if (sel.marcaId != null) disparadores.push({ marcaId: sel.marcaId });
-    if (sel.opcionIds.length) disparadores.push({ opcionId: { in: sel.opcionIds } });
+    if (sel.opcionIds.length)
+      disparadores.push({ opcionId: { in: sel.opcionIds } });
     if (!disparadores.length) return [];
 
     const reglas = await this.prisma.reglaOverride.findMany({
       where: { referenciaId: sel.referenciaId, OR: disparadores },
-      include: { tallas: { include: { talla: true } }, opcion: { include: { grupoOpcion: true } } },
+      include: {
+        tallas: { include: { talla: true } },
+        opcion: { include: { grupoOpcion: true } },
+      },
     });
 
     return reglas.map((r: any) => {
       const consumoPorTalla: Record<number, number> = {};
-      for (const t of r.tallas ?? []) consumoPorTalla[t.talla.valor] = num(t.consumo) as number;
+      for (const t of r.tallas ?? [])
+        consumoPorTalla[t.talla.valor] = num(t.consumo) as number;
       // Marca dispara primero (orden 0); opciones por el orden de su grupo.
-      const orden = r.marcaId != null ? 0 : (r.opcion?.grupoOpcion?.orden ?? 1) + 1;
+      const orden =
+        r.marcaId != null ? 0 : (r.opcion?.grupoOpcion?.orden ?? 1) + 1;
       return {
         accion: r.accion,
         orden,
@@ -104,13 +118,24 @@ export class BomLoaderService {
     while (pendientes.length) {
       const filas = await this.prisma.material.findMany({
         where: { id: { in: pendientes } },
-        include: { bomPropio: { include: { lineas: { include: { lineasTalla: { include: { talla: true } } } } } } },
+        include: {
+          bomPropio: {
+            include: {
+              lineas: {
+                include: { lineasTalla: { include: { talla: true } } },
+              },
+            },
+          },
+        },
       });
       const nuevos: number[] = [];
       for (const m of filas as any[]) {
-        const subBom: LineaBase[] = (m.bomPropio?.lineas ?? []).map((l: any) => this.mapLinea(l));
+        const subBom: LineaBase[] = (m.bomPropio?.lineas ?? []).map((l: any) =>
+          this.mapLinea(l),
+        );
         materiales[m.id] = { id: m.id, origen: m.origen, subBom };
-        for (const l of subBom) if (!(l.materialId in materiales)) nuevos.push(l.materialId);
+        for (const l of subBom)
+          if (!(l.materialId in materiales)) nuevos.push(l.materialId);
       }
       pendientes = [...new Set(nuevos)].filter((id) => !(id in materiales));
     }

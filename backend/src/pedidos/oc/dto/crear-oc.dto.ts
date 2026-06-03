@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class CrearOCTallaDto {
   @Type(() => Number) @IsInt() tallaId!: number;
@@ -8,7 +16,10 @@ export class CrearOCTallaDto {
 
 export class CrearOCLineaDto {
   @Type(() => Number) @IsInt() productoConfiguradoId!: number;
-  @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => CrearOCTallaDto)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CrearOCTallaDto)
   tallas!: CrearOCTallaDto[];
 }
 
@@ -16,6 +27,9 @@ export class CrearOCDto {
   @Type(() => Number) @IsInt() clienteId!: number;
   @IsOptional() @IsString() ocCliente?: string;
   @IsOptional() @IsString() observaciones?: string;
-  @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => CrearOCLineaDto)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CrearOCLineaDto)
   lineas!: CrearOCLineaDto[];
 }

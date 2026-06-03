@@ -12,19 +12,25 @@ function ctxWithUser(role: string): ExecutionContext {
 
 describe('RolesGuard', () => {
   it('permite cuando no hay roles requeridos', () => {
-    const reflector = { getAllAndOverride: () => undefined } as unknown as Reflector;
+    const reflector = {
+      getAllAndOverride: () => undefined,
+    } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
     expect(guard.canActivate(ctxWithUser('OPERARIO'))).toBe(true);
   });
 
   it('permite cuando el rol del usuario está en los requeridos', () => {
-    const reflector = { getAllAndOverride: () => ['ADMIN'] } as unknown as Reflector;
+    const reflector = {
+      getAllAndOverride: () => ['ADMIN'],
+    } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
     expect(guard.canActivate(ctxWithUser('ADMIN'))).toBe(true);
   });
 
   it('niega cuando el rol del usuario no está en los requeridos', () => {
-    const reflector = { getAllAndOverride: () => ['ADMIN'] } as unknown as Reflector;
+    const reflector = {
+      getAllAndOverride: () => ['ADMIN'],
+    } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
     expect(guard.canActivate(ctxWithUser('OPERARIO'))).toBe(false);
   });

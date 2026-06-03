@@ -1,7 +1,12 @@
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export enum TipoCreditoDto { CONTADO = 'CONTADO', D30 = 'D30', D60 = 'D60', D90 = 'D90' }
+export enum TipoCreditoDto {
+  CONTADO = 'CONTADO',
+  D30 = 'D30',
+  D60 = 'D60',
+  D90 = 'D90',
+}
 
 export class CrearClienteDto {
   @IsString() nit!: string;

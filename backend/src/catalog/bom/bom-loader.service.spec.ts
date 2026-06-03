@@ -18,40 +18,87 @@ describe('BomLoaderService.cargarEntrada', () => {
       id: 1,
       lineas: [
         {
-          materialId: 10, claseConsumo: 'CURVA', consumoFijo: null, mermaPct: null,
+          materialId: 10,
+          claseConsumo: 'CURVA',
+          consumoFijo: null,
+          mermaPct: null,
           lineasTalla: [{ talla: { valor: 42 }, consumo: dec(0.107) }],
         },
-        { materialId: 30, claseConsumo: 'FIJO', consumoFijo: dec(1), mermaPct: null, lineasTalla: [] },
+        {
+          materialId: 30,
+          claseConsumo: 'FIJO',
+          consumoFijo: dec(1),
+          mermaPct: null,
+          lineasTalla: [],
+        },
       ],
     });
     prisma.reglaOverride.findMany.mockResolvedValue([
       {
-        accion: 'ADD', opcionId: null, marcaId: 5, materialObjetivoId: null, materialNuevoId: 40,
-        consumoFijo: dec(1), heredaCurva: false, tallas: [],
-        marca: { id: 5 }, opcion: null,
+        accion: 'ADD',
+        opcionId: null,
+        marcaId: 5,
+        materialObjetivoId: null,
+        materialNuevoId: 40,
+        consumoFijo: dec(1),
+        heredaCurva: false,
+        tallas: [],
+        marca: { id: 5 },
+        opcion: null,
       },
     ]);
     const TODOS_MATERIALES: Record<number, any> = {
       10: { id: 10, origen: 'COMPRADO', bomPropio: null },
       30: { id: 30, origen: 'COMPRADO', bomPropio: null },
       40: {
-        id: 40, origen: 'FABRICADO',
-        bomPropio: { lineas: [{ materialId: 50, claseConsumo: 'FIJO', consumoFijo: dec(0.04), mermaPct: null, lineasTalla: [] }] },
+        id: 40,
+        origen: 'FABRICADO',
+        bomPropio: {
+          lineas: [
+            {
+              materialId: 50,
+              claseConsumo: 'FIJO',
+              consumoFijo: dec(0.04),
+              mermaPct: null,
+              lineasTalla: [],
+            },
+          ],
+        },
       },
       50: { id: 50, origen: 'COMPRADO', bomPropio: null },
     };
     prisma.material.findMany.mockImplementation((args: any) =>
-      Promise.resolve(args.where.id.in.map((id: number) => TODOS_MATERIALES[id]).filter(Boolean)),
+      Promise.resolve(
+        args.where.id.in
+          .map((id: number) => TODOS_MATERIALES[id])
+          .filter(Boolean),
+      ),
     );
 
-    const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: 5, opcionIds: [], talla: 42 });
+    const entrada = await service.cargarEntrada({
+      referenciaId: 1,
+      marcaId: 5,
+      opcionIds: [],
+      talla: 42,
+    });
 
     expect(entrada.talla).toBe(42);
     expect(entrada.lineasBase).toHaveLength(2);
-    expect(entrada.lineasBase[0]).toMatchObject({ materialId: 10, claseConsumo: 'CURVA', consumoPorTalla: { 42: 0.107 } });
-    expect(entrada.overrides[0]).toMatchObject({ accion: 'ADD', materialNuevoId: 40, orden: 0 }); // marca → orden 0
+    expect(entrada.lineasBase[0]).toMatchObject({
+      materialId: 10,
+      claseConsumo: 'CURVA',
+      consumoPorTalla: { 42: 0.107 },
+    });
+    expect(entrada.overrides[0]).toMatchObject({
+      accion: 'ADD',
+      materialNuevoId: 40,
+      orden: 0,
+    }); // marca → orden 0
     expect(entrada.materiales[40]).toMatchObject({ origen: 'FABRICADO' });
-    expect(entrada.materiales[40].subBom[0]).toMatchObject({ materialId: 50, consumoFijo: 0.04 });
+    expect(entrada.materiales[40].subBom[0]).toMatchObject({
+      materialId: 50,
+      consumoFijo: 0.04,
+    });
     // Verifica que el while loop iteró dos veces (carga multinivel genuina)
     expect(prisma.material.findMany).toHaveBeenCalledTimes(2);
     expect(prisma.material.findMany.mock.calls[1][0].where.id.in).toContain(50);
@@ -61,24 +108,45 @@ describe('BomLoaderService.cargarEntrada', () => {
     prisma.bom.findFirst.mockResolvedValue({ id: 1, lineas: [] });
     prisma.reglaOverride.findMany.mockResolvedValue([
       {
-        accion: 'ADD', opcionId: 7, marcaId: null, materialObjetivoId: null, materialNuevoId: 99,
-        consumoFijo: null, heredaCurva: false, tallas: [],
-        opcion: { grupoOpcion: { orden: 3 } }, marca: null,
+        accion: 'ADD',
+        opcionId: 7,
+        marcaId: null,
+        materialObjetivoId: null,
+        materialNuevoId: 99,
+        consumoFijo: null,
+        heredaCurva: false,
+        tallas: [],
+        opcion: { grupoOpcion: { orden: 3 } },
+        marca: null,
       },
     ]);
     prisma.material.findMany.mockResolvedValue([
       { id: 99, origen: 'COMPRADO', bomPropio: null },
     ]);
 
-    const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: null, opcionIds: [7], talla: 38 });
+    const entrada = await service.cargarEntrada({
+      referenciaId: 1,
+      marcaId: null,
+      opcionIds: [7],
+      talla: 38,
+    });
 
-    expect(entrada.overrides[0]).toMatchObject({ accion: 'ADD', materialNuevoId: 99, orden: 4 }); // 3 + 1
+    expect(entrada.overrides[0]).toMatchObject({
+      accion: 'ADD',
+      materialNuevoId: 99,
+      orden: 4,
+    }); // 3 + 1
   });
 
   it('lanza NotFound si la referencia no tiene BOM activo', async () => {
     prisma.bom.findFirst.mockResolvedValue(null);
     await expect(
-      service.cargarEntrada({ referenciaId: 999, marcaId: null, opcionIds: [], talla: 42 }),
+      service.cargarEntrada({
+        referenciaId: 999,
+        marcaId: null,
+        opcionIds: [],
+        talla: 42,
+      }),
     ).rejects.toThrow(/sin BOM/i);
   });
 });

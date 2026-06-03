@@ -9,6 +9,10 @@ import { RegistrarStockDto } from './dto/registrar-stock.dto';
 export class InventarioController {
   constructor(private readonly inventario: InventarioService) {}
 
-  @Post('bodegas') crearBodega(@Body() dto: CrearBodegaDto) { return this.inventario.crearBodega(dto); }
-  @Post('pt') registrarStock(@Body() dto: RegistrarStockDto) { return this.inventario.registrarStock(dto); }
+  @Post('bodegas') crearBodega(@Body() dto: CrearBodegaDto) {
+    return this.inventario.crearBodega(dto);
+  }
+  @Post('pt') registrarStock(@Body() dto: RegistrarStockDto) {
+    return this.inventario.registrarStock(dto);
+  }
 }

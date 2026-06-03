@@ -2,7 +2,7 @@ export interface DisponibilidadBodega {
   bodegaId: number;
   inventarioPTId: number;
   disponible: number; // cantDisponible - cantReservada
-  prioridad: number;  // menor = se consume primero
+  prioridad: number; // menor = se consume primero
 }
 
 export interface SolicitudTalla {
@@ -27,7 +27,9 @@ export function amarrarTalla(
   solicitud: SolicitudTalla,
   disponibilidades: DisponibilidadBodega[],
 ): ResultadoAmarreTalla {
-  const ordenadas = [...disponibilidades].sort((a, b) => a.prioridad - b.prioridad);
+  const ordenadas = [...disponibilidades].sort(
+    (a, b) => a.prioridad - b.prioridad,
+  );
   let restante = solicitud.cantPedida;
   const reservas: ReservaCalculada[] = [];
 

@@ -1,4 +1,11 @@
-import { LineaBase, Override, MaterialInfo, NodoResuelto, BomResuelto, EntradaResolucion } from './bom-resolver.types';
+import {
+  LineaBase,
+  Override,
+  MaterialInfo,
+  NodoResuelto,
+  BomResuelto,
+  EntradaResolucion,
+} from './bom-resolver.types';
 
 /** Consumo de una línea para una talla concreta, con merma aplicada. */
 export function resolverConsumoTalla(linea: LineaBase, talla: number): number {
@@ -8,7 +15,9 @@ export function resolverConsumoTalla(linea: LineaBase, talla: number): number {
   } else {
     const valor = linea.consumoPorTalla[talla];
     if (valor === undefined) {
-      throw new Error(`Material ${linea.materialId}: sin consumo definido para talla ${talla}`);
+      throw new Error(
+        `Material ${linea.materialId}: sin consumo definido para talla ${talla}`,
+      );
     }
     base = valor;
   }
@@ -36,12 +45,17 @@ function lineaDesdeOverride(ov: Override): LineaBase {
 }
 
 /** Aplica las reglas de override al BOM base y devuelve el conjunto efectivo de líneas. */
-export function aplicarOverrides(base: LineaBase[], overrides: Override[]): LineaBase[] {
+export function aplicarOverrides(
+  base: LineaBase[],
+  overrides: Override[],
+): LineaBase[] {
   const mapa = new Map<number, LineaBase>();
-  for (const l of base) mapa.set(l.materialId, { ...l, consumoPorTalla: { ...l.consumoPorTalla } });
+  for (const l of base)
+    mapa.set(l.materialId, { ...l, consumoPorTalla: { ...l.consumoPorTalla } });
 
   const ordenados = [...overrides].sort(
-    (a, b) => RANGO_ACCION[a.accion] - RANGO_ACCION[b.accion] || a.orden - b.orden,
+    (a, b) =>
+      RANGO_ACCION[a.accion] - RANGO_ACCION[b.accion] || a.orden - b.orden,
   );
 
   for (const ov of ordenados) {
@@ -54,7 +68,11 @@ export function aplicarOverrides(base: LineaBase[], overrides: Override[]): Line
         const objetivo = mapa.get(ov.materialObjetivoId);
         if (!objetivo) break;
         const nueva: LineaBase = ov.heredaCurva
-          ? { ...objetivo, materialId: ov.materialNuevoId, consumoPorTalla: { ...objetivo.consumoPorTalla } }
+          ? {
+              ...objetivo,
+              materialId: ov.materialNuevoId,
+              consumoPorTalla: { ...objetivo.consumoPorTalla },
+            }
           : lineaDesdeOverride(ov);
         mapa.delete(ov.materialObjetivoId);
         mapa.set(ov.materialNuevoId, nueva);
@@ -77,7 +95,8 @@ export function aplicarOverrides(base: LineaBase[], overrides: Override[]): Line
         break;
       }
       case 'ADD':
-        if (ov.materialNuevoId != null) mapa.set(ov.materialNuevoId, lineaDesdeOverride(ov));
+        if (ov.materialNuevoId != null)
+          mapa.set(ov.materialNuevoId, lineaDesdeOverride(ov));
         break;
     }
   }
@@ -110,14 +129,19 @@ export function explotarMultinivel(
             `(ruta: ${[...ruta, linea.materialId].join(' → ')})`,
         );
       }
-      hijos = explotarMultinivel(info.subBom, materiales, talla, consumo, [...ruta, linea.materialId]);
+      hijos = explotarMultinivel(info.subBom, materiales, talla, consumo, [
+        ...ruta,
+        linea.materialId,
+      ]);
     }
     return { materialId: linea.materialId, consumo, origen, hijos };
   });
 }
 
 /** Recorre el árbol y suma el consumo de las hojas COMPRADO por material. */
-export function consolidarComprados(arbol: NodoResuelto[]): { materialId: number; consumo: number }[] {
+export function consolidarComprados(
+  arbol: NodoResuelto[],
+): { materialId: number; consumo: number }[] {
   const acc = new Map<number, number>();
   const visitar = (nodos: NodoResuelto[]): void => {
     for (const n of nodos) {
@@ -129,13 +153,20 @@ export function consolidarComprados(arbol: NodoResuelto[]): { materialId: number
     }
   };
   visitar(arbol);
-  return [...acc.entries()].map(([materialId, consumo]) => ({ materialId, consumo }));
+  return [...acc.entries()].map(([materialId, consumo]) => ({
+    materialId,
+    consumo,
+  }));
 }
 
 /** Orquesta la resolución completa: overrides → explosión multinivel → consolidación. */
 export function resolverBom(entrada: EntradaResolucion): BomResuelto {
   const efectivas = aplicarOverrides(entrada.lineasBase, entrada.overrides);
-  const arbol = explotarMultinivel(efectivas, entrada.materiales, entrada.talla);
+  const arbol = explotarMultinivel(
+    efectivas,
+    entrada.materiales,
+    entrada.talla,
+  );
   const comprados = consolidarComprados(arbol);
   return { arbol, comprados };
 }

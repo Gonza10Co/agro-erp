@@ -35,10 +35,18 @@ export class AuthService {
     return this.issueTokens(user.id, user.username, user.role.name);
   }
 
-  private async issueTokens(userId: number, username: string, role: string): Promise<Tokens> {
+  private async issueTokens(
+    userId: number,
+    username: string,
+    role: string,
+  ): Promise<Tokens> {
     const payload = { sub: userId, username, role };
-    const accessSecret = this.config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
-    const refreshSecret = this.config?.get<string>('JWT_REFRESH_SECRET') ?? process.env.JWT_REFRESH_SECRET;
+    const accessSecret =
+      this.config?.get<string>('JWT_ACCESS_SECRET') ??
+      process.env.JWT_ACCESS_SECRET;
+    const refreshSecret =
+      this.config?.get<string>('JWT_REFRESH_SECRET') ??
+      process.env.JWT_REFRESH_SECRET;
 
     const accessTtl = (process.env.JWT_ACCESS_TTL ?? '900s') as ms.StringValue;
     const refreshTtl = (process.env.JWT_REFRESH_TTL ?? '7d') as ms.StringValue;

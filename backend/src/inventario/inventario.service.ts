@@ -9,15 +9,31 @@ export class InventarioService {
 
   crearBodega(dto: CrearBodegaDto) {
     return this.prisma.bodega.create({
-      data: { codigo: dto.codigo, nombre: dto.nombre, tipo: dto.tipo, prioridad: dto.prioridad },
+      data: {
+        codigo: dto.codigo,
+        nombre: dto.nombre,
+        tipo: dto.tipo,
+        prioridad: dto.prioridad,
+      },
     });
   }
 
   registrarStock(dto: RegistrarStockDto) {
     const { productoConfiguradoId, tallaId, bodegaId, cantidad } = dto;
     return this.prisma.inventarioPT.upsert({
-      where: { productoConfiguradoId_tallaId_bodegaId: { productoConfiguradoId, tallaId, bodegaId } },
-      create: { productoConfiguradoId, tallaId, bodegaId, cantDisponible: cantidad },
+      where: {
+        productoConfiguradoId_tallaId_bodegaId: {
+          productoConfiguradoId,
+          tallaId,
+          bodegaId,
+        },
+      },
+      create: {
+        productoConfiguradoId,
+        tallaId,
+        bodegaId,
+        cantDisponible: cantidad,
+      },
       update: { cantDisponible: { increment: cantidad } },
     });
   }

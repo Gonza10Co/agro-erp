@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
@@ -8,7 +12,9 @@ export class OcService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearOCDto) {
-    const agg = await this.prisma.ordenCompra.aggregate({ _max: { consecutivo: true } });
+    const agg = await this.prisma.ordenCompra.aggregate({
+      _max: { consecutivo: true },
+    });
     const consecutivo = (agg._max.consecutivo ?? 0) + 1;
     return this.prisma.ordenCompra.create({
       data: {
@@ -20,7 +26,12 @@ export class OcService {
         lineas: {
           create: dto.lineas.map((l) => ({
             productoConfiguradoId: l.productoConfiguradoId,
-            tallas: { create: l.tallas.map((t) => ({ tallaId: t.tallaId, cantidad: t.cantidad })) },
+            tallas: {
+              create: l.tallas.map((t) => ({
+                tallaId: t.tallaId,
+                cantidad: t.cantidad,
+              })),
+            },
           })),
         },
       },
@@ -35,7 +46,11 @@ export class OcService {
         cliente: true,
         lineas: {
           include: {
-            productoConfigurado: { include: { referencia: { include: { tallaMin: true, tallaMax: true } } } },
+            productoConfigurado: {
+              include: {
+                referencia: { include: { tallaMin: true, tallaMax: true } },
+              },
+            },
             tallas: { include: { talla: true } },
           },
         },
@@ -59,6 +74,9 @@ export class OcService {
     const errores = validarConfirmacionOC(paraValidar);
     if (errores.length > 0) throw new BadRequestException(errores);
 
-    return this.prisma.ordenCompra.update({ where: { id }, data: { estado: 'CONFIRMADA' } });
+    return this.prisma.ordenCompra.update({
+      where: { id },
+      data: { estado: 'CONFIRMADA' },
+    });
   }
 }

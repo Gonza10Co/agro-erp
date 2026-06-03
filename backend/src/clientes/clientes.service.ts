@@ -7,8 +7,11 @@ export class ClientesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearClienteDto) {
-    const existe = await this.prisma.cliente.findUnique({ where: { nit: dto.nit } });
-    if (existe) throw new ConflictException(`Ya existe un cliente con NIT ${dto.nit}`);
+    const existe = await this.prisma.cliente.findUnique({
+      where: { nit: dto.nit },
+    });
+    if (existe)
+      throw new ConflictException(`Ya existe un cliente con NIT ${dto.nit}`);
     return this.prisma.cliente.create({
       data: {
         nit: dto.nit,
