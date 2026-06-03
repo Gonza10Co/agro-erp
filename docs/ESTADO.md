@@ -23,19 +23,21 @@
 - **Login** rediseñado con el DS (split panel marca + form), redirect arreglado a `/`.
 - **Clientes (F4)**: `ui-drawer` reutilizable + `cliente-form` (crear) + `clientes-list`
   (tabla densa + drawer). Ruta `/clientes` real. Verificado E2E.
-- 22 tests verdes.
+- **Listado OC + Detalle (F5)**: `estado-badge` (mapeo estado→badge del DS), `oc-detalle`
+  (cabecera kv-list + líneas/tallas + OP enlazada + acciones confirmar/generar OP, con
+  `takeUntilDestroyed`), `oc-list` (tabla densa + drawer reusado). Ruta `/pedidos/oc` real.
+  El detalle vive en el drawer (no en ruta `:id`). Verificado: login + ruta + empty state.
+- 32 tests verdes.
 
 ## Qué falta — próximos planes (mismo patrón: spec frontend → writing-plans → subagentes)
 
 El spec del frontend ya cubre todo: `docs/specs/2026-06-03-frontend-flujo-pedidos-design.md`.
 Cada feature reemplaza el `placeholder.component` y reusa `ui-drawer`, los servicios API y los modelos.
 
-- **F5 — Listado OC + detalle**: tabla densa de OCs (`PedidosApi.listarOC`), detalle de una OC
-  (`obtenerOC`), acciones confirmar (`confirmarOC`) y generar OP (`generarOP`). Ruta `/pedidos/oc`.
 - **F6 — Crear OC (wizard)**: 4 pasos (cliente → productos configurados → curva de tallas →
   confirmar). Necesita un **combobox con búsqueda** (referencia: `design-ref/assets/combobox.js`)
-  y un **talla-grid** (curva 33-47). Posible gap: falta GET de productos configurados/tallas en
-  el backend del Módulo 1 — agregarlo en esta fase si no existe.
+  y un **talla-grid** (curva 33-47). **Gap confirmado**: el backend solo expone `catalog/bom/resolve`
+  (no hay GET de productos configurados ni de tallas) — hay que agregarlos en esta fase.
 - **F7 — OP / Amarre ⭐** (pantalla estrella): detalle de OP con el amarre (pedido vs. en stock vs.
   a producir, por talla y bodega) usando `obtenerOP` y un componente `amarre-bar`.
 
