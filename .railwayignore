@@ -1,0 +1,5 @@
+# Excluido del upload a Railway: forzar `npm install` (no `npm ci`).
+# Motivo: el lockfile tiene binarios nativos opcionales por plataforma
+# (@unrs/resolver-binding-*) y `npm ci` falla con EBADPLATFORM en Linux
+# en vez de saltear la variante win32. `npm install` los saltea bien.
+package-lock.json
