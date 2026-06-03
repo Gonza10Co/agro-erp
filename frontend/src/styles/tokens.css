@@ -1,0 +1,172 @@
+/* ════════════════════════════════════════════════════════════════════
+   BOTAS AGROINDUSTRIAL · ERP/MES · DESIGN TOKENS
+   Dirección "ACERO" — framework-agnóstico (CSS custom properties)
+   Portar a Angular/SCSS: copiar :root y [data-theme="dark"] tal cual.
+   Color en oklch() para escalas perceptualmente uniformes.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* ───────── PALETA PRIMITIVA · escalas crudas ───────── */
+  /* Primario — Azul acero (H250) */
+  --blue-50:oklch(0.96 0.02 250);  --blue-100:oklch(0.90 0.035 250); --blue-200:oklch(0.82 0.05 250);
+  --blue-300:oklch(0.72 0.062 250);--blue-400:oklch(0.62 0.07 250);  --blue-500:oklch(0.53 0.072 250);
+  --blue-600:oklch(0.47 0.072 250);--blue-700:oklch(0.41 0.07 250);  --blue-800:oklch(0.35 0.06 250);
+  --blue-900:oklch(0.29 0.05 250); --blue-950:oklch(0.23 0.04 250);
+
+  /* Neutros fríos (H255, croma ≤0.014) */
+  --neu-0:oklch(1 0 0);            --neu-50:oklch(0.985 0.003 255); --neu-100:oklch(0.96 0.004 255);
+  --neu-200:oklch(0.92 0.006 255); --neu-300:oklch(0.87 0.008 255); --neu-400:oklch(0.78 0.01 255);
+  --neu-500:oklch(0.66 0.012 255); --neu-600:oklch(0.54 0.014 255); --neu-700:oklch(0.44 0.014 255);
+  --neu-800:oklch(0.35 0.013 255); --neu-900:oklch(0.27 0.012 255); --neu-950:oklch(0.20 0.010 255);
+
+  /* Acento — Naranja de seguridad de la MARCA (H42, color del logo) */
+  --orange-50:oklch(0.96 0.035 48); --orange-100:oklch(0.92 0.06 46); --orange-200:oklch(0.86 0.09 45);
+  --orange-300:oklch(0.78 0.13 44); --orange-400:oklch(0.71 0.16 43); --orange-500:oklch(0.64 0.19 42);
+  --orange-600:oklch(0.58 0.20 40); --orange-700:oklch(0.50 0.18 38);
+
+  /* Semánticos primitivos */
+  --green-50:oklch(0.95 0.03 155); --green-500:oklch(0.56 0.13 155);--green-600:oklch(0.50 0.13 155);--green-700:oklch(0.43 0.12 155);
+  --yellow-50:oklch(0.96 0.04 80); --yellow-500:oklch(0.75 0.15 75);--yellow-600:oklch(0.66 0.15 66);--yellow-700:oklch(0.55 0.13 60);
+  --red-50:oklch(0.95 0.03 27);    --red-500:oklch(0.55 0.20 27);   --red-600:oklch(0.49 0.20 27);  --red-700:oklch(0.43 0.18 27);
+  --cyan-50:oklch(0.95 0.03 235);  --cyan-500:oklch(0.58 0.11 238); --cyan-600:oklch(0.51 0.11 238);--cyan-700:oklch(0.44 0.10 238);
+
+  /* ───────── TOKENS SEMÁNTICOS · roles (CLARO) ───────── */
+  --bg:var(--neu-100);
+  --surface:var(--neu-0);
+  --surface-raised:var(--neu-0);
+  --surface-sunken:var(--neu-50);
+  --surface-hover:var(--neu-50);
+  --surface-active:var(--neu-100);
+  --inset:var(--neu-100);
+
+  --border:var(--neu-200);
+  --border-strong:var(--neu-300);
+  --border-interactive:var(--neu-400);
+
+  --text:var(--neu-900);
+  --text-muted:var(--neu-600);
+  --text-subtle:var(--neu-500);
+  --text-inverse:var(--neu-0);
+  --text-on-accent:var(--neu-0);
+
+  --primary:var(--blue-600);
+  --primary-hover:var(--blue-700);
+  --primary-active:var(--blue-800);
+  --primary-fg:var(--neu-0);
+  --primary-subtle:var(--blue-50);
+  --primary-border:var(--blue-200);
+
+  --accent:var(--orange-500);
+  --accent-hover:var(--orange-600);
+  --accent-fg:var(--neu-0);
+  --accent-subtle:var(--orange-50);
+
+  --success:var(--green-600);   --success-fg:var(--neu-0); --success-subtle:var(--green-50);
+  --warning:var(--yellow-600);  --warning-fg:oklch(0.25 0.05 70); --warning-subtle:var(--yellow-50);
+  --error:var(--red-600);       --error-fg:var(--neu-0);   --error-subtle:var(--red-50);
+  --info:var(--cyan-600);       --info-fg:var(--neu-0);    --info-subtle:var(--cyan-50);
+
+  --focus-ring:oklch(0.62 0.12 250 / .9);
+  --focus-ring-shadow:0 0 0 3px oklch(0.62 0.12 250 / .35);
+
+  /* overlay para modales/drawers */
+  --scrim:oklch(0.20 0.01 255 / .45);
+
+  /* ───────── TIPOGRAFÍA ───────── */
+  --font-sans:'Inter','Inter var',system-ui,-apple-system,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
+
+  --text-display:34px; --lh-display:1.08; --ls-display:-0.022em;
+  --text-h1:26px;      --lh-h1:1.15;      --ls-h1:-0.02em;
+  --text-h2:20px;      --lh-h2:1.2;       --ls-h2:-0.015em;
+  --text-h3:16px;      --lh-h3:1.3;       --ls-h3:-0.01em;
+  --text-body-lg:15px; --lh-body-lg:1.55;
+  --text-body:14px;    --lh-body:1.5;
+  --text-sm:13px;      --lh-sm:1.45;
+  --text-caption:12px; --lh-caption:1.4;
+  --text-micro:11px;   --lh-micro:1.35;
+
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+
+  /* ───────── ESPACIADO · base 4px ───────── */
+  --sp-0:0; --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px;
+  --sp-6:24px; --sp-7:28px; --sp-8:32px; --sp-10:40px; --sp-12:48px; --sp-16:64px; --sp-20:80px;
+
+  /* ───────── RADIOS ───────── */
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-2xl:20px; --r-full:999px;
+
+  /* ───────── BORDES ───────── */
+  --bw:1px; --bw-2:2px;
+
+  /* ───────── SOMBRAS / ELEVACIÓN ───────── */
+  --shadow-xs:0 1px 2px oklch(0.2 0.01 255 / .05);
+  --shadow-sm:0 1px 2px oklch(0.2 0.01 255 / .06), 0 1px 3px oklch(0.2 0.01 255 / .08);
+  --shadow-md:0 2px 4px oklch(0.2 0.01 255 / .06), 0 4px 12px oklch(0.2 0.01 255 / .10);
+  --shadow-lg:0 8px 16px -4px oklch(0.2 0.01 255 / .10), 0 16px 32px -8px oklch(0.2 0.01 255 / .14);
+  --shadow-xl:0 24px 48px -12px oklch(0.2 0.01 255 / .22);
+  --shadow-focus:var(--focus-ring-shadow);
+
+  /* ───────── Z-INDEX ───────── */
+  --z-base:0; --z-sticky:100; --z-dropdown:1000; --z-overlay:1030; --z-drawer:1040;
+  --z-modal:1050; --z-toast:1080; --z-tooltip:1090;
+
+  /* ───────── MOVIMIENTO ───────── */
+  --dur-instant:80ms; --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms;
+  --ease:cubic-bezier(.2,.6,.2,1); --ease-in:cubic-bezier(.4,0,1,1); --ease-out:cubic-bezier(0,0,.2,1);
+
+  /* ───────── BREAKPOINTS (referencia) ─────────
+     sm:640px  md:768px  lg:1024px  xl:1280px  2xl:1536px
+     Plataforma: desktop-first; tablet = 2º target. */
+
+  /* ───────── LAYOUT APP SHELL ───────── */
+  --sidebar-w:248px; --sidebar-w-collapsed:64px; --topbar-h:56px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODO OSCURO — sólo se redefinen roles semánticos
+   ════════════════════════════════════════════════════════════════════ */
+[data-theme="dark"]{
+  --bg:oklch(0.165 0.008 255);
+  --surface:oklch(0.205 0.010 255);
+  --surface-raised:oklch(0.235 0.012 255);
+  --surface-sunken:oklch(0.185 0.009 255);
+  --surface-hover:oklch(0.255 0.013 255);
+  --surface-active:oklch(0.285 0.014 255);
+  --inset:oklch(0.18 0.009 255);
+
+  --border:oklch(0.30 0.012 255);
+  --border-strong:oklch(0.38 0.014 255);
+  --border-interactive:oklch(0.46 0.016 255);
+
+  --text:oklch(0.95 0.006 255);
+  --text-muted:oklch(0.74 0.012 255);
+  --text-subtle:oklch(0.58 0.014 255);
+  --text-inverse:oklch(0.20 0.01 255);
+
+  --primary:oklch(0.68 0.10 252);
+  --primary-hover:oklch(0.74 0.10 252);
+  --primary-active:oklch(0.80 0.09 252);
+  --primary-fg:oklch(0.16 0.03 255);
+  --primary-subtle:oklch(0.30 0.05 252);
+  --primary-border:oklch(0.40 0.06 252);
+
+  --accent:oklch(0.68 0.18 44);
+  --accent-hover:oklch(0.74 0.16 44);
+  --accent-fg:oklch(0.16 0.02 50);
+  --accent-subtle:oklch(0.32 0.08 44);
+
+  --success:oklch(0.72 0.14 155); --success-subtle:oklch(0.30 0.06 155);
+  --warning:oklch(0.82 0.14 78);  --warning-subtle:oklch(0.33 0.07 70);
+  --error:oklch(0.68 0.17 27);    --error-subtle:oklch(0.32 0.08 27);
+  --info:oklch(0.70 0.11 238);    --info-subtle:oklch(0.30 0.06 238);
+
+  --focus-ring:oklch(0.72 0.12 250 / .9);
+  --focus-ring-shadow:0 0 0 3px oklch(0.72 0.12 250 / .35);
+  --scrim:oklch(0.10 0.01 255 / .60);
+
+  --shadow-xs:0 1px 2px oklch(0 0 0 / .25);
+  --shadow-sm:0 1px 2px oklch(0 0 0 / .30), 0 1px 3px oklch(0 0 0 / .35);
+  --shadow-md:0 2px 4px oklch(0 0 0 / .35), 0 4px 12px oklch(0 0 0 / .45);
+  --shadow-lg:0 8px 16px -4px oklch(0 0 0 / .45), 0 16px 32px -8px oklch(0 0 0 / .55);
+  --shadow-xl:0 24px 48px -12px oklch(0 0 0 / .65);
+}

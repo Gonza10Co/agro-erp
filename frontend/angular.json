@@ -32,6 +32,9 @@
               }
             ],
             "styles": [
+              "src/styles/tokens.css",
+              "src/styles/components.css",
+              "src/styles/shell.css",
               "src/styles.scss"
             ],
             "scripts": []
@@ -91,6 +94,9 @@
               }
             ],
             "styles": [
+              "src/styles/tokens.css",
+              "src/styles/components.css",
+              "src/styles/shell.css",
               "src/styles.scss"
             ],
             "scripts": []
