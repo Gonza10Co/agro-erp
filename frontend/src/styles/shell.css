@@ -37,7 +37,7 @@
 .user-meta small{font-size:var(--text-micro);color:var(--text-subtle)}
 
 /* ───────── MAIN + TOPBAR ───────── */
-.app-main{display:flex;flex-direction:column;min-width:0}
+.app-main{display:flex;flex-direction:column;min-width:0;flex:1}
 .app-topbar{
   position:sticky;top:0;z-index:var(--z-sticky);
   display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
