@@ -102,6 +102,10 @@ INVENTARIO (mínimo, solo PT)
 - **InventarioPT**: `id`, `productoConfiguradoId` (FK), `tallaId` (FK), `bodegaId` (FK), `cantDisponible` (int),
   `cantReservada` (int, default 0). `@@unique([productoConfiguradoId, tallaId, bodegaId])`.
 
+- **ReservaInventarioPT** *(añadido en planeación)*: `id`, `opLineaTallaId` (FK), `inventarioPTId` (FK), `cantidad` (int).
+  Registra cada reserva concreta (qué bodega, cuánto) por línea de OP. `cantReservada` de `InventarioPT` es el agregado
+  para el chequeo rápido; estas filas permiten **devolver las reservas con precisión al anular la OP**.
+
 ### Enums nuevos
 - `TipoCredito`: CONTADO, D30, D60, D90
 - `EstadoCartera`: AL_DIA, VENCIDO, BLOQUEADO
@@ -149,7 +153,8 @@ OP
 
 - Paso 3 corre en **una sola transacción Prisma**: o se amarra y reserva todo, o nada (sin reservas huérfanas).
 - **Concurrencia**: la reserva valida `cantDisponible − cantReservada` dentro de la transacción → dos OP no reservan el mismo stock.
-- **Anular OP**: devuelve reservas (`cantReservada -= cantAmarrada` de cada línea).
+- **Anular OP**: recorre las `ReservaInventarioPT` de cada línea, devuelve cada reserva a su bodega
+  (`cantReservada -= cantidad`), borra las filas de reserva y deja la OC nuevamente en CONFIRMADA.
 - No se genera OP de una OC que no esté CONFIRMADA.
 - El amarre recorre bodegas por `prioridad` (PROPIA antes que HERMANA).
 
