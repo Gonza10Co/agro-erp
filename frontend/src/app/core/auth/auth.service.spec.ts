@@ -18,7 +18,7 @@ describe('AuthService', () => {
 
   it('guarda el access token tras login', () => {
     service.login('admin', 'admin123').subscribe();
-    const req = httpMock.expectOne('http://localhost:3000/auth/login');
+    const req = httpMock.expectOne('http://localhost:3001/auth/login');
     expect(req.request.method).toBe('POST');
     req.flush({ accessToken: 'AT', refreshToken: 'RT' });
     expect(service.accessToken).toBe('AT');

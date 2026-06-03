@@ -7,7 +7,7 @@ interface Tokens { accessToken: string; refreshToken: string; }
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:3000';
+  private readonly apiUrl = 'http://localhost:3001';
 
   get accessToken(): string | null {
     return localStorage.getItem('accessToken');
