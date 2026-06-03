@@ -36,3 +36,250 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime @default(now())
 }
+
+// ───────────────────────── Módulo 1: Catálogos + BOM ─────────────────────────
+
+enum OrigenMaterial {
+  COMPRADO
+  FABRICADO
+}
+
+enum ClaseBom {
+  DIRECTO_CURVA
+  DIRECTO_FIJO
+  INDIRECTO
+}
+
+enum ClaseConsumo {
+  CURVA
+  FIJO
+}
+
+enum AccionOverride {
+  ADD
+  REPLACE
+  REMOVE
+  SET_CONSUMO
+}
+
+enum TipoMarca {
+  PROPIA
+  MAQUILA
+}
+
+model UnidadMedida {
+  id         Int        @id @default(autoincrement())
+  codigo     String     @unique
+  nombre     String
+  materiales Material[]
+}
+
+model CategoriaMaterial {
+  id         Int        @id @default(autoincrement())
+  nombre     String     @unique
+  materiales Material[]
+}
+
+model Material {
+  id             Int               @id @default(autoincrement())
+  codigo         String            @unique
+  nombreCanonico String
+  categoriaId    Int
+  categoria      CategoriaMaterial @relation(fields: [categoriaId], references: [id])
+  unidadMedidaId Int
+  unidadMedida   UnidadMedida      @relation(fields: [unidadMedidaId], references: [id])
+  origen         OrigenMaterial
+  claseBom       ClaseBom
+  activo         Boolean           @default(true)
+
+  alias            MaterialAlias[]
+  bomPropio        Bom?            @relation("BomDeMaterial")
+  lineasComoInsumo BomLinea[]      @relation("InsumoDeLinea")
+  overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
+  overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
+}
+
+model MaterialAlias {
+  id         Int      @id @default(autoincrement())
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id])
+  textoLegacy String
+}
+
+model Talla {
+  id    Int @id @default(autoincrement())
+  valor Int @unique
+  orden Int
+
+  referenciasMin   Referencia[]        @relation("TallaMin")
+  referenciasMax   Referencia[]        @relation("TallaMax")
+  lineasTalla      BomLineaTalla[]
+  overridesTalla   ReglaOverrideTalla[]
+}
+
+model Referencia {
+  id            Int    @id @default(autoincrement())
+  codigo        String @unique
+  nombreInterno String
+  tallaMinId    Int
+  tallaMin      Talla  @relation("TallaMin", fields: [tallaMinId], references: [id])
+  tallaMaxId    Int
+  tallaMax      Talla  @relation("TallaMax", fields: [tallaMaxId], references: [id])
+  activo        Boolean @default(true)
+
+  bom                  Bom?
+  overrides            ReglaOverride[]
+  ejes                 ReferenciaEje[]
+  marcas               ReferenciaMarca[]
+  productosConfigurados ProductoConfigurado[]
+}
+
+model Bom {
+  id           Int      @id @default(autoincrement())
+  referenciaId Int?     @unique
+  referencia   Referencia? @relation(fields: [referenciaId], references: [id])
+  materialId   Int?     @unique
+  material     Material? @relation("BomDeMaterial", fields: [materialId], references: [id])
+  version      Int      @default(1)
+  vigenteDesde DateTime @default(now())
+  activo       Boolean  @default(true)
+
+  lineas BomLinea[]
+}
+
+model BomLinea {
+  id           Int          @id @default(autoincrement())
+  bomId        Int
+  bom          Bom          @relation(fields: [bomId], references: [id])
+  materialId   Int
+  material     Material     @relation("InsumoDeLinea", fields: [materialId], references: [id])
+  claseConsumo ClaseConsumo
+  consumoFijo  Decimal?
+  mermaPct     Decimal?
+  notas        String?
+
+  lineasTalla BomLineaTalla[]
+}
+
+model BomLineaTalla {
+  id         Int      @id @default(autoincrement())
+  bomLineaId Int
+  bomLinea   BomLinea @relation(fields: [bomLineaId], references: [id])
+  tallaId    Int
+  talla      Talla    @relation(fields: [tallaId], references: [id])
+  consumo    Decimal
+
+  @@unique([bomLineaId, tallaId])
+}
+
+model GrupoOpcion {
+  id          Int     @id @default(autoincrement())
+  codigo      String  @unique
+  nombre      String
+  obligatorio Boolean @default(false)
+  orden       Int     @default(0)
+
+  opciones Opcion[]
+  ejes     ReferenciaEje[]
+}
+
+model Opcion {
+  id            Int         @id @default(autoincrement())
+  grupoOpcionId Int
+  grupoOpcion   GrupoOpcion @relation(fields: [grupoOpcionId], references: [id])
+  codigo        String
+  nombre        String
+  activo        Boolean     @default(true)
+
+  overrides                 ReglaOverride[]
+  productoConfiguradoOpciones ProductoConfiguradoOpcion[]
+
+  @@unique([grupoOpcionId, codigo])
+}
+
+model Marca {
+  id        Int       @id @default(autoincrement())
+  codigo    String    @unique
+  nombre    String
+  tipo      TipoMarca
+  clienteId Int?
+  activo    Boolean   @default(true)
+
+  overrides            ReglaOverride[]
+  referenciaMarcas     ReferenciaMarca[]
+  productosConfigurados ProductoConfigurado[]
+}
+
+model ReglaOverride {
+  id                 Int            @id @default(autoincrement())
+  referenciaId       Int
+  referencia         Referencia     @relation(fields: [referenciaId], references: [id])
+  opcionId           Int?
+  opcion             Opcion?        @relation(fields: [opcionId], references: [id])
+  marcaId            Int?
+  marca              Marca?         @relation(fields: [marcaId], references: [id])
+  accion             AccionOverride
+  materialObjetivoId Int?
+  materialObjetivo   Material?      @relation("MaterialObjetivo", fields: [materialObjetivoId], references: [id])
+  materialNuevoId    Int?
+  materialNuevo      Material?      @relation("MaterialNuevo", fields: [materialNuevoId], references: [id])
+  consumoFijo        Decimal?
+  heredaCurva        Boolean        @default(false)
+
+  tallas ReglaOverrideTalla[]
+}
+
+model ReglaOverrideTalla {
+  id              Int           @id @default(autoincrement())
+  reglaOverrideId Int
+  reglaOverride   ReglaOverride @relation(fields: [reglaOverrideId], references: [id])
+  tallaId         Int
+  talla           Talla         @relation(fields: [tallaId], references: [id])
+  consumo         Decimal
+
+  @@unique([reglaOverrideId, tallaId])
+}
+
+model ReferenciaEje {
+  id            Int         @id @default(autoincrement())
+  referenciaId  Int
+  referencia    Referencia  @relation(fields: [referenciaId], references: [id])
+  grupoOpcionId Int
+  grupoOpcion   GrupoOpcion @relation(fields: [grupoOpcionId], references: [id])
+  obligatorio   Boolean     @default(false)
+
+  @@unique([referenciaId, grupoOpcionId])
+}
+
+model ReferenciaMarca {
+  id           Int        @id @default(autoincrement())
+  referenciaId Int
+  referencia   Referencia @relation(fields: [referenciaId], references: [id])
+  marcaId      Int
+  marca        Marca      @relation(fields: [marcaId], references: [id])
+
+  @@unique([referenciaId, marcaId])
+}
+
+model ProductoConfigurado {
+  id              Int        @id @default(autoincrement())
+  codigo          String     @unique
+  nombreComercial String
+  referenciaId    Int
+  referencia      Referencia @relation(fields: [referenciaId], references: [id])
+  marcaId         Int
+  marca           Marca      @relation(fields: [marcaId], references: [id])
+  activo          Boolean    @default(true)
+
+  opciones ProductoConfiguradoOpcion[]
+}
+
+model ProductoConfiguradoOpcion {
+  id                    Int                 @id @default(autoincrement())
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  opcionId              Int
+  opcion                Opcion              @relation(fields: [opcionId], references: [id])
+
+  @@unique([productoConfiguradoId, opcionId])
+}
