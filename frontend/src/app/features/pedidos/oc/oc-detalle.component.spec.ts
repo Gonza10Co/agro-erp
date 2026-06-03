@@ -68,4 +68,12 @@ describe('OcDetalleComponent', () => {
     expect(fixture.componentInstance.error()).toBe('Cliente inactivo Talla fuera de rango');
     expect(fixture.componentInstance.accion()).toBe(false);
   });
+
+  it('si obtenerOC falla al cargar, cargando vuelve a false (no queda colgado)', () => {
+    const fixture = setup();
+    apiMock.obtenerOC.and.returnValue(throwError(() => ({ status: 500 })));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.cargando()).toBe(false);
+    expect(fixture.componentInstance.oc()).toBeNull();
+  });
 });

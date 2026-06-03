@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, inject, input, output, signal, DestroyRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenCompra } from '../../../core/api/models/pedidos.models';
 import { badgeOC, badgeOP } from './estado-badge';
@@ -59,6 +60,7 @@ import { badgeOC, badgeOP } from './estado-badge';
 })
 export class OcDetalleComponent implements OnInit {
   private readonly api = inject(PedidosApi);
+  private readonly destroyRef = inject(DestroyRef);
   ocId = input.required<number>();
   changed = output<void>();
 
@@ -71,28 +73,35 @@ export class OcDetalleComponent implements OnInit {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.obtenerOC(this.ocId()).subscribe({
-      next: (o) => { this.oc.set(o); this.cargando.set(false); },
-      error: () => this.cargando.set(false),
-    });
+    this.oc.set(null);
+    this.api.obtenerOC(this.ocId())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (o) => { this.oc.set(o); this.cargando.set(false); },
+        error: () => this.cargando.set(false),
+      });
   }
 
   confirmar(): void {
     if (this.accion()) return;
     this.accion.set(true); this.error.set('');
-    this.api.confirmarOC(this.ocId()).subscribe({
-      next: () => { this.accion.set(false); this.cargar(); this.changed.emit(); },
-      error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
-    });
+    this.api.confirmarOC(this.ocId())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => { this.accion.set(false); this.cargar(); this.changed.emit(); },
+        error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+      });
   }
 
   generarOP(): void {
     if (this.accion()) return;
     this.accion.set(true); this.error.set('');
-    this.api.generarOP(this.ocId()).subscribe({
-      next: () => { this.accion.set(false); this.cargar(); this.changed.emit(); },
-      error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
-    });
+    this.api.generarOP(this.ocId())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => { this.accion.set(false); this.cargar(); this.changed.emit(); },
+        error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+      });
   }
 
   badge(o: OrdenCompra) { return badgeOC(o.estado); }
