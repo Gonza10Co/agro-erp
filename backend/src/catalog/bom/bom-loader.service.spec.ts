@@ -57,6 +57,24 @@ describe('BomLoaderService.cargarEntrada', () => {
     expect(prisma.material.findMany.mock.calls[1][0].where.id.in).toContain(50);
   });
 
+  it('calcula orden de override por opción según grupoOpcion.orden (orden = grupo.orden + 1)', async () => {
+    prisma.bom.findFirst.mockResolvedValue({ id: 1, lineas: [] });
+    prisma.reglaOverride.findMany.mockResolvedValue([
+      {
+        accion: 'ADD', opcionId: 7, marcaId: null, materialObjetivoId: null, materialNuevoId: 99,
+        consumoFijo: null, heredaCurva: false, tallas: [],
+        opcion: { grupoOpcion: { orden: 3 } }, marca: null,
+      },
+    ]);
+    prisma.material.findMany.mockResolvedValue([
+      { id: 99, origen: 'COMPRADO', bomPropio: null },
+    ]);
+
+    const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: null, opcionIds: [7], talla: 38 });
+
+    expect(entrada.overrides[0]).toMatchObject({ accion: 'ADD', materialNuevoId: 99, orden: 4 }); // 3 + 1
+  });
+
   it('lanza NotFound si la referencia no tiene BOM activo', async () => {
     prisma.bom.findFirst.mockResolvedValue(null);
     await expect(

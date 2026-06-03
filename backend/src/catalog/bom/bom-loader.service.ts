@@ -18,6 +18,14 @@ type DecimalLike = { toNumber(): number } | number | null;
 const num = (d: DecimalLike): number | null =>
   d == null ? null : typeof d === 'number' ? d : d.toNumber();
 
+interface LineaRaw {
+  materialId: number;
+  claseConsumo: 'CURVA' | 'FIJO';
+  consumoFijo: DecimalLike;
+  mermaPct: DecimalLike;
+  lineasTalla?: { talla: { valor: number }; consumo: DecimalLike }[];
+}
+
 @Injectable()
 export class BomLoaderService {
   constructor(private readonly prisma: PrismaService) {}
@@ -38,7 +46,7 @@ export class BomLoaderService {
     return { lineasBase, overrides, talla: sel.talla, materiales };
   }
 
-  private mapLinea(l: any): LineaBase {
+  private mapLinea(l: LineaRaw): LineaBase {
     const consumoPorTalla: Record<number, number> = {};
     for (const lt of l.lineasTalla ?? []) consumoPorTalla[lt.talla.valor] = num(lt.consumo) as number;
     return {
