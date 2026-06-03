@@ -28,6 +28,26 @@ async function main() {
     update: { nombre: 'Bogotá (Hermana)', tipo: 'HERMANA', prioridad: 200 },
   });
 
+  // ── Productos configurados demo ────────────────────────────────────────────
+  const ref = await prisma.referencia.findUnique({ where: { codigo: '101' } });
+  const marca = await prisma.marca.findUnique({ where: { codigo: 'PODEROSA' } });
+  if (ref && marca) {
+    const productosDemo = [
+      { codigo: 'PC-101-PODEROSA-DIEL', nombreComercial: 'Bota Dieléctrica Poderosa' },
+      { codigo: 'PC-101-PODEROSA-PACE', nombreComercial: 'Bota Punta Acero Poderosa' },
+      { codigo: 'PC-101-PODEROSA-NEGRA', nombreComercial: 'Bota Negra Industrial Poderosa' },
+    ];
+    for (const pc of productosDemo) {
+      await prisma.productoConfigurado.upsert({
+        where: { codigo: pc.codigo },
+        create: { codigo: pc.codigo, nombreComercial: pc.nombreComercial, referenciaId: ref.id, marcaId: marca.id },
+        update: { nombreComercial: pc.nombreComercial, referenciaId: ref.id, marcaId: marca.id },
+      });
+    }
+  } else {
+    console.warn('No se encontró Referencia 101 o Marca PODEROSA; corré seed:catalogo primero.');
+  }
+
   const ibg = await prisma.bodega.findUniqueOrThrow({ where: { codigo: 'IBG' } });
   const productos = await prisma.productoConfigurado.findMany({
     include: { referencia: { include: { tallaMin: true, tallaMax: true } } },
