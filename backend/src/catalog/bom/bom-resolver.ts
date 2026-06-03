@@ -1,4 +1,4 @@
-import { LineaBase, Override, MaterialInfo, NodoResuelto } from './bom-resolver.types';
+import { LineaBase, Override, MaterialInfo, NodoResuelto, BomResuelto, EntradaResolucion } from './bom-resolver.types';
 
 /** Consumo de una línea para una talla concreta, con merma aplicada. */
 export function resolverConsumoTalla(linea: LineaBase, talla: number): number {
@@ -102,4 +102,28 @@ export function explotarMultinivel(
         : [];
     return { materialId: linea.materialId, consumo, origen, hijos };
   });
+}
+
+/** Recorre el árbol y suma el consumo de las hojas COMPRADO por material. */
+export function consolidarComprados(arbol: NodoResuelto[]): { materialId: number; consumo: number }[] {
+  const acc = new Map<number, number>();
+  const visitar = (nodos: NodoResuelto[]): void => {
+    for (const n of nodos) {
+      if (n.origen === 'COMPRADO' && n.hijos.length === 0) {
+        acc.set(n.materialId, (acc.get(n.materialId) ?? 0) + n.consumo);
+      } else {
+        visitar(n.hijos);
+      }
+    }
+  };
+  visitar(arbol);
+  return [...acc.entries()].map(([materialId, consumo]) => ({ materialId, consumo }));
+}
+
+/** Orquesta la resolución completa: overrides → explosión multinivel → consolidación. */
+export function resolverBom(entrada: EntradaResolucion): BomResuelto {
+  const efectivas = aplicarOverrides(entrada.lineasBase, entrada.overrides);
+  const arbol = explotarMultinivel(efectivas, entrada.materiales, entrada.talla);
+  const comprados = consolidarComprados(arbol);
+  return { arbol, comprados };
 }

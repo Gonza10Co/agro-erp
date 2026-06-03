@@ -131,3 +131,77 @@ describe('explotarMultinivel', () => {
     expect(arbol[0].hijos[0].consumo).toBeCloseTo(0.08, 5); // 0.04 * 2
   });
 });
+
+import { consolidarComprados, resolverBom } from './bom-resolver';
+import { EntradaResolucion, BomResuelto } from './bom-resolver.types';
+
+describe('consolidarComprados', () => {
+  it('aplana el árbol, suma por material y descarta los FABRICADO', () => {
+    const arbol: NodoResuelto[] = [
+      { materialId: 1, consumo: 0.1, origen: 'COMPRADO', hijos: [] },
+      {
+        materialId: 2, consumo: 1, origen: 'FABRICADO',
+        hijos: [
+          { materialId: 3, consumo: 0.04, origen: 'COMPRADO', hijos: [] },
+          { materialId: 1, consumo: 0.02, origen: 'COMPRADO', hijos: [] },
+        ],
+      },
+    ];
+    const r = consolidarComprados(arbol);
+    expect(r).toEqual(
+      expect.arrayContaining([
+        { materialId: 1, consumo: expect.closeTo(0.12, 5) }, // 0.1 + 0.02
+        { materialId: 3, consumo: expect.closeTo(0.04, 5) },
+      ]),
+    );
+    expect(r.find((x) => x.materialId === 2)).toBeUndefined(); // fabricado no aparece
+    expect(r).toHaveLength(2);
+  });
+});
+
+describe('resolverBom (end-to-end, caso AGR-452 simplificado)', () => {
+  it('resuelve 101·PODEROSA·CAFÉ talla 42 con overrides + multinivel', () => {
+    const entrada: EntradaResolucion = {
+      talla: 42,
+      lineasBase: [
+        { materialId: 10, claseConsumo: 'CURVA', consumoFijo: null, consumoPorTalla: { 42: 0.107 }, mermaPct: null }, // micropiel negra
+        { materialId: 30, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null },                 // suela base
+      ],
+      overrides: [
+        // COLOR=CAFÉ: micropiel negra → café, hereda curva
+        { accion: 'REPLACE', orden: 1, materialObjetivoId: 10, materialNuevoId: 11, consumoFijo: null, heredaCurva: true, consumoPorTalla: {} },
+        // SUELA=RIVER: suela base → river creek
+        { accion: 'REPLACE', orden: 2, materialObjetivoId: 30, materialNuevoId: 31, consumoFijo: 1, heredaCurva: false, consumoPorTalla: {} },
+        // MARCA=PODEROSA: + plantilla PU (fabricada)
+        { accion: 'ADD', orden: 0, materialObjetivoId: null, materialNuevoId: 40, consumoFijo: 1, heredaCurva: false, consumoPorTalla: {} },
+      ],
+      materiales: {
+        11: { id: 11, origen: 'COMPRADO', subBom: [] },
+        31: { id: 31, origen: 'COMPRADO', subBom: [] },
+        40: {
+          id: 40, origen: 'FABRICADO',
+          subBom: [{ materialId: 50, claseConsumo: 'FIJO', consumoFijo: 0.04, consumoPorTalla: {}, mermaPct: null }], // poliol
+        },
+        50: { id: 50, origen: 'COMPRADO', subBom: [] },
+      },
+    };
+
+    const r = resolverBom(entrada);
+
+    // árbol: micropiel café, suela river, plantilla PU (con poliol hijo)
+    expect(r.arbol.map((n) => n.materialId).sort()).toEqual([11, 31, 40]);
+    const plantilla = r.arbol.find((n) => n.materialId === 40)!;
+    expect(plantilla.hijos[0]).toMatchObject({ materialId: 50, origen: 'COMPRADO' });
+
+    // comprados consolidados: micropiel café 0.107, suela river 1, poliol 0.04 (la plantilla NO aparece)
+    expect(r.comprados).toEqual(
+      expect.arrayContaining([
+        { materialId: 11, consumo: expect.closeTo(0.107, 5) },
+        { materialId: 31, consumo: 1 },
+        { materialId: 50, consumo: expect.closeTo(0.04, 5) },
+      ]),
+    );
+    expect(r.comprados.find((x) => x.materialId === 40)).toBeUndefined();
+    expect(r.comprados).toHaveLength(3);
+  });
+});
