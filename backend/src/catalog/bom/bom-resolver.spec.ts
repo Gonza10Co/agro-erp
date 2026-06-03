@@ -1,6 +1,13 @@
 import { resolverConsumoTalla } from './bom-resolver';
 import { LineaBase } from './bom-resolver.types';
 
+import { aplicarOverrides } from './bom-resolver';
+import { Override } from './bom-resolver.types';
+
+function lineaFija(materialId: number, consumo: number): LineaBase {
+  return { materialId, claseConsumo: 'FIJO', consumoFijo: consumo, consumoPorTalla: {}, mermaPct: null };
+}
+
 describe('resolverConsumoTalla', () => {
   it('CURVA: devuelve el consumo de la talla pedida', () => {
     const linea: LineaBase = {
@@ -32,5 +39,62 @@ describe('resolverConsumoTalla', () => {
       consumoPorTalla: { 38: 0.1 }, mermaPct: null,
     };
     expect(() => resolverConsumoTalla(linea, 99)).toThrow(/talla 99/i);
+  });
+});
+
+describe('aplicarOverrides', () => {
+  const base: LineaBase[] = [
+    { materialId: 10, claseConsumo: 'CURVA', consumoFijo: null, consumoPorTalla: { 42: 0.1 }, mermaPct: null }, // micropiel negra
+    lineaFija(20, 0.094), // forro rossy
+  ];
+
+  it('ADD: agrega un material nuevo', () => {
+    const ov: Override[] = [{
+      accion: 'ADD', orden: 0, materialObjetivoId: null, materialNuevoId: 99,
+      consumoFijo: 1, heredaCurva: false, consumoPorTalla: {},
+    }];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === 99)).toMatchObject({ claseConsumo: 'FIJO', consumoFijo: 1 });
+    expect(r).toHaveLength(3);
+  });
+
+  it('REMOVE: quita el material objetivo', () => {
+    const ov: Override[] = [{
+      accion: 'REMOVE', orden: 0, materialObjetivoId: 20, materialNuevoId: null,
+      consumoFijo: null, heredaCurva: false, consumoPorTalla: {},
+    }];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === 20)).toBeUndefined();
+    expect(r).toHaveLength(1);
+  });
+
+  it('REPLACE con heredaCurva: cambia el material pero conserva la curva del objetivo', () => {
+    const ov: Override[] = [{
+      accion: 'REPLACE', orden: 0, materialObjetivoId: 10, materialNuevoId: 11, // micropiel café
+      consumoFijo: null, heredaCurva: true, consumoPorTalla: {},
+    }];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === 10)).toBeUndefined();
+    expect(r.find((l) => l.materialId === 11)).toMatchObject({
+      claseConsumo: 'CURVA', consumoPorTalla: { 42: 0.1 },
+    });
+  });
+
+  it('SET_CONSUMO: reescribe el consumo del material objetivo', () => {
+    const ov: Override[] = [{
+      accion: 'SET_CONSUMO', orden: 0, materialObjetivoId: 20, materialNuevoId: null,
+      consumoFijo: 0.2, heredaCurva: false, consumoPorTalla: {},
+    }];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === 20)).toMatchObject({ consumoFijo: 0.2 });
+  });
+
+  it('precedencia: REMOVE gana sobre ADD del mismo material', () => {
+    const ov: Override[] = [
+      { accion: 'ADD', orden: 0, materialObjetivoId: null, materialNuevoId: 20, consumoFijo: 5, heredaCurva: false, consumoPorTalla: {} },
+      { accion: 'REMOVE', orden: 0, materialObjetivoId: 20, materialNuevoId: null, consumoFijo: null, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === 20)).toBeUndefined();
   });
 });
