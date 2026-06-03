@@ -31,15 +31,18 @@ describe('BomLoaderService.cargarEntrada', () => {
         marca: { id: 5 }, opcion: null,
       },
     ]);
-    prisma.material.findMany.mockResolvedValue([
-      { id: 10, origen: 'COMPRADO', bomPropio: null },
-      { id: 30, origen: 'COMPRADO', bomPropio: null },
-      {
+    const TODOS_MATERIALES: Record<number, any> = {
+      10: { id: 10, origen: 'COMPRADO', bomPropio: null },
+      30: { id: 30, origen: 'COMPRADO', bomPropio: null },
+      40: {
         id: 40, origen: 'FABRICADO',
         bomPropio: { lineas: [{ materialId: 50, claseConsumo: 'FIJO', consumoFijo: dec(0.04), mermaPct: null, lineasTalla: [] }] },
       },
-      { id: 50, origen: 'COMPRADO', bomPropio: null },
-    ]);
+      50: { id: 50, origen: 'COMPRADO', bomPropio: null },
+    };
+    prisma.material.findMany.mockImplementation((args: any) =>
+      Promise.resolve(args.where.id.in.map((id: number) => TODOS_MATERIALES[id]).filter(Boolean)),
+    );
 
     const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: 5, opcionIds: [], talla: 42 });
 
@@ -49,6 +52,9 @@ describe('BomLoaderService.cargarEntrada', () => {
     expect(entrada.overrides[0]).toMatchObject({ accion: 'ADD', materialNuevoId: 40, orden: 0 }); // marca → orden 0
     expect(entrada.materiales[40]).toMatchObject({ origen: 'FABRICADO' });
     expect(entrada.materiales[40].subBom[0]).toMatchObject({ materialId: 50, consumoFijo: 0.04 });
+    // Verifica que el while loop iteró dos veces (carga multinivel genuina)
+    expect(prisma.material.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.material.findMany.mock.calls[1][0].where.id.in).toContain(50);
   });
 
   it('lanza NotFound si la referencia no tiene BOM activo', async () => {
