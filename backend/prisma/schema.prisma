@@ -104,6 +104,8 @@ model MaterialAlias {
   materialId Int
   material   Material @relation(fields: [materialId], references: [id])
   textoLegacy String
+
+  @@unique([materialId, textoLegacy])
 }
 
 model Talla {
@@ -159,6 +161,9 @@ model BomLinea {
   notas        String?
 
   lineasTalla BomLineaTalla[]
+
+  @@index([bomId])
+  @@index([materialId])
 }
 
 model BomLineaTalla {
@@ -227,6 +232,9 @@ model ReglaOverride {
   heredaCurva        Boolean        @default(false)
 
   tallas ReglaOverrideTalla[]
+
+  @@index([referenciaId])
+  @@index([materialObjetivoId])
 }
 
 model ReglaOverrideTalla {
