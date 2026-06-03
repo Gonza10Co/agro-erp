@@ -1,13 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 interface Tokens { accessToken: string; refreshToken: string; }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:3001';
+  private readonly apiUrl = environment.apiUrl;
 
   get accessToken(): string | null {
     return localStorage.getItem('accessToken');
