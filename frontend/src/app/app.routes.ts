@@ -12,7 +12,7 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell/shell.component').then(m => m.ShellComponent),
     children: [
       { path: 'pedidos/oc', loadComponent: () => import('./features/placeholder.component').then(m => m.PlaceholderComponent) },
-      { path: 'clientes', loadComponent: () => import('./features/placeholder.component').then(m => m.PlaceholderComponent) },
+      { path: 'clientes', loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'pedidos/oc' },
     ],
   },
