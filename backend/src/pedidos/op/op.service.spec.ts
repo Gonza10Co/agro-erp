@@ -158,3 +158,40 @@ describe('OpService.anular', () => {
     });
   });
 });
+
+describe('OpService lectura', () => {
+  it('listar ordena por consecutivo desc', async () => {
+    const prisma: any = {
+      ordenProduccion: { findMany: jest.fn().mockResolvedValue([{ id: 2 }, { id: 1 }]) },
+    };
+    const service = new OpService(prisma);
+    const r = await service.listar();
+    expect(prisma.ordenProduccion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { consecutivo: 'desc' } }),
+    );
+    expect(r).toHaveLength(2);
+  });
+
+  it('obtener lanza NotFound si la OP no existe', async () => {
+    const prisma: any = {
+      ordenProduccion: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const service = new OpService(prisma);
+    await expect(service.obtener(99)).rejects.toThrow('OP 99 no existe');
+  });
+
+  it('obtener devuelve la OP con el desglose de amarre', async () => {
+    const prisma: any = {
+      ordenProduccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50,
+          estado: 'AMARRADA',
+          lineas: [{ tallas: [{ cantPedida: 100, cantAmarrada: 30, cantAProducir: 70, reservas: [] }] }],
+        }),
+      },
+    };
+    const service = new OpService(prisma);
+    const r = await service.obtener(50);
+    expect(r).toMatchObject({ id: 50, estado: 'AMARRADA' });
+  });
+});

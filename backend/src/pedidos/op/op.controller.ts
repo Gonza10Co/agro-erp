@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Param,
   ParseIntPipe,
   Post,
@@ -15,6 +16,12 @@ export class OpController {
 
   @Post('desde-oc/:ocId') generar(@Param('ocId', ParseIntPipe) ocId: number) {
     return this.op.generarDesdeOC(ocId);
+  }
+  @Get() listar() {
+    return this.op.listar();
+  }
+  @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
+    return this.op.obtener(id);
   }
   @Post(':id/anular') anular(@Param('id', ParseIntPipe) id: number) {
     return this.op.anular(id);

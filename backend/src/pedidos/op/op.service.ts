@@ -135,4 +135,48 @@ export class OpService {
       });
     });
   }
+
+  listar() {
+    return this.prisma.ordenProduccion.findMany({
+      orderBy: { consecutivo: 'desc' },
+      include: {
+        oc: {
+          select: {
+            id: true,
+            consecutivo: true,
+            cliente: { select: { id: true, nombre: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async obtener(id: number) {
+    const op = await this.prisma.ordenProduccion.findUnique({
+      where: { id },
+      include: {
+        oc: {
+          include: {
+            cliente: { select: { id: true, nit: true, nombre: true } },
+          },
+        },
+        lineas: {
+          include: {
+            productoConfigurado: true,
+            tallas: {
+              orderBy: { talla: { orden: 'asc' } },
+              include: {
+                talla: true,
+                reservas: {
+                  include: { inventarioPT: { include: { bodega: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!op) throw new NotFoundException(`OP ${id} no existe`);
+    return op;
+  }
 }

@@ -79,4 +79,39 @@ export class OcService {
       data: { estado: 'CONFIRMADA' },
     });
   }
+
+  listar() {
+    return this.prisma.ordenCompra.findMany({
+      orderBy: { consecutivo: 'desc' },
+      include: {
+        cliente: { select: { id: true, nit: true, nombre: true } },
+        ordenProduccion: {
+          select: { id: true, consecutivo: true, estado: true },
+        },
+      },
+    });
+  }
+
+  async obtener(id: number) {
+    const oc = await this.prisma.ordenCompra.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        ordenProduccion: {
+          select: { id: true, consecutivo: true, estado: true },
+        },
+        lineas: {
+          include: {
+            productoConfigurado: true,
+            tallas: {
+              include: { talla: true },
+              orderBy: { talla: { orden: 'asc' } },
+            },
+          },
+        },
+      },
+    });
+    if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+    return oc;
+  }
 }

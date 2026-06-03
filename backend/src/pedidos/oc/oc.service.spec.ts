@@ -7,6 +7,7 @@ describe('OcService', () => {
       aggregate: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
     },
   } as any;
@@ -97,5 +98,25 @@ describe('OcService', () => {
       data: { estado: 'CONFIRMADA' },
     });
     expect(r).toMatchObject({ estado: 'CONFIRMADA' });
+  });
+
+  it('listar devuelve las OCs ordenadas por consecutivo desc', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+    const r = await service.listar();
+    expect(prisma.ordenCompra.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { consecutivo: 'desc' } }),
+    );
+    expect(r).toHaveLength(2);
+  });
+
+  it('obtener lanza NotFound si la OC no existe', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue(null);
+    await expect(service.obtener(99)).rejects.toThrow('OC 99 no existe');
+  });
+
+  it('obtener devuelve la OC con sus relaciones', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, lineas: [] });
+    const r = await service.obtener(1);
+    expect(r).toMatchObject({ id: 1 });
   });
 });

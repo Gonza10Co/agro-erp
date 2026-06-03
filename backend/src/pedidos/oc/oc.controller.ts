@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseIntPipe,
   Post,
@@ -17,6 +18,12 @@ export class OcController {
 
   @Post() crear(@Body() dto: CrearOCDto) {
     return this.oc.crear(dto);
+  }
+  @Get() listar() {
+    return this.oc.listar();
+  }
+  @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
+    return this.oc.obtener(id);
   }
   @Post(':id/confirmar') confirmar(@Param('id', ParseIntPipe) id: number) {
     return this.oc.confirmar(id);
