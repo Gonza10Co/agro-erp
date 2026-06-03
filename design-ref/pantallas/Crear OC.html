@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crear Orden de Compra · Botas Agroindustrial ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/components.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<style>
+  .wizard{max-width:920px;margin:0 auto}
+  .stepper-wrap{padding:var(--sp-5) var(--sp-6);margin-bottom:var(--sp-5)}
+  .step-panel{display:none}
+  .step-panel.active{display:block}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-4)}
+  .panel-title{font-size:var(--text-h3);font-weight:var(--fw-semibold);margin-bottom:4px}
+  .panel-sub{font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--sp-5)}
+  .cliente-opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:var(--bw) solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all var(--dur-fast);margin-bottom:8px}
+  .cliente-opt:hover{border-color:var(--border-interactive);background:var(--surface-hover)}
+  .cliente-opt.sel{border-color:var(--primary);background:var(--primary-subtle)}
+  .cliente-opt .meta b{font-size:var(--text-sm);font-weight:var(--fw-semibold);display:block}
+  .cliente-opt .meta small{font-size:var(--text-caption);color:var(--text-muted)}
+  .cliente-opt .check-ring{width:18px;height:18px;border-radius:50%;border:2px solid var(--border-interactive);margin-left:auto;display:grid;place-items:center}
+  .cliente-opt.sel .check-ring{border-color:var(--primary);background:var(--primary)}
+  .cliente-opt.sel .check-ring::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--primary-fg)}
+  .prod-row{display:flex;align-items:center;gap:14px;padding:14px;border:var(--bw) solid var(--border);border-radius:var(--r-md);margin-bottom:8px;background:var(--surface)}
+  .prod-thumb{width:46px;height:46px;border-radius:var(--r-sm);background:repeating-linear-gradient(45deg,var(--surface-sunken),var(--surface-sunken) 6px,var(--inset) 6px,var(--inset) 12px);border:var(--bw) solid var(--border);display:grid;place-items:center;color:var(--text-subtle);flex:none;font-family:var(--font-mono);font-size:8px;text-align:center}
+  .prod-row .p-meta b{font-size:var(--text-sm);font-weight:var(--fw-semibold)}
+  .prod-row .p-meta .specs{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+  .spec{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);background:var(--surface-sunken);padding:2px 7px;border-radius:var(--r-full);border:var(--bw) solid var(--border)}
+  .add-prod-form{padding:var(--sp-5);border:1.5px dashed var(--border-strong);border-radius:var(--r-md);background:var(--surface-sunken)}
+  .tallas-block{margin-bottom:var(--sp-5)}
+  .tallas-block .tb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .tallas-block .tb-head b{font-size:var(--text-sm);font-weight:var(--fw-semibold)}
+  .quick-fill{display:flex;gap:6px}
+  .review-line{display:flex;justify-content:space-between;padding:11px 0;border-bottom:var(--bw) solid var(--border);font-size:var(--text-sm)}
+  .review-line:last-child{border-bottom:0}
+  .review-line .k{color:var(--text-muted)}
+  .review-line .v{font-weight:var(--fw-medium)}
+  .total-box{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-5);background:var(--primary-subtle);border:var(--bw) solid var(--primary-border);border-radius:var(--r-md);margin-top:var(--sp-4)}
+  .total-box .tv{font-family:var(--font-mono);font-size:28px;font-weight:var(--fw-bold);color:var(--primary);letter-spacing:-0.02em}
+  .wizard-foot{display:flex;justify-content:space-between;align-items:center;margin-top:var(--sp-5)}
+  @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-screen="oc" data-title="Crear OC" data-screen-label="Crear OC (Wizard)">
+<main class="app-main">
+  <div class="page">
+    <div class="wizard">
+
+      <div class="page-header">
+        <div>
+          <nav class="breadcrumb" style="margin-bottom:8px"><a href="Órdenes de Compra.html">Órdenes de Compra</a><span class="sep">/</span><span class="current">Nueva OC</span></nav>
+          <div class="ph-title">Crear Orden de Compra</div>
+        </div>
+        <button class="btn btn-ghost">Guardar borrador</button>
+      </div>
+
+      <!-- STEPPER -->
+      <div class="card stepper-wrap">
+        <div class="stepper" id="stepper">
+          <div class="step is-active" data-step="0"><span class="marker">1</span><span class="s-label">Cliente</span><span class="s-line"></span></div>
+          <div class="step" data-step="1"><span class="marker">2</span><span class="s-label">Productos</span><span class="s-line"></span></div>
+          <div class="step" data-step="2"><span class="marker">3</span><span class="s-label">Curva de tallas</span><span class="s-line"></span></div>
+          <div class="step" data-step="3"><span class="marker">4</span><span class="s-label">Revisar</span></div>
+        </div>
+      </div>
+
+      <div class="card card-body">
+
+        <!-- PASO 1 · CLIENTE -->
+        <div class="step-panel active" data-panel="0">
+          <div class="panel-title">¿Para qué cliente es el pedido?</div>
+          <div class="panel-sub">Buscá entre los 291 clientes por nombre o NIT. Al elegir, sus condiciones comerciales se cargan solas.</div>
+          <div class="field" style="margin-bottom:var(--sp-4)">
+            <label class="label">Cliente <span class="req">*</span></label>
+            <div id="clienteCombo"></div>
+            <div class="hint">Escribí para filtrar · ↑ ↓ para navegar · Enter para elegir</div>
+          </div>
+          <div id="clienteSelected"></div>
+        </div>
+
+        <!-- PASO 2 · PRODUCTOS -->
+        <div class="step-panel" data-panel="1">
+          <div class="panel-title">Productos configurados</div>
+          <div class="panel-sub">Agregá los modelos del pedido con su configuración. Cada uno tendrá su propia curva de tallas.</div>
+          <div id="prodList"></div>
+          <div class="add-prod-form" id="addForm" style="display:none">
+            <div class="grid-2" style="margin-bottom:var(--sp-4)">
+              <div class="field"><label class="label">Modelo <span class="req">*</span></label><div class="select-wrap"><select class="select" id="f-modelo"><option>Bota Dieléctrica PU</option><option>Bota Composite Agro</option><option>Bota Minera Reforzada</option><option>Botín Industrial Liviano</option></select></div></div>
+              <div class="field"><label class="label">Color</label><div class="select-wrap"><select class="select" id="f-color"><option>Negro</option><option>Miel</option><option>Caramelo</option></select></div></div>
+            </div>
+            <div class="grid-3" style="margin-bottom:var(--sp-4)">
+              <div class="field"><label class="label">Puntera</label><div class="select-wrap"><select class="select" id="f-punt"><option>Composite</option><option>Acero</option><option>Sin puntera</option></select></div></div>
+              <div class="field"><label class="label">Suela</label><div class="select-wrap"><select class="select" id="f-suela"><option>Inyección PU directa</option><option>PU/TPU bidensidad</option></select></div></div>
+              <div class="field"><label class="label">Dieléctrico</label><div class="select-wrap"><select class="select" id="f-diel"><option>Sí</option><option>No</option></select></div></div>
+            </div>
+            <div class="flex gap-2" style="justify-content:flex-end"><button class="btn btn-ghost" id="cancelProd">Cancelar</button><button class="btn btn-primary" id="saveProd">Agregar producto</button></div>
+          </div>
+          <button class="btn btn-secondary" id="showAddForm" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar producto</button>
+        </div>
+
+        <!-- PASO 3 · CURVA DE TALLAS -->
+        <div class="step-panel" data-panel="2">
+          <div class="panel-title">Curva de tallas</div>
+          <div class="panel-sub">Cantidades por talla (33–47). Usá Tab o las flechas para moverte rápido. Total se calcula solo.</div>
+          <div id="tallasContainer"></div>
+        </div>
+
+        <!-- PASO 4 · REVISAR -->
+        <div class="step-panel" data-panel="3">
+          <div class="panel-title">Revisar y confirmar</div>
+          <div class="panel-sub">Verificá el pedido. Al confirmar se genera la OP y se intenta amarrar inventario disponible.</div>
+          <div id="reviewBody"></div>
+        </div>
+
+      </div>
+
+      <!-- NAV -->
+      <div class="wizard-foot">
+        <button class="btn btn-ghost" id="backBtn" style="visibility:hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>Atrás</button>
+        <div class="t-caption t-subtle" id="stepHint">Paso 1 de 4</div>
+        <button class="btn btn-primary" id="nextBtn">Continuar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div id="toastStack" class="toast-stack"></div>
+
+<script>window.AGRO={};</script>
+<script src="../assets/shell.js"></script>
+<script src="../assets/combobox.js"></script>
+<script>
+const CLIENTES=(function(){
+  const base=[
+    {n:'Minera El Roble',nit:'900.123.456-7',cond:'30 días · Maquila marca propia'},
+    {n:'Maquila Norte SAS',nit:'901.998.221-3',cond:'Contado · Maquila 3 marcas'},
+    {n:'Constructora Yopal',nit:'860.551.092-1',cond:'45 días · Pedido directo'},
+    {n:'Petro Servicios SA',nit:'830.445.778-9',cond:'60 días · Pedido directo'}
+  ];
+  const A=['Minera','Constructora','Agroindustrias','Petro','Ingenio','Carbones','Palma','Café','Seguridad','Industrias','Distribuidora','Comercial','Inversiones','Manufacturas','Calzado','Servicios','Maquila','Cooperativa','Transportes','Cementos'];
+  const B=['del Llano','Andina','del Valle','del Cauca','del Norte','Tolima','del Sur','Pacífico','Central','del Oriente','La Esperanza','San Jorge','El Progreso','Los Andes','del Caribe','Quindío','del Huila','Boyacá','del Meta','Casanare'];
+  const C=['SAS','S.A.','Ltda.','& Cía','Group','SAS','S.A.','Ltda.'];
+  const conds=['30 días · Pedido directo','Contado · Maquila 3 marcas','45 días · Maquila marca propia','60 días · Pedido directo','Contado · Pedido directo'];
+  const out=base.slice();
+  let seed=7;const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
+  for(let i=0;i<287;i++){
+    const n=A[Math.floor(rnd()*A.length)]+' '+B[Math.floor(rnd()*B.length)]+' '+C[Math.floor(rnd()*C.length)];
+    const nit='9'+String(Math.floor(rnd()*99)).padStart(2,'0')+'.'+String(Math.floor(rnd()*999)).padStart(3,'0')+'.'+String(Math.floor(rnd()*999)).padStart(3,'0')+'-'+Math.floor(rnd()*10);
+    out.push({n,nit,cond:conds[Math.floor(rnd()*conds.length)]});
+  }
+  out.forEach(c=>{const w=c.n.split(' ');c.ini=(w[0][0]+(w[1]?w[1][0]:'')).toUpperCase();});
+  return out;
+})();
+const TALLAS=[33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
+const PRICE=40000;
+let step=0, cliente=null, productos=[];
+
+// ── PASO 1 · combobox de cliente ──
+const clienteSelected=document.getElementById('clienteSelected');
+const combo=AgroCombobox(document.getElementById('clienteCombo'),{
+  placeholder:'Buscar cliente por nombre o NIT…',
+  leadIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  allowAddLabel:'Crear cliente',
+  items:CLIENTES.map((c,i)=>({value:i,label:c.n,sub:'NIT '+c.nit+' · '+c.cond,avatar:c.ini})),
+  onSelect:(it)=>{
+    if(!it){cliente=null;clienteSelected.innerHTML='';return;}
+    cliente=CLIENTES[it.value];
+    clienteSelected.innerHTML='<div class="cliente-opt sel" style="cursor:default"><span class="avatar">'+cliente.ini+'</span><div class="meta"><b>'+cliente.n+'</b><small>NIT '+cliente.nit+' · '+cliente.cond+'</small></div><span class="badge badge-success" style="margin-left:auto"><span class="dot"></span>Seleccionado</span></div>';
+  },
+  onAdd:(q)=>{toast('Abriría el formulario para crear “'+(q||'nuevo cliente')+'”','info');}
+});
+
+// ── PASO 2 ──
+const prodList=document.getElementById('prodList'),addForm=document.getElementById('addForm');
+document.getElementById('showAddForm').onclick=()=>{addForm.style.display='block';document.getElementById('showAddForm').style.display='none';};
+document.getElementById('cancelProd').onclick=()=>{addForm.style.display='none';document.getElementById('showAddForm').style.display='flex';};
+document.getElementById('saveProd').onclick=()=>{
+  productos.push({modelo:f('modelo'),color:f('color'),punt:f('punt'),suela:f('suela'),diel:f('diel'),tallas:{}});
+  addForm.style.display='none';document.getElementById('showAddForm').style.display='flex';renderProds();
+};
+function f(id){return document.getElementById('f-'+id).value;}
+function renderProds(){
+  if(!productos.length){prodList.innerHTML='<div class="empty" style="padding:var(--sp-8)"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7v10l8 4 8-4V7l-8-4z"/></svg></div><h4>Sin productos aún</h4><p>Agregá al menos un modelo configurado para continuar.</p></div>';return;}
+  prodList.innerHTML=productos.map((p,i)=>'<div class="prod-row"><div class="prod-thumb">FOTO<br>BOTA</div><div class="p-meta grow"><b>'+p.modelo+' · '+p.color+'</b><div class="specs"><span class="spec">Puntera '+p.punt+'</span><span class="spec">'+p.suela+'</span><span class="spec">Dieléctrico '+p.diel+'</span></div></div><button class="icon-btn" onclick="delProd('+i+')" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>').join('');
+}
+function delProd(i){productos.splice(i,1);renderProds();}
+
+// ── PASO 3 ──
+function renderTallas(){
+  const cont=document.getElementById('tallasContainer');
+  cont.innerHTML=productos.map((p,pi)=>{
+    const cells=TALLAS.map(t=>'<div class="talla-cell'+(p.tallas[t]?' is-filled':'')+'"><div class="t-head">'+t+'</div><input inputmode="numeric" data-p="'+pi+'" data-t="'+t+'" value="'+(p.tallas[t]||'')+'"></div>').join('');
+    return '<div class="tallas-block"><div class="tb-head"><b>'+p.modelo+' · '+p.color+'</b><div class="quick-fill"><button class="btn btn-secondary btn-sm" onclick="fillEven('+pi+',600)">Repartir 600</button><button class="btn btn-ghost btn-sm" onclick="clearCurve('+pi+')">Limpiar</button></div></div><div class="tallas-grid">'+cells+'</div><div class="tallas-foot" style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;color:var(--text-muted)">Subtotal <b class="mono" data-subtotal="'+pi+'" style="color:var(--text);font-size:16px">0</b></div></div>';
+  }).join('');
+  cont.querySelectorAll('input[data-t]').forEach(inp=>{
+    inp.addEventListener('input',()=>{const pi=+inp.dataset.p,t=+inp.dataset.t;productos[pi].tallas[t]=parseInt(inp.value||0,10)||0;inp.closest('.talla-cell').classList.toggle('is-filled',!!productos[pi].tallas[t]);recalc();});
+    inp.addEventListener('keydown',e=>{
+      const cells=[...cont.querySelectorAll('input[data-p="'+inp.dataset.p+'"]')];const idx=cells.indexOf(inp);
+      if(e.key==='ArrowRight'&&idx<cells.length-1){cells[idx+1].focus();cells[idx+1].select();e.preventDefault();}
+      if(e.key==='ArrowLeft'&&idx>0){cells[idx-1].focus();cells[idx-1].select();e.preventDefault();}
+      if((e.key==='Enter'||e.key==='ArrowDown')&&idx<cells.length-1){cells[idx+1].focus();cells[idx+1].select();e.preventDefault();}
+    });
+  });
+  recalc();
+}
+function recalc(){
+  document.querySelectorAll('[data-subtotal]').forEach(el=>{const pi=+el.dataset.subtotal;const s=Object.values(productos[pi].tallas).reduce((a,b)=>a+(+b||0),0);el.textContent=s.toLocaleString('es-CO');});
+}
+function fillEven(pi,total){const per=Math.floor(total/TALLAS.length);TALLAS.forEach(t=>productos[pi].tallas[t]=per);renderTallas();}
+function clearCurve(pi){productos[pi].tallas={};renderTallas();}
+
+// ── PASO 4 ──
+function renderReview(){
+  const totalPares=productos.reduce((a,p)=>a+Object.values(p.tallas).reduce((x,y)=>x+(+y||0),0),0);
+  const totalVal=totalPares*PRICE;
+  document.getElementById('reviewBody').innerHTML=
+    '<div class="grid-2"><div class="card card-pad"><div class="eyebrow" style="margin-bottom:10px">Cliente</div>'+
+      '<div class="review-line"><span class="k">Razón social</span><span class="v">'+(cliente?cliente.n:'—')+'</span></div>'+
+      '<div class="review-line"><span class="k">NIT</span><span class="v mono">'+(cliente?cliente.nit:'—')+'</span></div>'+
+      '<div class="review-line"><span class="k">Condiciones</span><span class="v">'+(cliente?cliente.cond:'—')+'</span></div></div>'+
+    '<div class="card card-pad"><div class="eyebrow" style="margin-bottom:10px">Resumen</div>'+
+      '<div class="review-line"><span class="k">Productos</span><span class="v">'+productos.length+'</span></div>'+
+      '<div class="review-line"><span class="k">Total pares</span><span class="v mono">'+totalPares.toLocaleString('es-CO')+'</span></div>'+
+      '<div class="review-line"><span class="k">Valor estimado</span><span class="v mono">$'+(totalVal/1e6).toFixed(1)+'M</span></div></div></div>'+
+    '<div style="margin-top:var(--sp-4)">'+productos.map(p=>{const sub=Object.values(p.tallas).reduce((a,b)=>a+(+b||0),0);return '<div class="prod-row"><div class="prod-thumb">FOTO<br>BOTA</div><div class="p-meta grow"><b>'+p.modelo+' · '+p.color+'</b><div class="specs"><span class="spec">Puntera '+p.punt+'</span><span class="spec">'+p.suela+'</span></div></div><div class="mono" style="font-weight:600">'+sub.toLocaleString('es-CO')+' pares</div></div>';}).join('')+'</div>'+
+    '<div class="total-box"><div><div class="eyebrow">Total del pedido</div><div class="t-caption t-muted" style="margin-top:2px">'+totalPares.toLocaleString('es-CO')+' pares · IVA no incluido</div></div><div class="tv">$'+(totalVal/1e6).toFixed(1)+'M</div></div>';
+}
+
+// ── NAVEGACIÓN ──
+const panels=[...document.querySelectorAll('.step-panel')],steps=[...document.querySelectorAll('.step')];
+function go(n){
+  // validación
+  if(n>step){
+    if(step===0&&!cliente){toast('Seleccioná un cliente','error');return;}
+    if(step===1&&!productos.length){toast('Agregá al menos un producto','error');return;}
+    if(step===2){const tot=productos.reduce((a,p)=>a+Object.values(p.tallas).reduce((x,y)=>x+(+y||0),0),0);if(!tot){toast('Ingresá cantidades en la curva de tallas','error');return;}}
+  }
+  step=Math.max(0,Math.min(3,n));
+  panels.forEach((p,i)=>p.classList.toggle('active',i===step));
+  steps.forEach((s,i)=>{s.classList.toggle('is-active',i===step);s.classList.toggle('is-done',i<step);});
+  document.getElementById('backBtn').style.visibility=step===0?'hidden':'visible';
+  const nb=document.getElementById('nextBtn');
+  nb.innerHTML=step===3?'Confirmar pedido<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg>':'Continuar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>';
+  nb.className=step===3?'btn btn-accent':'btn btn-primary';
+  document.getElementById('stepHint').textContent='Paso '+(step+1)+' de 4';
+  if(step===1)renderProds();
+  if(step===2)renderTallas();
+  if(step===3)renderReview();
+}
+document.getElementById('backBtn').onclick=()=>go(step-1);
+document.getElementById('nextBtn').onclick=()=>{
+  if(step===3){const b=document.getElementById('nextBtn');b.classList.add('is-loading');setTimeout(()=>{toast('OC creada · OP generada y amarrada','success');b.classList.remove('is-loading');setTimeout(()=>window.location.href='Detalle OP — Amarre.html',1100);},900);return;}
+  go(step+1);
+};
+steps.forEach(s=>s.addEventListener('click',()=>{const n=+s.dataset.step;if(n<step)go(n);}));
+
+// toast helper
+function toast(msg,type){
+  const icons={success:'<path d="M5 12l5 5L20 6"/>',error:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'};
+  const t=document.createElement('div');t.className='toast '+type;
+  t.innerHTML='<span class="t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+icons[type]+'</svg></span><div><div class="t-title">'+msg+'</div></div>';
+  document.getElementById('toastStack').appendChild(t);
+  setTimeout(()=>{t.style.opacity=0;t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},2600);
+}
+// preseleccionar primer cliente para demo fluida
+combo.setValue(0);
+</script>
+</body>
+</html>

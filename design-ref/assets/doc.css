@@ -1,0 +1,39 @@
+/* ════════════════════════════════════════════════════════════════════
+   DOC PAGES · layout de documentación (hub, fundaciones, componentes)
+   ════════════════════════════════════════════════════════════════════ */
+.doc-body{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.doc-nav{position:sticky;top:0;height:100vh;border-right:var(--bw) solid var(--border);background:var(--surface);padding:var(--sp-5) var(--sp-4);overflow-y:auto}
+.doc-brand{display:flex;align-items:center;gap:11px;margin-bottom:var(--sp-6);padding:0 8px}
+.doc-brand .m{width:30px;height:30px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+.doc-brand .m svg{width:18px;height:18px}
+.doc-brand b{font-size:13px;font-weight:var(--fw-bold);letter-spacing:.02em;line-height:1.1}
+.doc-brand small{font-family:var(--font-mono);font-size:8px;letter-spacing:.18em;color:var(--text-subtle);display:block;margin-top:3px}
+.doc-nav-group{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-subtle);padding:0 8px;margin:var(--sp-5) 0 6px}
+.doc-nav a{display:block;padding:7px 10px;border-radius:var(--r-sm);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--fw-medium);transition:all var(--dur-fast)}
+.doc-nav a:hover{background:var(--surface-hover);color:var(--text)}
+.doc-nav a.active{background:var(--primary-subtle);color:var(--primary)}
+.doc-main{min-width:0}
+.doc-topbar{position:sticky;top:0;z-index:var(--z-sticky);display:flex;align-items:center;justify-content:space-between;height:var(--topbar-h);padding:0 var(--sp-8);border-bottom:var(--bw) solid var(--border);background:color-mix(in oklch,var(--surface) 86%,transparent);backdrop-filter:blur(10px)}
+.doc-content{padding:var(--sp-10) var(--sp-8);max-width:1100px}
+.doc-section{margin-bottom:var(--sp-16);scroll-margin-top:80px}
+.doc-section > h2{font-size:var(--text-h1);font-weight:var(--fw-bold);letter-spacing:var(--ls-h1);margin-bottom:8px}
+.doc-section > .lead{color:var(--text-muted);font-size:var(--text-body-lg);max-width:62ch;margin-bottom:var(--sp-6)}
+.doc-h3{font-size:var(--text-h3);font-weight:var(--fw-semibold);margin:var(--sp-8) 0 var(--sp-3);display:flex;align-items:center;gap:10px}
+.doc-h3 .pill{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-subtle);background:var(--surface-sunken);border:var(--bw) solid var(--border);padding:3px 8px;border-radius:var(--r-full)}
+.demo-box{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);padding:var(--sp-6);box-shadow:var(--shadow-xs)}
+.demo-box + .demo-box{margin-top:var(--sp-3)}
+.demo-row{display:flex;flex-wrap:wrap;gap:var(--sp-4);align-items:center}
+.demo-grid{display:grid;gap:var(--sp-4)}
+.note{font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--sp-3);line-height:1.6}
+.note b{color:var(--text)}
+.anatomy{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--sp-3);margin-top:var(--sp-4)}
+.anatomy .ana{background:var(--surface-sunken);border:var(--bw) solid var(--border);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4)}
+.anatomy .ana .at{font-size:var(--text-caption);font-weight:var(--fw-semibold)}
+.anatomy .ana .ad{font-size:var(--text-micro);color:var(--text-muted);margin-top:3px;line-height:1.45}
+.token-line{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--text-subtle)}
+.codeblock{background:var(--neu-950);color:var(--neu-100);border-radius:var(--r-lg);padding:var(--sp-5);font-family:var(--font-mono);font-size:12px;line-height:1.7;overflow:auto;border:var(--bw) solid var(--border);position:relative;white-space:pre}
+[data-theme="dark"] .codeblock{background:var(--inset)}
+.copy-btn{position:absolute;top:12px;right:12px;font-family:var(--font-sans);font-size:11px;font-weight:600;padding:6px 12px;border-radius:var(--r-sm);border:1px solid color-mix(in oklch,var(--neu-0) 20%,transparent);background:color-mix(in oklch,var(--neu-0) 8%,transparent);color:var(--neu-0);cursor:pointer}
+.copy-btn:hover{background:color-mix(in oklch,var(--neu-0) 16%,transparent)}
+.label-mini{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-subtle);margin-bottom:10px}
+@media(max-width:920px){.doc-body{grid-template-columns:1fr}.doc-nav{display:none}}

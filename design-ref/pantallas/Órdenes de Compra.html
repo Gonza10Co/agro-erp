@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Órdenes de Compra · Botas Agroindustrial ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/components.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<style>
+  .filters{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;margin-bottom:var(--sp-4)}
+  .seg{display:inline-flex;background:var(--surface-sunken);border:var(--bw) solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;color:var(--text-muted);font-size:var(--text-caption);font-weight:var(--fw-medium);padding:6px 11px;border-radius:var(--r-xs);cursor:pointer;transition:all var(--dur-fast);display:inline-flex;align-items:center;gap:6px}
+  .seg button .c{font-family:var(--font-mono);font-size:10px;opacity:.7}
+  .seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-xs)}
+  .seg button[aria-pressed="true"] .c{opacity:1}
+  .bulk-bar{display:flex;align-items:center;gap:var(--sp-3);padding:8px 14px;background:var(--primary-subtle);border:var(--bw) solid var(--primary-border);border-radius:var(--r-md);margin-bottom:var(--sp-3);font-size:var(--text-sm)}
+  .bulk-bar b{color:var(--primary)}
+  .actions-cell{display:flex;gap:3px;justify-content:flex-end}
+  .row-actions .icon-btn{width:26px;height:26px}
+  .row-actions .icon-btn svg{width:14px;height:14px}
+  .grow-space{flex:1}
+</style>
+</head>
+<body data-screen="oc" data-title="Órdenes de Compra" data-screen-label="Listado de OCs">
+<main class="app-main">
+  <div class="page page-wide">
+
+    <div class="page-header">
+      <div>
+        <div class="ph-title">Órdenes de Compra</div>
+        <div class="ph-sub" id="subcount">— pedidos · cartera abierta $1.240M</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar</button>
+        <a class="btn btn-primary" href="Crear OC.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nueva OC</a>
+      </div>
+    </div>
+
+    <!-- filtros -->
+    <div class="filters">
+      <div class="seg" id="statusSeg">
+        <button data-st="all" aria-pressed="true">Todas <span class="c" id="c-all">0</span></button>
+        <button data-st="Borrador" aria-pressed="false">Borrador <span class="c" id="c-Borrador">0</span></button>
+        <button data-st="Confirmada" aria-pressed="false">Confirmada <span class="c" id="c-Confirmada">0</span></button>
+        <button data-st="En producción" aria-pressed="false">En prod. <span class="c" id="c-prod">0</span></button>
+        <button data-st="Cerrada" aria-pressed="false">Cerrada <span class="c" id="c-Cerrada">0</span></button>
+        <button data-st="Anulada" aria-pressed="false">Anulada <span class="c" id="c-Anulada">0</span></button>
+      </div>
+      <div class="grow-space"></div>
+      <div class="search" style="width:240px"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span><input class="input" id="searchInput" placeholder="Buscar OC o cliente…"></div>
+      <div class="select-wrap"><select class="select" id="clienteSel" style="height:36px"><option value="">Todos los clientes</option></select></div>
+      <button class="btn btn-secondary btn-sm" id="densityBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Densidad</button>
+    </div>
+
+    <!-- selección masiva -->
+    <div class="bulk-bar" id="bulkBar" style="display:none">
+      <span><b id="bulkCount">0</b> seleccionadas</span>
+      <div class="divider" style="width:1px;height:18px;margin:0"></div>
+      <button class="btn btn-ghost btn-sm">Confirmar</button>
+      <button class="btn btn-ghost btn-sm">Exportar</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--error)">Anular</button>
+      <div class="grow-space"></div>
+      <button class="btn btn-ghost btn-sm" id="clearSel">Limpiar</button>
+    </div>
+
+    <!-- tabla -->
+    <div class="table-wrap" id="tableWrap">
+      <div class="table-scroll" style="max-height:62vh">
+        <table class="data" id="ocTable">
+          <thead>
+            <tr>
+              <th class="row-check"><label class="check"><input type="checkbox" id="selAll"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></th>
+              <th class="sortable" data-sort="oc">OC <span class="arrow">↕</span></th>
+              <th class="sortable" data-sort="cliente">Cliente <span class="arrow">↕</span></th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th class="sortable" data-sort="entrega">Entrega <span class="arrow">↕</span></th>
+              <th class="num sortable" data-sort="pares">Pares <span class="arrow">↕</span></th>
+              <th class="num sortable" data-sort="valor">Valor <span class="arrow">↕</span></th>
+              <th style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="table-foot">
+        <span id="rangeLabel">—</span>
+        <div class="pager" id="pager"></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- DRAWER DE DETALLE -->
+<div id="ocScrim" class="scrim" style="display:none"></div>
+<aside id="ocDrawer" class="drawer" style="display:none" aria-label="Detalle de orden">
+  <div class="drawer-head">
+    <div>
+      <div class="eyebrow" id="dw-oc">OC-0000</div>
+      <h2 class="t-h2" id="dw-cliente" style="margin-top:4px">Cliente</h2>
+    </div>
+    <button class="icon-btn" id="dwClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body" id="dw-body"></div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost" id="dwCancel">Cerrar</button>
+    <a class="btn btn-primary" href="Detalle OP — Amarre.html">Ver OP / amarre<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></a>
+  </div>
+</aside>
+
+<script src="../assets/shell.js"></script>
+<script>
+const STATUS={
+  'Borrador':'badge-neutral','Confirmada':'badge-info','En producción':'badge-warning','Cerrada':'badge-success','Anulada':'badge-error','OP amarrada':'badge-accent'
+};
+const CLIENTES=['Minera El Roble','Maquila Norte SAS','Constructora Yopal','Agroindustrias del Llano','Petro Servicios SA','Cafetera Quindío','Ingenio del Valle','Seguridad Andina','Palma & Cía','Carbones del Cesar'];
+const TIPOS=['Pedido directo','Maquila marca propia','Maquila 3ros'];
+function mkData(){
+  const rows=[],estados=Object.keys(STATUS);
+  for(let i=0;i<47;i++){
+    const st=estados[Math.floor(Math.random()*5)];
+    const cli=CLIENTES[Math.floor(Math.random()*CLIENTES.length)];
+    const pares=[120,160,240,320,480,640,880,1200,1600,2000][Math.floor(Math.random()*10)];
+    rows.push({oc:'OC-'+(2041-i),cliente:cli,tipo:TIPOS[Math.floor(Math.random()*3)],estado:st,
+      entrega:st==='Borrador'||st==='Anulada'?null:new Date(2026,5,4+Math.floor(Math.random()*40)),
+      pares, valor:pares*40000});
+  }
+  return rows;
+}
+const DATA=mkData();
+let filterSt='all',search='',cliente='',sortKey='oc',sortDir=1,page=1,perPage=12,dense=false;
+const sel=new Set();
+
+function fmt(n){return n.toLocaleString('es-CO');}
+function money(n){return '$'+(n/1e6).toFixed(1)+'M';}
+function fdate(d){return d?d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}):'—';}
+
+function filtered(){
+  let r=DATA.filter(x=>{
+    if(filterSt!=='all'&&x.estado!==filterSt)return false;
+    if(cliente&&x.cliente!==cliente)return false;
+    if(search){const s=search.toLowerCase();if(!(x.oc.toLowerCase().includes(s)||x.cliente.toLowerCase().includes(s)))return false;}
+    return true;
+  });
+  r.sort((a,b)=>{let av=a[sortKey],bv=b[sortKey];if(sortKey==='entrega'){av=av?av.getTime():0;bv=bv?bv.getTime():0;}if(typeof av==='string'){return av.localeCompare(bv)*sortDir;}return (av-bv)*sortDir;});
+  return r;
+}
+function render(){
+  const all=filtered();
+  const pages=Math.max(1,Math.ceil(all.length/perPage));
+  if(page>pages)page=pages;
+  const start=(page-1)*perPage, slice=all.slice(start,start+perPage);
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=slice.map(x=>{
+    const checked=sel.has(x.oc)?'checked':'';
+    const selCls=sel.has(x.oc)?' class="is-selected"':'';
+    return '<tr'+selCls+' data-oc="'+x.oc+'">'+
+      '<td class="row-check"><label class="check"><input type="checkbox" class="rowsel" '+checked+'><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></td>'+
+      '<td class="cell-mono"><a href="Detalle OP — Amarre.html" style="color:var(--primary);font-weight:600">'+x.oc+'</a></td>'+
+      '<td>'+x.cliente+'</td>'+
+      '<td class="cell-sub">'+x.tipo+'</td>'+
+      '<td><span class="badge '+STATUS[x.estado]+'"><span class="dot"></span>'+x.estado+'</span></td>'+
+      '<td class="cell-sub">'+fdate(x.entrega)+'</td>'+
+      '<td class="num">'+fmt(x.pares)+'</td>'+
+      '<td class="num">'+money(x.valor)+'</td>'+
+      '<td><div class="actions-cell row-actions">'+
+        '<button class="icon-btn act-view" data-oc="'+x.oc+'" title="Ver detalle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>'+
+        '<button class="icon-btn" title="Abrir OP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 6l6 6-6 6"/></svg></button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+  // listeners de selección por fila
+  tb.querySelectorAll('.rowsel').forEach((cb,i)=>{
+    cb.addEventListener('change',()=>{const oc=slice[i].oc;if(cb.checked)sel.add(oc);else sel.delete(oc);syncSel();render();});
+  });
+  // estado vacío
+  if(slice.length===0){tb.innerHTML='<tr><td colspan="9"><div class="empty"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h4>Sin resultados</h4><p>No hay órdenes que coincidan con los filtros. Probá limpiar la búsqueda o el estado.</p></div></td></tr>';}
+  document.getElementById('rangeLabel').textContent=all.length?('Mostrando '+(start+1)+'–'+Math.min(start+perPage,all.length)+' de '+all.length):'0 resultados';
+  renderPager(pages);
+  // sort indicators
+  document.querySelectorAll('th.sortable').forEach(th=>{th.removeAttribute('aria-sort');th.querySelector('.arrow').textContent='↕';if(th.dataset.sort===sortKey){th.setAttribute('aria-sort',sortDir>0?'ascending':'descending');th.querySelector('.arrow').textContent=sortDir>0?'↑':'↓';}});
+}
+function renderPager(pages){
+  const p=document.getElementById('pager');let h='';
+  h+='<button '+(page===1?'disabled':'')+' data-p="'+(page-1)+'">‹</button>';
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||Math.abs(i-page)<=1){h+='<button '+(i===page?'aria-current="page"':'')+' data-p="'+i+'">'+i+'</button>';}else if(Math.abs(i-page)===2){h+='<span style="padding:0 4px;color:var(--text-subtle)">…</span>';}}
+  h+='<button '+(page===pages?'disabled':'')+' data-p="'+(page+1)+'">›</button>';
+  p.innerHTML=h;
+  p.querySelectorAll('button[data-p]').forEach(b=>b.addEventListener('click',()=>{page=parseInt(b.dataset.p);render();}));
+}
+function syncSel(){
+  const bar=document.getElementById('bulkBar');
+  document.getElementById('bulkCount').textContent=sel.size;
+  bar.style.display=sel.size?'flex':'none';
+}
+function updateCounts(){
+  document.getElementById('c-all').textContent=DATA.length;
+  ['Borrador','Confirmada','Cerrada','Anulada'].forEach(s=>document.getElementById('c-'+s).textContent=DATA.filter(x=>x.estado===s).length);
+  document.getElementById('c-prod').textContent=DATA.filter(x=>x.estado==='En producción').length;
+  document.getElementById('subcount').textContent=DATA.length+' pedidos · cartera abierta $1.240M';
+}
+
+// filtros UI
+document.getElementById('statusSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;filterSt=b.dataset.st;page=1;document.querySelectorAll('#statusSeg button').forEach(x=>x.setAttribute('aria-pressed',x===b));render();});
+document.getElementById('searchInput').addEventListener('input',e=>{search=e.target.value;page=1;render();});
+const cs=document.getElementById('clienteSel');CLIENTES.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
+cs.addEventListener('change',e=>{cliente=e.target.value;page=1;render();});
+document.querySelectorAll('th.sortable').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.sort;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}render();}));
+document.getElementById('selAll').addEventListener('change',e=>{const all=filtered().slice((page-1)*perPage,(page-1)*perPage+perPage);if(e.target.checked)all.forEach(x=>sel.add(x.oc));else all.forEach(x=>sel.delete(x.oc));syncSel();render();});
+document.getElementById('clearSel').addEventListener('click',()=>{sel.clear();syncSel();render();});
+document.getElementById('densityBtn').addEventListener('click',()=>{dense=!dense;document.getElementById('tableWrap').classList.toggle('density-compact',dense);perPage=dense?18:12;render();});
+
+// ── DRAWER DE DETALLE ──
+const ocDrawer=document.getElementById('ocDrawer'),ocScrim=document.getElementById('ocScrim');
+function openDrawer(oc){
+  const x=DATA.find(r=>r.oc===oc);if(!x)return;
+  document.getElementById('dw-oc').textContent=x.oc;
+  document.getElementById('dw-cliente').textContent=x.cliente;
+  const stock=Math.round(x.pares*(0.4+Math.random()*0.5)),prod=x.pares-stock,pct=Math.round(stock/x.pares*100);
+  document.getElementById('dw-body').innerHTML=
+    '<div class="flex gap-2" style="margin-bottom:16px"><span class="badge '+STATUS[x.estado]+'"><span class="dot"></span>'+x.estado+'</span><span class="badge badge-neutral">'+x.tipo+'</span></div>'+
+    '<div class="kv-list">'+
+      '<div class="kv"><span class="k">Cliente</span><span class="v">'+x.cliente+'</span></div>'+
+      '<div class="kv"><span class="k">Tipo</span><span class="v">'+x.tipo+'</span></div>'+
+      '<div class="kv"><span class="k">Entrega</span><span class="v">'+fdate(x.entrega)+'</span></div>'+
+      '<div class="kv"><span class="k">Pares</span><span class="v mono">'+fmt(x.pares)+'</span></div>'+
+      '<div class="kv"><span class="k">Valor</span><span class="v mono">'+money(x.valor)+'</span></div>'+
+    '</div>'+
+    '<div class="drawer-section-h">Amarre de inventario</div>'+
+    '<div class="card card-pad" style="padding:14px">'+
+      '<div class="flex between center" style="margin-bottom:10px"><span class="t-caption t-muted">Cumplimiento por stock</span><span class="mono" style="font-weight:600">'+pct+'%</span></div>'+
+      '<div class="stack-bar" style="height:14px;border-radius:999px;background:var(--inset);border:1px solid var(--border);display:flex;overflow:hidden"><div style="width:'+pct+'%;background:var(--success)"></div><div style="width:'+(100-pct)+'%;background:var(--accent)"></div></div>'+
+      '<div class="flex gap-4" style="margin-top:11px;font-size:12px"><span class="flex center gap-2"><i style="width:10px;height:10px;border-radius:3px;background:var(--success);display:inline-block"></i>En stock <b class="mono">'+fmt(stock)+'</b></span><span class="flex center gap-2"><i style="width:10px;height:10px;border-radius:3px;background:var(--accent);display:inline-block"></i>A producir <b class="mono">'+fmt(prod)+'</b></span></div>'+
+    '</div>';
+  ocScrim.style.display='block';ocDrawer.style.display='flex';
+}
+function closeDrawer(){ocDrawer.style.display='none';ocScrim.style.display='none';}
+document.getElementById('tbody').addEventListener('click',e=>{const b=e.target.closest('.act-view');if(b)openDrawer(b.dataset.oc);});
+document.getElementById('dwClose').addEventListener('click',closeDrawer);
+document.getElementById('dwCancel').addEventListener('click',closeDrawer);
+ocScrim.addEventListener('click',closeDrawer);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+
+updateCounts();render();
+</script>
+</body>
+</html>

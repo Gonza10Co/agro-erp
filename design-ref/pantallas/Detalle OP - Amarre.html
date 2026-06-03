@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OP-1187 · Amarre · Botas Agroindustrial ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/components.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<style>
+  .op-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-5)}
+  .op-id{display:flex;align-items:center;gap:14px}
+  .op-id .seal{width:50px;height:50px;border-radius:var(--r-md);background:var(--primary-subtle);color:var(--primary);display:grid;place-items:center;flex:none}
+  .op-id .seal svg{width:26px;height:26px}
+  .op-id h1{font-size:var(--text-h1);font-weight:var(--fw-bold);letter-spacing:var(--ls-h1);line-height:1}
+  .op-id .meta{display:flex;gap:10px;align-items:center;margin-top:7px;font-size:var(--text-caption);color:var(--text-muted)}
+  .op-id .meta a{color:var(--primary);font-weight:var(--fw-medium)}
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:var(--sp-5)}
+  .sum{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);padding:var(--sp-4) var(--sp-5);position:relative;overflow:hidden}
+  .sum.hl-stock{border-color:color-mix(in oklch,var(--success) 35%,var(--border))}
+  .sum.hl-prod{border-color:color-mix(in oklch,var(--accent) 40%,var(--border))}
+  .sum .sl{font-size:var(--text-caption);color:var(--text-muted);font-weight:var(--fw-medium);display:flex;align-items:center;gap:7px}
+  .sum .sl i{width:9px;height:9px;border-radius:3px}
+  .sum .sv{font-family:var(--font-mono);font-size:28px;font-weight:var(--fw-semibold);letter-spacing:-0.02em;margin-top:8px}
+  .sum .sd{font-size:var(--text-micro);color:var(--text-subtle);margin-top:3px}
+  .overall{display:flex;align-items:center;gap:var(--sp-5);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);margin-bottom:var(--sp-5)}
+  .overall .ring{--p:0;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--success) calc(var(--p)*1%),var(--accent) calc(var(--p)*1%) 100%);display:grid;place-items:center;position:relative}
+  .overall .ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--surface)}
+  .overall .ring b{position:relative;font-family:var(--font-mono);font-size:19px;font-weight:var(--fw-bold)}
+  .overall .ov-text h3{font-size:var(--text-h3);font-weight:var(--fw-semibold)}
+  .overall .ov-text p{font-size:var(--text-sm);color:var(--text-muted);margin-top:3px;max-width:52ch}
+  .overall .ov-bar{flex:1;min-width:200px}
+  .stack-bar{height:14px;border-radius:var(--r-full);background:var(--inset);overflow:hidden;display:flex;border:var(--bw) solid var(--border)}
+  .stack-bar .s-stock{background:var(--success)}
+  .stack-bar .s-prod{background:var(--accent)}
+  .stack-legend{display:flex;gap:18px;margin-top:11px;font-size:var(--text-caption);color:var(--text-muted);flex-wrap:wrap}
+  .stack-legend span{display:inline-flex;align-items:center;gap:7px}
+  .stack-legend i{width:11px;height:11px;border-radius:3px}
+
+  .amarre-head{display:grid;grid-template-columns:54px 1fr 150px;gap:14px;padding:0 2px 10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-subtle);border-bottom:var(--bw) solid var(--border);margin-bottom:14px}
+  .amarre-head .r{text-align:right}
+  .a-line{display:grid;grid-template-columns:54px 1fr 150px;gap:14px;align-items:center;padding:7px 2px}
+  .a-talla{font-family:var(--font-mono);font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--text)}
+  .a-talla small{display:block;font-weight:400;color:var(--text-subtle);font-size:9px}
+  .a-bar{position:relative;height:26px;border-radius:var(--r-sm);background:var(--inset);border:var(--bw) solid var(--border);overflow:hidden;display:flex}
+  .a-bar .b-stock{background:var(--success);height:100%;transition:width var(--dur-slow) var(--ease)}
+  .a-bar .b-prod{background:var(--accent);height:100%;transition:width var(--dur-slow) var(--ease)}
+  .a-bar.full .b-stock{background:var(--success)}
+  .a-bar .b-empty{flex:1}
+  .a-vals{text-align:right;font-family:var(--font-mono);font-size:var(--text-caption);font-variant-numeric:tabular-nums}
+  .a-vals .vstock{color:var(--success);font-weight:var(--fw-semibold)}
+  .a-vals .vprod{color:var(--accent)}
+  .a-vals .vped{color:var(--text-subtle)}
+  .a-total{border-top:1.5px solid var(--border-strong);margin-top:8px;padding-top:12px}
+  .a-total .a-talla{color:var(--text)}
+
+  /* tabla por bodega */
+  .bod-table th.num,.bod-table td.num{text-align:right}
+  .bod-cell{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .bod-zero{color:var(--text-subtle)}
+  .layout{display:grid;grid-template-columns:1fr 320px;gap:var(--sp-4);align-items:start}
+  .side-card .info-line{display:flex;justify-content:space-between;padding:9px 0;border-bottom:var(--bw) solid var(--border);font-size:var(--text-sm)}
+  .side-card .info-line:last-child{border-bottom:0}
+  .side-card .info-line .k{color:var(--text-muted)}
+  .timeline{position:relative;padding-left:22px}
+  .timeline::before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--border)}
+  .tl-item{position:relative;padding:0 0 16px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-item::before{content:"";position:absolute;left:-19px;top:3px;width:11px;height:11px;border-radius:50%;background:var(--surface);border:2px solid var(--border-interactive)}
+  .tl-item.done::before{background:var(--primary);border-color:var(--primary)}
+  .tl-item.active::before{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-subtle)}
+  .tl-item .tl-t{font-size:var(--text-sm);font-weight:var(--fw-medium)}
+  .tl-item .tl-d{font-size:var(--text-micro);color:var(--text-subtle);margin-top:2px}
+  @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-screen="op" data-title="Detalle OP" data-screen-label="Detalle OP + Amarre">
+<main class="app-main">
+  <div class="page page-wide">
+
+    <nav class="breadcrumb" style="margin-bottom:var(--sp-4)"><a href="Órdenes de Compra.html">Órdenes de Compra</a><span class="sep">/</span><a href="#">OC-2041</a><span class="sep">/</span><span class="current">OP-1187</span></nav>
+
+    <!-- HERO -->
+    <div class="op-hero">
+      <div class="op-id">
+        <span class="seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></span>
+        <div>
+          <h1>OP-1187</h1>
+          <div class="meta"><span class="badge badge-accent"><span class="dot"></span>Amarrada</span><span>·</span><span>OC <a href="#">OC-2041</a></span><span>·</span><span>Minera El Roble</span><span>·</span><span>Entrega 14 jun</span></div>
+        </div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar</button>
+        <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Generar OF por célula</button>
+        <button class="btn btn-accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg>Autorizar despacho</button>
+      </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="summary">
+      <div class="sum"><div class="sl"><i style="background:var(--text-subtle)"></i>Pedido total</div><div class="sv" id="s-ped">0</div><div class="sd">pares · Bota Dieléctrica PU Negro</div></div>
+      <div class="sum hl-stock"><div class="sl"><i style="background:var(--success)"></i>Amarrado en stock</div><div class="sv" id="s-stock" style="color:var(--success)">0</div><div class="sd" id="s-stock-pct">0% del pedido</div></div>
+      <div class="sum hl-prod"><div class="sl"><i style="background:var(--accent)"></i>A producir</div><div class="sv" id="s-prod" style="color:var(--accent)">0</div><div class="sd" id="s-prod-pct">0% del pedido</div></div>
+      <div class="sum"><div class="sl"><i style="background:var(--primary)"></i>Bodegas</div><div class="sv">2</div><div class="sd">Principal · Norte</div></div>
+    </div>
+
+    <!-- OVERALL -->
+    <div class="overall">
+      <div class="ring" id="ring"><b id="ringPct">0%</b></div>
+      <div class="ov-text grow">
+        <h3>Cumplimiento por inventario</h3>
+        <p id="ovDesc">—</p>
+        <div class="ov-bar" style="margin-top:14px">
+          <div class="stack-bar"><div class="s-stock" id="ovStock" style="width:0"></div><div class="s-prod" id="ovProd" style="width:0"></div></div>
+          <div class="stack-legend">
+            <span><i style="background:var(--success)"></i>En stock (amarrado)</span>
+            <span><i style="background:var(--accent)"></i>A producir</span>
+            <span><i style="background:var(--inset);border:1px solid var(--border)"></i>Pedido total</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- AMARRE -->
+      <div class="card">
+        <div class="card-head">
+          <h3>Amarre por talla</h3>
+          <div class="tabs" style="border:0" id="viewTabs">
+            <button class="tab" aria-selected="true" data-v="talla">Por talla</button>
+            <button class="tab" aria-selected="false" data-v="bodega">Por bodega</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- vista por talla -->
+          <div id="viewTalla">
+            <div class="amarre-head"><span>Talla</span><span>Disponibilidad (stock + a producir vs. pedido)</span><span class="r">Stock / Prod / Ped</span></div>
+            <div id="amarreLines"></div>
+          </div>
+          <!-- vista por bodega -->
+          <div id="viewBodega" style="display:none">
+            <div class="table-wrap" style="border-radius:var(--r-md)">
+              <table class="data bod-table">
+                <thead><tr><th>Talla</th><th class="num">Pedido</th><th class="num">Bod. Principal</th><th class="num">Bod. Norte</th><th class="num">Total stock</th><th class="num">A producir</th></tr></thead>
+                <tbody id="bodBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LATERAL -->
+      <div class="stack" style="display:flex;flex-direction:column;gap:var(--sp-4)">
+        <div class="card card-body side-card">
+          <div class="eyebrow" style="margin-bottom:12px">Detalle del pedido</div>
+          <div class="info-line"><span class="k">Modelo</span><span>Bota Dieléctrica PU</span></div>
+          <div class="info-line"><span class="k">Color</span><span>Negro</span></div>
+          <div class="info-line"><span class="k">Puntera</span><span>Composite</span></div>
+          <div class="info-line"><span class="k">Suela</span><span>Inyección PU</span></div>
+          <div class="info-line"><span class="k">Tipo</span><span>Maquila marca propia</span></div>
+        </div>
+        <div class="card card-body side-card">
+          <div class="eyebrow" style="margin-bottom:16px">Trazabilidad</div>
+          <div class="timeline">
+            <div class="tl-item done"><div class="tl-t">OC confirmada</div><div class="tl-d">28 may · Carolina M.</div></div>
+            <div class="tl-item done"><div class="tl-t">OP generada</div><div class="tl-d">28 may · automático</div></div>
+            <div class="tl-item active"><div class="tl-t">Inventario amarrado</div><div class="tl-d">29 may · 780 pares en stock</div></div>
+            <div class="tl-item"><div class="tl-t">OF por célula</div><div class="tl-d">Pendiente · 420 a producir</div></div>
+            <div class="tl-item"><div class="tl-t">Despacho</div><div class="tl-d">Programado 14 jun</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script src="../assets/shell.js"></script>
+<script>
+// talla: pedido + stock por bodega
+const ROWS=[
+  {t:36,ped:60, principal:60, norte:0},
+  {t:37,ped:120,principal:90, norte:30},
+  {t:38,ped:180,principal:120,norte:40},
+  {t:39,ped:240,principal:90, norte:30},
+  {t:40,ped:240,principal:60, norte:20},
+  {t:41,ped:200,principal:70, norte:10},
+  {t:42,ped:120,principal:80, norte:20},
+  {t:43,ped:40, principal:40, norte:0}
+];
+const fmt=n=>n.toLocaleString('es-CO');
+let totPed=0,totStock=0,totProd=0;
+ROWS.forEach(r=>{r.stock=Math.min(r.ped,r.principal+r.norte);r.prod=Math.max(0,r.ped-r.stock);totPed+=r.ped;totStock+=r.stock;totProd+=r.prod;});
+
+// resumen
+document.getElementById('s-ped').textContent=fmt(totPed);
+document.getElementById('s-stock').textContent=fmt(totStock);
+document.getElementById('s-prod').textContent=fmt(totProd);
+const pct=Math.round(totStock/totPed*100);
+document.getElementById('s-stock-pct').textContent=pct+'% del pedido';
+document.getElementById('s-prod-pct').textContent=(100-pct)+'% del pedido';
+document.getElementById('ringPct').textContent=pct+'%';
+document.getElementById('ovDesc').textContent='De los '+fmt(totPed)+' pares pedidos, '+fmt(totStock)+' ya están en bodega y se amarraron al pedido. Faltan '+fmt(totProd)+' por fabricar, concentrados en tallas 39 a 41.';
+setTimeout(()=>{
+  document.getElementById('ring').style.setProperty('--p',pct);
+  document.getElementById('ovStock').style.width=pct+'%';
+  document.getElementById('ovProd').style.width=(100-pct)+'%';
+},150);
+
+// líneas por talla
+const maxPed=Math.max(...ROWS.map(r=>r.ped));
+document.getElementById('amarreLines').innerHTML=ROWS.map(r=>{
+  const wPed=r.ped/maxPed*100;
+  const stockW=r.stock/r.ped*wPed, prodW=r.prod/r.ped*wPed, emptyW=100-stockW-prodW;
+  const full=r.prod===0;
+  return '<div class="a-line"><span class="a-talla">'+r.t+'<small>'+(full?'completo':'parcial')+'</small></span>'+
+    '<div class="a-bar'+(full?' full':'')+'"><div class="b-stock" style="width:'+stockW+'%"></div><div class="b-prod" style="width:'+prodW+'%"></div><div class="b-empty"></div></div>'+
+    '<div class="a-vals"><span class="vstock">'+fmt(r.stock)+'</span> / <span class="vprod">'+fmt(r.prod)+'</span> / <span class="vped">'+fmt(r.ped)+'</span></div></div>';
+}).join('');
+// total
+document.getElementById('amarreLines').insertAdjacentHTML('beforeend',
+  '<div class="a-line a-total"><span class="a-talla">Σ</span><div class="a-bar full"><div class="b-stock" style="width:'+(totStock/totPed*100)+'%"></div><div class="b-prod" style="width:'+(totProd/totPed*100)+'%"></div></div><div class="a-vals"><span class="vstock">'+fmt(totStock)+'</span> / <span class="vprod">'+fmt(totProd)+'</span> / <span class="vped">'+fmt(totPed)+'</span></div></div>');
+
+// tabla por bodega
+document.getElementById('bodBody').innerHTML=ROWS.map(r=>'<tr><td class="cell-mono">'+r.t+'</td><td class="num bod-cell">'+fmt(r.ped)+'</td><td class="num bod-cell">'+fmt(r.principal)+'</td><td class="num bod-cell'+(r.norte?'':' bod-zero')+'">'+fmt(r.norte)+'</td><td class="num bod-cell" style="color:var(--success);font-weight:600">'+fmt(r.stock)+'</td><td class="num bod-cell" style="color:var(--accent);font-weight:600">'+(r.prod?fmt(r.prod):'—')+'</td></tr>').join('')+
+  '<tr style="border-top:1.5px solid var(--border-strong)"><td class="cell-mono" style="font-weight:700">Σ</td><td class="num bod-cell" style="font-weight:700">'+fmt(totPed)+'</td><td class="num bod-cell">'+fmt(ROWS.reduce((a,r)=>a+r.principal,0))+'</td><td class="num bod-cell">'+fmt(ROWS.reduce((a,r)=>a+r.norte,0))+'</td><td class="num bod-cell" style="color:var(--success);font-weight:700">'+fmt(totStock)+'</td><td class="num bod-cell" style="color:var(--accent);font-weight:700">'+fmt(totProd)+'</td></tr>';
+
+// tabs
+document.getElementById('viewTabs').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#viewTabs .tab').forEach(x=>x.setAttribute('aria-selected',x===b));
+  const v=b.dataset.v;
+  document.getElementById('viewTalla').style.display=v==='talla'?'block':'none';
+  document.getElementById('viewBodega').style.display=v==='bodega'?'block':'none';
+});
+</script>
+</body>
+</html>

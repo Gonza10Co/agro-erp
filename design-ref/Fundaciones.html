@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fundaciones · Design System Botas Agroindustrial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/components.css">
+<link rel="stylesheet" href="assets/doc.css">
+<style>
+  .scale{display:grid;grid-template-columns:repeat(12,1fr);border-radius:var(--r-md);overflow:hidden;border:var(--bw) solid var(--border)}
+  .scale.s11{grid-template-columns:repeat(11,1fr)}
+  .scale.s8{grid-template-columns:repeat(8,1fr)}
+  .sw{height:64px;display:flex;flex-direction:column;justify-content:flex-end;padding:7px;font-family:var(--font-mono);font-size:9px}
+  .sw .n{font-weight:600}.sw .v{opacity:.7;font-size:7.5px;margin-top:2px}
+  .sem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3)}
+  .sem-card{border:var(--bw) solid var(--border);border-radius:var(--r-md);overflow:hidden}
+  .sem-card .top{height:56px}.sem-card .bot{padding:10px 12px}
+  .sem-card b{font-size:var(--text-sm);display:block}.sem-card small{font-family:var(--font-mono);font-size:9px;color:var(--text-subtle)}
+  .type-spec{display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:var(--bw) dashed var(--border)}
+  .type-spec .meta{width:160px;flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--text-subtle)}
+  .sp-bar{display:flex;align-items:center;gap:14px;padding:5px 0}
+  .sp-bar .lbl{width:130px;font-family:var(--font-mono);font-size:11px;color:var(--text-muted)}
+  .sp-bar .bar{height:14px;background:var(--accent);border-radius:3px}
+  .radii-row{display:flex;gap:14px;flex-wrap:wrap}
+  .radii{width:80px;height:80px;background:var(--primary-subtle);border:1.5px solid var(--primary-border);display:grid;place-items:flex-end;padding:7px;font-family:var(--font-mono);font-size:10px;color:var(--primary)}
+  .shadow-row{display:flex;gap:20px;flex-wrap:wrap}
+  .shadow-card{width:130px;height:80px;background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-md);display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;color:var(--text-muted)}
+  .spec-table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+  .spec-table td{padding:9px 12px;border-bottom:var(--bw) solid var(--border)}
+  .spec-table td:first-child{font-family:var(--font-mono);color:var(--text-muted);width:200px}
+  .spec-table td .mono{font-family:var(--font-mono);font-size:12px}
+</style>
+</head>
+<body class="doc-body">
+  <aside class="doc-nav">
+    <a class="doc-brand" href="index.html"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v9a4 4 0 0 0 4 4h10a2 2 0 0 0 2-2 4 4 0 0 0-3-3.9L11 10V5z"/></svg></span><span><b>Design System</b><small>BOTAS AGROINDUSTRIAL</small></span></a>
+    <div class="doc-nav-group">General</div>
+    <a href="index.html">Inicio</a>
+    <a href="Fundaciones.html" class="active">Fundaciones</a>
+    <a href="Componentes.html">Componentes</a>
+    <div class="doc-nav-group">Fundaciones</div>
+    <a href="#color">Color</a>
+    <a href="#tipografia">Tipografía</a>
+    <a href="#espaciado">Espaciado</a>
+    <a href="#radios">Radios</a>
+    <a href="#sombras">Sombras</a>
+    <a href="#sistema">Z-index & motion</a>
+    <a href="#tokens">Tokens (copiar)</a>
+  </aside>
+
+  <main class="doc-main">
+    <header class="doc-topbar">
+      <div class="breadcrumb"><a href="index.html">Design System</a><span class="sep">/</span><span class="current">Fundaciones</span></div>
+      <button class="icon-btn" id="themeBtn" title="Tema"></button>
+    </header>
+    <div class="doc-content">
+
+      <section class="doc-section" id="color">
+        <h2>Color</h2>
+        <p class="lead">Dirección <b>Acero</b>: neutros fríos + azul estructural como primario, y el <b>naranja de la marca</b> como acento puntual. Definido en oklch para escalas uniformes. Texto cumple contraste <b>AA</b>.</p>
+        <div class="doc-h3">Primario · Azul acero <span class="pill">--blue-50 → 950</span></div>
+        <div class="scale s11" id="sc-blue"></div>
+        <div class="doc-h3">Neutros fríos <span class="pill">--neu-0 → 950</span></div>
+        <div class="scale" id="sc-neu"></div>
+        <div class="doc-h3">Acento · Naranja de marca <span class="pill">--orange-50 → 700</span></div>
+        <div class="scale s8" id="sc-orange"></div>
+        <div class="doc-h3">Semánticos · estados de pedido</div>
+        <div class="sem-grid">
+          <div class="sem-card"><div class="top" style="background:var(--success)"></div><div class="bot"><b style="color:var(--success)">Éxito</b><small>--success · Cerrada</small></div></div>
+          <div class="sem-card"><div class="top" style="background:var(--warning)"></div><div class="bot"><b style="color:var(--warning)">Aviso</b><small>--warning · En prod.</small></div></div>
+          <div class="sem-card"><div class="top" style="background:var(--error)"></div><div class="bot"><b style="color:var(--error)">Error</b><small>--error · Anulada</small></div></div>
+          <div class="sem-card"><div class="top" style="background:var(--info)"></div><div class="bot"><b style="color:var(--info)">Info</b><small>--info · Confirmada</small></div></div>
+        </div>
+        <div class="note"><b>Roles, no primitivas:</b> los componentes usan tokens semánticos (<span class="token-line">--primary, --surface, --text, --accent</span>), nunca primitivas crudas. Así el modo oscuro se resuelve redefiniendo solo los roles.</div>
+      </section>
+
+      <section class="doc-section" id="tipografia">
+        <h2>Tipografía</h2>
+        <p class="lead"><b>Inter</b> para UI y texto (grotesca neutra, técnica). <b>IBM Plex Mono</b> para datos, IDs y todo número en tabla — siempre con cifras tabulares.</p>
+        <div class="demo-box">
+          <div class="type-spec"><span class="meta">Display · 700 · 34px</span><span class="t-display">Orden de Producción</span></div>
+          <div class="type-spec"><span class="meta">H1 · 700 · 26px</span><span class="t-h1">Amarre por talla</span></div>
+          <div class="type-spec"><span class="meta">H2 · 600 · 20px</span><span class="t-h2">Detalle del pedido</span></div>
+          <div class="type-spec"><span class="meta">H3 · 600 · 16px</span><span class="t-h3">Disponibilidad de inventario</span></div>
+          <div class="type-spec"><span class="meta">Body · 400 · 14px</span><span class="t-body">Curva de tallas confirmada para el pedido OC-2041 del cliente Minera El Roble.</span></div>
+          <div class="type-spec"><span class="meta">Caption · 12px</span><span class="t-caption t-muted">CLIENTE · BODEGA · ENTREGA</span></div>
+          <div class="type-spec" style="border:0"><span class="meta">Mono tabular</span><span class="mono" style="font-size:18px;font-weight:500">1.248 · 33–47 · $4.820.000</span></div>
+        </div>
+      </section>
+
+      <section class="doc-section" id="espaciado">
+        <h2>Espaciado</h2>
+        <p class="lead">Escala base 4px. Usar tokens <span class="token-line">--sp-1 … --sp-20</span>; preferir <b>gap</b> en flex/grid sobre márgenes sueltos.</p>
+        <div class="demo-box" id="spacing"></div>
+      </section>
+
+      <section class="doc-section" id="radios">
+        <h2>Radios</h2>
+        <div class="demo-box radii-row">
+          <div class="radii" style="border-radius:var(--r-xs)">xs · 4</div>
+          <div class="radii" style="border-radius:var(--r-sm)">sm · 6</div>
+          <div class="radii" style="border-radius:var(--r-md)">md · 8</div>
+          <div class="radii" style="border-radius:var(--r-lg)">lg · 12</div>
+          <div class="radii" style="border-radius:var(--r-xl)">xl · 16</div>
+          <div class="radii" style="border-radius:var(--r-full)">full</div>
+        </div>
+      </section>
+
+      <section class="doc-section" id="sombras">
+        <h2>Sombras / Elevación</h2>
+        <div class="demo-box shadow-row">
+          <div class="shadow-card" style="box-shadow:var(--shadow-xs)">xs</div>
+          <div class="shadow-card" style="box-shadow:var(--shadow-sm)">sm</div>
+          <div class="shadow-card" style="box-shadow:var(--shadow-md)">md</div>
+          <div class="shadow-card" style="box-shadow:var(--shadow-lg)">lg</div>
+          <div class="shadow-card" style="box-shadow:var(--shadow-xl)">xl</div>
+        </div>
+        <div class="note">Sombras frías y sutiles en claro; en oscuro se vuelven negras y más profundas. Elevación = jerarquía, no decoración.</div>
+      </section>
+
+      <section class="doc-section" id="sistema">
+        <h2>Z-index & Motion</h2>
+        <div class="demo-box">
+          <table class="spec-table">
+            <tr><td>--z-sticky</td><td><span class="mono">100</span> · headers sticky</td></tr>
+            <tr><td>--z-dropdown</td><td><span class="mono">1000</span> · menús</td></tr>
+            <tr><td>--z-drawer / modal</td><td><span class="mono">1040 / 1050</span></td></tr>
+            <tr><td>--z-toast / tooltip</td><td><span class="mono">1080 / 1090</span></td></tr>
+            <tr><td>--dur-fast / base / slow</td><td><span class="mono">120ms / 200ms / 320ms</span></td></tr>
+            <tr><td>--ease</td><td><span class="mono">cubic-bezier(.2,.6,.2,1)</span></td></tr>
+          </table>
+        </div>
+      </section>
+
+      <section class="doc-section" id="tokens">
+        <h2>Tokens · listo para copiar</h2>
+        <p class="lead">Todo el sistema como CSS custom properties, framework-agnóstico. Pegá en tu proyecto Angular (global styles / SCSS) y consumí con <span class="token-line">var(--token)</span>.</p>
+        <div class="codeblock"><button class="copy-btn" id="copyTokens">Copiar</button><span id="tokensOut"></span></div>
+      </section>
+
+    </div>
+  </main>
+
+<script id="tokensSrc" type="text/plain"></script>
+<script>
+(function(){try{if(localStorage.getItem('agro-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1v3M12 20v3M4 12H1M23 12h-3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>';
+const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const tb=document.getElementById('themeBtn');function ic(){tb.innerHTML=document.documentElement.getAttribute('data-theme')==='dark'?sun:moon;}ic();
+tb.onclick=()=>{const d=document.documentElement.getAttribute('data-theme')==='dark';if(d)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dark');try{localStorage.setItem('agro-theme',d?'light':'dark');}catch(e){}ic();};
+
+const steps=['50','100','200','300','400','500','600','700','800','900','950'];
+const blue=['0.96 0.02 250','0.90 0.035 250','0.82 0.05 250','0.72 0.062 250','0.62 0.07 250','0.53 0.072 250','0.47 0.072 250','0.41 0.07 250','0.35 0.06 250','0.29 0.05 250','0.23 0.04 250'];
+const neuSteps=['0','50','100','200','300','400','500','600','700','800','900','950'];
+const neu=['1 0 0','0.985 0.003 255','0.96 0.004 255','0.92 0.006 255','0.87 0.008 255','0.78 0.01 255','0.66 0.012 255','0.54 0.014 255','0.44 0.014 255','0.35 0.013 255','0.27 0.012 255','0.20 0.010 255'];
+const oSteps=['50','100','200','300','400','500','600','700'];
+const orange=['0.96 0.035 48','0.92 0.06 46','0.86 0.09 45','0.78 0.13 44','0.71 0.16 43','0.64 0.19 42','0.58 0.20 40','0.50 0.18 38'];
+function paint(id,arr,labels){const el=document.getElementById(id);el.innerHTML=arr.map((c,i)=>{const L=parseFloat(c);const tcol=L>0.62?'oklch(0.25 0.02 60)':'oklch(0.96 0.01 60)';return '<div class="sw" style="background:oklch('+c+');color:'+tcol+'"><span class="n">'+labels[i]+'</span><span class="v">'+c.split(' ')[0]+'</span></div>';}).join('');}
+paint('sc-blue',blue,steps);paint('sc-neu',neu,neuSteps);paint('sc-orange',orange,oSteps);
+
+// spacing
+const sps=[['--sp-1',4],['--sp-2',8],['--sp-3',12],['--sp-4',16],['--sp-5',20],['--sp-6',24],['--sp-8',32],['--sp-10',40],['--sp-12',48],['--sp-16',64]];
+document.getElementById('spacing').innerHTML=sps.map(s=>'<div class="sp-bar"><span class="lbl">'+s[0]+' · '+s[1]+'</span><div class="bar" style="width:'+s[1]+'px"></div></div>').join('');
+
+// tokens copy: traer tokens.css inline
+const TOKENS=`/* BOTAS AGROINDUSTRIAL · ERP/MES · DESIGN TOKENS · Dirección "ACERO" */
+:root{
+  /* PRIMITIVAS — Azul acero (H250) */
+  --blue-50:oklch(0.96 0.02 250);  --blue-100:oklch(0.90 0.035 250); --blue-200:oklch(0.82 0.05 250);
+  --blue-300:oklch(0.72 0.062 250);--blue-400:oklch(0.62 0.07 250);  --blue-500:oklch(0.53 0.072 250);
+  --blue-600:oklch(0.47 0.072 250);--blue-700:oklch(0.41 0.07 250);  --blue-800:oklch(0.35 0.06 250);
+  --blue-900:oklch(0.29 0.05 250); --blue-950:oklch(0.23 0.04 250);
+  /* Neutros fríos (H255) */
+  --neu-0:oklch(1 0 0); --neu-50:oklch(0.985 0.003 255); --neu-100:oklch(0.96 0.004 255);
+  --neu-200:oklch(0.92 0.006 255); --neu-300:oklch(0.87 0.008 255); --neu-400:oklch(0.78 0.01 255);
+  --neu-500:oklch(0.66 0.012 255); --neu-600:oklch(0.54 0.014 255); --neu-700:oklch(0.44 0.014 255);
+  --neu-800:oklch(0.35 0.013 255); --neu-900:oklch(0.27 0.012 255); --neu-950:oklch(0.20 0.010 255);
+  /* Acento — Naranja de marca (H42) */
+  --orange-50:oklch(0.96 0.035 48); --orange-100:oklch(0.92 0.06 46); --orange-200:oklch(0.86 0.09 45);
+  --orange-300:oklch(0.78 0.13 44); --orange-400:oklch(0.71 0.16 43); --orange-500:oklch(0.64 0.19 42);
+  --orange-600:oklch(0.58 0.20 40); --orange-700:oklch(0.50 0.18 38);
+  /* Semánticos */
+  --green-500:oklch(0.56 0.13 155); --green-600:oklch(0.50 0.13 155);
+  --yellow-500:oklch(0.75 0.15 75); --yellow-600:oklch(0.66 0.15 66);
+  --red-500:oklch(0.55 0.20 27);    --red-600:oklch(0.49 0.20 27);
+  --cyan-500:oklch(0.58 0.11 238);  --cyan-600:oklch(0.51 0.11 238);
+
+  /* ROLES SEMÁNTICOS (claro) */
+  --bg:var(--neu-100); --surface:var(--neu-0); --surface-sunken:var(--neu-50);
+  --surface-hover:var(--neu-50); --inset:var(--neu-100);
+  --border:var(--neu-200); --border-strong:var(--neu-300); --border-interactive:var(--neu-400);
+  --text:var(--neu-900); --text-muted:var(--neu-600); --text-subtle:var(--neu-500); --text-inverse:var(--neu-0);
+  --primary:var(--blue-600); --primary-hover:var(--blue-700); --primary-fg:var(--neu-0); --primary-subtle:var(--blue-50);
+  --accent:var(--orange-500); --accent-hover:var(--orange-600); --accent-fg:var(--neu-0); --accent-subtle:var(--orange-50);
+  --success:var(--green-600); --warning:var(--yellow-600); --error:var(--red-600); --info:var(--cyan-600);
+  --focus-ring:oklch(0.62 0.12 250 / .9);
+
+  /* TIPOGRAFÍA */
+  --font-sans:'Inter',system-ui,sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  --text-display:34px; --text-h1:26px; --text-h2:20px; --text-h3:16px;
+  --text-body:14px; --text-sm:13px; --text-caption:12px; --text-micro:11px;
+
+  /* ESPACIADO · base 4px */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px;
+  /* RADIOS */ --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-full:999px;
+  /* SOMBRAS */
+  --shadow-sm:0 1px 2px oklch(0.2 0.01 255/.06), 0 1px 3px oklch(0.2 0.01 255/.08);
+  --shadow-md:0 2px 4px oklch(0.2 0.01 255/.06), 0 4px 12px oklch(0.2 0.01 255/.10);
+  --shadow-lg:0 8px 16px -4px oklch(0.2 0.01 255/.10), 0 16px 32px -8px oklch(0.2 0.01 255/.14);
+  /* Z-INDEX */ --z-sticky:100; --z-dropdown:1000; --z-drawer:1040; --z-modal:1050; --z-toast:1080; --z-tooltip:1090;
+  /* MOTION */ --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms; --ease:cubic-bezier(.2,.6,.2,1);
+  /* LAYOUT */ --sidebar-w:248px; --topbar-h:56px;
+}
+
+[data-theme="dark"]{
+  --bg:oklch(0.165 0.008 255); --surface:oklch(0.205 0.010 255); --surface-sunken:oklch(0.185 0.009 255);
+  --surface-hover:oklch(0.255 0.013 255); --inset:oklch(0.18 0.009 255);
+  --border:oklch(0.30 0.012 255); --border-strong:oklch(0.38 0.014 255); --border-interactive:oklch(0.46 0.016 255);
+  --text:oklch(0.95 0.006 255); --text-muted:oklch(0.74 0.012 255); --text-subtle:oklch(0.58 0.014 255);
+  --primary:oklch(0.68 0.10 252); --primary-hover:oklch(0.74 0.10 252); --primary-fg:oklch(0.16 0.03 255); --primary-subtle:oklch(0.30 0.05 252);
+  --accent:oklch(0.68 0.18 44); --accent-hover:oklch(0.74 0.16 44); --accent-fg:oklch(0.16 0.02 50); --accent-subtle:oklch(0.32 0.08 44);
+  --success:oklch(0.72 0.14 155); --warning:oklch(0.82 0.14 78); --error:oklch(0.68 0.17 27); --info:oklch(0.70 0.11 238);
+}`;
+document.getElementById('tokensOut').textContent=TOKENS;
+document.getElementById('copyTokens').onclick=function(){navigator.clipboard.writeText(TOKENS).then(()=>{this.textContent='¡Copiado!';setTimeout(()=>this.textContent='Copiar',1600);});};
+
+// toc
+const secs=[...document.querySelectorAll('.doc-section')],links=[...document.querySelectorAll('.doc-nav a[href^="#"]')];
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)links.forEach(l=>l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id));});},{rootMargin:'-20% 0px -70% 0px'});
+secs.forEach(s=>io.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design System · ERP/MES Botas Agroindustrial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/components.css">
+<style>
+  .hub-top{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:0 var(--sp-8);height:var(--topbar-h);border-bottom:var(--bw) solid var(--border);background:color-mix(in oklch,var(--surface) 86%,transparent);backdrop-filter:blur(10px)}
+  .hub-brand{display:flex;align-items:center;gap:11px}
+  .hub-brand .m{width:30px;height:30px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center}
+  .hub-brand .m svg{width:18px;height:18px}
+  .hub-brand b{font-size:14px;font-weight:700;letter-spacing:.01em}
+  .hub-brand small{font-family:var(--font-mono);font-size:8px;letter-spacing:.18em;color:var(--text-subtle);display:block;margin-top:2px}
+  .wrap{max-width:1080px;margin:0 auto;padding:var(--sp-12) var(--sp-8) 96px}
+  /* hero */
+  .hero{position:relative;border-radius:var(--r-2xl);overflow:hidden;background:var(--neu-950);color:var(--neu-0);padding:var(--sp-12) var(--sp-10);margin-bottom:var(--sp-10)}
+  .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(110% 80% at 100% 0%,color-mix(in oklch,var(--accent) 28%,transparent),transparent 55%),radial-gradient(90% 70% at 0% 100%,color-mix(in oklch,var(--primary) 32%,transparent),transparent 50%)}
+  .hero .grid-bg{position:absolute;inset:0;background-image:linear-gradient(var(--neu-0) 1px,transparent 1px),linear-gradient(90deg,var(--neu-0) 1px,transparent 1px);background-size:46px 46px;opacity:.04}
+  .hero-c{position:relative;z-index:1}
+  .hero .eyebrow{color:color-mix(in oklch,var(--neu-0) 60%,transparent);font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;display:flex;align-items:center;gap:9px}
+  .hero .eyebrow::before{content:"";width:20px;height:2px;background:var(--accent)}
+  .hero h1{font-size:42px;line-height:1.05;letter-spacing:-0.025em;font-weight:700;margin:16px 0 14px;max-width:16ch}
+  .hero p{color:color-mix(in oklch,var(--neu-0) 74%,transparent);font-size:16px;line-height:1.6;max-width:56ch}
+  .hero-meta{display:flex;gap:var(--sp-8);margin-top:var(--sp-8);flex-wrap:wrap}
+  .hero-meta .hm b{font-family:var(--font-mono);font-size:13px;display:block}
+  .hero-meta .hm small{font-size:11px;color:color-mix(in oklch,var(--neu-0) 56%,transparent)}
+  .section-h{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-subtle);margin:var(--sp-10) 0 var(--sp-4);display:flex;align-items:center;gap:9px}
+  .section-h::after{content:"";flex:1;height:1px;background:var(--border)}
+  /* cards */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .cards.three{grid-template-columns:repeat(3,1fr)}
+  .nav-card{display:flex;flex-direction:column;gap:10px;padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);transition:all var(--dur-base) var(--ease);box-shadow:var(--shadow-xs)}
+  .nav-card:hover{border-color:var(--border-interactive);box-shadow:var(--shadow-md);transform:translateY(-2px)}
+  .nav-card .nc-ic{width:38px;height:38px;border-radius:var(--r-md);background:var(--primary-subtle);color:var(--primary);display:grid;place-items:center}
+  .nav-card .nc-ic svg{width:20px;height:20px}
+  .nav-card.accent .nc-ic{background:var(--accent-subtle);color:var(--accent)}
+  .nav-card h3{font-size:var(--text-h3);font-weight:var(--fw-semibold);display:flex;align-items:center;justify-content:space-between}
+  .nav-card h3 .arr{color:var(--text-subtle);transition:transform var(--dur-fast)}
+  .nav-card:hover h3 .arr{transform:translateX(3px);color:var(--primary)}
+  .nav-card p{font-size:var(--text-sm);color:var(--text-muted);line-height:1.5}
+  .nav-card .tagline{font-family:var(--font-mono);font-size:10px;color:var(--text-subtle);letter-spacing:.04em}
+  /* principios */
+  .princ-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
+  .princ{padding:var(--sp-5);border:var(--bw) solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
+  .princ .pn{font-family:var(--font-mono);font-size:12px;color:var(--accent);font-weight:600;margin-bottom:8px}
+  .princ h4{font-size:var(--text-body-lg);font-weight:var(--fw-semibold);margin-bottom:5px}
+  .princ p{font-size:var(--text-sm);color:var(--text-muted);line-height:1.55}
+  .dod{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .dod .col{padding:var(--sp-5);border-radius:var(--r-lg);border:var(--bw) solid var(--border);background:var(--surface)}
+  .dod h4{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+  .dod ul{list-style:none;font-size:var(--text-sm);color:var(--text-muted);line-height:1.4;display:flex;flex-direction:column;gap:10px}
+  .dod li{padding-left:22px;position:relative}
+  .dod.do h4{color:var(--success)} .dod.do li::before{content:"✓";position:absolute;left:0;color:var(--success);font-weight:700}
+  .dod.dont h4{color:var(--error)} .dod.dont li::before{content:"✕";position:absolute;left:0;color:var(--error);font-weight:700}
+  .aa{display:flex;gap:14px;align-items:center;padding:var(--sp-5);border:var(--bw) solid var(--border);border-radius:var(--r-lg);background:var(--surface)}
+  .aa .aa-badge{width:48px;height:48px;border-radius:var(--r-md);background:var(--success);color:var(--neu-0);display:grid;place-items:center;font-weight:700;font-family:var(--font-mono);flex:none}
+  .aa h4{font-size:var(--text-body-lg);font-weight:var(--fw-semibold)}
+  .aa p{font-size:var(--text-sm);color:var(--text-muted);margin-top:3px}
+  @media(max-width:760px){.cards,.cards.three,.princ-grid,.dod{grid-template-columns:1fr}.hero h1{font-size:32px}}
+</style>
+</head>
+<body>
+  <header class="hub-top">
+    <div class="hub-brand"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v9a4 4 0 0 0 4 4h10a2 2 0 0 0 2-2 4 4 0 0 0-3-3.9L11 10V5z"/></svg></span><span><b>Design System</b><small>BOTAS AGROINDUSTRIAL</small></span></div>
+    <button class="icon-btn" id="themeBtn" title="Tema"></button>
+  </header>
+
+  <div class="wrap">
+    <!-- HERO -->
+    <div class="hero">
+      <div class="grid-bg"></div>
+      <div class="hero-c">
+        <div class="eyebrow">Dirección Acero · v1.0</div>
+        <h1>El sistema de diseño del ERP + MES.</h1>
+        <p>Industrial pero limpio. Denso en datos sin abrumar. Del pedido a la inyección, del amarre al despacho — una sola gramática visual, lista para reimplementar en Angular.</p>
+        <div class="hero-meta">
+          <div class="hm"><b>Inter / IBM Plex Mono</b><small>Tipografía</small></div>
+          <div class="hm"><b>Azul acero + naranja</b><small>Color</small></div>
+          <div class="hm"><b>Claro & oscuro</b><small>Temas</small></div>
+          <div class="hm"><b>CSS variables</b><small>Tokens</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUNDAMENTOS -->
+    <div class="section-h">Fundamentos & componentes</div>
+    <div class="cards">
+      <a class="nav-card" href="Fundaciones.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="16" cy="15" r="3"/><path d="M3 20h18"/></svg></span>
+        <h3>Fundaciones <span class="arr">→</span></h3>
+        <p>Color, tipografía, espaciado, radios, sombras, motion. Incluye el bloque completo de tokens para copiar.</p>
+        <span class="tagline">TOKENS · OKLCH · AA</span>
+      </a>
+      <a class="nav-card" href="Componentes.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+        <h3>Componentes <span class="arr">→</span></h3>
+        <p>Botones, formularios, tabla densa, badges de estado, curva de tallas, amarre, overlays — con estados y anatomía.</p>
+        <span class="tagline">ANATOMÍA · VARIANTES · ESTADOS</span>
+      </a>
+    </div>
+
+    <!-- PANTALLAS -->
+    <div class="section-h">Pantallas de validación</div>
+    <div class="cards three">
+      <a class="nav-card" href="pantallas/Login.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></span>
+        <h3>Login <span class="arr">→</span></h3>
+        <p>Ingreso con panel de marca industrial.</p>
+      </a>
+      <a class="nav-card" href="pantallas/Dashboard.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3h7v7H3zM14 3h7v4h-7zM14 11h7v10h-7zM3 14h7v7H3z"/></svg></span>
+        <h3>Dashboard <span class="arr">→</span></h3>
+        <p>KPIs, pedidos recientes y alertas.</p>
+      </a>
+      <a class="nav-card" href="pantallas/Órdenes de Compra.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h13l3 3v13H4z"/><path d="M8 10h8M8 14h5"/></svg></span>
+        <h3>Listado OCs <span class="arr">→</span></h3>
+        <p>Tabla densa, filtros y selección.</p>
+      </a>
+      <a class="nav-card" href="pantallas/Crear OC.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 11l3 3 8-8M12 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></span>
+        <h3>Crear OC <span class="arr">→</span></h3>
+        <p>Wizard de 4 pasos con curva de tallas.</p>
+      </a>
+      <a class="nav-card accent" href="pantallas/Detalle OP — Amarre.html">
+        <span class="nc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></span>
+        <h3>OP · Amarre <span class="arr">→</span></h3>
+        <p>Pantalla estrella: pedido vs. stock vs. a producir, por talla y bodega.</p>
+        <span class="tagline" style="color:var(--accent)">⭐ PANTALLA ESTRELLA</span>
+      </a>
+    </div>
+
+    <!-- PRINCIPIOS -->
+    <div class="section-h">Principios de diseño</div>
+    <div class="princ-grid">
+      <div class="princ"><div class="pn">01</div><h4>El dato manda</h4><p>Jerarquía por peso y espacio, no por cajas y líneas. Números en mono tabular, alineados a la derecha. La tipografía se aparta para que la información respire.</p></div>
+      <div class="princ"><div class="pn">02</div><h4>Color con intención</h4><p>Neutros fríos en el 95% del UI; azul para acción primaria; naranja de marca solo donde hay que decidir o alertar. El color significa algo.</p></div>
+      <div class="princ"><div class="pn">03</div><h4>Densa, no abrumadora</h4><p>Es un ERP: mucha tabla, mucho número. Pero con respiración — densidad ajustable, agrupación clara, una acción primaria por vista.</p></div>
+      <div class="princ"><div class="pn">04</div><h4>Mínima captura manual</h4><p>"Entre menos datos manuales, mejor." Autocompletar, valores por defecto, atajos de teclado en la curva de tallas. El sistema trabaja, el usuario decide.</p></div>
+    </div>
+
+    <!-- DO / DONT -->
+    <div class="section-h">Do's & Don'ts</div>
+    <div class="dod">
+      <div class="col do dod">
+        <h4>Hacer</h4>
+        <ul>
+          <li>Una sola acción primaria por pantalla.</li>
+          <li>Números tabulares siempre a la derecha.</li>
+          <li>Estado = color + ícono/punto + texto.</li>
+          <li>Contemplar vacío, carga y error en toda lista.</li>
+          <li>Usar tokens semánticos, no colores crudos.</li>
+        </ul>
+      </div>
+      <div class="col dont">
+        <h4>Evitar</h4>
+        <ul>
+          <li>Naranja como relleno de áreas grandes.</li>
+          <li>Gradientes decorativos en superficies de trabajo.</li>
+          <li>Más de 2 familias tipográficas.</li>
+          <li>Comprimir la tabla al punto de perder legibilidad.</li>
+          <li>Comunicar estado solo con color.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- AA -->
+    <div class="section-h">Accesibilidad</div>
+    <div class="aa">
+      <div class="aa-badge">AA</div>
+      <div>
+        <h4>Cumplimiento WCAG 2.1 AA</h4>
+        <p>Contraste de texto ≥ 4.5:1 (≥ 3:1 en texto grande). Foco visible en todo control interactivo. Estados nunca dependen solo del color. Hit targets ≥ 44px para uso en planta (tablet).</p>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function(){try{if(localStorage.getItem('agro-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1v3M12 20v3M4 12H1M23 12h-3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>';
+const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const tb=document.getElementById('themeBtn');function ic(){tb.innerHTML=document.documentElement.getAttribute('data-theme')==='dark'?sun:moon;}ic();
+tb.onclick=()=>{const d=document.documentElement.getAttribute('data-theme')==='dark';if(d)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dark');try{localStorage.setItem('agro-theme',d?'light':'dark');}catch(e){}ic();};
+</script>
+</body>
+</html>
