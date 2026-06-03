@@ -98,3 +98,36 @@ describe('aplicarOverrides', () => {
     expect(r.find((l) => l.materialId === 20)).toBeUndefined();
   });
 });
+
+import { explotarMultinivel } from './bom-resolver';
+import { MaterialInfo, NodoResuelto } from './bom-resolver.types';
+
+describe('explotarMultinivel', () => {
+  // material 1 = COMPRADO (cuero); material 2 = FABRICADO (plantilla PU) con sub-BOM
+  const materiales: Record<number, MaterialInfo> = {
+    1: { id: 1, origen: 'COMPRADO', subBom: [] },
+    2: {
+      id: 2, origen: 'FABRICADO',
+      subBom: [
+        { materialId: 3, claseConsumo: 'FIJO', consumoFijo: 0.04, consumoPorTalla: {}, mermaPct: null }, // poliol
+      ],
+    },
+    3: { id: 3, origen: 'COMPRADO', subBom: [] },
+  };
+
+  it('material comprado: nodo hoja sin hijos', () => {
+    const lineas: LineaBase[] = [lineaFija(1, 0.1)];
+    const arbol = explotarMultinivel(lineas, materiales, 42);
+    expect(arbol).toEqual([{ materialId: 1, consumo: 0.1, origen: 'COMPRADO', hijos: [] }]);
+  });
+
+  it('material fabricado: explota su sub-BOM multiplicando por el consumo del padre', () => {
+    const lineas: LineaBase[] = [lineaFija(2, 2)]; // 2 plantillas por par
+    const arbol = explotarMultinivel(lineas, materiales, 42);
+    expect(arbol[0].materialId).toBe(2);
+    expect(arbol[0].consumo).toBe(2);
+    expect(arbol[0].hijos).toHaveLength(1);
+    expect(arbol[0].hijos[0]).toMatchObject({ materialId: 3, origen: 'COMPRADO' });
+    expect(arbol[0].hijos[0].consumo).toBeCloseTo(0.08, 5); // 0.04 * 2
+  });
+});

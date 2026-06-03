@@ -1,4 +1,4 @@
-import { LineaBase, Override } from './bom-resolver.types';
+import { LineaBase, Override, MaterialInfo, NodoResuelto } from './bom-resolver.types';
 
 /** Consumo de una línea para una talla concreta, con merma aplicada. */
 export function resolverConsumoTalla(linea: LineaBase, talla: number): number {
@@ -83,4 +83,23 @@ export function aplicarOverrides(base: LineaBase[], overrides: Override[]): Line
   }
 
   return [...mapa.values()];
+}
+
+/** Explota las líneas a un árbol de nodos resueltos para la talla, bajando a sub-BOMs. */
+export function explotarMultinivel(
+  lineas: LineaBase[],
+  materiales: Record<number, MaterialInfo>,
+  talla: number,
+  factor = 1,
+): NodoResuelto[] {
+  return lineas.map((linea) => {
+    const consumo = resolverConsumoTalla(linea, talla) * factor;
+    const info = materiales[linea.materialId];
+    const origen = info?.origen ?? 'COMPRADO';
+    const hijos =
+      info?.origen === 'FABRICADO'
+        ? explotarMultinivel(info.subBom, materiales, talla, consumo)
+        : [];
+    return { materialId: linea.materialId, consumo, origen, hijos };
+  });
 }
