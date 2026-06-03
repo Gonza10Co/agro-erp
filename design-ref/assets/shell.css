@@ -1,0 +1,72 @@
+/* ════════════════════════════════════════════════════════════════════
+   APP SHELL · layout (sidebar + topbar + main). Importar tras components.css
+   ════════════════════════════════════════════════════════════════════ */
+.app-body{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+
+/* ───────── SIDEBAR ───────── */
+.app-sidebar{
+  grid-row:1/-1;display:flex;flex-direction:column;
+  background:var(--surface);border-right:var(--bw) solid var(--border);
+  position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:11px;padding:0 18px;height:var(--topbar-h);border-bottom:var(--bw) solid var(--border);flex:none}
+.brand-mark{width:30px;height:30px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
+.brand-mark svg{width:18px;height:18px}
+.brand-text{display:flex;flex-direction:column;line-height:1}
+.brand-text b{font-size:14px;font-weight:var(--fw-bold);letter-spacing:.02em;color:var(--text)}
+.brand-text small{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.18em;color:var(--text-subtle);margin-top:3px}
+
+.nav{flex:1;overflow-y:auto;padding:var(--sp-4) 12px}
+.nav-group{margin-bottom:var(--sp-5)}
+.nav-group-h{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-subtle);padding:0 10px;margin-bottom:8px}
+.nav-tag{font-size:8px;letter-spacing:.08em;background:var(--surface-sunken);border:var(--bw) solid var(--border);color:var(--text-subtle);padding:2px 6px;border-radius:var(--r-full)}
+.nav-item{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--r-sm);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--fw-medium);transition:all var(--dur-fast) var(--ease);margin-bottom:1px;position:relative}
+.nav-item:hover{background:var(--surface-hover);color:var(--text)}
+.nav-ic{width:18px;height:18px;flex:none;color:currentColor;opacity:.85}
+.nav-ic svg{width:18px;height:18px}
+.nav-item.is-active{background:var(--primary-subtle);color:var(--primary)}
+.nav-item.is-active::before{content:"";position:absolute;left:-12px;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--primary)}
+.nav-item.is-active .nav-ic{opacity:1}
+.nav-item.is-soon{opacity:.5;cursor:default}
+.nav-item.is-soon:hover{background:transparent;color:var(--text-muted)}
+
+.sidebar-foot{padding:12px;border-top:var(--bw) solid var(--border);flex:none}
+.user-card{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-top:4px;border-radius:var(--r-sm)}
+.user-meta{display:flex;flex-direction:column;line-height:1.2;flex:1;min-width:0}
+.user-meta b{font-size:var(--text-sm);font-weight:var(--fw-semibold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-meta small{font-size:var(--text-micro);color:var(--text-subtle)}
+
+/* ───────── MAIN + TOPBAR ───────── */
+.app-main{display:flex;flex-direction:column;min-width:0}
+.app-topbar{
+  position:sticky;top:0;z-index:var(--z-sticky);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
+  height:var(--topbar-h);padding:0 var(--sp-6);
+  background:color-mix(in oklch,var(--surface) 86%,transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:var(--bw) solid var(--border);flex:none;
+}
+.topbar-left{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
+.topbar-left h1{margin:0}
+.topbar-right{display:flex;align-items:center;gap:var(--sp-2)}
+
+.page{padding:var(--sp-6);max-width:1440px;width:100%}
+.page-wide{max-width:none}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);margin-bottom:var(--sp-5);flex-wrap:wrap}
+.page-header .ph-title{font-size:var(--text-h1);font-weight:var(--fw-bold);letter-spacing:var(--ls-h1)}
+.page-header .ph-sub{font-size:var(--text-sm);color:var(--text-muted);margin-top:4px}
+.page-actions{display:flex;align-items:center;gap:var(--sp-2)}
+
+/* responsive: tablet colapsa sidebar a iconos */
+@media(max-width:1024px){
+  .app-body{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
+  .brand-text,.nav-label,.nav-group-h,.nav-tag,.user-meta{display:none}
+  .brand{justify-content:center;padding:0}
+  .nav-item{justify-content:center;padding:10px}
+  .nav-item.is-active::before{left:-12px}
+  .user-card{justify-content:center;padding:8px 0}
+  .search{display:none}
+}
+@media(max-width:640px){
+  .page{padding:var(--sp-4)}
+}

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · Botas Agroindustrial ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/components.css">
+<link rel="stylesheet" href="../assets/shell.css">
+<style>
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:var(--sp-5)}
+  .dash-grid{display:grid;grid-template-columns:1fr 360px;gap:var(--sp-4);align-items:start}
+  .stack{display:flex;flex-direction:column;gap:var(--sp-4)}
+  .cell-row{display:flex;flex-direction:column;gap:13px}
+  .cell-line{display:grid;grid-template-columns:120px 1fr 52px;align-items:center;gap:12px;font-size:var(--text-sm)}
+  .cell-line .nm{color:var(--text-muted);font-weight:var(--fw-medium)}
+  .cell-line .pct{font-family:var(--font-mono);font-size:var(--text-caption);text-align:right;color:var(--text)}
+  .alert-item{display:flex;gap:11px;padding:11px 0;border-bottom:var(--bw) solid var(--border)}
+  .alert-item:last-child{border-bottom:0;padding-bottom:0}
+  .alert-item .a-ic{width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;flex:none}
+  .alert-item .a-ic svg{width:15px;height:15px}
+  .alert-item .a-t{font-size:var(--text-sm);font-weight:var(--fw-medium);line-height:1.35}
+  .alert-item .a-d{font-size:var(--text-caption);color:var(--text-muted);margin-top:2px}
+  @media(max-width:1200px){.kpi-row{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-screen="dashboard" data-title="Dashboard" data-screen-label="Dashboard">
+<main class="app-main">
+  <div class="page">
+
+    <div class="page-header">
+      <div>
+        <div class="ph-title">Buen día, Carolina</div>
+        <div class="ph-sub">Martes 3 de junio · 12 OCs requieren tu atención hoy</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Importar</button>
+        <a class="btn btn-primary" href="Crear OC.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nueva OC</a>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi anim-up" style="animation-delay:0ms">
+        <div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/><path d="M8 10h8M8 14h5"/></svg></span>OCs abiertas</div>
+        <div class="kpi-value">128</div>
+        <div class="kpi-delta up">▲ 12% <span class="t-subtle" style="font-weight:400">vs. mayo</span></div>
+      </div>
+      <div class="kpi anim-up" style="animation-delay:60ms">
+        <div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7v10l8 4 8-4V7l-8-4z"/></svg></span>Pares a producir</div>
+        <div class="kpi-value">8.420<span class="unit"> pares</span></div>
+        <div class="kpi-delta down">▼ 4% <span class="t-subtle" style="font-weight:400">vs. plan semanal</span></div>
+      </div>
+      <div class="kpi anim-up" style="animation-delay:120ms">
+        <div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>Cartera abierta</div>
+        <div class="kpi-value">$1.240<span class="unit">M</span></div>
+        <div class="kpi-delta flat">● estable</div>
+      </div>
+      <div class="kpi anim-up" style="animation-delay:180ms">
+        <div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 6L9 17l-5-5"/></svg></span>Cumpl. despacho</div>
+        <div class="kpi-value">94<span class="unit">%</span></div>
+        <div class="kpi-delta up">▲ 3 pts <span class="t-subtle" style="font-weight:400">a tiempo</span></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <!-- col izquierda -->
+      <div class="stack">
+        <div class="card anim-up" style="animation-delay:220ms">
+          <div class="card-head">
+            <h3>Órdenes recientes</h3>
+            <a class="btn btn-ghost btn-sm" href="Órdenes de Compra.html">Ver todas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M9 6l6 6-6 6"/></svg></a>
+          </div>
+          <div class="table-scroll">
+            <table class="data">
+              <thead><tr><th>OC</th><th>Cliente</th><th>Estado</th><th>Entrega</th><th class="num">Pares</th><th class="num">Valor</th></tr></thead>
+              <tbody>
+                <tr><td class="cell-mono">OC-2041</td><td>Minera El Roble<div class="cell-sub">Maquila · marca propia</div></td><td><span class="badge badge-warning"><span class="dot"></span>En producción</span></td><td class="cell-sub">14 jun</td><td class="num">1.200</td><td class="num">$48.0M</td></tr>
+                <tr><td class="cell-mono">OC-2040</td><td>Maquila Norte SAS<div class="cell-sub">Maquila · 3 marcas</div></td><td><span class="badge badge-info"><span class="dot"></span>Confirmada</span></td><td class="cell-sub">22 jun</td><td class="num">640</td><td class="num">$25.6M</td></tr>
+                <tr><td class="cell-mono">OC-2039</td><td>Constructora Yopal</td><td><span class="badge badge-success"><span class="dot"></span>Cerrada</span></td><td class="cell-sub">30 may</td><td class="num">2.000</td><td class="num">$80.0M</td></tr>
+                <tr><td class="cell-mono">OC-2038</td><td>Agroindustrias del Llano</td><td><span class="badge badge-neutral"><span class="dot"></span>Borrador</span></td><td class="cell-sub">—</td><td class="num">320</td><td class="num">$12.8M</td></tr>
+                <tr><td class="cell-mono">OC-2037</td><td>Petro Servicios SA</td><td><span class="badge badge-accent"><span class="dot"></span>OP amarrada</span></td><td class="cell-sub">18 jun</td><td class="num">880</td><td class="num">$35.2M</td></tr>
+                <tr><td class="cell-mono">OC-2036</td><td>Cafetera Quindío</td><td><span class="badge badge-error"><span class="dot"></span>Anulada</span></td><td class="cell-sub">—</td><td class="num">150</td><td class="num">$6.0M</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card anim-up" style="animation-delay:280ms">
+          <div class="card-head"><h3>Producción por célula</h3><span class="badge badge-neutral">Semana 23</span></div>
+          <div class="card-body">
+            <div class="cell-row">
+              <div class="cell-line"><span class="nm">Corte</span><div class="progress"><div class="bar" style="width:88%"></div></div><span class="pct">88%</span></div>
+              <div class="cell-line"><span class="nm">Guarnición</span><div class="progress"><div class="bar" style="width:72%"></div></div><span class="pct">72%</span></div>
+              <div class="cell-line"><span class="nm">Inyección</span><div class="progress"><div class="bar accent" style="width:54%"></div></div><span class="pct">54%</span></div>
+              <div class="cell-line"><span class="nm">P. Terminado</span><div class="progress"><div class="bar" style="width:41%"></div></div><span class="pct">41%</span></div>
+              <div class="cell-line"><span class="nm">Despacho</span><div class="progress"><div class="bar" style="width:96%"></div></div><span class="pct">96%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- col derecha -->
+      <div class="stack">
+        <div class="card anim-up" style="animation-delay:320ms">
+          <div class="card-head"><h3>Requiere atención</h3><span class="badge badge-error">4</span></div>
+          <div class="card-body" style="padding-top:var(--sp-2);padding-bottom:var(--sp-3)">
+            <div class="alert-item">
+              <span class="a-ic" style="background:var(--error-subtle);color:var(--error)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+              <div><div class="a-t">OC-2041 sin amarrar completo</div><div class="a-d">Faltan 420 pares por producir · talla 39–41</div></div>
+            </div>
+            <div class="alert-item">
+              <span class="a-ic" style="background:var(--warning-subtle);color:var(--warning)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7v10l8 4 8-4V7l-8-4z"/></svg></span>
+              <div><div class="a-t">Stock bajo · Bota Dieléctrica</div><div class="a-d">Bodega P.T. — 60 pares en talla 42</div></div>
+            </div>
+            <div class="alert-item">
+              <span class="a-ic" style="background:var(--info-subtle);color:var(--info)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/></svg></span>
+              <div><div class="a-t">2 OCs esperan confirmación</div><div class="a-d">Borradores con más de 48h</div></div>
+            </div>
+            <div class="alert-item">
+              <span class="a-ic" style="background:var(--accent-subtle);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 7h13v9H1zM14 10h4l3 3v3h-7"/></svg></span>
+              <div><div class="a-t">Despacho programado mañana</div><div class="a-d">OC-2037 · Petro Servicios · 880 pares</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card anim-up" style="animation-delay:360ms">
+          <div class="card-head"><h3>Pedidos por estado</h3></div>
+          <div class="card-body cell-row">
+            <div class="cell-line"><span class="nm flex center gap-2"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-subtle)"></span>Borrador</span><div class="progress"><div class="bar" style="width:18%;background:var(--text-subtle)"></div></div><span class="pct">14</span></div>
+            <div class="cell-line"><span class="nm flex center gap-2"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--info)"></span>Confirmada</span><div class="progress"><div class="bar" style="width:42%;background:var(--info)"></div></div><span class="pct">38</span></div>
+            <div class="cell-line"><span class="nm flex center gap-2"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--warning)"></span>En prod.</span><div class="progress"><div class="bar" style="width:58%;background:var(--warning)"></div></div><span class="pct">52</span></div>
+            <div class="cell-line"><span class="nm flex center gap-2"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--success)"></span>Cerrada</span><div class="progress"><div class="bar" style="width:26%;background:var(--success)"></div></div><span class="pct">24</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+<script>window.AGRO={actions:''};</script>
+<script src="../assets/shell.js"></script>
+</body>
+</html>

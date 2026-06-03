@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Componentes · Design System Botas Agroindustrial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/components.css">
+<link rel="stylesheet" href="assets/doc.css">
+</head>
+<body class="doc-body">
+  <!-- NAV -->
+  <aside class="doc-nav">
+    <a class="doc-brand" href="index.html"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v9a4 4 0 0 0 4 4h10a2 2 0 0 0 2-2 4 4 0 0 0-3-3.9L11 10V5z"/></svg></span><span><b>Design System</b><small>BOTAS AGROINDUSTRIAL</small></span></a>
+    <div class="doc-nav-group">General</div>
+    <a href="index.html">Inicio</a>
+    <a href="Fundaciones.html">Fundaciones</a>
+    <a href="Componentes.html" class="active">Componentes</a>
+    <div class="doc-nav-group">Componentes</div>
+    <a href="#botones">Botones</a>
+    <a href="#forms">Formularios</a>
+    <a href="#combobox">Combobox / búsqueda</a>
+    <a href="#badges">Badges de estado</a>
+    <a href="#tabla">Tabla densa</a>
+    <a href="#cards">Cards & KPIs</a>
+    <a href="#nav">Navegación</a>
+    <a href="#overlays">Overlays</a>
+    <a href="#tallas">Curva de tallas</a>
+    <a href="#amarre">Amarre</a>
+    <a href="#estados">Estados vacíos / carga</a>
+  </aside>
+
+  <main class="doc-main">
+    <header class="doc-topbar">
+      <div class="breadcrumb"><a href="index.html">Design System</a><span class="sep">/</span><span class="current">Componentes</span></div>
+      <button class="icon-btn" id="themeBtn" title="Tema"></button>
+    </header>
+    <div class="doc-content">
+
+      <!-- BOTONES -->
+      <section class="doc-section" id="botones">
+        <h2>Botones</h2>
+        <p class="lead">Una sola acción primaria por vista. El <b>acento naranja</b> se reserva para la acción decisiva del flujo (confirmar, autorizar); el azul para acciones primarias generales.</p>
+        <div class="demo-box">
+          <div class="label-mini">Jerarquía</div>
+          <div class="demo-row">
+            <button class="btn btn-primary">Primario</button>
+            <button class="btn btn-accent">Acento · decisión</button>
+            <button class="btn btn-secondary">Secundario</button>
+            <button class="btn btn-ghost">Ghost</button>
+            <button class="btn btn-danger">Peligro</button>
+            <button class="btn btn-danger-solid">Peligro sólido</button>
+          </div>
+        </div>
+        <div class="demo-box">
+          <div class="label-mini">Con ícono · tamaños · estados</div>
+          <div class="demo-row">
+            <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nueva OC</button>
+            <button class="btn btn-secondary btn-sm">Pequeño</button>
+            <button class="btn btn-primary btn-lg">Grande</button>
+            <button class="btn btn-primary is-loading">Cargando</button>
+            <button class="btn btn-primary" disabled>Disabled</button>
+            <button class="btn btn-secondary btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8M4.6 9a1.6 1.6 0 0 0-.3-1.8"/></svg></button>
+          </div>
+        </div>
+        <div class="anatomy">
+          <div class="ana"><div class="at">Altura</div><div class="ad">36px (sm 30 · lg 44). Hit target táctil ≥44px en planta.</div></div>
+          <div class="ana"><div class="at">Radio</div><div class="ad">--r-sm (6px)</div></div>
+          <div class="ana"><div class="at">Estados</div><div class="ad">default · hover · active · focus-visible · disabled · loading</div></div>
+          <div class="ana"><div class="at">Tokens</div><div class="ad token-line">--primary · --accent · --border-strong · --focus-ring</div></div>
+        </div>
+      </section>
+
+      <!-- FORMS -->
+      <section class="doc-section" id="forms">
+        <h2>Formularios</h2>
+        <p class="lead">Captura mínima: autocompletar donde se pueda. Labels arriba, mensajes de error en línea, foco azul consistente.</p>
+        <div class="demo-box">
+          <div class="demo-grid" style="grid-template-columns:1fr 1fr;max-width:640px">
+            <div class="field"><label class="label">Cliente <span class="req">*</span></label><div class="input-group"><span class="ig-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><input class="input" value="Minera El Roble"></div></div>
+            <div class="field"><label class="label">NIT</label><div class="input-group has-suffix"><input class="input" value="900.123.456"><span class="ig-suffix">-7</span></div></div>
+            <div class="field"><label class="label">Bodega</label><div class="select-wrap"><select class="select"><option>Principal</option><option>Norte</option></select></div></div>
+            <div class="field"><label class="label">Buscar</label><div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input class="input" placeholder="Buscar…"></div></div>
+            <div class="field"><label class="label">Con error</label><input class="input is-error" value="900.12"><div class="field-msg error"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>NIT incompleto.</div></div>
+            <div class="field"><label class="label">Notas</label><textarea class="textarea" placeholder="Observaciones del pedido…"></textarea></div>
+          </div>
+          <div class="demo-row" style="margin-top:var(--sp-5)">
+            <label class="check"><input type="checkbox" checked><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span>Checkbox</label>
+            <label class="check radio"><input type="checkbox"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="5" fill="currentColor"/></svg></span>Radio</label>
+            <label class="switch"><input type="checkbox" checked><span class="track"></span></label>
+          </div>
+        </div>
+        <div class="note"><b>Comportamiento:</b> validar al perder foco (blur) y al enviar, nunca a cada tecla. Mensajes específicos y accionables.</div>
+      </section>
+
+      <!-- COMBOBOX -->
+      <section class="doc-section" id="combobox">
+        <h2>Combobox / búsqueda</h2>
+        <p class="lead">Autocomplete para listas largas: <b>291 clientes, 109 marcas, ~200 materiales</b>. Un <code style="font-family:var(--font-mono);font-size:12px">&lt;select&gt;</code> común no alcanza. Filtra por nombre o subtexto, resalta coincidencias y se maneja 100% con teclado.</p>
+        <div class="demo-box">
+          <div class="demo-grid" style="grid-template-columns:1fr 1fr;max-width:680px;align-items:start">
+            <div class="field"><label class="label">Cliente <span class="req">*</span></label><div id="cbCliente"></div><div class="hint">Escribí para filtrar · ↑ ↓ navegar · Enter elegir · Esc cerrar</div></div>
+            <div class="field"><label class="label">Material</label><div id="cbMaterial"></div><div class="hint">Permite "Crear" si no existe (onAdd).</div></div>
+          </div>
+        </div>
+        <div class="anatomy">
+          <div class="ana"><div class="at">Filtrado</div><div class="ad">Insensible a mayúsculas; matchea label + subtexto; resalta con &lt;mark&gt;</div></div>
+          <div class="ana"><div class="at">Teclado</div><div class="ad">↑ ↓ mueven, Enter elige, Esc cierra, scroll automático al activo</div></div>
+          <div class="ana"><div class="at">Rendimiento</div><div class="ad">Renderiza hasta 80 resultados; muestra contador "N de total"</div></div>
+          <div class="ana"><div class="at">Crear al vuelo</div><div class="ad">allowAddLabel + onAdd para alta rápida sin salir del flujo</div></div>
+        </div>
+        <div class="note">En vivo dentro del wizard: <a class="link" style="color:var(--primary);font-weight:600" href="pantallas/Crear OC.html">Crear OC → paso Cliente</a>. Reutilizable vía <span class="token-line">AgroCombobox(el, opciones)</span>.</div>
+      </section>
+
+      <!-- BADGES -->
+      <section class="doc-section" id="badges">
+        <h2>Badges de estado</h2>
+        <p class="lead">El lenguaje de estados del pedido. Color semántico + punto + texto: nunca color solo (accesibilidad).</p>
+        <div class="demo-box">
+          <div class="label-mini">Orden de Compra (OC)</div>
+          <div class="demo-row">
+            <span class="badge badge-neutral"><span class="dot"></span>Borrador</span>
+            <span class="badge badge-info"><span class="dot"></span>Confirmada</span>
+            <span class="badge badge-warning"><span class="dot"></span>En producción</span>
+            <span class="badge badge-success"><span class="dot"></span>Cerrada</span>
+            <span class="badge badge-error"><span class="dot"></span>Anulada</span>
+          </div>
+          <div class="label-mini" style="margin-top:20px">Orden de Producción (OP) · otros</div>
+          <div class="demo-row">
+            <span class="badge badge-info"><span class="dot"></span>Creada</span>
+            <span class="badge badge-accent"><span class="dot"></span>Amarrada</span>
+            <span class="badge badge-solid">Sólido</span>
+            <span class="badge badge-count">12</span>
+          </div>
+        </div>
+        <div class="note"><b>Mapeo:</b> Borrador→neutral · Confirmada/Creada→info · En producción→warning · Cerrada→success · Anulada→error · Amarrada→accent.</div>
+      </section>
+
+      <!-- TABLA -->
+      <section class="doc-section" id="tabla">
+        <h2>Tabla densa</h2>
+        <p class="lead">El caballo de batalla del ERP. Header sticky, ordenable, fila seleccionable, números tabulares a la derecha, densidad ajustable.</p>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th class="row-check"><label class="check"><input type="checkbox"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></th><th class="sortable" aria-sort="ascending">OC <span class="arrow">↑</span></th><th>Cliente</th><th>Estado</th><th class="num sortable">Pares <span class="arrow">↕</span></th><th class="num sortable">Valor <span class="arrow">↕</span></th></tr></thead>
+            <tbody>
+              <tr class="is-selected"><td class="row-check"><label class="check"><input type="checkbox" checked><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></td><td class="cell-mono">OC-2041</td><td>Minera El Roble</td><td><span class="badge badge-warning"><span class="dot"></span>En producción</span></td><td class="num">1.200</td><td class="num">$48.0M</td></tr>
+              <tr><td class="row-check"><label class="check"><input type="checkbox"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></td><td class="cell-mono">OC-2040</td><td>Maquila Norte SAS</td><td><span class="badge badge-info"><span class="dot"></span>Confirmada</span></td><td class="num">640</td><td class="num">$25.6M</td></tr>
+              <tr><td class="row-check"><label class="check"><input type="checkbox"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg></span></label></td><td class="cell-mono">OC-2039</td><td>Constructora Yopal</td><td><span class="badge badge-success"><span class="dot"></span>Cerrada</span></td><td class="num">2.000</td><td class="num">$80.0M</td></tr>
+            </tbody>
+          </table>
+          <div class="table-foot"><span>Mostrando 1–3 de 47</span><div class="pager"><button disabled>‹</button><button aria-current="page">1</button><button>2</button><button>3</button><button>›</button></div></div>
+        </div>
+        <div class="anatomy">
+          <div class="ana"><div class="at">Header</div><div class="ad">sticky, mono uppercase, ordenable con aria-sort</div></div>
+          <div class="ana"><div class="at">Números</div><div class="ad">.num → mono tabular, alineados derecha</div></div>
+          <div class="ana"><div class="at">Selección</div><div class="ad">.is-selected → barra acento + tinte</div></div>
+          <div class="ana"><div class="at">Densidad</div><div class="ad">.density-compact reduce padding vertical</div></div>
+        </div>
+      </section>
+
+      <!-- CARDS -->
+      <section class="doc-section" id="cards">
+        <h2>Cards & KPIs</h2>
+        <p class="lead">Contenedores de respiración. KPI = número grande en mono tabular + delta con color semántico.</p>
+        <div class="demo-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/></svg></span>OCs abiertas</div><div class="kpi-value">128</div><div class="kpi-delta up">▲ 12% vs. mayo</div></div>
+          <div class="kpi"><div class="kpi-label"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7v10l8 4 8-4V7l-8-4z"/></svg></span>A producir</div><div class="kpi-value">8.420<span class="unit"> pares</span></div><div class="kpi-delta down">▼ 4% vs. plan</div></div>
+          <div class="card"><div class="card-head"><h3>Card con header</h3><span class="badge badge-neutral">Info</span></div><div class="card-body t-sm t-muted">Cuerpo de card. Usar para agrupar contenido relacionado con título y acciones.</div></div>
+        </div>
+      </section>
+
+      <!-- NAV -->
+      <section class="doc-section" id="nav">
+        <h2>Navegación</h2>
+        <p class="lead">Tabs, breadcrumbs y el stepper del wizard de creación de OC.</p>
+        <div class="demo-box">
+          <div class="label-mini">Tabs</div>
+          <div class="tabs"><button class="tab" aria-selected="true">Amarre</button><button class="tab">Curva <span class="badge-count">8</span></button><button class="tab">Trazabilidad</button><button class="tab">OF por célula</button></div>
+          <div class="label-mini" style="margin-top:24px">Breadcrumb</div>
+          <nav class="breadcrumb"><a href="#">Órdenes de Compra</a><span class="sep">/</span><a href="#">OC-2041</a><span class="sep">/</span><span class="current">OP-1187</span></nav>
+          <div class="label-mini" style="margin-top:24px">Stepper / Wizard</div>
+          <div class="stepper" style="max-width:560px"><div class="step is-done"><span class="marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:13px;height:13px"><path d="M5 12l5 5L20 6"/></svg></span><span class="s-label">Cliente</span><span class="s-line"></span></div><div class="step is-active"><span class="marker">2</span><span class="s-label">Productos</span><span class="s-line"></span></div><div class="step"><span class="marker">3</span><span class="s-label">Tallas</span><span class="s-line"></span></div><div class="step"><span class="marker">4</span><span class="s-label">Revisar</span></div></div>
+        </div>
+      </section>
+
+      <!-- OVERLAYS -->
+      <section class="doc-section" id="overlays">
+        <h2>Overlays</h2>
+        <p class="lead">Modal, drawer, toast y tooltip. Scrim con blur sutil; animaciones de 200–320ms.</p>
+        <div class="demo-box">
+          <div class="demo-row">
+            <button class="btn btn-secondary" onclick="document.getElementById('demoModal').style.display='block';document.getElementById('demoScrim').style.display='block'">Abrir modal</button>
+            <button class="btn btn-secondary" onclick="openDocDrawer()">Abrir drawer de detalle</button>
+            <button class="btn btn-secondary" onclick="showToast()">Disparar toast</button>
+            <span class="tip"><button class="btn btn-secondary">Hover tooltip</button><span class="tip-body">Inventario amarrado al pedido</span></span>
+          </div>
+          <div class="label-mini" style="margin-top:24px">Toast (estático)</div>
+          <div class="toast success toast-accent" style="position:static;max-width:360px"><span class="t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span><div><div class="t-title">OC creada correctamente</div><div class="t-desc">OP-1187 generada y amarrada · 780 pares en stock</div></div></div>
+        </div>
+      </section>
+
+      <!-- TALLAS -->
+      <section class="doc-section" id="tallas">
+        <h2>Curva de tallas</h2>
+        <p class="lead">Grid compacto 33–47 para captura rápida por teclado (Tab / flechas / Enter). Celda con valor se resalta en acento.</p>
+        <div class="demo-box">
+          <div class="tallas-grid" id="docTallas"></div>
+          <div class="note" style="display:flex;justify-content:space-between;align-items:center"><span>Navegación: <b>Tab</b> / <b>← →</b> / <b>Enter</b>. Total se calcula en vivo.</span><span>Total <b class="mono" id="docTallasTot" style="font-size:16px">0</b></span></div>
+        </div>
+      </section>
+
+      <!-- AMARRE -->
+      <section class="doc-section" id="amarre">
+        <h2>Amarre / Disponibilidad</h2>
+        <p class="lead">El componente firma del sistema: <b>pedido = en stock + a producir</b>, por talla. Verde = ya disponible, naranja = falta fabricar.</p>
+        <div class="demo-box">
+          <div class="amarre-table" id="docAmarre"></div>
+          <div class="amarre-legend" style="margin-top:16px"><span><i style="background:var(--success)"></i>En stock (amarrado)</span><span><i style="background:var(--accent)"></i>A producir</span><span><i style="background:var(--inset);border:1px solid var(--border)"></i>Pedido</span></div>
+        </div>
+        <div class="note">Ver la pantalla completa en <a class="link" style="color:var(--primary);font-weight:600" href="pantallas/Detalle OP — Amarre.html">Detalle OP — Amarre</a>.</div>
+      </section>
+
+      <!-- ESTADOS -->
+      <section class="doc-section" id="estados">
+        <h2>Estados vacíos & carga</h2>
+        <p class="lead">Toda lista contempla vacío, carga (skeleton) y error. Nunca una pantalla en blanco.</p>
+        <div class="demo-grid" style="grid-template-columns:1fr 1fr">
+          <div class="demo-box"><div class="label-mini">Estado vacío</div><div class="empty"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7v10l8 4 8-4V7l-8-4z"/></svg></div><h4>Sin órdenes aún</h4><p>Creá tu primera OC para empezar a gestionar producción.</p><button class="btn btn-primary btn-sm" style="margin-top:8px">Nueva OC</button></div></div>
+          <div class="demo-box"><div class="label-mini">Skeleton de carga</div><div style="padding:8px 0"><div class="skel skel-text-lg" style="width:55%"></div><div class="skel skel-line" style="width:90%"></div><div class="skel skel-line" style="width:80%"></div><div class="skel skel-line" style="width:88%"></div><div class="skel skel-line" style="width:40%"></div></div></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- modal demo -->
+  <div id="demoScrim" class="scrim" style="display:none" onclick="this.style.display='none';document.getElementById('demoModal').style.display='none'"></div>
+  <div id="demoModal" class="modal" style="display:none">
+    <div class="modal-head"><h3>Anular OC-2041</h3><button class="icon-btn" onclick="document.getElementById('demoModal').style.display='none';document.getElementById('demoScrim').style.display='none'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="modal-body">Esta acción anulará la orden y liberará el inventario amarrado. No se puede deshacer. ¿Continuar?</div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="document.getElementById('demoModal').style.display='none';document.getElementById('demoScrim').style.display='none'">Cancelar</button><button class="btn btn-danger-solid">Sí, anular</button></div>
+  </div>
+  <div id="toastStack" class="toast-stack"></div>
+
+  <!-- drawer demo -->
+  <div id="docDrawerScrim" class="scrim" style="display:none" onclick="closeDocDrawer()"></div>
+  <aside id="docDrawer" class="drawer" style="display:none">
+    <div class="drawer-head"><div><div class="eyebrow">OC-2041</div><h2 class="t-h2" style="margin-top:4px">Minera El Roble</h2></div><button class="icon-btn" onclick="closeDocDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="drawer-body">
+      <div class="flex gap-2" style="margin-bottom:16px"><span class="badge badge-warning"><span class="dot"></span>En producción</span><span class="badge badge-neutral">Maquila marca propia</span></div>
+      <div class="kv-list">
+        <div class="kv"><span class="k">Entrega</span><span class="v">14 jun</span></div>
+        <div class="kv"><span class="k">Pares</span><span class="v mono">1.200</span></div>
+        <div class="kv"><span class="k">Valor</span><span class="v mono">$48.0M</span></div>
+      </div>
+      <div class="drawer-section-h">Amarre de inventario</div>
+      <div class="card card-pad" style="padding:14px">
+        <div class="flex between center" style="margin-bottom:10px"><span class="t-caption t-muted">Cumplimiento por stock</span><span class="mono" style="font-weight:600">63%</span></div>
+        <div style="height:14px;border-radius:999px;background:var(--inset);border:1px solid var(--border);display:flex;overflow:hidden"><div style="width:63%;background:var(--success)"></div><div style="width:37%;background:var(--accent)"></div></div>
+      </div>
+    </div>
+    <div class="drawer-foot"><button class="btn btn-ghost" onclick="closeDocDrawer()">Cerrar</button><a class="btn btn-primary" href="pantallas/Detalle OP — Amarre.html">Ver OP / amarre →</a></div>
+  </aside>
+  <script src="assets/combobox.js"></script>
+
+<script>
+// tema
+(function(){try{if(localStorage.getItem('agro-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 1v3M12 20v3M4 12H1M23 12h-3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>';
+const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const tb=document.getElementById('themeBtn');function ic(){tb.innerHTML=document.documentElement.getAttribute('data-theme')==='dark'?sun:moon;}ic();
+tb.onclick=()=>{const d=document.documentElement.getAttribute('data-theme')==='dark';if(d)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dark');try{localStorage.setItem('agro-theme',d?'light':'dark');}catch(e){}ic();};
+// toast
+function showToast(){const t=document.createElement('div');t.className='toast info toast-accent';t.innerHTML='<span class="t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span><div><div class="t-title">Acción registrada</div><div class="t-desc">Ejemplo de notificación del sistema</div></div>';document.getElementById('toastStack').appendChild(t);setTimeout(()=>{t.style.opacity=0;t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300);},2800);}
+// tallas demo
+const T=[33,34,35,36,37,38,39,40,41,42,43,44,45,46,47],seed={37:40,38:120,39:180,40:240,41:200,42:120,43:40};
+const g=document.getElementById('docTallas');
+T.forEach(t=>{const c=document.createElement('div');c.className='talla-cell'+(seed[t]?' is-filled':'');c.innerHTML='<div class="t-head">'+t+'</div><input inputmode="numeric" value="'+(seed[t]||'')+'">';const i=c.querySelector('input');i.addEventListener('input',()=>{c.classList.toggle('is-filled',!!i.value);tot();});g.appendChild(c);});
+function tot(){let s=0;g.querySelectorAll('input').forEach(i=>s+=parseInt(i.value||0,10));document.getElementById('docTallasTot').textContent=s.toLocaleString('es-CO');}tot();
+// amarre demo
+const A=[{t:38,ped:120,stock:80},{t:39,ped:180,stock:60},{t:40,ped:240,stock:240},{t:41,ped:200,stock:90},{t:42,ped:120,stock:120}];
+document.getElementById('docAmarre').innerHTML=A.map(d=>{const prod=Math.max(0,d.ped-d.stock);const full=prod===0;return '<div class="amarre-line"><span class="amarre-talla">'+d.t+'</span><div class="amarre-bar"><div class="amarre-stock" style="width:'+(d.stock/d.ped*100)+'%"></div><div class="amarre-prod" style="width:'+(prod/d.ped*100)+'%"></div></div><span class="amarre-vals"><b style="color:var(--success)">'+d.stock+'</b> / <b style="color:var(--accent)">'+prod+'</b> / '+d.ped+'</span></div>';}).join('');
+// drawer demo
+function openDocDrawer(){document.getElementById('docDrawerScrim').style.display='block';document.getElementById('docDrawer').style.display='flex';}
+function closeDocDrawer(){document.getElementById('docDrawer').style.display='none';document.getElementById('docDrawerScrim').style.display='none';}
+// combobox demos
+const _clientes=['Minera El Roble','Constructora Yopal','Agroindustrias del Llano','Petro Servicios SA','Ingenio del Valle','Carbones del Cesar','Palma & Cía','Seguridad Andina','Maquila Norte SAS','Industrias del Pacífico','Distribuidora Central','Comercial del Oriente','Inversiones La Esperanza','Calzado San Jorge','Transportes del Meta','Cementos Boyacá','Café del Huila','Cooperativa del Cauca','Manufacturas Quindío','Servicios del Caribe'];
+const _conds=['30 días · Pedido directo','Contado · Maquila 3 marcas','45 días · Maquila marca propia','60 días · Pedido directo'];
+AgroCombobox(document.getElementById('cbCliente'),{
+  placeholder:'Buscar entre 291 clientes…',
+  leadIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  items:_clientes.map((n,i)=>({value:i,label:n,sub:'NIT 9'+(10+i)+'.'+(100+i*7)%999+'.001-'+(i%10)+' · '+_conds[i%4],avatar:n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}))
+});
+const _mats=['Cuero graso negro 1.8mm','Cuero nobuck miel','Forro Cambrelle','Plantilla EVA perforada','Puntera composite 200J','PU densidad suela','PU densidad confort','Hilo poliéster 40','Ojalete latón','Cordón plano 120cm','Contrafuerte termoplástico','Membrana dieléctrica'];
+AgroCombobox(document.getElementById('cbMaterial'),{
+  placeholder:'Buscar material…',allowAddLabel:'Crear material',
+  leadIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>',
+  items:_mats.map((n,i)=>({value:i,label:n,sub:'SKU MAT-'+(1000+i),avatar:'M'})),
+  onAdd:(q)=>showToast()
+});
+
+// toc active
+const secs=[...document.querySelectorAll('.doc-section')],links=[...document.querySelectorAll('.doc-nav a[href^="#"]')];
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id));}});},{rootMargin:'-20% 0px -70% 0px'});
+secs.forEach(s=>io.observe(s));
+</script>
+</body>
+</html>

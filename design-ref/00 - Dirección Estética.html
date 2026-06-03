@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dirección Estética — ERP/MES Botas Agroindustrial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=Onest:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ESTRUCTURA COMPARTIDA (framework-agnóstica)
+   ============================================================ */
+:root{
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-full:999px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px;
+  --dur-1:120ms; --dur-2:200ms; --ease:cubic-bezier(.2,.6,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{
+  background:var(--page);
+  color:var(--page-ink);
+  font-family:'Inter',system-ui,sans-serif;
+  line-height:1.5;
+  transition:background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+/* página = neutral según tema global */
+body[data-theme="light"]{ --page:oklch(0.955 0.004 255); --page-ink:oklch(0.28 0.01 255); --page-sub:oklch(0.52 0.012 255); --page-card:oklch(1 0 0); --page-border:oklch(0.90 0.006 255); }
+body[data-theme="dark"]{  --page:oklch(0.155 0.008 255); --page-ink:oklch(0.94 0.005 255); --page-sub:oklch(0.66 0.01 255); --page-card:oklch(0.205 0.01 255); --page-border:oklch(0.30 0.012 255); }
+
+/* ---------- layout de página ---------- */
+.wrap{max-width:1480px;margin:0 auto;padding:var(--sp-12) var(--sp-8) 96px;}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-8);flex-wrap:wrap;margin-bottom:var(--sp-10);}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--page-sub);display:flex;align-items:center;gap:8px;}
+.eyebrow::before{content:"";width:18px;height:2px;background:oklch(0.64 0.19 42);display:inline-block;}
+h1.title{font-size:34px;line-height:1.08;letter-spacing:-0.02em;font-weight:700;margin:14px 0 12px;max-width:18ch;}
+.lede{color:var(--page-sub);font-size:15px;max-width:62ch;line-height:1.6;}
+.lede strong{color:var(--page-ink);font-weight:600;}
+
+.toggle{display:inline-flex;background:var(--page-card);border:1px solid var(--page-border);border-radius:var(--r-full);padding:3px;gap:2px;}
+.toggle button{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.04em;border:0;background:transparent;color:var(--page-sub);padding:7px 16px;border-radius:var(--r-full);cursor:pointer;transition:all var(--dur-1) var(--ease);}
+.toggle button[aria-pressed="true"]{background:var(--page-ink);color:var(--page);}
+
+.context{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--page-border);border:1px solid var(--page-border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--sp-12);}
+.context div{background:var(--page-card);padding:var(--sp-5) var(--sp-5);}
+.context .k{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;letter-spacing:-0.01em;}
+.context .l{font-size:12.5px;color:var(--page-sub);margin-top:3px;}
+
+/* ---------- grid de comparación ---------- */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-6);align-items:start;}
+@media(max-width:1100px){.compare{grid-template-columns:1fr;}.context{grid-template-columns:repeat(2,1fr);}}
+
+/* ============================================================
+   BOARD = una dirección estética, con su propio set de tokens
+   ============================================================ */
+.board{
+  border-radius:var(--r-xl);
+  background:var(--c-bg);
+  border:1px solid var(--c-border);
+  overflow:hidden;
+  font-family:var(--font-ui);
+  color:var(--c-text);
+  box-shadow:0 1px 2px oklch(0 0 0/.04), 0 24px 48px -28px oklch(0 0 0/.22);
+}
+/* ---- ACERO · claro ---- */
+.board[data-dir="acero"]{
+  --font-ui:'Inter',system-ui,sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  --c-bg:oklch(0.975 0.004 250); --c-surface:oklch(1 0 0); --c-surface-2:oklch(0.97 0.005 250); --c-inset:oklch(0.955 0.006 250);
+  --c-border:oklch(0.905 0.006 250); --c-border-strong:oklch(0.82 0.01 250);
+  --c-text:oklch(0.26 0.016 255); --c-muted:oklch(0.5 0.014 255); --c-subtle:oklch(0.64 0.012 255);
+  --c-primary:oklch(0.47 0.072 250); --c-primary-hover:oklch(0.41 0.075 250); --c-primary-fg:oklch(0.99 0.005 250); --c-primary-soft:oklch(0.95 0.03 250);
+  --c-accent:oklch(0.77 0.15 72); --c-accent-hover:oklch(0.72 0.16 66); --c-accent-fg:oklch(0.28 0.06 70);
+  --c-success:oklch(0.56 0.13 155); --c-warning:oklch(0.74 0.15 72); --c-error:oklch(0.55 0.2 27); --c-info:oklch(0.53 0.11 250);
+  --c-focus:oklch(0.7 0.12 250);
+}
+.board[data-dir="acero"][data-mode="dark"]{
+  --c-bg:oklch(0.195 0.012 255); --c-surface:oklch(0.235 0.013 255); --c-surface-2:oklch(0.275 0.014 255); --c-inset:oklch(0.22 0.012 255);
+  --c-border:oklch(0.33 0.014 255); --c-border-strong:oklch(0.42 0.016 255);
+  --c-text:oklch(0.95 0.006 255); --c-muted:oklch(0.74 0.012 255); --c-subtle:oklch(0.58 0.014 255);
+  --c-primary:oklch(0.68 0.1 252); --c-primary-hover:oklch(0.74 0.1 252); --c-primary-fg:oklch(0.16 0.03 255); --c-primary-soft:oklch(0.3 0.05 252);
+  --c-accent:oklch(0.79 0.15 72); --c-accent-hover:oklch(0.84 0.14 72); --c-accent-fg:oklch(0.2 0.05 70);
+  --c-success:oklch(0.72 0.14 155); --c-warning:oklch(0.82 0.14 78); --c-error:oklch(0.68 0.17 27); --c-info:oklch(0.7 0.11 250);
+  --c-focus:oklch(0.72 0.12 250);
+}
+/* ---- CONCRETO · claro ---- */
+.board[data-dir="concreto"]{
+  --font-ui:'Onest',system-ui,sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --c-bg:oklch(0.972 0.005 75); --c-surface:oklch(0.995 0.003 75); --c-surface-2:oklch(0.962 0.007 70); --c-inset:oklch(0.95 0.008 70);
+  --c-border:oklch(0.9 0.008 70); --c-border-strong:oklch(0.8 0.011 65);
+  --c-text:oklch(0.24 0.011 60); --c-muted:oklch(0.46 0.013 60); --c-subtle:oklch(0.6 0.012 62);
+  --c-primary:oklch(0.29 0.012 55); --c-primary-hover:oklch(0.22 0.012 55); --c-primary-fg:oklch(0.98 0.006 75); --c-primary-soft:oklch(0.93 0.014 65);
+  --c-accent:oklch(0.64 0.19 42); --c-accent-hover:oklch(0.58 0.2 40); --c-accent-fg:oklch(0.99 0.01 70);
+  --c-success:oklch(0.57 0.12 150); --c-warning:oklch(0.74 0.15 68); --c-error:oklch(0.55 0.2 30); --c-info:oklch(0.54 0.1 238);
+  --c-focus:oklch(0.64 0.19 42);
+}
+.board[data-dir="concreto"][data-mode="dark"]{
+  --c-bg:oklch(0.185 0.008 60); --c-surface:oklch(0.225 0.009 60); --c-surface-2:oklch(0.265 0.01 60); --c-inset:oklch(0.21 0.008 60);
+  --c-border:oklch(0.32 0.01 60); --c-border-strong:oklch(0.42 0.012 60);
+  --c-text:oklch(0.94 0.007 70); --c-muted:oklch(0.72 0.012 65); --c-subtle:oklch(0.56 0.012 62);
+  --c-primary:oklch(0.93 0.012 70); --c-primary-hover:oklch(0.86 0.014 70); --c-primary-fg:oklch(0.2 0.012 60); --c-primary-soft:oklch(0.32 0.02 65);
+  --c-accent:oklch(0.68 0.18 44); --c-accent-hover:oklch(0.74 0.16 44); --c-accent-fg:oklch(0.16 0.02 60);
+  --c-success:oklch(0.72 0.13 150); --c-warning:oklch(0.8 0.14 70); --c-error:oklch(0.68 0.17 30); --c-info:oklch(0.7 0.1 238);
+  --c-focus:oklch(0.68 0.18 44);
+}
+
+/* ---------- header del board ---------- */
+.board-head{padding:var(--sp-6) var(--sp-6) var(--sp-5);border-bottom:1px solid var(--c-border);background:var(--c-surface);}
+.board-id{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-subtle);}
+.board-id .dot{width:9px;height:9px;border-radius:2px;background:var(--c-accent);}
+.board h2{font-size:26px;font-weight:700;letter-spacing:-0.02em;margin:10px 0 8px;}
+.board .desc{font-size:13.5px;color:var(--c-muted);line-height:1.55;max-width:46ch;}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;}
+.tag{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--c-muted);background:var(--c-surface-2);border:1px solid var(--c-border);padding:4px 9px;border-radius:var(--r-full);}
+
+/* ---------- secciones internas ---------- */
+.sec{padding:var(--sp-6);border-bottom:1px solid var(--c-border);}
+.sec:last-child{border-bottom:0;}
+.sec-h{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-subtle);margin-bottom:var(--sp-5);}
+.sec-h .n{color:var(--c-accent);}
+
+/* ---------- tipografía specimen ---------- */
+.type-row{display:flex;align-items:baseline;gap:14px;padding:9px 0;border-bottom:1px dashed var(--c-border);}
+.type-row:last-child{border-bottom:0;}
+.type-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--c-subtle);width:104px;flex:none;letter-spacing:.02em;}
+.type-spec{color:var(--c-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.t-display{font-size:30px;font-weight:700;letter-spacing:-0.025em;}
+.t-h{font-size:19px;font-weight:600;letter-spacing:-0.015em;}
+.t-body{font-size:14px;font-weight:400;}
+.t-cap{font-size:11.5px;font-weight:500;color:var(--c-muted);}
+.t-num{font-family:var(--font-mono);font-size:18px;font-weight:500;font-variant-numeric:tabular-nums;}
+
+/* ---------- paleta ---------- */
+.pal-group{margin-bottom:var(--sp-5);}
+.pal-group:last-child{margin-bottom:0;}
+.pal-label{font-size:12px;font-weight:600;color:var(--c-muted);margin-bottom:8px;display:flex;justify-content:space-between;}
+.pal-label span{font-family:var(--font-mono);font-weight:400;font-size:10.5px;color:var(--c-subtle);}
+.swatches{display:grid;grid-template-columns:repeat(11,1fr);gap:0;border-radius:var(--r-md);overflow:hidden;border:1px solid var(--c-border);}
+.sw{height:46px;display:flex;align-items:flex-end;justify-content:flex-start;padding:5px;font-family:var(--font-mono);font-size:8.5px;}
+.semantic{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.sem{border:1px solid var(--c-border);border-radius:var(--r-md);overflow:hidden;background:var(--c-surface);}
+.sem .chip{height:42px;}
+.sem .meta{padding:7px 9px;}
+.sem .meta b{font-size:12px;display:block;}
+.sem .meta small{font-family:var(--font-mono);font-size:9.5px;color:var(--c-subtle);}
+.accent-feature{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px;border-radius:var(--r-md);background:var(--c-surface);border:1px solid var(--c-border);}
+.accent-chip{width:54px;height:54px;border-radius:var(--r-sm);background:var(--c-accent);flex:none;}
+.accent-feature .at{font-size:13px;font-weight:600;}
+.accent-feature .as{font-size:12px;color:var(--c-muted);}
+
+/* ============================================================
+   COMPONENTES DE MUESTRA
+   ============================================================ */
+.demo{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:var(--sp-5);}
+.demo + .demo{margin-top:var(--sp-4);}
+.demo-cap{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-subtle);margin-bottom:14px;}
+
+/* botones */
+.btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.btn{font-family:var(--font-ui);font-size:13px;font-weight:500;border-radius:var(--r-sm);padding:9px 15px;border:1px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all var(--dur-1) var(--ease);line-height:1;}
+.btn svg{width:14px;height:14px;}
+.btn:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px;}
+.btn-pri{background:var(--c-primary);color:var(--c-primary-fg);}
+.btn-pri:hover{background:var(--c-primary-hover);}
+.btn-sec{background:var(--c-surface);color:var(--c-text);border-color:var(--c-border-strong);}
+.btn-sec:hover{background:var(--c-surface-2);}
+.btn-ghost{background:transparent;color:var(--c-muted);}
+.btn-ghost:hover{background:var(--c-surface-2);color:var(--c-text);}
+.btn-accent{background:var(--c-accent);color:var(--c-accent-fg);font-weight:600;}
+.btn-accent:hover{background:var(--c-accent-hover);}
+.btn-danger{background:transparent;color:var(--c-error);border-color:color-mix(in oklch,var(--c-error) 40%,transparent);}
+.btn-danger:hover{background:color-mix(in oklch,var(--c-error) 12%,var(--c-surface));}
+.btn-dis{background:var(--c-surface-2);color:var(--c-subtle);border-color:var(--c-border);cursor:not-allowed;}
+
+/* badges de estado */
+.badges{display:flex;flex-wrap:wrap;gap:8px;}
+.badge{font-size:11.5px;font-weight:600;letter-spacing:.01em;padding:4px 10px 4px 8px;border-radius:var(--r-full);display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;}
+.badge .bd{width:6px;height:6px;border-radius:50%;flex:none;}
+.bg-draft{background:var(--c-surface-2);color:var(--c-muted);border-color:var(--c-border);}
+.bg-draft .bd{background:var(--c-subtle);}
+.bg-info{background:color-mix(in oklch,var(--c-info) 14%,var(--c-surface));color:var(--c-info);border-color:color-mix(in oklch,var(--c-info) 30%,transparent);}
+.bg-info .bd{background:var(--c-info);}
+.bg-warn{background:color-mix(in oklch,var(--c-warning) 20%,var(--c-surface));color:color-mix(in oklch,var(--c-warning) 75%,var(--c-text));border-color:color-mix(in oklch,var(--c-warning) 40%,transparent);}
+.bg-warn .bd{background:var(--c-warning);}
+.bg-ok{background:color-mix(in oklch,var(--c-success) 14%,var(--c-surface));color:var(--c-success);border-color:color-mix(in oklch,var(--c-success) 30%,transparent);}
+.bg-ok .bd{background:var(--c-success);}
+.bg-err{background:color-mix(in oklch,var(--c-error) 12%,var(--c-surface));color:var(--c-error);border-color:color-mix(in oklch,var(--c-error) 30%,transparent);}
+.bg-err .bd{background:var(--c-error);}
+.bg-accent{background:color-mix(in oklch,var(--c-accent) 22%,var(--c-surface));color:color-mix(in oklch,var(--c-accent) 80%,var(--c-text));border-color:color-mix(in oklch,var(--c-accent) 45%,transparent);}
+.bg-accent .bd{background:var(--c-accent);}
+.badge-sub{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-subtle);margin:14px 0 8px;}
+
+/* KPI cards */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.kpi{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:14px;}
+.kpi .kl{font-size:11.5px;color:var(--c-muted);display:flex;align-items:center;gap:6px;}
+.kpi .kl .ico{width:7px;height:7px;border-radius:2px;background:var(--c-accent);}
+.kpi .kv{font-family:var(--font-mono);font-size:27px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;margin-top:8px;}
+.kpi .kv .u{font-size:13px;color:var(--c-subtle);font-weight:400;}
+.kpi .kd{font-size:11px;font-weight:600;margin-top:5px;display:inline-flex;align-items:center;gap:4px;}
+.kd.up{color:var(--c-success);} .kd.dn{color:var(--c-error);}
+
+/* tabla densa */
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+.tbl thead th{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--c-subtle);text-align:left;font-weight:500;padding:9px 10px;border-bottom:1px solid var(--c-border-strong);white-space:nowrap;}
+.tbl thead th.r,.tbl tbody td.r{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-mono);}
+.tbl tbody td{padding:10px;border-bottom:1px solid var(--c-border);color:var(--c-text);}
+.tbl tbody tr:hover td{background:var(--c-surface-2);}
+.tbl tbody tr.sel td{background:color-mix(in oklch,var(--c-accent) 9%,var(--c-surface));}
+.tbl .oc{font-family:var(--font-mono);font-weight:500;}
+.tbl .cli{color:var(--c-muted);}
+.tbl-wrap{border:1px solid var(--c-border);border-radius:var(--r-md);overflow:hidden;}
+
+/* curva de tallas */
+.tallas{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;}
+.talla{border:1px solid var(--c-border);border-radius:var(--r-xs);overflow:hidden;background:var(--c-surface);text-align:center;}
+.talla .th{font-family:var(--font-mono);font-size:10px;color:var(--c-subtle);padding:4px 0 2px;background:var(--c-surface-2);}
+.talla input{width:100%;border:0;background:transparent;text-align:center;font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--c-text);padding:7px 0;font-variant-numeric:tabular-nums;}
+.talla input:focus{outline:0;background:color-mix(in oklch,var(--c-accent) 14%,var(--c-surface));}
+.talla.filled{border-color:color-mix(in oklch,var(--c-accent) 50%,var(--c-border));}
+.tallas-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:var(--c-muted);}
+.tallas-foot b{font-family:var(--font-mono);font-size:16px;color:var(--c-text);font-variant-numeric:tabular-nums;}
+
+/* amarre / disponibilidad */
+.amarre-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.amarre-row:last-child{margin-bottom:0;}
+.amarre-talla{font-family:var(--font-mono);font-size:12px;font-weight:600;width:34px;flex:none;color:var(--c-muted);}
+.amarre-bar{flex:1;height:22px;border-radius:var(--r-xs);background:var(--c-inset);overflow:hidden;display:flex;border:1px solid var(--c-border);}
+.amarre-stock{background:var(--c-success);height:100%;}
+.amarre-prod{background:var(--c-accent);height:100%;}
+.amarre-vals{font-family:var(--font-mono);font-size:11px;width:96px;flex:none;text-align:right;color:var(--c-muted);font-variant-numeric:tabular-nums;}
+.amarre-vals b{color:var(--c-text);}
+.amarre-legend{display:flex;gap:16px;margin-top:14px;font-size:11.5px;color:var(--c-muted);}
+.amarre-legend span{display:inline-flex;align-items:center;gap:6px;}
+.amarre-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+/* inputs muestra */
+.field{margin-bottom:12px;}
+.field:last-child{margin-bottom:0;}
+.field label{font-size:11.5px;font-weight:600;color:var(--c-muted);display:block;margin-bottom:6px;}
+.input{width:100%;font-family:var(--font-ui);font-size:13px;color:var(--c-text);background:var(--c-surface);border:1px solid var(--c-border-strong);border-radius:var(--r-sm);padding:9px 12px;transition:all var(--dur-1) var(--ease);}
+.input::placeholder{color:var(--c-subtle);}
+.input:focus{outline:0;border-color:var(--c-focus);box-shadow:0 0 0 3px color-mix(in oklch,var(--c-focus) 22%,transparent);}
+.input.err{border-color:var(--c-error);box-shadow:0 0 0 3px color-mix(in oklch,var(--c-error) 18%,transparent);}
+.err-msg{font-size:11px;color:var(--c-error);margin-top:5px;display:flex;align-items:center;gap:5px;}
+
+/* principios */
+.principles{display:grid;grid-template-columns:1fr;gap:10px;}
+.princ{display:flex;gap:12px;padding:13px 14px;border:1px solid var(--c-border);border-radius:var(--r-md);background:var(--c-surface);}
+.princ .pn{font-family:var(--font-mono);font-size:12px;color:var(--c-accent);font-weight:600;flex:none;}
+.princ .pt{font-size:13px;font-weight:600;margin-bottom:2px;}
+.princ .pd{font-size:12px;color:var(--c-muted);line-height:1.5;}
+
+/* footer cta */
+.footnote{margin-top:var(--sp-12);padding:var(--sp-8);background:var(--page-card);border:1px solid var(--page-border);border-radius:var(--r-lg);}
+.footnote h3{font-size:16px;font-weight:600;margin-bottom:10px;letter-spacing:-0.01em;}
+.footnote ol{margin:0 0 0 18px;color:var(--page-sub);font-size:13.5px;line-height:1.9;}
+.footnote b{color:var(--page-ink);}
+.dod{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;}
+.dod .col{padding:14px 16px;border-radius:var(--r-md);border:1px solid var(--page-border);}
+.dod h4{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;}
+.dod ul{list-style:none;font-size:12.5px;color:var(--page-sub);line-height:1.85;}
+.dod li{padding-left:18px;position:relative;}
+.dod.do h4{color:oklch(0.56 0.13 155);} .dod .do li::before{content:"✓";position:absolute;left:0;color:oklch(0.56 0.13 155);font-weight:700;}
+.dont li::before{content:"✕";position:absolute;left:0;color:oklch(0.55 0.2 27);font-weight:700;}
+@media(max-width:680px){.dod,.context{grid-template-columns:1fr;}}
+</style>
+</head>
+<body data-theme="light">
+<div class="wrap">
+
+  <!-- ENCABEZADO -->
+  <header class="page-head">
+    <div>
+      <div class="eyebrow">Design System · v0 · Dirección estética</div>
+      <h1 class="title">ERP + MES para Botas Agroindustrial</h1>
+      <p class="lede">Antes de construir el sistema completo, dos direcciones para <strong>validar la personalidad visual</strong>. Ambas son industriales y limpias (estilo Linear/Vercel), soportan <strong>modo claro y oscuro</strong>, usan grotesca neutra y números tabulares, y aplican el <strong>acento de seguridad</strong> de la marca de forma puntual. Probá el toggle y compará los componentes reales del ERP.</p>
+    </div>
+    <div class="toggle" role="group" aria-label="Modo de color">
+      <button data-set="light" aria-pressed="true">Claro</button>
+      <button data-set="dark" aria-pressed="false">Oscuro</button>
+    </div>
+  </header>
+
+  <!-- CONTEXTO MARCA -->
+  <section class="context">
+    <div><div class="k">40</div><div class="l">años de experiencia</div></div>
+    <div><div class="k">350K</div><div class="l">botas fabricadas al año</div></div>
+    <div><div class="k">make-to-order</div><div class="l">+ maquila multimarca</div></div>
+    <div><div class="k">Desktop-first</div><div class="l">tablet como 2º target</div></div>
+  </section>
+
+  <!-- COMPARACIÓN -->
+  <main class="compare">
+
+    <!-- ===================== DIRECCIÓN A · ACERO ===================== -->
+    <section class="board" data-dir="acero" data-mode="light">
+      <div class="board-head">
+        <div class="board-id"><span class="dot"></span>Dirección A</div>
+        <h2>Acero</h2>
+        <p class="desc">Neutros fríos de acero templado y un azul estructural como color primario. El ámbar de seguridad aparece solo en momentos clave. Precisión de instrumento de medición: sobrio, técnico, confiable.</p>
+        <div class="tags"><span class="tag">Inter</span><span class="tag">IBM Plex Mono</span><span class="tag">Neutros fríos</span><span class="tag">Azul acero + ámbar</span></div>
+      </div>
+
+      <!-- tipografía -->
+      <div class="sec">
+        <div class="sec-h"><span class="n">01</span> Tipografía · Inter / IBM Plex Mono</div>
+        <div class="type-row"><span class="type-meta">Display · 700</span><span class="type-spec t-display">Orden de Producción</span></div>
+        <div class="type-row"><span class="type-meta">Heading · 600</span><span class="type-spec t-h">Amarre de inventario por talla</span></div>
+        <div class="type-row"><span class="type-meta">Body · 400</span><span class="type-spec t-body">Curva de tallas confirmada para el pedido OC-2041.</span></div>
+        <div class="type-row"><span class="type-meta">Caption · 500</span><span class="type-spec t-cap">CLIENTE · BODEGA · ESTADO</span></div>
+        <div class="type-row"><span class="type-meta">Tabular · mono</span><span class="type-spec t-num">1.248 &nbsp; 33–47 &nbsp; $4.820.000</span></div>
+      </div>
+
+      <!-- paleta -->
+      <div class="sec">
+        <div class="sec-h"><span class="n">02</span> Paleta</div>
+        <div class="pal-group">
+          <div class="pal-label">Primario · Azul acero <span>oklch · H250</span></div>
+          <div class="swatches" data-scale="acero-pri"></div>
+        </div>
+        <div class="pal-group">
+          <div class="pal-label">Neutros fríos <span>oklch · H255 · c≤0.016</span></div>
+          <div class="swatches" data-scale="acero-neu"></div>
+        </div>
+        <div class="pal-group">
+          <div class="pal-label">Semánticos · estados</div>
+          <div class="semantic">
+            <div class="sem"><div class="chip" style="background:var(--c-success)"></div><div class="meta"><b>Éxito</b><small>Cerrada</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-warning)"></div><div class="meta"><b>Aviso</b><small>En producción</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-error)"></div><div class="meta"><b>Error</b><small>Anulada</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-info)"></div><div class="meta"><b>Info</b><small>Confirmada</small></div></div>
+          </div>
+        </div>
+        <div class="accent-feature">
+          <div class="accent-chip"></div>
+          <div><div class="at">Ámbar de seguridad — acento</div><div class="as">CTAs decisivos, highlights y barras de "a producir". Uso puntual, nunca de fondo.</div></div>
+        </div>
+      </div>
+
+      <!-- componentes -->
+      <div class="sec">
+        <div class="sec-h"><span class="n">03</span> Componentes en contexto</div>
+
+        <div class="demo">
+          <div class="demo-cap">Botones · todos los estados</div>
+          <div class="btns">
+            <button class="btn btn-pri"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>Nueva OC</button>
+            <button class="btn btn-sec">Secundario</button>
+            <button class="btn btn-ghost">Ghost</button>
+            <button class="btn btn-danger">Anular</button>
+            <button class="btn btn-dis" disabled>Disabled</button>
+          </div>
+          <div class="btns" style="margin-top:10px;">
+            <button class="btn btn-accent"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l3.5 3.5L13 5"/></svg>Confirmar pedido</button>
+            <button class="btn btn-sec"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6l4 4 4-4"/></svg>Exportar</button>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Badges de estado · OC y OP</div>
+          <div class="badge-sub">Orden de compra</div>
+          <div class="badges">
+            <span class="badge bg-draft"><span class="bd"></span>Borrador</span>
+            <span class="badge bg-info"><span class="bd"></span>Confirmada</span>
+            <span class="badge bg-warn"><span class="bd"></span>En producción</span>
+            <span class="badge bg-ok"><span class="bd"></span>Cerrada</span>
+            <span class="badge bg-err"><span class="bd"></span>Anulada</span>
+          </div>
+          <div class="badge-sub">Orden de producción</div>
+          <div class="badges">
+            <span class="badge bg-info"><span class="bd"></span>Creada</span>
+            <span class="badge bg-accent"><span class="bd"></span>Amarrada</span>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">KPIs</div>
+          <div class="kpis">
+            <div class="kpi"><div class="kl"><span class="ico"></span>OCs abiertas</div><div class="kv">128</div><div class="kd up">▲ 12% vs. mes ant.</div></div>
+            <div class="kpi"><div class="kl"><span class="ico"></span>Pares a producir</div><div class="kv">8.420<span class="u"> pares</span></div><div class="kd dn">▼ 4% vs. plan</div></div>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Tabla densa · sticky header, fila seleccionable</div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>OC</th><th>Cliente</th><th>Estado</th><th class="r">Pares</th><th class="r">Valor</th></tr></thead>
+              <tbody>
+                <tr class="sel"><td class="oc">OC-2041</td><td class="cli">Minera El Roble</td><td><span class="badge bg-warn"><span class="bd"></span>En prod.</span></td><td class="r">1.200</td><td class="r">$48.0M</td></tr>
+                <tr><td class="oc">OC-2040</td><td class="cli">Maquila Norte</td><td><span class="badge bg-info"><span class="bd"></span>Confirmada</span></td><td class="r">640</td><td class="r">$25.6M</td></tr>
+                <tr><td class="oc">OC-2039</td><td class="cli">Constructora Yopal</td><td><span class="badge bg-ok"><span class="bd"></span>Cerrada</span></td><td class="r">2.000</td><td class="r">$80.0M</td></tr>
+                <tr><td class="oc">OC-2038</td><td class="cli">Agroindustrias SAS</td><td><span class="badge bg-draft"><span class="bd"></span>Borrador</span></td><td class="r">320</td><td class="r">$12.8M</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Grid curva de tallas · 33–47, llenado por teclado</div>
+          <div class="tallas" data-tallas></div>
+          <div class="tallas-foot">Total del pedido <b data-tallas-total>0</b></div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Amarre / disponibilidad · stock vs. a producir</div>
+          <div data-amarre></div>
+          <div class="amarre-legend">
+            <span><i style="background:var(--c-success)"></i>En stock</span>
+            <span><i style="background:var(--c-accent)"></i>A producir</span>
+            <span><i style="background:var(--c-inset);border:1px solid var(--c-border)"></i>Pedido</span>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Inputs · default, focus, error</div>
+          <div class="field"><label>Cliente</label><input class="input" placeholder="Buscar cliente…" value="Minera El Roble"></div>
+          <div class="field"><label>NIT</label><input class="input err" value="900.123"><div class="err-msg"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11h.01"/></svg>NIT incompleto (9 dígitos + verificación).</div></div>
+        </div>
+      </div>
+
+      <!-- principios -->
+      <div class="sec">
+        <div class="sec-h"><span class="n">04</span> Personalidad</div>
+        <div class="principles">
+          <div class="princ"><span class="pn">A1</span><div><div class="pt">El dato manda</div><div class="pd">Números en mono tabular, alineados a la derecha. La tipografía se aparta para que la información respire.</div></div></div>
+          <div class="princ"><span class="pn">A2</span><div><div class="pt">Color con intención</div><div class="pd">Neutros fríos del 95% del UI; azul para acción, ámbar solo donde hay que decidir o alertar.</div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== DIRECCIÓN B · CONCRETO ===================== -->
+    <section class="board" data-dir="concreto" data-mode="light">
+      <div class="board-head">
+        <div class="board-id"><span class="dot"></span>Dirección B</div>
+        <h2>Concreto</h2>
+        <p class="desc">Neutros cálidos de cemento y grafito, con el naranja de seguridad de la marca como acento vivo. Más terrenal y robusto — sabe a planta de producción sin perder pulcritud de SaaS.</p>
+        <div class="tags"><span class="tag">Onest</span><span class="tag">JetBrains Mono</span><span class="tag">Neutros cálidos</span><span class="tag">Grafito + naranja marca</span></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="n">01</span> Tipografía · Onest / JetBrains Mono</div>
+        <div class="type-row"><span class="type-meta">Display · 700</span><span class="type-spec t-display">Orden de Producción</span></div>
+        <div class="type-row"><span class="type-meta">Heading · 600</span><span class="type-spec t-h">Amarre de inventario por talla</span></div>
+        <div class="type-row"><span class="type-meta">Body · 400</span><span class="type-spec t-body">Curva de tallas confirmada para el pedido OC-2041.</span></div>
+        <div class="type-row"><span class="type-meta">Caption · 500</span><span class="type-spec t-cap">CLIENTE · BODEGA · ESTADO</span></div>
+        <div class="type-row"><span class="type-meta">Tabular · mono</span><span class="type-spec t-num">1.248 &nbsp; 33–47 &nbsp; $4.820.000</span></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="n">02</span> Paleta</div>
+        <div class="pal-group">
+          <div class="pal-label">Primario · Grafito <span>oklch · H55</span></div>
+          <div class="swatches" data-scale="concreto-pri"></div>
+        </div>
+        <div class="pal-group">
+          <div class="pal-label">Neutros cálidos <span>oklch · H65 · c≤0.013</span></div>
+          <div class="swatches" data-scale="concreto-neu"></div>
+        </div>
+        <div class="pal-group">
+          <div class="pal-label">Semánticos · estados</div>
+          <div class="semantic">
+            <div class="sem"><div class="chip" style="background:var(--c-success)"></div><div class="meta"><b>Éxito</b><small>Cerrada</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-warning)"></div><div class="meta"><b>Aviso</b><small>En producción</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-error)"></div><div class="meta"><b>Error</b><small>Anulada</small></div></div>
+            <div class="sem"><div class="chip" style="background:var(--c-info)"></div><div class="meta"><b>Info</b><small>Confirmada</small></div></div>
+          </div>
+        </div>
+        <div class="accent-feature">
+          <div class="accent-chip"></div>
+          <div><div class="at">Naranja de seguridad — marca</div><div class="as">Es el color del logo. CTAs primarios y momentos de "a producir". Vivo pero medido.</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="n">03</span> Componentes en contexto</div>
+
+        <div class="demo">
+          <div class="demo-cap">Botones · todos los estados</div>
+          <div class="btns">
+            <button class="btn btn-pri"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>Nueva OC</button>
+            <button class="btn btn-sec">Secundario</button>
+            <button class="btn btn-ghost">Ghost</button>
+            <button class="btn btn-danger">Anular</button>
+            <button class="btn btn-dis" disabled>Disabled</button>
+          </div>
+          <div class="btns" style="margin-top:10px;">
+            <button class="btn btn-accent"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l3.5 3.5L13 5"/></svg>Confirmar pedido</button>
+            <button class="btn btn-sec"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6l4 4 4-4"/></svg>Exportar</button>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Badges de estado · OC y OP</div>
+          <div class="badge-sub">Orden de compra</div>
+          <div class="badges">
+            <span class="badge bg-draft"><span class="bd"></span>Borrador</span>
+            <span class="badge bg-info"><span class="bd"></span>Confirmada</span>
+            <span class="badge bg-warn"><span class="bd"></span>En producción</span>
+            <span class="badge bg-ok"><span class="bd"></span>Cerrada</span>
+            <span class="badge bg-err"><span class="bd"></span>Anulada</span>
+          </div>
+          <div class="badge-sub">Orden de producción</div>
+          <div class="badges">
+            <span class="badge bg-info"><span class="bd"></span>Creada</span>
+            <span class="badge bg-accent"><span class="bd"></span>Amarrada</span>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">KPIs</div>
+          <div class="kpis">
+            <div class="kpi"><div class="kl"><span class="ico"></span>OCs abiertas</div><div class="kv">128</div><div class="kd up">▲ 12% vs. mes ant.</div></div>
+            <div class="kpi"><div class="kl"><span class="ico"></span>Pares a producir</div><div class="kv">8.420<span class="u"> pares</span></div><div class="kd dn">▼ 4% vs. plan</div></div>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Tabla densa · sticky header, fila seleccionable</div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>OC</th><th>Cliente</th><th>Estado</th><th class="r">Pares</th><th class="r">Valor</th></tr></thead>
+              <tbody>
+                <tr class="sel"><td class="oc">OC-2041</td><td class="cli">Minera El Roble</td><td><span class="badge bg-warn"><span class="bd"></span>En prod.</span></td><td class="r">1.200</td><td class="r">$48.0M</td></tr>
+                <tr><td class="oc">OC-2040</td><td class="cli">Maquila Norte</td><td><span class="badge bg-info"><span class="bd"></span>Confirmada</span></td><td class="r">640</td><td class="r">$25.6M</td></tr>
+                <tr><td class="oc">OC-2039</td><td class="cli">Constructora Yopal</td><td><span class="badge bg-ok"><span class="bd"></span>Cerrada</span></td><td class="r">2.000</td><td class="r">$80.0M</td></tr>
+                <tr><td class="oc">OC-2038</td><td class="cli">Agroindustrias SAS</td><td><span class="badge bg-draft"><span class="bd"></span>Borrador</span></td><td class="r">320</td><td class="r">$12.8M</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Grid curva de tallas · 33–47, llenado por teclado</div>
+          <div class="tallas" data-tallas></div>
+          <div class="tallas-foot">Total del pedido <b data-tallas-total>0</b></div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Amarre / disponibilidad · stock vs. a producir</div>
+          <div data-amarre></div>
+          <div class="amarre-legend">
+            <span><i style="background:var(--c-success)"></i>En stock</span>
+            <span><i style="background:var(--c-accent)"></i>A producir</span>
+            <span><i style="background:var(--c-inset);border:1px solid var(--c-border)"></i>Pedido</span>
+          </div>
+        </div>
+
+        <div class="demo">
+          <div class="demo-cap">Inputs · default, focus, error</div>
+          <div class="field"><label>Cliente</label><input class="input" placeholder="Buscar cliente…" value="Minera El Roble"></div>
+          <div class="field"><label>NIT</label><input class="input err" value="900.123"><div class="err-msg"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11h.01"/></svg>NIT incompleto (9 dígitos + verificación).</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="n">04</span> Personalidad</div>
+        <div class="principles">
+          <div class="princ"><span class="pn">B1</span><div><div class="pt">Calor de planta</div><div class="pd">Neutros cálidos de cemento: el sistema se siente del taller, no de una hoja de cálculo fría.</div></div></div>
+          <div class="princ"><span class="pn">B2</span><div><div class="pt">Naranja = marca</div><div class="pd">Reutiliza el naranja del logo como primario de acción. Coherencia inmediata con la identidad existente.</div></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- CIERRE -->
+  <section class="footnote">
+    <h3>Cómo seguimos</h3>
+    <ol>
+      <li>Elegí una dirección — <b>Acero</b> o <b>Concreto</b> (o pedime un híbrido: ej. neutros de Concreto + azul de Acero).</li>
+      <li>Con eso fijo, construyo las <b>fundaciones completas</b> (todos los tokens como CSS variables) y la librería de <b>componentes documentada</b> para reimplementar en Angular.</li>
+      <li>Después armo las <b>5 pantallas</b>: Login, Dashboard, Listado de OCs, Wizard Crear OC y el Detalle de OP con Amarre (la pantalla estrella).</li>
+    </ol>
+    <div class="dod">
+      <div class="col do dod"><h4>Principios — Do</h4><ul>
+        <li>Jerarquía por peso y espacio, no por cajas y líneas.</li>
+        <li>Números tabulares siempre alineados a la derecha.</li>
+        <li>Acento de seguridad reservado para acción/alerta.</li>
+        <li>Contraste AA mínimo en texto y estados.</li>
+      </ul></div>
+      <div class="col dont"><h4 style="color:oklch(0.55 0.2 27)">Principios — Don't</h4><ul>
+        <li>No saturar de color de fondo ni gradientes decorativos.</li>
+        <li>No usar el acento como relleno de áreas grandes.</li>
+        <li>No mezclar más de 2 familias tipográficas.</li>
+        <li>No comprimir la tabla al punto de perder legibilidad.</li>
+      </ul></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ---- toggle claro/oscuro global ----
+const body=document.body;
+document.querySelectorAll('.toggle button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const mode=b.dataset.set;
+    body.dataset.theme=mode;
+    document.querySelectorAll('.toggle button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+    document.querySelectorAll('.board').forEach(bd=>bd.dataset.mode=mode);
+    try{localStorage.setItem('agro-mode',mode);}catch(e){}
+  });
+});
+(function(){try{const m=localStorage.getItem('agro-mode');if(m){document.querySelector('.toggle button[data-set="'+m+'"]').click();}}catch(e){}})();
+
+// ---- escalas de paleta ----
+const scales={
+  'acero-pri':[ '0.96 0.02 250','0.9 0.035 250','0.82 0.05 250','0.72 0.062 250','0.62 0.07 250','0.53 0.072 250','0.47 0.072 250','0.41 0.07 250','0.35 0.06 250','0.29 0.05 250','0.23 0.04 250'],
+  'acero-neu':[ '0.985 0.003 255','0.96 0.004 255','0.92 0.006 255','0.87 0.008 255','0.78 0.01 255','0.66 0.012 255','0.54 0.014 255','0.44 0.014 255','0.35 0.013 255','0.27 0.012 255','0.2 0.01 255'],
+  'concreto-pri':['0.96 0.006 60','0.91 0.008 60','0.83 0.01 58','0.72 0.012 56','0.6 0.013 56','0.49 0.013 55','0.4 0.013 55','0.34 0.012 55','0.29 0.012 55','0.24 0.011 55','0.19 0.009 55'],
+  'concreto-neu':['0.985 0.004 70','0.96 0.006 70','0.92 0.008 68','0.86 0.01 66','0.77 0.012 64','0.65 0.013 62','0.53 0.013 62','0.44 0.013 60','0.35 0.012 60','0.27 0.011 60','0.2 0.009 60']
+};
+const steps=['50','100','200','300','400','500','600','700','800','900','950'];
+document.querySelectorAll('[data-scale]').forEach(el=>{
+  const arr=scales[el.dataset.scale];
+  arr.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='sw';
+    d.style.background='oklch('+c+')';
+    const L=parseFloat(c);
+    d.style.color=L>0.6?'oklch(0.25 0.02 60)':'oklch(0.95 0.01 60)';
+    d.textContent=steps[i];
+    el.appendChild(d);
+  });
+});
+
+// ---- curva de tallas interactiva ----
+const tallasRange=[33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
+const seed={37:40,38:120,39:180,40:240,41:220,42:200,43:120,44:60,45:20};
+document.querySelectorAll('[data-tallas]').forEach(grid=>{
+  const total=grid.closest('.demo').querySelector('[data-tallas-total]');
+  tallasRange.forEach(t=>{
+    const cell=document.createElement('div'); cell.className='talla';
+    const v=seed[t]||'';
+    cell.innerHTML='<div class="th">'+t+'</div><input inputmode="numeric" value="'+v+'">';
+    if(v) cell.classList.add('filled');
+    const inp=cell.querySelector('input');
+    inp.addEventListener('input',()=>{cell.classList.toggle('filled',!!inp.value);recalc();});
+    grid.appendChild(cell);
+  });
+  function recalc(){
+    let s=0; grid.querySelectorAll('input').forEach(i=>s+=parseInt(i.value||0,10));
+    total.textContent=s.toLocaleString('es-CO');
+  }
+  recalc();
+});
+
+// ---- amarre / disponibilidad ----
+const amarreData=[
+  {t:'38',ped:120,stock:80},{t:'39',ped:180,stock:60},{t:'40',ped:240,stock:240},
+  {t:'41',ped:220,stock:90},{t:'42',ped:200,stock:140}
+];
+document.querySelectorAll('[data-amarre]').forEach(box=>{
+  amarreData.forEach(d=>{
+    const prod=Math.max(0,d.ped-d.stock);
+    const row=document.createElement('div'); row.className='amarre-row';
+    row.innerHTML=
+      '<span class="amarre-talla">'+d.t+'</span>'+
+      '<div class="amarre-bar"><div class="amarre-stock" style="width:'+(d.stock/d.ped*100)+'%"></div><div class="amarre-prod" style="width:'+(prod/d.ped*100)+'%"></div></div>'+
+      '<span class="amarre-vals"><b>'+d.stock+'</b>/'+prod+'<br>'+d.ped+' ped.</span>';
+    box.appendChild(row);
+  });
+});
+</script>
+</body>
+</html>
