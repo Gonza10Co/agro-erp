@@ -16,25 +16,25 @@ model Role {
 }
 
 model User {
-  id           Int            @id @default(autoincrement())
-  username     String         @unique
-  passwordHash String
-  isActive     Boolean        @default(true)
-  roleId       Int
-  role         Role           @relation(fields: [roleId], references: [id])
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  passwordHash  String
+  isActive      Boolean        @default(true)
+  roleId        Int
+  role          Role           @relation(fields: [roleId], references: [id])
   refreshTokens RefreshToken[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model RefreshToken {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   tokenHash String
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 // ───────────────────────── Módulo 1: Catálogos + BOM ─────────────────────────
@@ -92,17 +92,17 @@ model Material {
   claseBom       ClaseBom
   activo         Boolean           @default(true)
 
-  alias            MaterialAlias[]
-  bomPropio        Bom?            @relation("BomDeMaterial")
-  lineasComoInsumo BomLinea[]      @relation("InsumoDeLinea")
+  alias             MaterialAlias[]
+  bomPropio         Bom?            @relation("BomDeMaterial")
+  lineasComoInsumo  BomLinea[]      @relation("InsumoDeLinea")
   overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
   overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
 }
 
 model MaterialAlias {
-  id         Int      @id @default(autoincrement())
-  materialId Int
-  material   Material @relation(fields: [materialId], references: [id])
+  id          Int      @id @default(autoincrement())
+  materialId  Int
+  material    Material @relation(fields: [materialId], references: [id])
   textoLegacy String
 
   @@unique([materialId, textoLegacy])
@@ -113,38 +113,41 @@ model Talla {
   valor Int @unique
   orden Int
 
-  referenciasMin   Referencia[]        @relation("TallaMin")
-  referenciasMax   Referencia[]        @relation("TallaMax")
-  lineasTalla      BomLineaTalla[]
-  overridesTalla   ReglaOverrideTalla[]
+  referenciasMin Referencia[]                @relation("TallaMin")
+  referenciasMax Referencia[]                @relation("TallaMax")
+  lineasTalla    BomLineaTalla[]
+  overridesTalla ReglaOverrideTalla[]
+  ocLineasTalla  OrdenCompraLineaTalla[]
+  opLineasTalla  OrdenProduccionLineaTalla[]
+  inventarioPT   InventarioPT[]
 }
 
 model Referencia {
-  id            Int    @id @default(autoincrement())
-  codigo        String @unique
+  id            Int     @id @default(autoincrement())
+  codigo        String  @unique
   nombreInterno String
   tallaMinId    Int
-  tallaMin      Talla  @relation("TallaMin", fields: [tallaMinId], references: [id])
+  tallaMin      Talla   @relation("TallaMin", fields: [tallaMinId], references: [id])
   tallaMaxId    Int
-  tallaMax      Talla  @relation("TallaMax", fields: [tallaMaxId], references: [id])
+  tallaMax      Talla   @relation("TallaMax", fields: [tallaMaxId], references: [id])
   activo        Boolean @default(true)
 
-  bom                  Bom?
-  overrides            ReglaOverride[]
-  ejes                 ReferenciaEje[]
-  marcas               ReferenciaMarca[]
+  bom                   Bom?
+  overrides             ReglaOverride[]
+  ejes                  ReferenciaEje[]
+  marcas                ReferenciaMarca[]
   productosConfigurados ProductoConfigurado[]
 }
 
 model Bom {
-  id           Int      @id @default(autoincrement())
-  referenciaId Int?     @unique
+  id           Int         @id @default(autoincrement())
+  referenciaId Int?        @unique
   referencia   Referencia? @relation(fields: [referenciaId], references: [id])
-  materialId   Int?     @unique
-  material     Material? @relation("BomDeMaterial", fields: [materialId], references: [id])
-  version      Int      @default(1)
-  vigenteDesde DateTime @default(now())
-  activo       Boolean  @default(true)
+  materialId   Int?        @unique
+  material     Material?   @relation("BomDeMaterial", fields: [materialId], references: [id])
+  version      Int         @default(1)
+  vigenteDesde DateTime    @default(now())
+  activo       Boolean     @default(true)
 
   lineas BomLinea[]
 }
@@ -196,7 +199,7 @@ model Opcion {
   nombre        String
   activo        Boolean     @default(true)
 
-  overrides                 ReglaOverride[]
+  overrides                   ReglaOverride[]
   productoConfiguradoOpciones ProductoConfiguradoOpcion[]
 
   @@unique([grupoOpcionId, codigo])
@@ -208,10 +211,11 @@ model Marca {
   nombre    String
   tipo      TipoMarca
   clienteId Int?
+  cliente   Cliente?  @relation(fields: [clienteId], references: [id])
   activo    Boolean   @default(true)
 
-  overrides            ReglaOverride[]
-  referenciaMarcas     ReferenciaMarca[]
+  overrides             ReglaOverride[]
+  referenciaMarcas      ReferenciaMarca[]
   productosConfigurados ProductoConfigurado[]
 }
 
@@ -279,7 +283,10 @@ model ProductoConfigurado {
   marca           Marca      @relation(fields: [marcaId], references: [id])
   activo          Boolean    @default(true)
 
-  opciones ProductoConfiguradoOpcion[]
+  opciones     ProductoConfiguradoOpcion[]
+  lineasOC     OrdenCompraLinea[]
+  lineasOP     OrdenProduccionLinea[]
+  inventarioPT InventarioPT[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -290,4 +297,176 @@ model ProductoConfiguradoOpcion {
   opcion                Opcion              @relation(fields: [opcionId], references: [id])
 
   @@unique([productoConfiguradoId, opcionId])
+}
+
+// ───────────────────────── Módulo 2: Pedidos (OC → OP) ─────────────────────────
+
+enum TipoCredito {
+  CONTADO
+  D30
+  D60
+  D90
+}
+
+enum EstadoCartera {
+  AL_DIA
+  VENCIDO
+  BLOQUEADO
+}
+
+enum TipoBodega {
+  PROPIA
+  HERMANA
+}
+
+enum EstadoOC {
+  BORRADOR
+  CONFIRMADA
+  EN_PRODUCCION
+  CERRADA
+  ANULADA
+}
+
+enum EstadoOP {
+  CREADA
+  AMARRADA
+  EN_PRODUCCION
+  ANULADA
+}
+
+model Cliente {
+  id            Int           @id @default(autoincrement())
+  nit           String        @unique
+  nombre        String
+  ciudad        String?
+  tipoCredito   TipoCredito   @default(CONTADO)
+  cupo          Decimal?      @db.Decimal(14, 2)
+  estadoCartera EstadoCartera @default(AL_DIA)
+  activo        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  marcas        Marca[]
+  ordenesCompra OrdenCompra[]
+}
+
+model Bodega {
+  id        Int        @id @default(autoincrement())
+  codigo    String     @unique
+  nombre    String
+  tipo      TipoBodega @default(PROPIA)
+  prioridad Int        @default(100)
+  activo    Boolean    @default(true)
+
+  inventarioPT InventarioPT[]
+}
+
+model OrdenCompra {
+  id            Int      @id @default(autoincrement())
+  consecutivo   Int      @unique
+  ocCliente     String?
+  clienteId     Int
+  cliente       Cliente  @relation(fields: [clienteId], references: [id])
+  fecha         DateTime @default(now())
+  estado        EstadoOC @default(BORRADOR)
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lineas          OrdenCompraLinea[]
+  ordenProduccion OrdenProduccion?
+
+  @@index([clienteId])
+}
+
+model OrdenCompraLinea {
+  id                    Int                 @id @default(autoincrement())
+  ocId                  Int
+  oc                    OrdenCompra         @relation(fields: [ocId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+
+  tallas OrdenCompraLineaTalla[]
+
+  @@index([ocId])
+}
+
+model OrdenCompraLineaTalla {
+  id        Int              @id @default(autoincrement())
+  ocLineaId Int
+  ocLinea   OrdenCompraLinea @relation(fields: [ocLineaId], references: [id])
+  tallaId   Int
+  talla     Talla            @relation(fields: [tallaId], references: [id])
+  cantidad  Int
+
+  @@unique([ocLineaId, tallaId])
+}
+
+model InventarioPT {
+  id                    Int                 @id @default(autoincrement())
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  bodegaId              Int
+  bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  cantDisponible        Int                 @default(0)
+  cantReservada         Int                 @default(0)
+
+  reservas ReservaInventarioPT[]
+
+  @@unique([productoConfiguradoId, tallaId, bodegaId])
+  @@index([productoConfiguradoId, tallaId])
+}
+
+model OrdenProduccion {
+  id          Int         @id @default(autoincrement())
+  consecutivo Int         @unique
+  ocId        Int         @unique
+  oc          OrdenCompra @relation(fields: [ocId], references: [id])
+  fecha       DateTime    @default(now())
+  estado      EstadoOP    @default(CREADA)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  lineas OrdenProduccionLinea[]
+}
+
+model OrdenProduccionLinea {
+  id                    Int                 @id @default(autoincrement())
+  opId                  Int
+  op                    OrdenProduccion     @relation(fields: [opId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+
+  tallas OrdenProduccionLineaTalla[]
+
+  @@index([opId])
+}
+
+model OrdenProduccionLineaTalla {
+  id            Int                  @id @default(autoincrement())
+  opLineaId     Int
+  opLinea       OrdenProduccionLinea @relation(fields: [opLineaId], references: [id])
+  tallaId       Int
+  talla         Talla                @relation(fields: [tallaId], references: [id])
+  cantPedida    Int
+  cantAmarrada  Int                  @default(0)
+  cantAProducir Int                  @default(0)
+
+  reservas ReservaInventarioPT[]
+
+  @@unique([opLineaId, tallaId])
+}
+
+model ReservaInventarioPT {
+  id             Int                       @id @default(autoincrement())
+  opLineaTallaId Int
+  opLineaTalla   OrdenProduccionLineaTalla @relation(fields: [opLineaTallaId], references: [id])
+  inventarioPTId Int
+  inventarioPT   InventarioPT              @relation(fields: [inventarioPTId], references: [id])
+  cantidad       Int
+
+  @@index([opLineaTallaId])
+  @@index([inventarioPTId])
 }
