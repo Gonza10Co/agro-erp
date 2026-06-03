@@ -20,5 +20,4 @@ ENV NODE_ENV=production
 
 # migrate deploy es idempotente (la DB ya está migrada); deja listas
 # las migraciones futuras. Luego arranca la app (escucha en $PORT de Railway).
-# nest build emite dist/src/main.js (prisma.config.ts en la raíz sube el rootDir).
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]

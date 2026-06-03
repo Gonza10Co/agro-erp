@@ -85,21 +85,33 @@ export function aplicarOverrides(base: LineaBase[], overrides: Override[]): Line
   return [...mapa.values()];
 }
 
-/** Explota las líneas a un árbol de nodos resueltos para la talla, bajando a sub-BOMs. */
+/**
+ * Explota las líneas a un árbol de nodos resueltos para la talla, bajando a sub-BOMs.
+ * `ruta` lleva los materiales FABRICADO ancestros para detectar ciclos (un BOM que se
+ * contiene a sí mismo, directa o indirectamente) y lanzar un error claro en vez de
+ * desbordar la pila por recursión infinita.
+ */
 export function explotarMultinivel(
   lineas: LineaBase[],
   materiales: Record<number, MaterialInfo>,
   talla: number,
   factor = 1,
+  ruta: number[] = [],
 ): NodoResuelto[] {
   return lineas.map((linea) => {
     const consumo = resolverConsumoTalla(linea, talla) * factor;
     const info = materiales[linea.materialId];
     const origen = info?.origen ?? 'COMPRADO';
-    const hijos =
-      info?.origen === 'FABRICADO'
-        ? explotarMultinivel(info.subBom, materiales, talla, consumo)
-        : [];
+    let hijos: NodoResuelto[] = [];
+    if (info?.origen === 'FABRICADO') {
+      if (ruta.includes(linea.materialId)) {
+        throw new Error(
+          `Ciclo en el BOM: el material ${linea.materialId} se contiene a sí mismo ` +
+            `(ruta: ${[...ruta, linea.materialId].join(' → ')})`,
+        );
+      }
+      hijos = explotarMultinivel(info.subBom, materiales, talla, consumo, [...ruta, linea.materialId]);
+    }
     return { materialId: linea.materialId, consumo, origen, hijos };
   });
 }

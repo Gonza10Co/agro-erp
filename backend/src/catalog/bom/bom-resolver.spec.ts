@@ -205,3 +205,42 @@ describe('resolverBom (end-to-end, caso AGR-452 simplificado)', () => {
     expect(r.comprados).toHaveLength(3);
   });
 });
+
+describe('explotarMultinivel — detección de ciclos', () => {
+  it('lanza error (no stack overflow) si un material FABRICADO se contiene a sí mismo', () => {
+    const materiales: Record<number, MaterialInfo> = {
+      100: {
+        id: 100, origen: 'FABRICADO',
+        subBom: [{ materialId: 100, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null }],
+      },
+    };
+    const lineas: LineaBase[] = [lineaFija(100, 1)];
+    expect(() => explotarMultinivel(lineas, materiales, 42)).toThrow(/ciclo/i);
+  });
+
+  it('detecta un ciclo indirecto A→B→A', () => {
+    const materiales: Record<number, MaterialInfo> = {
+      200: {
+        id: 200, origen: 'FABRICADO',
+        subBom: [{ materialId: 201, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null }],
+      },
+      201: {
+        id: 201, origen: 'FABRICADO',
+        subBom: [{ materialId: 200, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null }],
+      },
+    };
+    const lineas: LineaBase[] = [lineaFija(200, 1)];
+    expect(() => explotarMultinivel(lineas, materiales, 42)).toThrow(/ciclo/i);
+  });
+
+  it('NO confunde un material compartido en ramas distintas con un ciclo (diamante)', () => {
+    // 300 (FABRICADO) usa 302 (COMPRADO); 301 (FABRICADO) también usa 302. No es ciclo.
+    const materiales: Record<number, MaterialInfo> = {
+      300: { id: 300, origen: 'FABRICADO', subBom: [{ materialId: 302, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null }] },
+      301: { id: 301, origen: 'FABRICADO', subBom: [{ materialId: 302, claseConsumo: 'FIJO', consumoFijo: 1, consumoPorTalla: {}, mermaPct: null }] },
+      302: { id: 302, origen: 'COMPRADO', subBom: [] },
+    };
+    const lineas: LineaBase[] = [lineaFija(300, 1), lineaFija(301, 1)];
+    expect(() => explotarMultinivel(lineas, materiales, 42)).not.toThrow();
+  });
+});
