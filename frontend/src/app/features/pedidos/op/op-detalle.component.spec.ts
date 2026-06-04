@@ -59,4 +59,24 @@ describe('OpDetalleComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Total stock');
     http.verify();
   });
+
+  it('anular() hace POST /pedidos/op/:id/anular y recarga', () => {
+    const { fixture, http } = setup('12');
+    fixture.detectChanges();
+    const base = {
+      id: 12, consecutivo: 1187, ocId: 41, fecha: '2026-05-28T00:00:00.000Z',
+      oc: { id: 41, consecutivo: 2041, clienteId: 3, fecha: '2026-05-28T00:00:00.000Z', estado: 'EN_PRODUCCION',
+            cliente: { id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } },
+      lineas: [],
+    };
+    http.expectOne('http://localhost:3001/pedidos/op/12').flush({ ...base, estado: 'AMARRADA' });
+    fixture.detectChanges();
+    fixture.componentInstance.anular();
+    const req = http.expectOne('http://localhost:3001/pedidos/op/12/anular');
+    expect(req.request.method).toBe('POST');
+    req.flush({ ...base, estado: 'ANULADA' });
+    // tras anular, recarga (segundo GET)
+    http.expectOne('http://localhost:3001/pedidos/op/12').flush({ ...base, estado: 'ANULADA' });
+    http.verify();
+  });
 });

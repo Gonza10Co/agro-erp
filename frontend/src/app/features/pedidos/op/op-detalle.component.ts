@@ -36,6 +36,11 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               </div>
             </div>
           </div>
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
+            <div class="page-actions">
+              <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
+            </div>
+          }
         </div>
 
         <!-- SUMMARY -->
@@ -214,6 +219,16 @@ export class OpDetalleComponent implements OnInit {
   }
 
   badge(o: OrdenProduccion) { return badgeOP(o.estado); }
+
+  anular(): void {
+    const o = this.op();
+    if (!o || this.accion()) return;
+    this.accion.set(true); this.error.set('');
+    this.api.anularOP(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.accion.set(false); this.cargar(o.id); },
+      error: e => { this.accion.set(false); this.error.set(this.msg(e)); },
+    });
+  }
 
   protected msg(e: any): string {
     const m = e?.error?.message;
