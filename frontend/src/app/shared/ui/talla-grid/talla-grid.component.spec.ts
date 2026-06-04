@@ -32,4 +32,22 @@ describe('TallaGridComponent', () => {
     input.dispatchEvent(new Event('input'));
     expect(emitido).toEqual({ 1: 7 });
   });
+
+  it('trunca decimales a entero', () => {
+    const fixture = setup({});
+    const c = fixture.componentInstance;
+    let emitido = null as Record<number, number> | null;
+    c.cambio.subscribe((m: Record<number, number>) => (emitido = m));
+    c.onInput(1, { target: { value: '2.7' } } as any);
+    expect(emitido).toEqual({ 1: 2 });
+  });
+
+  it('clampa negativos a 0', () => {
+    const fixture = setup({});
+    const c = fixture.componentInstance;
+    let emitido = null as Record<number, number> | null;
+    c.cambio.subscribe((m: Record<number, number>) => (emitido = m));
+    c.onInput(1, { target: { value: '-3' } } as any);
+    expect(emitido).toEqual({ 1: 0 });
+  });
 });

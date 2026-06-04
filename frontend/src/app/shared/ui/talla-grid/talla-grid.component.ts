@@ -10,7 +10,7 @@ import { totalCurva } from './curva.util';
       @for (t of tallas(); track t.id) {
         <label class="tg-cell">
           <span class="tg-talla">{{ t.valor }}</span>
-          <input type="number" min="0" class="tg-input" [value]="valores()[t.id] || ''" (input)="onInput(t.id, $event)" />
+          <input type="number" min="0" step="1" class="tg-input" [value]="valores()[t.id] || ''" (input)="onInput(t.id, $event)" />
         </label>
       }
     </div>
@@ -34,7 +34,7 @@ export class TallaGridComponent {
   total = computed(() => totalCurva(this.valores()));
 
   onInput(tallaId: number, e: Event) {
-    const n = Math.max(0, Number((e.target as HTMLInputElement).value) || 0);
+    const n = Math.max(0, Math.trunc(Number((e.target as HTMLInputElement).value) || 0));
     this.cambio.emit({ ...this.valores(), [tallaId]: n });
   }
 }
