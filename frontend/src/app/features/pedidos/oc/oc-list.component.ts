@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenCompra } from '../../../core/api/models/pedidos.models';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
@@ -9,11 +10,15 @@ import { badgeOC } from './estado-badge';
 @Component({
   selector: 'app-oc-list',
   standalone: true,
-  imports: [DatePipe, DrawerComponent, OcDetalleComponent],
+  imports: [DatePipe, RouterLink, DrawerComponent, OcDetalleComponent],
   template: `
     <div class="page">
-      <div class="page-header">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
         <div><div class="ph-title">Órdenes de Compra</div></div>
+        <a class="btn btn-primary" routerLink="/pedidos/oc/nueva">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Nueva OC
+        </a>
       </div>
 
       @if (cargando()) {

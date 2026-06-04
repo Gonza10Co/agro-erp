@@ -45,16 +45,23 @@
 - 49 tests verdes. `ng build` limpio (budget de estilo por componente subido a 8kB warn / 12kB error
   en `angular.json` para acomodar la pantalla densa de amarre).
 
-## Qué falta — próximos planes (mismo patrón: spec frontend → writing-plans → subagentes)
+- **F6 — Crear OC (wizard) ⭐ — hecho y en master** (2026-06-04): wizard de 4 pasos
+  (`features/pedidos/oc/oc-crear.component`, ruta `/pedidos/oc/nueva`, botón "Nueva OC" en el
+  listado). Componentes reusables nuevos: `shared/ui/buscador-select` (dropdown con búsqueda por
+  signals, genérico) y `shared/ui/talla-grid` (curva editable + `totalCurva`). Lógica pura
+  `oc-crear.util.ts` (`tallasDeProducto` por rango de referencia, `construirDto`). Backend: nuevos
+  `GET /catalog/productos` (con marca + referencia.tallaMin/Max) y `GET /catalog/tallas`
+  (`CatalogService`/`CatalogController`). **Verificado E2E end-to-end**: Nueva OC → wizard → Crear →
+  OC BORRADOR → Confirmar → Generar OP → amarre, todo desde la UI sin tocar la API. Plan:
+  `docs/plans/2026-06-04-f6-crear-oc-wizard.md`. **64 tests frontend + 62 backend verdes.**
 
-El spec del frontend ya cubre todo: `docs/specs/2026-06-03-frontend-flujo-pedidos-design.md`.
-Cada feature reemplaza el `placeholder.component` y reusa `ui-drawer`, los servicios API y los modelos.
+## Flujo de pedidos: COMPLETO ✅
 
-- **F6 — Crear OC (wizard)** ← único feature pendiente: 4 pasos (cliente → productos configurados →
-  curva de tallas → confirmar). Necesita un **combobox con búsqueda** (referencia:
-  `design-ref/assets/combobox.js`) y un **talla-grid** (curva 33-47). **Gap confirmado**: el backend
-  solo expone `catalog/bom/resolve` (no hay GET de productos configurados ni de tallas) — hay que
-  agregarlos en esta fase.
+El ciclo OC → OP → amarre es operable de punta a punta desde la UI (crear OC, confirmar, generar OP,
+ver amarre por talla/bodega, anular OP). No quedan features del flujo de pedidos pendientes.
+
+Próximos focos posibles (fuera del flujo de pedidos): módulos MES de planta, despacho, factura,
+cartera; dashboard con KPIs; deploy del frontend a Railway.
 
 ### Mejoras menores anotadas en review de F7 (no bloquean, encarar al pasar)
 - `op-detalle` muestra el skeleton "Cargando…" al recargar tras Anular (flash). Si molesta en demo:
