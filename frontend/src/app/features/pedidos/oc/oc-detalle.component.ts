@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, input, output, signal, DestroyRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenCompra } from '../../../core/api/models/pedidos.models';
@@ -8,7 +9,7 @@ import { badgeOC, badgeOP } from './estado-badge';
 @Component({
   selector: 'app-oc-detalle',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   template: `
     @if (cargando()) {
       <p class="cell-sub">Cargando orden…</p>
@@ -21,7 +22,7 @@ import { badgeOC, badgeOP } from './estado-badge';
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge {{ badge(o).clase }}"><span class="dot"></span>{{ badge(o).label }}</span></span></div>
         @if (o.ordenProduccion; as op) {
-          <div class="kv"><span class="k">Orden de producción</span><span class="v">OP #{{ op.consecutivo }} · {{ badgeOpLabel(op.estado) }}</span></div>
+          <div class="kv"><span class="k">Orden de producción</span><span class="v"><a [routerLink]="['/pedidos/op', op.id]">OP #{{ op.consecutivo }}</a> · {{ badgeOpLabel(op.estado) }}</span></div>
         }
       </div>
 
