@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.component';
 
@@ -42,6 +42,7 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
     .link:hover{text-decoration:underline}
     .login-foot{margin-top:var(--sp-6);text-align:center;font-size:var(--text-caption);color:var(--text-subtle)}
     .login-error{color:var(--error);font-size:var(--text-sm);margin-top:var(--sp-3)}
+    .login-aviso{margin-bottom:var(--sp-4);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-sm);font-size:var(--text-sm);background:color-mix(in oklch,var(--accent) 12%,var(--surface));border:var(--bw) solid color-mix(in oklch,var(--accent) 35%,var(--border));color:var(--text)}
     .theme-fab{position:fixed;top:18px;right:18px;z-index:10}
     @media(max-width:880px){:host{grid-template-columns:1fr}.brand-panel{display:none}}
   `],
@@ -69,6 +70,9 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
     <div class="form-panel">
       <div class="theme-fab"><app-theme-toggle /></div>
       <form class="login-card" (ngSubmit)="onSubmit()">
+        @if (expirada()) {
+          <div class="login-aviso" role="alert">Tu sesión expiró, ingresá de nuevo.</div>
+        }
         <div class="lead">
           <h2>Ingresar</h2>
           <p>Accedé con tu cuenta corporativa para gestionar pedidos y producción.</p>
@@ -98,6 +102,8 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
 export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  expirada = signal(this.route.snapshot.queryParamMap.get('expired') === '1');
 
   username = '';
   password = '';
