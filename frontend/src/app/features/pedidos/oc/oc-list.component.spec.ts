@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { OcListComponent } from './oc-list.component';
 import { PedidosApi } from '../../../core/api/pedidos.api';
@@ -17,7 +18,10 @@ describe('OcListComponent', () => {
     };
     TestBed.configureTestingModule({
       imports: [OcListComponent],
-      providers: [{ provide: PedidosApi, useValue: apiMock }],
+      providers: [
+        { provide: PedidosApi, useValue: apiMock },
+        provideRouter([]),
+      ],
     });
     return TestBed.createComponent(OcListComponent);
   }
