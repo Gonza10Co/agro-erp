@@ -35,7 +35,14 @@
   `bodegasDeOP`). Enlace desde el detalle de OC ("OP #N" → ruta). Alcance "fiel pero honesto":
   sin timeline ni detalle-modelo falsos (no hay datos en backend). Plan:
   `docs/plans/2026-06-04-frontend-op-amarre.md`.
-- 42 tests verdes. `ng build` limpio (budget de estilo por componente subido a 8kB warn / 12kB error
+- **Navegabilidad (2026-06-04)**: listado **"Órdenes de Producción"** en el menú lateral
+  (`features/pedidos/op/op-list.component`, ruta `/pedidos/op`, fila → `/pedidos/op/:id`) +
+  **interceptor de errores 401** (`core/interceptors/auth-error.interceptor`): en 401 (salvo
+  `/auth/login`) hace logout y redirige a `/login?expired=1`; el login muestra un banner
+  `role="alert"` "Tu sesión expiró". Mata el empty-state engañoso al expirar el token.
+  Plan: `docs/plans/2026-06-04-navegabilidad-op-list-y-401.md`. Verificado E2E (menú→lista→amarre y
+  redirección 401→login con token corrupto).
+- 49 tests verdes. `ng build` limpio (budget de estilo por componente subido a 8kB warn / 12kB error
   en `angular.json` para acomodar la pantalla densa de amarre).
 
 ## Qué falta — próximos planes (mismo patrón: spec frontend → writing-plans → subagentes)
@@ -80,8 +87,12 @@ npm start
 - Backend `npm run start:dev` (nest --watch) crashea ("Cannot find module dist/main").
   Workaround: `build` + `start:prod`. Arreglar la config del watcher.
 - Shell: título del topbar y avatar/usuario hardcodeados → conectar a ruta activa y al JWT.
-- Falta interceptor de errores HTTP global (401 → login; toasts). El `jwtInterceptor` solo
-  agrega el token.
+- ~~Falta interceptor de errores HTTP global (401 → login)~~ ✅ HECHO (auth-error.interceptor).
+  Falta aún un **sistema de toasts** para otros errores (500, validaciones) — sigue pendiente.
+- Backend: si `nest build` no emite `dist/` (sale exit 0 pero no hay JS), es la **caché incremental
+  obsoleta**: borrar `tsconfig.build.tsbuildinfo` y reconstruir. Pasa porque `deleteOutDir:true`
+  borra `dist/` pero `tsc --incremental` cree que ya está compilado. (Relacionado con la deuda del
+  watcher.) El entry compilado es `dist/main.js` → `start:prod` (`node dist/main`) está OK.
 - `InventarioApi` sin tipos de retorno (tipar al definir modelos Bodega/InventarioPT).
 - Antes del primer deploy del front: crear `environment.prod.ts` + `fileReplacements` en
   `angular.json` con la URL de Railway.
