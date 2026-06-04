@@ -6,7 +6,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
   template: `
     <div class="bsc">
       <input class="input bsc-input" type="text" [placeholder]="placeholder()" [value]="filtro()"
-        (input)="onFiltro($event)" (focus)="abierto.set(true)" (keydown.enter)="elegirPrimero($event)" />
+        (input)="onFiltro($event)" (focus)="abierto.set(true)" (keydown.enter)="elegirPrimero($event)" (blur)="onBlur()" />
       @if (abierto() && filtrados().length) {
         <div class="bsc-list">
           @for (item of filtrados(); track $index) {
@@ -62,5 +62,8 @@ export class BuscadorSelectComponent<T> {
     e.preventDefault();
     const f = this.filtrados();
     if (f.length) this.elegir(f[0]);
+  }
+  onBlur() {
+    setTimeout(() => this.abierto.set(false), 150);
   }
 }
