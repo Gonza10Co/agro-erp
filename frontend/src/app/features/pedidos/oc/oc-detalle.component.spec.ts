@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { OcDetalleComponent } from './oc-detalle.component';
 import { PedidosApi } from '../../../core/api/pedidos.api';
@@ -23,7 +24,7 @@ describe('OcDetalleComponent', () => {
     };
     TestBed.configureTestingModule({
       imports: [OcDetalleComponent],
-      providers: [{ provide: PedidosApi, useValue: apiMock }],
+      providers: [{ provide: PedidosApi, useValue: apiMock }, provideRouter([])],
     });
     const fixture = TestBed.createComponent(OcDetalleComponent);
     fixture.componentRef.setInput('ocId', ocId);
@@ -75,5 +76,18 @@ describe('OcDetalleComponent', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.cargando()).toBe(false);
     expect(fixture.componentInstance.oc()).toBeNull();
+  });
+
+  it('cuando la OC tiene ordenProduccion, el enlace apunta a /pedidos/op/:id', () => {
+    const fixture = setup();
+    apiMock.obtenerOC.and.returnValue(of({
+      ...OC_BORRADOR,
+      estado: 'CONFIRMADA',
+      ordenProduccion: { id: 7, consecutivo: 1187, estado: 'AMARRADA' },
+    }));
+    fixture.detectChanges();
+    const anchor: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href]');
+    expect(anchor).withContext('debe existir un enlace <a> a la OP').toBeTruthy();
+    expect(anchor.getAttribute('href')).toContain('/pedidos/op/7');
   });
 });
