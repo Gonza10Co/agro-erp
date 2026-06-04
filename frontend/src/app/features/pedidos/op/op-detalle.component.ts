@@ -46,6 +46,26 @@ import { resumenAmarre } from './amarre-view';
           <div class="sum"><div class="sl"><i style="background:var(--primary)"></i>Bodegas</div><div class="sv">{{ resumen().bodegas.length }}</div><div class="sd">{{ nombresBodegas() }}</div></div>
         </div>
 
+        <!-- OVERALL -->
+        <div class="overall">
+          <div class="ring" [style.--p]="resumen().pctStock.toString()"><b>{{ resumen().pctStock }}%</b></div>
+          <div class="ov-text">
+            <h3>Cumplimiento por inventario</h3>
+            <p>De los {{ resumen().pedido | number:'1.0-0' }} pares pedidos, {{ resumen().stock | number:'1.0-0' }} ya están en bodega y se amarraron al pedido. Faltan {{ resumen().producir | number:'1.0-0' }} por fabricar.</p>
+            <div class="ov-bar" style="margin-top:14px">
+              <div class="stack-bar">
+                <div class="s-stock" [style.width.%]="resumen().pctStock"></div>
+                <div class="s-prod" [style.width.%]="100 - resumen().pctStock"></div>
+              </div>
+              <div class="stack-legend">
+                <span><i style="background:var(--success)"></i>En stock (amarrado)</span>
+                <span><i style="background:var(--accent)"></i>A producir</span>
+                <span><i style="background:var(--inset);border:1px solid var(--border)"></i>Pedido total</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
         }
       } @else {
@@ -69,6 +89,19 @@ import { resumenAmarre } from './amarre-view';
     .sum .sl i{width:9px;height:9px;border-radius:3px}
     .sum .sv{font-family:var(--font-mono);font-size:28px;font-weight:var(--fw-semibold);letter-spacing:-0.02em;margin-top:8px}
     .sum .sd{font-size:var(--text-micro);color:var(--text-subtle);margin-top:3px}
+    .overall{display:flex;align-items:center;gap:var(--sp-5);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);margin-bottom:var(--sp-5)}
+    .overall .ring{--p:0;width:84px;height:84px;border-radius:50%;flex:none;background:conic-gradient(var(--success) calc(var(--p)*1%),var(--accent) calc(var(--p)*1%) 100%);display:grid;place-items:center;position:relative}
+    .overall .ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--surface)}
+    .overall .ring b{position:relative;font-family:var(--font-mono);font-size:19px;font-weight:var(--fw-bold)}
+    .overall .ov-text{flex:1}
+    .overall .ov-text h3{font-size:var(--text-h3);font-weight:var(--fw-semibold)}
+    .overall .ov-text p{font-size:var(--text-sm);color:var(--text-muted);margin-top:3px;max-width:60ch}
+    .stack-bar{height:14px;border-radius:var(--r-full);background:var(--inset);overflow:hidden;display:flex;border:var(--bw) solid var(--border)}
+    .stack-bar .s-stock{background:var(--success)}
+    .stack-bar .s-prod{background:var(--accent)}
+    .stack-legend{display:flex;gap:18px;margin-top:11px;font-size:var(--text-caption);color:var(--text-muted);flex-wrap:wrap}
+    .stack-legend span{display:inline-flex;align-items:center;gap:7px}
+    .stack-legend i{width:11px;height:11px;border-radius:3px}
     @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}}
   `],
 })
