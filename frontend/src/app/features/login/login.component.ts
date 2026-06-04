@@ -71,7 +71,7 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
       <div class="theme-fab"><app-theme-toggle /></div>
       <form class="login-card" (ngSubmit)="onSubmit()">
         @if (expirada()) {
-          <div class="login-aviso">Tu sesión expiró, ingresá de nuevo.</div>
+          <div class="login-aviso" role="alert">Tu sesión expiró, ingresá de nuevo.</div>
         }
         <div class="lead">
           <h2>Ingresar</h2>
