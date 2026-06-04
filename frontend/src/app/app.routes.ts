@@ -12,6 +12,7 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell/shell.component').then(m => m.ShellComponent),
     children: [
       { path: 'pedidos/oc', loadComponent: () => import('./features/pedidos/oc/oc-list.component').then(m => m.OcListComponent) },
+      { path: 'pedidos/op/:id', loadComponent: () => import('./features/pedidos/op/op-detalle.component').then(m => m.OpDetalleComponent) },
       { path: 'clientes', loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'pedidos/oc' },
     ],
