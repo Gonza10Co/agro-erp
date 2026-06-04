@@ -22,7 +22,7 @@ import { badgeOC, badgeOP } from './estado-badge';
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge {{ badge(o).clase }}"><span class="dot"></span>{{ badge(o).label }}</span></span></div>
         @if (o.ordenProduccion; as op) {
-          <div class="kv"><span class="k">Orden de producción</span><span class="v"><a [routerLink]="['/pedidos/op', op.id]">OP #{{ op.consecutivo }}</a> · {{ badgeOpLabel(op.estado) }}</span></div>
+          <div class="kv"><span class="k">Orden de producción</span><span class="v">OP #{{ op.consecutivo }} <span class="badge {{ badgeOp(op.estado).clase }}"><span class="dot"></span>{{ badgeOp(op.estado).label }}</span></span></div>
         }
       </div>
 
@@ -54,6 +54,12 @@ import { badgeOC, badgeOP } from './estado-badge';
           @if (o.estado === 'CONFIRMADA') {
             <button class="btn btn-accent" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="generarOP()">Generar OP</button>
           }
+        </div>
+      }
+
+      @if (o.ordenProduccion; as op) {
+        <div class="drawer-foot">
+          <a class="btn btn-primary btn-block" [routerLink]="['/pedidos/op', op.id]">Ver orden de producción · OP #{{ op.consecutivo }}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
       }
     }
@@ -106,7 +112,7 @@ export class OcDetalleComponent implements OnInit {
   }
 
   badge(o: OrdenCompra) { return badgeOC(o.estado); }
-  badgeOpLabel(estado: 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'ANULADA') { return badgeOP(estado).label; }
+  badgeOp(estado: 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'ANULADA') { return badgeOP(estado); }
 
   private msg(e: any): string {
     const m = e?.error?.message;
