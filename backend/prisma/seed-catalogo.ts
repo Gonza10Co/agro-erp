@@ -106,6 +106,25 @@ async function main() {
     where: { codigo: 'PODEROSA' }, update: {}, create: { codigo: 'PODEROSA', nombre: 'Poderosa', tipo: 'PROPIA' },
   });
 
+  // Ejes de configuración de la referencia 101 (qué grupos aplican y si son obligatorios)
+  await prisma.referenciaEje.upsert({
+    where: { referenciaId_grupoOpcionId: { referenciaId: ref.id, grupoOpcionId: grupoColor.id } },
+    update: { obligatorio: true },
+    create: { referenciaId: ref.id, grupoOpcionId: grupoColor.id, obligatorio: true },
+  });
+  await prisma.referenciaEje.upsert({
+    where: { referenciaId_grupoOpcionId: { referenciaId: ref.id, grupoOpcionId: grupoSuela.id } },
+    update: { obligatorio: true },
+    create: { referenciaId: ref.id, grupoOpcionId: grupoSuela.id, obligatorio: true },
+  });
+
+  // Marca disponible para la referencia 101
+  await prisma.referenciaMarca.upsert({
+    where: { referenciaId_marcaId: { referenciaId: ref.id, marcaId: marca.id } },
+    update: {},
+    create: { referenciaId: ref.id, marcaId: marca.id },
+  });
+
   // Overrides (idempotencia: borrar los de esta referencia y recrear)
   await prisma.reglaOverride.deleteMany({ where: { referenciaId: ref.id } });
   await prisma.reglaOverride.create({
