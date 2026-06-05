@@ -223,31 +223,31 @@ async function main() {
 
   // ── Limpieza idempotente (respetar orden de FKs) ─────────────────────────────
   await prisma.despachoLinea.deleteMany({
-    where: { despacho: { op: { consecutivo: { in: [9001, 9002] } } } },
+    where: { despacho: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
   });
   await prisma.despacho.deleteMany({
-    where: { op: { consecutivo: { in: [9001, 9002] } } },
+    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
   });
   await prisma.reservaInventarioPT.deleteMany({
-    where: { opLineaTalla: { opLinea: { op: { consecutivo: { in: [9001, 9002] } } } } },
+    where: { opLineaTalla: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003] } } } } },
   });
   await prisma.ordenProduccionLineaTalla.deleteMany({
-    where: { opLinea: { op: { consecutivo: { in: [9001, 9002] } } } },
+    where: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
   });
   await prisma.ordenProduccionLinea.deleteMany({
-    where: { op: { consecutivo: { in: [9001, 9002] } } },
+    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
   });
   await prisma.ordenProduccion.deleteMany({
-    where: { consecutivo: { in: [9001, 9002] } },
+    where: { consecutivo: { in: [9001, 9002, 9003] } },
   });
   await prisma.ordenCompraLineaTalla.deleteMany({
-    where: { ocLinea: { oc: { consecutivo: { in: [9001, 9002] } } } },
+    where: { ocLinea: { oc: { consecutivo: { in: [9001, 9002, 9003] } } } },
   });
   await prisma.ordenCompraLinea.deleteMany({
-    where: { oc: { consecutivo: { in: [9001, 9002] } } },
+    where: { oc: { consecutivo: { in: [9001, 9002, 9003] } } },
   });
   await prisma.ordenCompra.deleteMany({
-    where: { consecutivo: { in: [9001, 9002] } },
+    where: { consecutivo: { in: [9001, 9002, 9003] } },
   });
 
   // ── OP 9001 — cliente AL_DIA → camino feliz ───────────────────────────────
@@ -276,6 +276,89 @@ async function main() {
     consecutivoOP: 9002,
   });
 
+  // ── OP 9003 — producción PENDIENTE (cantAProducir > 0) → driver de Compras ──
+  // El cálculo de requerimientos solo explota tallas con cantAProducir > 0
+  // (ComprasService.calcularRequerimiento). Las OPs 9001/9002 están 100%
+  // amarradas (cantAProducir = 0) y no generarían requerimiento. Esta OP sí.
+  const oc9003 = await prisma.ordenCompra.create({
+    data: {
+      consecutivo: 9003,
+      clienteId: clienteAlDia.id,
+      estado: 'EN_PRODUCCION',
+      lineas: {
+        create: [
+          {
+            productoConfiguradoId: prodDiel.id,
+            tallas: {
+              create: [
+                { tallaId: tallaA.id, cantidad: 100 },
+                { tallaId: tallaB.id, cantidad: 100 },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  const op9003 = await prisma.ordenProduccion.create({
+    data: { consecutivo: 9003, ocId: oc9003.id, estado: 'EN_PRODUCCION' },
+  });
+  const op9003Linea = await prisma.ordenProduccionLinea.create({
+    data: { opId: op9003.id, productoConfiguradoId: prodDiel.id },
+  });
+  await prisma.ordenProduccionLineaTalla.createMany({
+    data: [
+      { opLineaId: op9003Linea.id, tallaId: tallaA.id, cantPedida: 100, cantAmarrada: 0, cantAProducir: 100 },
+      { opLineaId: op9003Linea.id, tallaId: tallaB.id, cantPedida: 100, cantAmarrada: 0, cantAProducir: 100 },
+    ],
+  });
+
+  // ── Demo 4: Proveedores + proveedor preferido + stock de insumos ────────────
+  // Proveedores (upsert por NIT, idempotente)
+  const curtiembre = await prisma.proveedor.upsert({
+    where: { nit: '900111111-1' },
+    update: {},
+    create: { nit: '900111111-1', nombre: 'Curtiembre Andina', ciudad: 'Bogotá' },
+  });
+  const quimicos = await prisma.proveedor.upsert({
+    where: { nit: '900222222-2' },
+    update: {},
+    create: { nit: '900222222-2', nombre: 'Químicos del Tolima', ciudad: 'Ibagué' },
+  });
+  const herrajes = await prisma.proveedor.upsert({
+    where: { nit: '900333333-3' },
+    update: {},
+    create: { nit: '900333333-3', nombre: 'Herrajes y Avíos SAS', ciudad: 'Medellín' },
+  });
+
+  // Asignar proveedor preferido a materiales COMPRADOS existentes (por código real)
+  async function asignarProveedor(codigo: string, proveedorId: number) {
+    await prisma.material.updateMany({ where: { codigo }, data: { proveedorId } });
+  }
+  await asignarProveedor('MICRO-NEG', curtiembre.id); // cuero → curtiembre
+  await asignarProveedor('MICRO-CAF', curtiembre.id); // cuero → curtiembre
+  await asignarProveedor('POLIOL', quimicos.id);      // químico PU → químicos
+  await asignarProveedor('SUELA-RIVER', herrajes.id); // suela alterna → herrajes
+  // SUELA-BASE queda SIN proveedor a propósito → grupo "Sin proveedor" en la demo
+
+  // Stock variado de insumos (upsert por materialId, idempotente)
+  async function stock(codigo: string, cant: number) {
+    const m = await prisma.material.findUnique({ where: { codigo } });
+    if (!m) return;
+    await prisma.inventarioMaterial.upsert({
+      where: { materialId: m.id },
+      update: { cantDisponible: cant },
+      create: { materialId: m.id, cantDisponible: cant },
+    });
+  }
+  // Requerimiento bruto de la OP 9003 (200 pares DIEL = base PODEROSA):
+  //   MICRO-NEG  (curva)      → 100*0.104 + 100*0.105 = 20.9 m
+  //   SUELA-BASE (fijo 1)     → 200 par
+  //   POLIOL     (vía PLANT-PU FABRICADO, 0.04/par) → 8 kg   ← multinivel visible
+  await stock('SUELA-BASE', 250); // ABUNDANTE → neto 0 (a comprar 0)  [sin proveedor]
+  await stock('MICRO-NEG', 12);   // PARCIAL   → neto 8.9 m a comprar   [curtiembre]
+  // POLIOL: SIN registro de InventarioMaterial → todo a comprar (8 kg) [químicos]
+
   console.log('Seed demo OK:', {
     clientes: clientes.length,
     productos: productos.length,
@@ -285,6 +368,9 @@ async function main() {
     tallasDemo: `${tallaA.valor} y ${tallaB.valor}`,
     op9001: `OP#${op9001.consecutivo} → ${clienteAlDia.nombre} (AL_DIA) — camino feliz`,
     op9002: `OP#${op9002.consecutivo} → ${clienteVencido.nombre} (VENCIDO) — camino bloqueado`,
+    op9003: `OP#${op9003.consecutivo} → ${clienteAlDia.nombre} — 200 pares A PRODUCIR (driver de Compras)`,
+    proveedores: `${curtiembre.nombre}, ${quimicos.nombre}, ${herrajes.nombre}`,
+    stockInsumos: 'SUELA-BASE=250 (neto 0), MICRO-NEG=12 (parcial), POLIOL=sin stock (todo a comprar)',
   });
 }
 
