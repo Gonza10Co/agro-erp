@@ -25,6 +25,8 @@ model User {
   refreshTokens RefreshToken[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  despachosAutorizados Despacho[]
 }
 
 model RefreshToken {
@@ -120,6 +122,7 @@ model Talla {
   ocLineasTalla  OrdenCompraLineaTalla[]
   opLineasTalla  OrdenProduccionLineaTalla[]
   inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
 }
 
 model Referencia {
@@ -283,10 +286,11 @@ model ProductoConfigurado {
   marca           Marca      @relation(fields: [marcaId], references: [id])
   activo          Boolean    @default(true)
 
-  opciones     ProductoConfiguradoOpcion[]
-  lineasOC     OrdenCompraLinea[]
-  lineasOP     OrdenProduccionLinea[]
-  inventarioPT InventarioPT[]
+  opciones       ProductoConfiguradoOpcion[]
+  lineasOC       OrdenCompraLinea[]
+  lineasOP       OrdenProduccionLinea[]
+  inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -331,6 +335,7 @@ enum EstadoOP {
   CREADA
   AMARRADA
   EN_PRODUCCION
+  DESPACHADA
   ANULADA
 }
 
@@ -358,7 +363,8 @@ model Bodega {
   prioridad Int        @default(100)
   activo    Boolean    @default(true)
 
-  inventarioPT InventarioPT[]
+  inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
 }
 
 model OrdenCompra {
@@ -429,7 +435,8 @@ model OrdenProduccion {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  lineas OrdenProduccionLinea[]
+  lineas   OrdenProduccionLinea[]
+  despacho Despacho?
 }
 
 model OrdenProduccionLinea {
@@ -469,4 +476,35 @@ model ReservaInventarioPT {
 
   @@index([opLineaTallaId])
   @@index([inventarioPTId])
+}
+
+// ───────────────────────── Módulo 3: Despacho ─────────────────────────
+
+model Despacho {
+  id                 Int             @id @default(autoincrement())
+  consecutivo        Int             @unique
+  opId               Int             @unique
+  op                 OrdenProduccion @relation(fields: [opId], references: [id])
+  fecha              DateTime        @default(now())
+  autorizadoPorId    Int?
+  autorizadoPor      User?           @relation(fields: [autorizadoPorId], references: [id])
+  motivoAutorizacion String?
+  createdAt          DateTime        @default(now())
+
+  lineas DespachoLinea[]
+}
+
+model DespachoLinea {
+  id                    Int                 @id @default(autoincrement())
+  despachoId            Int
+  despacho              Despacho            @relation(fields: [despachoId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  bodegaId              Int
+  bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  cantidad              Int
+
+  @@index([despachoId])
 }
