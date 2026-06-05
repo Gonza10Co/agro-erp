@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
 import { DespachosApi } from '../../../core/api/despachos.api';
+import { ComprasApi } from '../../../core/api/compras.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
@@ -43,6 +44,9 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
             <div class="page-actions">
               @if (despachable()) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
+              }
+              @if (requerible()) {
+                <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
               <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
             </div>
@@ -209,6 +213,7 @@ export class OpDetalleComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly despachosApi = inject(DespachosApi);
+  private readonly comprasApi = inject(ComprasApi);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
@@ -264,6 +269,21 @@ export class OpDetalleComponent implements OnInit {
     const o = this.op();
     return !!o && o.estado === 'AMARRADA' && this.resumen().producir === 0;
   });
+
+  requerible = computed(() => {
+    const o = this.op();
+    return !!o && o.estado !== 'ANULADA' && this.resumen().producir > 0;
+  });
+
+  requerir(): void {
+    const o = this.op();
+    if (!o || this.accion()) return;
+    this.accion.set(true); this.error.set('');
+    this.comprasApi.calcular(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (r) => { this.accion.set(false); this.router.navigateByUrl('/compras/requerimiento/' + r.id); },
+      error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+    });
+  }
 
   despachar(autorizar = false) {
     const o = this.op();
