@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MetaMaterial } from './bom/bom-enriquecer';
 
 @Injectable()
 export class CatalogService {
@@ -36,6 +37,17 @@ export class CatalogService {
       orderBy: { codigo: 'asc' },
       select: { id: true, codigo: true, nombreInterno: true },
     });
+  }
+
+  async metaMateriales(ids: number[]): Promise<Record<number, MetaMaterial>> {
+    if (!ids.length) return {};
+    const filas = await this.prisma.material.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, codigo: true, nombreCanonico: true, unidadMedida: { select: { codigo: true } } },
+    });
+    const map: Record<number, MetaMaterial> = {};
+    for (const m of filas) map[m.id] = { codigo: m.codigo, nombre: m.nombreCanonico, unidad: m.unidadMedida.codigo };
+    return map;
   }
 
   async configReferencia(id: number) {
