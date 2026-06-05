@@ -222,6 +222,12 @@ async function main() {
   const [tallaA, tallaB] = tallasConStock;
 
   // ── Limpieza idempotente (respetar orden de FKs) ─────────────────────────────
+  await prisma.requerimientoCompraLinea.deleteMany({
+    where: { requerimiento: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
+  });
+  await prisma.requerimientoCompra.deleteMany({
+    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
+  });
   await prisma.despachoLinea.deleteMany({
     where: { despacho: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
   });

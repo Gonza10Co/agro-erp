@@ -40,7 +40,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               </div>
             </div>
           </div>
-          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || requerible()) {
             <div class="page-actions">
               @if (despachable()) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
@@ -48,7 +48,9 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               @if (requerible()) {
                 <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
-              <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
+              @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
+                <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
+              }
             </div>
           }
         </div>
