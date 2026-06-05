@@ -115,6 +115,7 @@ export class ConfiguradorComponent implements OnInit {
   subRef = (r: ReferenciaListItem) => r.codigo;
 
   private readonly trigger = new Subject<ResolverParams>();
+  private readonly refTrigger = new Subject<ReferenciaListItem>();
 
   constructor() {
     this.trigger.pipe(
@@ -131,6 +132,15 @@ export class ConfiguradorComponent implements OnInit {
       if (res.ok) { this.resultado.set(res.r); this.error.set(''); }
       else { this.resultado.set(null); this.error.set(this.msg(res.e)); }
     });
+
+    this.refTrigger.pipe(
+      switchMap((r) => this.api.configReferencia(r.id)),
+      takeUntilDestroyed(),
+    ).subscribe((c) => {
+      this.config.set(c);
+      this.tallaSel.set(c.referencia.tallaMin);
+      this.recalcular();
+    });
   }
 
   ngOnInit(): void {
@@ -144,11 +154,8 @@ export class ConfiguradorComponent implements OnInit {
     this.opcionesSel.set(new Map());
     this.resultado.set(null);
     this.error.set('');
-    this.api.configReferencia(r.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((c) => {
-      this.config.set(c);
-      this.tallaSel.set(c.referencia.tallaMin);
-      this.recalcular();
-    });
+    this.cargando.set(false);
+    this.refTrigger.next(r);
   }
 
   elegirMarca(e: Event) {

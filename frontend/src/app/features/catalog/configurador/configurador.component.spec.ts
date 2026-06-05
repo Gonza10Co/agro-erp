@@ -38,6 +38,7 @@ describe('ConfiguradorComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.elegirReferencia({ id: 1, codigo: '101', nombreInterno: 'PODEROSA base' });
     http.expectOne(`${BASE}/referencias/1/config`).flush(CONFIG);
+    fixture.detectChanges();
     expect(cmp.tallaSel()).toBe(38);
     expect(cmp.faltantes()).toEqual(['Color']);
   });
@@ -55,6 +56,21 @@ describe('ConfiguradorComponent', () => {
     expect(req.request.params.get('talla')).toBe('38');
     expect(req.request.params.getAll('opcionIds')).toEqual(['8']);
     req.flush({ arbol: [{ materialId: 1, codigo: 'X', nombre: 'X', unidad: 'M', origen: 'COMPRADO', consumo: 0.1, hijos: [] }], comprados: [] });
+    fixture.detectChanges();
     expect(cmp.resultado()?.arbol.length).toBe(1);
+  }));
+
+  it('si resolve falla, setea error y limpia resultado', fakeAsync(() => {
+    const fixture = crear();
+    http.expectOne(`${BASE}/referencias`).flush([{ id: 1, codigo: '101', nombreInterno: 'PODEROSA base' }]);
+    const cmp = fixture.componentInstance;
+    cmp.elegirReferencia({ id: 1, codigo: '101', nombreInterno: 'PODEROSA base' });
+    http.expectOne(`${BASE}/referencias/1/config`).flush(CONFIG);
+    cmp.setOpcion(1, 8);
+    tick(150);
+    const req = http.expectOne((r) => r.url === `${BASE}/bom/resolve`);
+    req.flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    expect(cmp.error()).toBeTruthy();
+    expect(cmp.resultado()).toBeNull();
   }));
 });
