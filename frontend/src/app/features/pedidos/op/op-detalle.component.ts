@@ -55,7 +55,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
             @if (puedeAutorizar()) {
               <div style="display:flex;gap:var(--sp-3);align-items:center;margin-top:var(--sp-3)">
                 <input class="cb-input" style="flex:1" placeholder="Motivo de la autorización" [ngModel]="motivo()" (ngModelChange)="motivo.set($event)" />
-                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar(true)">Autorizar y despachar</button>
+                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion() || !motivo().trim()" (click)="despachar(true)">Autorizar y despachar</button>
               </div>
             } @else {
               <p class="cell-sub" style="margin-top:var(--sp-2)">Solo un gerente puede autorizar este despacho.</p>
@@ -143,7 +143,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
           </div>
         </div>
 
-        @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
+        @if (error() && !carteraBloqueada()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
         }
       } @else {
         <div class="card"><div class="card-body"><div class="empty"><h4>No se encontró la orden de producción</h4></div></div></div>
@@ -240,6 +240,8 @@ export class OpDetalleComponent implements OnInit {
   cargar(id: number): void {
     this.cargando.set(true);
     this.op.set(null);
+    this.carteraBloqueada.set(false);
+    this.motivo.set('');
     this.api.obtenerOP(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: o => { this.op.set(o); this.cargando.set(false); },
       error: () => this.cargando.set(false),
@@ -258,14 +260,15 @@ export class OpDetalleComponent implements OnInit {
     });
   }
 
-  despachable(): boolean {
+  despachable = computed(() => {
     const o = this.op();
     return !!o && o.estado === 'AMARRADA' && this.resumen().producir === 0;
-  }
+  });
 
   despachar(autorizar = false) {
     const o = this.op();
     if (!o || this.accion()) return;
+    this.carteraBloqueada.set(false);
     this.accion.set(true); this.error.set('');
     const body = autorizar ? { opId: o.id, autorizar: true, motivo: this.motivo() } : { opId: o.id };
     this.despachosApi.despachar(body).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
