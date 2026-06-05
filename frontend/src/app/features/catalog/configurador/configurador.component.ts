@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, catchError, debounceTime, map, of, switchMap } from 'rxjs';
+import { EMPTY, Subject, catchError, debounceTime, map, of, switchMap } from 'rxjs';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
 import {
   BomResuelto, MarcaOpt, ReferenciaConfig, ReferenciaListItem, ResolverParams,
@@ -134,7 +134,11 @@ export class ConfiguradorComponent implements OnInit {
     });
 
     this.refTrigger.pipe(
-      switchMap((r) => this.api.configReferencia(r.id)),
+      switchMap((r) =>
+        this.api.configReferencia(r.id).pipe(
+          catchError(() => { this.error.set('No se pudo cargar la configuración'); return EMPTY; }),
+        ),
+      ),
       takeUntilDestroyed(),
     ).subscribe((c) => {
       this.config.set(c);

@@ -73,4 +73,23 @@ describe('ConfiguradorComponent', () => {
     expect(cmp.error()).toBeTruthy();
     expect(cmp.resultado()).toBeNull();
   }));
+
+  it('si configReferencia falla, muestra error y el pipe sobrevive (otra referencia recarga)', () => {
+    const fixture = crear();
+    http.expectOne(`${BASE}/referencias`).flush([
+      { id: 1, codigo: '101', nombreInterno: 'PODEROSA base' },
+      { id: 2, codigo: '102', nombreInterno: 'OTRA' },
+    ]);
+    const cmp = fixture.componentInstance;
+    cmp.elegirReferencia({ id: 1, codigo: '101', nombreInterno: 'PODEROSA base' });
+    http.expectOne(`${BASE}/referencias/1/config`).flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    expect(cmp.error()).toBeTruthy();
+    expect(cmp.config()).toBeNull();
+    // el pipe sigue vivo: elegir otra referencia dispara un nuevo GET config
+    cmp.elegirReferencia({ id: 2, codigo: '102', nombreInterno: 'OTRA' });
+    const req2 = http.expectOne(`${BASE}/referencias/2/config`);
+    expect(req2.request.method).toBe('GET');
+    req2.flush({ referencia: { id: 2, codigo: '102', nombreInterno: 'OTRA', tallaMin: 38, tallaMax: 40 }, marcas: [], ejes: [] });
+    expect(cmp.config()).not.toBeNull();
+  });
 });

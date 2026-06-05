@@ -46,7 +46,7 @@ export class CatalogService {
       select: { id: true, codigo: true, nombreCanonico: true, unidadMedida: { select: { codigo: true } } },
     });
     const map: Record<number, MetaMaterial> = {};
-    for (const m of filas) map[m.id] = { codigo: m.codigo, nombre: m.nombreCanonico, unidad: m.unidadMedida.codigo };
+    for (const m of filas) map[m.id] = { codigo: m.codigo, nombre: m.nombreCanonico, unidad: m.unidadMedida?.codigo ?? '' };
     return map;
   }
 
