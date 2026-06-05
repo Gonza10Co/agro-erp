@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CatalogService } from './catalog.service';
 
@@ -20,5 +20,10 @@ export class CatalogController {
   @Get('referencias')
   referencias() {
     return this.catalog.listarReferencias();
+  }
+
+  @Get('referencias/:id/config')
+  config(@Param('id', ParseIntPipe) id: number) {
+    return this.catalog.configReferencia(id);
   }
 }
