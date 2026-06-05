@@ -18,6 +18,7 @@ export const routes: Routes = [
       { path: 'clientes', loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
       { path: 'catalog/configurador', loadComponent: () => import('./features/catalog/configurador/configurador.component').then(m => m.ConfiguradorComponent) },
       { path: 'despachos', loadComponent: () => import('./features/despachos/despachos-list.component').then(m => m.DespachosListComponent) },
+      { path: 'compras/requerimiento/:id', loadComponent: () => import('./features/compras/requerimiento.component').then(m => m.RequerimientoComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'pedidos/oc' },
     ],
   },
