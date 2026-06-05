@@ -32,6 +32,13 @@ import { AuthService } from '../../core/auth/auth.service';
           </a>
         </div>
         <div class="nav-group">
+          <div class="nav-group-h">Catálogo</div>
+          <a class="nav-item" routerLink="/catalog/configurador" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="2"/></svg></span>
+            <span class="nav-label">Configurador de BOM</span>
+          </a>
+        </div>
+        <div class="nav-group">
           <div class="nav-group-h">Planta · MES<span class="nav-tag">Próximamente</span></div>
           <a class="nav-item is-soon" href="#" tabindex="-1" aria-disabled="true">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.5 15.5M20 20L8.5 8.5"/></svg></span>
