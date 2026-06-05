@@ -69,6 +69,10 @@ enum TipoMarca {
   MAQUILA
 }
 
+enum EstadoRequerimiento {
+  CALCULADO
+}
+
 model UnidadMedida {
   id         Int        @id @default(autoincrement())
   codigo     String     @unique
@@ -93,12 +97,16 @@ model Material {
   origen         OrigenMaterial
   claseBom       ClaseBom
   activo         Boolean           @default(true)
+  proveedorId    Int?
+  proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
 
   alias             MaterialAlias[]
   bomPropio         Bom?            @relation("BomDeMaterial")
   lineasComoInsumo  BomLinea[]      @relation("InsumoDeLinea")
   overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
   overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
+  inventario        InventarioMaterial?
+  lineasReq         RequerimientoCompraLinea[]
 }
 
 model MaterialAlias {
@@ -435,8 +443,9 @@ model OrdenProduccion {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  lineas   OrdenProduccionLinea[]
-  despacho Despacho?
+  lineas         OrdenProduccionLinea[]
+  despacho       Despacho?
+  requerimientos RequerimientoCompra[]
 }
 
 model OrdenProduccionLinea {
@@ -507,4 +516,56 @@ model DespachoLinea {
   cantidad              Int
 
   @@index([despachoId])
+}
+
+// ───────────────────────── Módulo 4: Compras / Requerimientos ─────────────────────────
+
+model Proveedor {
+  id        Int      @id @default(autoincrement())
+  nit       String   @unique
+  nombre    String
+  ciudad    String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  materiales Material[]
+  lineasReq  RequerimientoCompraLinea[]
+}
+
+model InventarioMaterial {
+  id             Int      @id @default(autoincrement())
+  materialId     Int      @unique
+  material       Material @relation(fields: [materialId], references: [id])
+  cantDisponible Decimal  @default(0) @db.Decimal(14, 4)
+  updatedAt      DateTime @updatedAt
+}
+
+model RequerimientoCompra {
+  id          Int                 @id @default(autoincrement())
+  consecutivo Int                 @unique
+  opId        Int
+  op          OrdenProduccion     @relation(fields: [opId], references: [id])
+  fecha       DateTime            @default(now())
+  estado      EstadoRequerimiento @default(CALCULADO)
+  createdAt   DateTime            @default(now())
+
+  lineas RequerimientoCompraLinea[]
+
+  @@index([opId])
+}
+
+model RequerimientoCompraLinea {
+  id              Int                 @id @default(autoincrement())
+  requerimientoId Int
+  requerimiento   RequerimientoCompra @relation(fields: [requerimientoId], references: [id])
+  materialId      Int
+  material        Material            @relation(fields: [materialId], references: [id])
+  proveedorId     Int?
+  proveedor       Proveedor?          @relation(fields: [proveedorId], references: [id])
+  cantNecesaria   Decimal             @db.Decimal(14, 4)
+  cantDisponible  Decimal             @db.Decimal(14, 4)
+  cantAComprar    Decimal             @db.Decimal(14, 4)
+
+  @@index([requerimientoId])
 }
