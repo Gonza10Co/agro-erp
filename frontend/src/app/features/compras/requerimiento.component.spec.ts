@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { RequerimientoComponent } from './requerimiento.component';
 import { ComprasApi } from '../../core/api/compras.api';
 import { Requerimiento } from '../../core/api/models/compras.models';
@@ -45,5 +45,20 @@ describe('RequerimientoComponent', () => {
   it('muestra estado vacío cuando no hay grupos', () => {
     const el: HTMLElement = setup({ ...datos, grupos: [] }).nativeElement;
     expect(el.textContent).toContain('Nada que comprar');
+  });
+
+  it('muestra estado de error cuando el fetch falla', () => {
+    const api = { obtener: () => throwError(() => new Error('boom')) };
+    TestBed.configureTestingModule({
+      imports: [RequerimientoComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ComprasApi, useValue: api },
+        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(RequerimientoComponent);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No se encontró el requerimiento');
   });
 });

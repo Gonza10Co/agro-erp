@@ -23,7 +23,7 @@ import { Requerimiento } from '../../core/api/models/compras.models';
         </div>
 
         @if (r.grupos.length) {
-          @for (g of r.grupos; track g.proveedor?.id ?? -1) {
+          @for (g of r.grupos; track $index) {
             <div class="card" style="margin-bottom:var(--sp-4)">
               <div class="card-head" style="padding:var(--sp-4) var(--sp-5);border-bottom:var(--bw) solid var(--border)">
                 <h3 style="font-size:var(--text-h3);font-weight:var(--fw-semibold)">
@@ -53,6 +53,11 @@ import { Requerimiento } from '../../core/api/models/compras.models';
             <p class="cell-sub">La OP está completamente cubierta por inventario.</p>
           </div></div></div>
         }
+      } @else if (estado() === 'error') {
+        <div class="card"><div class="card-body"><div class="empty">
+          <h4>No se encontró el requerimiento</h4>
+          <p class="cell-sub">No pudimos cargar este requerimiento de compra.</p>
+        </div></div></div>
       } @else {
         <div class="card"><div class="card-body">Cargando requerimiento…</div></div>
       }
@@ -73,11 +78,16 @@ export class RequerimientoComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   req = signal<Requerimiento | null>(null);
+  estado = signal<'cargando' | 'ok' | 'error'>('cargando');
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
       const id = Number(p.get('id'));
-      this.api.obtener(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((r) => this.req.set(r));
+      this.estado.set('cargando');
+      this.api.obtener(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (r) => { this.req.set(r); this.estado.set('ok'); },
+        error: () => this.estado.set('error'),
+      });
     });
   }
 }
