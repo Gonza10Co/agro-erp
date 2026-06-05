@@ -80,3 +80,13 @@ export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string;
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export interface CrearOCLineaDto { productoConfiguradoId: number; tallas: CrearOCTallaDto[]; }
 export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; lineas: CrearOCLineaDto[]; }
+
+export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
+export interface DespachoListItem {
+  id: number;
+  consecutivo: number;
+  fecha: string;
+  autorizadoPorId: number | null;
+  op: { consecutivo: number; oc: { cliente: { nombre: string } } };
+}
+export interface Despacho { id: number; consecutivo: number; }
