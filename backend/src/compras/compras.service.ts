@@ -43,15 +43,20 @@ export class ComprasService {
     for (const linea of op.lineas as any[]) {
       const pc = linea.productoConfigurado;
       const opcionIds = pc.opciones.map((o: any) => o.opcionId);
-      for (const t of linea.tallas as any[]) {
-        if (t.cantAProducir <= 0) continue;
-        const entrada = await this.bomLoader.cargarEntrada({
-          referenciaId: pc.referenciaId,
-          marcaId: pc.marcaId,
-          opcionIds,
-          talla: t.talla.valor,
-        });
-        const { comprados } = this.resolver(entrada);
+      const tallasActivas = (linea.tallas as any[]).filter(
+        (t) => t.cantAProducir > 0,
+      );
+      if (!tallasActivas.length) continue;
+      // El BOM/overrides/materiales no dependen de la talla: se cargan una vez
+      // por línea y solo se varía `talla` al resolver cada curva. Evita el N+1.
+      const entradaBase = await this.bomLoader.cargarEntrada({
+        referenciaId: pc.referenciaId,
+        marcaId: pc.marcaId,
+        opcionIds,
+        talla: tallasActivas[0].talla.valor,
+      });
+      for (const t of tallasActivas) {
+        const { comprados } = this.resolver({ ...entradaBase, talla: t.talla.valor });
         for (const c of comprados) {
           bruto.set(
             c.materialId,
