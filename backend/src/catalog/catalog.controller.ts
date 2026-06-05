@@ -16,4 +16,9 @@ export class CatalogController {
   tallas() {
     return this.catalog.listarTallas();
   }
+
+  @Get('referencias')
+  referencias() {
+    return this.catalog.listarReferencias();
+  }
 }

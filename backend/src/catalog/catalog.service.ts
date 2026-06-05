@@ -29,4 +29,12 @@ export class CatalogService {
   listarTallas() {
     return this.prisma.talla.findMany({ orderBy: { orden: 'asc' } });
   }
+
+  listarReferencias() {
+    return this.prisma.referencia.findMany({
+      where: { activo: true },
+      orderBy: { codigo: 'asc' },
+      select: { id: true, codigo: true, nombreInterno: true },
+    });
+  }
 }
