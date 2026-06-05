@@ -8,6 +8,7 @@ import { ClientesModule } from './clientes/clientes.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { OcModule } from './pedidos/oc/oc.module';
 import { OpModule } from './pedidos/op/op.module';
+import { DespachoModule } from './despachos/despacho.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { OpModule } from './pedidos/op/op.module';
     InventarioModule,
     OcModule,
     OpModule,
+    DespachoModule,
   ],
   controllers: [AppController],
 })
