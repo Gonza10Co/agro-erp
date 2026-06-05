@@ -14,6 +14,7 @@ const OP: Record<EstadoOP, EstadoBadge> = {
   CREADA:        { clase: 'badge-neutral', label: 'Creada' },
   AMARRADA:      { clase: 'badge-info',    label: 'Amarrada' },
   EN_PRODUCCION: { clase: 'badge-accent',  label: 'En producción' },
+  DESPACHADA:    { clase: 'badge-success', label: 'Despachada' },
   ANULADA:       { clase: 'badge-neutral', label: 'Anulada' },
 };
 

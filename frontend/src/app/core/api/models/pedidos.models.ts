@@ -1,5 +1,5 @@
 export type EstadoOC = 'BORRADOR' | 'CONFIRMADA' | 'EN_PRODUCCION' | 'CERRADA' | 'ANULADA';
-export type EstadoOP = 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'ANULADA';
+export type EstadoOP = 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'DESPACHADA' | 'ANULADA';
 export type TipoCredito = 'CONTADO' | 'D30' | 'D60' | 'D90';
 export type EstadoCartera = 'AL_DIA' | 'VENCIDO' | 'BLOQUEADO';
 export type TipoBodega = 'PROPIA' | 'HERMANA';

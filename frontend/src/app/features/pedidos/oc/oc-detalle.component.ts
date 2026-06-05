@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
-import { OrdenCompra } from '../../../core/api/models/pedidos.models';
+import { OrdenCompra, EstadoOP } from '../../../core/api/models/pedidos.models';
 import { badgeOC, badgeOP } from './estado-badge';
 
 @Component({
@@ -112,7 +112,7 @@ export class OcDetalleComponent implements OnInit {
   }
 
   badge(o: OrdenCompra) { return badgeOC(o.estado); }
-  badgeOp(estado: 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'ANULADA') { return badgeOP(estado); }
+  badgeOp(estado: EstadoOP) { return badgeOP(estado); }
 
   private msg(e: any): string {
     const m = e?.error?.message;

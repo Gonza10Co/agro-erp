@@ -32,3 +32,32 @@ describe('AuthService', () => {
     expect(service.isAuthenticated()).toBe(false);
   });
 });
+
+function jwtConRol(role: string): string {
+  const payload = btoa(JSON.stringify({ sub: 1, username: 'x', role }));
+  return `h.${payload}.s`;
+}
+
+describe('AuthService.rol', () => {
+  let auth: AuthService;
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [AuthService, provideHttpClient(), provideHttpClientTesting()] });
+    auth = TestBed.inject(AuthService);
+    localStorage.clear();
+  });
+  afterEach(() => localStorage.clear());
+
+  it('devuelve null si no hay token', () => {
+    expect(auth.rol()).toBeNull();
+  });
+
+  it('decodifica el role del JWT', () => {
+    localStorage.setItem('accessToken', jwtConRol('GERENTE'));
+    expect(auth.rol()).toBe('GERENTE');
+  });
+
+  it('devuelve null si el token es inválido', () => {
+    localStorage.setItem('accessToken', 'no-es-un-jwt');
+    expect(auth.rol()).toBeNull();
+  });
+});

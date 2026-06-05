@@ -18,6 +18,17 @@ export class AuthService {
     return !!this.accessToken;
   }
 
+  rol(): string | null {
+    const t = this.accessToken;
+    if (!t) return null;
+    try {
+      const payload = JSON.parse(atob(t.split('.')[1]));
+      return payload.role ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   login(username: string, password: string): Observable<Tokens> {
     return this.http.post<Tokens>(`${this.apiUrl}/auth/login`, { username, password }).pipe(
       tap((tokens) => {
