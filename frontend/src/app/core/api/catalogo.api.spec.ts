@@ -26,4 +26,28 @@ describe('CatalogoApi', () => {
     expect(req.request.method).toBe('GET');
     req.flush([]);
   });
+
+  it('listarReferencias hace GET /catalog/referencias', () => {
+    api.listarReferencias().subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/referencias');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('configReferencia hace GET /catalog/referencias/:id/config', () => {
+    api.configReferencia(7).subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/referencias/7/config');
+    expect(req.request.method).toBe('GET');
+    req.flush({});
+  });
+
+  it('resolver arma los query params (referenciaId, talla, marcaId, opcionIds[])', () => {
+    api.resolver({ referenciaId: 1, talla: 42, marcaId: 5, opcionIds: [8, 9] }).subscribe();
+    const req = http.expectOne((r) => r.url === 'http://localhost:3001/catalog/bom/resolve');
+    expect(req.request.params.get('referenciaId')).toBe('1');
+    expect(req.request.params.get('talla')).toBe('42');
+    expect(req.request.params.get('marcaId')).toBe('5');
+    expect(req.request.params.getAll('opcionIds')).toEqual(['8', '9']);
+    req.flush({ arbol: [], comprados: [] });
+  });
 });
