@@ -5,6 +5,12 @@
 **Módulo:** Compras (aprovisionamiento). Calcula, desde una OP, qué insumos hay que comprar.
 **Estado previo:** el ciclo OC→OP→amarre PT está implementado (Demo 1, en master); el Configurador de BOM (Demo 2) y Despacho + cartera (Demo 3) están en `develop`. El schema ya tiene `Material.origen` (COMPRADO/FABRICADO), BOM con consumo por talla (`BomLineaTalla`) + `consumoFijo`/`mermaPct`, y `OrdenProduccionLineaTalla.cantAProducir` (lo que falta fabricar tras el amarre). **No existe** ningún modelo de proveedor, ni inventario de insumos (solo `InventarioPT` = producto terminado), ni compra a proveedor (la `OrdenCompra` del schema es la del **cliente**).
 
+**Reuso clave (Demo 2):** la explosión BOM multinivel **ya existe y está testeada** en `backend/src/catalog/bom/`:
+- `bom-resolver.ts` → `resolverBom(entrada)` orquesta `aplicarOverrides` (BOM efectivo según marca/opciones) + `explotarMultinivel` (recursivo, **con guard anti-ciclo**) + `consolidarComprados` (suma consumo por material COMPRADO **para una talla**, con merma aplicada). Funciones **puras**.
+- `bom-loader.service.ts` → `BomLoaderService.cargarEntrada({ referenciaId, marcaId, opcionIds, talla })` carga desde Prisma todo lo necesario (BOM base, overrides, materiales con sub-BOMs) y devuelve la `EntradaResolucion` que consume `resolverBom`.
+
+Por lo tanto Demo 4 **NO reimplementa el explotador**: lo **orquesta**. El cálculo de requerimiento = para cada (productoConfigurado, talla con `cantAProducir > 0`): `resolverBom` → `comprados[]` (consumo por par para esa talla) × `cantAProducir`, acumular por material, restar stock, agrupar por proveedor.
+
 ## 1. Objetivo
 
 Desde una **OP**, calcular el **requerimiento de compra**: explotar el BOM de lo que falta producir (`cantAProducir`), sumar el consumo de cada insumo **COMPRADO** (incluyendo los comprados ocultos dentro de semielaborados **FABRICADO**, vía explosión multinivel), restar el stock de insumos disponible y mostrar el **neto a comprar agrupado por proveedor**. Decisiones tomadas en brainstorming (2026-06-05).
@@ -106,24 +112,25 @@ Cambios en modelos existentes:
 POST /ops/:id/requerimiento   → calcula + persiste; devuelve el requerimiento agrupado por proveedor  (JwtAuthGuard)
 GET  /requerimientos/:id       → detalle (agrupado por proveedor)
 GET  /requerimientos?opId=     → lista de requerimientos de una OP
-GET  /proveedores              → lista (+ CRUD básico: POST/PATCH; JwtAuthGuard)
+GET  /proveedores              → lista (solo lectura; el alta se hace por seed en esta demo)
 GET  /inventario-material      → lista stock de insumos (para verlo en la demo)
 ```
+> Todos bajo `JwtAuthGuard`. El **CRUD de proveedor por UI/API** (POST/PATCH) queda como mejora futura — para la demo basta con que el seed los cree.
+```
+```
 
-- **Helper puro `explotarBom(lineasOpConTallas, bomsPorReferencia, materialesById)`** → devuelve `Map<materialId, Decimal>` con la **necesidad bruta** por material COMPRADO. Recursivo, multinivel, con:
-  - consumo por talla desde `BomLineaTalla` (clase `CURVA`) o `consumoFijo` (clase `FIJO`);
-  - factor de merma `× (1 + mermaPct)` aplicado en **cada nivel** (cascada);
-  - **guard anti-ciclo**: `Set` de `materialId` en la rama de recursión actual; si un FABRICADO se referencia (directa o transitivamente) a sí mismo → corta esa rama y lo registra (no explota infinito).
-  - Es **puro y testeable sin DB** (recibe BOMs y materiales ya cargados).
+- **Reuso (no reimplementar):** la explosión multinivel se hace con `resolverBom` + `BomLoaderService` de Demo 2. Para usar el loader fuera de `catalog`, **exportarlo**: agregar `exports: [BomLoaderService]` en `CatalogModule` e `imports: [CatalogModule]` en `ComprasModule`.
+- **Helper puro nuevo `construirLineasRequerimiento(brutoPorMaterial, stockPorMaterial, proveedorPorMaterial)`** → recibe 3 `Map<number, ...>` (bruto acumulado, stock disponible, proveedorId) y devuelve `LineaRequerimientoData[]` con `{ materialId, proveedorId, cantNecesaria, cantDisponible, cantAComprar }` donde `cantAComprar = max(0, cantNecesaria − cantDisponible)`. Solo emite líneas con `cantNecesaria > 0`. **Puro, testeable sin DB.**
+- **Helper puro nuevo `agruparPorProveedor(lineas, proveedoresById, materialesById)`** → agrupa `LineaRequerimientoData[]` en `{ proveedor: {id,nombre}|null, lineas: [...] }[]`; las de `proveedorId == null` van a un grupo final "Sin proveedor". Preserva orden estable. **Puro, testeable sin DB.**
 - **`ComprasService.calcularRequerimiento(opId)`**:
-  1. Carga la OP con `lineas.productoConfigurado.referencia`, `lineas.tallas` (con `cantAProducir`).
-  2. Carga los BOMs necesarios (de las referencias y, transitivamente, de los materiales FABRICADO) + materiales con `origen`/`proveedorId`.
-  3. `explotarBom(...)` → bruto por material.
-  4. Carga `InventarioMaterial` de esos materiales → `disponible` (0 si no hay registro).
-  5. `neto = max(0, bruto − disponible)` por material.
-  6. **Transacción:** crea `RequerimientoCompra` + `RequerimientoCompraLinea[]` (snapshot necesaria/disponible/aComprar + proveedorId del material); `consecutivo` = max+1 dentro de la transacción (mismo patrón que OC/OP/Despacho).
-  7. Devuelve el requerimiento **agrupado por proveedor** (incluye un grupo "Sin proveedor" para comprados sin `proveedorId`).
-- **Decimal:** usar `Prisma.Decimal` en la acumulación para evitar errores de punto flotante en consumos/mermas.
+  1. Carga la OP con `lineas.productoConfigurado` (incluye `referenciaId`, `marcaId`, `opciones.opcionId`) y `lineas.tallas` (con `cantAProducir` y `talla.valor`).
+  2. Si no existe → `NotFoundException`. Si ninguna línea-talla tiene `cantAProducir > 0` → requerimiento vacío (sin tocar DB de cálculo; igual persiste cabecera vacía o devuelve vacío — ver paso 6).
+  3. **Por cada** línea-talla con `cantAProducir > 0`: `entrada = await bomLoader.cargarEntrada({ referenciaId, marcaId, opcionIds, talla: valor })`; `{ comprados } = resolverBom(entrada)`; por cada `{ materialId, consumo }` acumular en `bruto` el valor `consumo × cantAProducir`.
+  4. Carga `InventarioMaterial` de los materiales con bruto > 0 → `stock` (0 si no hay registro). Carga los materiales (para `proveedorId` y nombre) y proveedores.
+  5. `lineas = construirLineasRequerimiento(bruto, stock, proveedorPorMaterial)`.
+  6. **Transacción:** crea `RequerimientoCompra` + `RequerimientoCompraLinea[]` (snapshot necesaria/disponible/aComprar + proveedorId); `consecutivo` = `max+1` dentro de la transacción (patrón OC/OP/Despacho).
+  7. Devuelve `{ id, consecutivo, opId, fecha, grupos: agruparPorProveedor(...) }`.
+- **Números:** el resolver opera en `number` (igual que Demo 2); se persiste a columnas `Decimal` (Prisma acepta `number` al crear). No mezclar `Prisma.Decimal` en el cálculo.
 
 ## 6. Frontend
 
@@ -153,13 +160,10 @@ features/pedidos/op/op-detalle.component.ts   (MODIFICAR: acción "Calcular requ
 ## 8. Testing
 
 - **Backend:**
-  - `explotarBom` (puro, sin DB) — **el test clave**:
-    - una línea COMPRADO con curva por talla → cantidad correcta;
-    - `consumoFijo` (clase FIJO) → no depende de talla;
-    - **merma en cascada** → `× (1 + mermaPct)` aplicada en cada nivel;
-    - **multinivel** → un FABRICADO explota su BOM y acumula sus comprados con consumos multiplicados;
-    - **ciclo** → no entra en loop infinito, corta la rama.
-  - `calcularRequerimiento` (prisma mock + `$transaction`): bruto − stock = neto; agrupación por proveedor; "Sin proveedor"; OP 100% amarrada → vacío; genera consecutivo.
+  - La explosión multinivel (curva/fijo, merma en cascada, multinivel, ciclo) **ya está cubierta** por `bom-resolver.spec.ts` de Demo 2 — no se re-testea.
+  - `construirLineasRequerimiento` (puro) — **test clave del módulo**: `cantAComprar = max(0, necesaria − disponible)`; stock ≥ necesaria → 0; sin registro de stock → todo a comprar; descarta materiales con `cantNecesaria == 0`.
+  - `agruparPorProveedor` (puro): agrupa por proveedor; las de `proveedorId == null` caen en grupo "Sin proveedor" al final; orden estable.
+  - `calcularRequerimiento` (prisma mock + `bomLoader` mock + `$transaction`): acumula `consumo × cantAProducir` por talla; bruto − stock = neto; persiste líneas + genera consecutivo; OP inexistente → 404; OP sin `cantAProducir > 0` → vacío.
 - **Frontend:**
   - `CompraApi` (HttpTestingController): POST/GET con params.
   - `op-detalle`: acción "Calcular requerimientos" (navega/expande).
