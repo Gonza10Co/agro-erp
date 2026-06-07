@@ -10,6 +10,7 @@ import { OcModule } from './pedidos/oc/oc.module';
 import { OpModule } from './pedidos/op/op.module';
 import { DespachoModule } from './despachos/despacho.module';
 import { ComprasModule } from './compras/compras.module';
+import { FabricacionModule } from './fabricacion/fabricacion.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ComprasModule } from './compras/compras.module';
     OpModule,
     DespachoModule,
     ComprasModule,
+    FabricacionModule,
   ],
   controllers: [AppController],
 })

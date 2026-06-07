@@ -222,38 +222,52 @@ async function main() {
   const [tallaA, tallaB] = tallasConStock;
 
   // ── Limpieza idempotente (respetar orden de FKs) ─────────────────────────────
+
+  // ── Limpieza MES (idempotente) ──
+  await prisma.eventoTrazabilidad.deleteMany({
+    where: { par: { of: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } } },
+  });
+  await prisma.par.deleteMany({
+    where: { of: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } },
+  });
+  await prisma.ordenFabricacion.deleteMany({
+    where: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } },
+  });
+  await prisma.maquina.deleteMany({});
+  await prisma.operario.deleteMany({});
+
   await prisma.requerimientoCompraLinea.deleteMany({
-    where: { requerimiento: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
+    where: { requerimiento: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } },
   });
   await prisma.requerimientoCompra.deleteMany({
-    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
+    where: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } },
   });
   await prisma.despachoLinea.deleteMany({
-    where: { despacho: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
+    where: { despacho: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } },
   });
   await prisma.despacho.deleteMany({
-    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
+    where: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } },
   });
   await prisma.reservaInventarioPT.deleteMany({
-    where: { opLineaTalla: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003] } } } } },
+    where: { opLineaTalla: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } } },
   });
   await prisma.ordenProduccionLineaTalla.deleteMany({
-    where: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003] } } } },
+    where: { opLinea: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } },
   });
   await prisma.ordenProduccionLinea.deleteMany({
-    where: { op: { consecutivo: { in: [9001, 9002, 9003] } } },
+    where: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } },
   });
   await prisma.ordenProduccion.deleteMany({
-    where: { consecutivo: { in: [9001, 9002, 9003] } },
+    where: { consecutivo: { in: [9001, 9002, 9003, 9005] } },
   });
   await prisma.ordenCompraLineaTalla.deleteMany({
-    where: { ocLinea: { oc: { consecutivo: { in: [9001, 9002, 9003] } } } },
+    where: { ocLinea: { oc: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } },
   });
   await prisma.ordenCompraLinea.deleteMany({
-    where: { oc: { consecutivo: { in: [9001, 9002, 9003] } } },
+    where: { oc: { consecutivo: { in: [9001, 9002, 9003, 9005] } } },
   });
   await prisma.ordenCompra.deleteMany({
-    where: { consecutivo: { in: [9001, 9002, 9003] } },
+    where: { consecutivo: { in: [9001, 9002, 9003, 9005] } },
   });
 
   // ── OP 9001 — cliente AL_DIA → camino feliz ───────────────────────────────
@@ -365,6 +379,59 @@ async function main() {
   await stock('MICRO-NEG', 12);   // PARCIAL   → neto 8.9 m a comprar   [curtiembre]
   // POLIOL: SIN registro de InventarioMaterial → todo a comprar (8 kg) [químicos]
 
+  // ── MES: operarios y máquinas (uno por célula) ──
+  const celulas = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'] as const;
+  const nombresOperario: Record<(typeof celulas)[number], string> = {
+    CORTE: 'Carlos Cortés',
+    GUARNICION: 'Gloria Guarín',
+    ALMACEN: 'Aldo Mena',
+    INYECCION: 'Iván Yepes',
+    PT: 'Patricia Téllez',
+  };
+  const nombresMaquina: Record<(typeof celulas)[number], string> = {
+    CORTE: 'Cortadora CNC',
+    GUARNICION: 'Máquina de costura plana',
+    ALMACEN: 'Estación de armado',
+    INYECCION: 'Inyectora robotizada',
+    PT: 'Empacadora',
+  };
+  for (const c of celulas) {
+    await prisma.operario.create({ data: { nombre: nombresOperario[c], celula: c } });
+    await prisma.maquina.create({
+      data: { codigo: `MAQ-${c}`, nombre: nombresMaquina[c], celula: c },
+    });
+  }
+
+  // ── OP 9005 — driver del MES (cantidades chicas para el tablero) ──
+  const oc9005 = await prisma.ordenCompra.create({
+    data: {
+      consecutivo: 9005,
+      clienteId: clienteAlDia.id,
+      estado: 'EN_PRODUCCION',
+      lineas: {
+        create: [
+          {
+            productoConfiguradoId: prodDiel.id,
+            tallas: { create: [{ tallaId: tallaA.id, cantidad: 6 }, { tallaId: tallaB.id, cantidad: 6 }] },
+          },
+        ],
+      },
+    },
+  });
+  const op9005 = await prisma.ordenProduccion.create({
+    data: { consecutivo: 9005, ocId: oc9005.id, estado: 'EN_PRODUCCION' },
+  });
+  const op9005Linea = await prisma.ordenProduccionLinea.create({
+    data: { opId: op9005.id, productoConfiguradoId: prodDiel.id },
+  });
+  await prisma.ordenProduccionLineaTalla.createMany({
+    data: [
+      { opLineaId: op9005Linea.id, tallaId: tallaA.id, cantPedida: 6, cantAmarrada: 0, cantAProducir: 6 },
+      { opLineaId: op9005Linea.id, tallaId: tallaB.id, cantPedida: 6, cantAmarrada: 0, cantAProducir: 6 },
+    ],
+  });
+  console.log('  OP-9005 (driver MES): 12 pares pendientes desde Corte');
+
   console.log('Seed demo OK:', {
     clientes: clientes.length,
     productos: productos.length,
@@ -375,6 +442,7 @@ async function main() {
     op9001: `OP#${op9001.consecutivo} → ${clienteAlDia.nombre} (AL_DIA) — camino feliz`,
     op9002: `OP#${op9002.consecutivo} → ${clienteVencido.nombre} (VENCIDO) — camino bloqueado`,
     op9003: `OP#${op9003.consecutivo} → ${clienteAlDia.nombre} — 200 pares A PRODUCIR (driver de Compras)`,
+    op9005: `OP#${op9005.consecutivo} → ${clienteAlDia.nombre} — 12 pares A PRODUCIR (driver MES)`,
     proveedores: `${curtiembre.nombre}, ${quimicos.nombre}, ${herrajes.nombre}`,
     stockInsumos: 'SUELA-BASE=250 (neto 0), MICRO-NEG=12 (parcial), POLIOL=sin stock (todo a comprar)',
   });

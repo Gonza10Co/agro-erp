@@ -131,6 +131,7 @@ model Talla {
   opLineasTalla  OrdenProduccionLineaTalla[]
   inventarioPT   InventarioPT[]
   lineasDespacho DespachoLinea[]
+  pares          Par[]
 }
 
 model Referencia {
@@ -299,6 +300,7 @@ model ProductoConfigurado {
   lineasOP       OrdenProduccionLinea[]
   inventarioPT   InventarioPT[]
   lineasDespacho DespachoLinea[]
+  pares          Par[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -443,9 +445,10 @@ model OrdenProduccion {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  lineas         OrdenProduccionLinea[]
-  despacho       Despacho?
-  requerimientos RequerimientoCompra[]
+  lineas              OrdenProduccionLinea[]
+  despacho            Despacho?
+  requerimientos      RequerimientoCompra[]
+  ordenesFabricacion  OrdenFabricacion[]
 }
 
 model OrdenProduccionLinea {
@@ -568,4 +571,95 @@ model RequerimientoCompraLinea {
   cantAComprar    Decimal             @db.Decimal(14, 4)
 
   @@index([requerimientoId])
+}
+
+// ───────────────────────── Módulo 5: MES / Fabricación ─────────────────────────
+
+enum Celula {
+  CORTE
+  GUARNICION
+  ALMACEN
+  INYECCION
+  PT
+}
+
+enum EstadoOF {
+  ABIERTA
+  EN_PROCESO
+  TERMINADA
+  ANULADA
+}
+
+enum EstadoPar {
+  EN_PROCESO
+  TERMINADO
+}
+
+model OrdenFabricacion {
+  id          Int             @id @default(autoincrement())
+  consecutivo Int             @unique
+  opId        Int
+  op          OrdenProduccion @relation(fields: [opId], references: [id])
+  fecha       DateTime        @default(now())
+  estado      EstadoOF        @default(ABIERTA)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  pares Par[]
+
+  @@index([opId])
+}
+
+model Par {
+  id                    Int                 @id @default(autoincrement())
+  codigo                String              @unique
+  ofId                  Int
+  of                    OrdenFabricacion    @relation(fields: [ofId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  celulaActual          Celula              @default(CORTE)
+  estado                EstadoPar           @default(EN_PROCESO)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  eventos EventoTrazabilidad[]
+
+  @@index([ofId])
+  @@index([celulaActual])
+}
+
+model EventoTrazabilidad {
+  id         Int      @id @default(autoincrement())
+  parId      Int
+  par        Par      @relation(fields: [parId], references: [id])
+  celula     Celula
+  operarioId Int
+  operario   Operario @relation(fields: [operarioId], references: [id])
+  maquinaId  Int
+  maquina    Maquina  @relation(fields: [maquinaId], references: [id])
+  timestamp  DateTime @default(now())
+
+  @@index([parId])
+  @@index([celula])
+}
+
+model Operario {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  celula Celula
+  activo Boolean @default(true)
+
+  eventos EventoTrazabilidad[]
+}
+
+model Maquina {
+  id     Int     @id @default(autoincrement())
+  codigo String  @unique
+  nombre String
+  celula Celula
+  activo Boolean @default(true)
+
+  eventos EventoTrazabilidad[]
 }

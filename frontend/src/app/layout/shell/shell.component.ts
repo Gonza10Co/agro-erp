@@ -30,6 +30,14 @@ import { AuthService } from '../../core/auth/auth.service';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13v10H3zM16 10h3l2 3v4h-5zM7 17a2 2 0 1 0 4 0M16 17a2 2 0 1 0 4 0"/></svg></span>
             <span class="nav-label">Despachos</span>
           </a>
+          <a class="nav-item" routerLink="/fabricacion/tablero" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16"/><rect x="10" y="4" width="5" height="10"/><rect x="17" y="4" width="4" height="7"/></svg></span>
+            <span class="nav-label">Tablero de fabricación</span>
+          </a>
+          <a class="nav-item" routerLink="/fabricacion/operario" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l5 5v5h-2M3 7v10h2M9 7V4h4v3"/><circle cx="7" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg></span>
+            <span class="nav-label">Puesto de operario</span>
+          </a>
           <a class="nav-item" routerLink="/clientes" routerLinkActive="is-active">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.6M21 20a5.5 5.5 0 0 0-4-5.3"/></svg></span>
             <span class="nav-label">Clientes</span>
