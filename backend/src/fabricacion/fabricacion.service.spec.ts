@@ -198,3 +198,26 @@ describe('FabricacionService.avanzar', () => {
     await expect(new FabricacionService(prisma).avanzar('OF1-0001', dto)).rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+describe('FabricacionService lecturas', () => {
+  it('tablero filtra por ofId cuando se pasa', async () => {
+    const { prisma } = makePrisma();
+    prisma.par = {
+      ...prisma.par,
+      findMany: jest.fn().mockResolvedValue([]),
+    };
+    await new FabricacionService(prisma).tablero(1);
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ofId: 1 } }),
+    );
+  });
+
+  it('tablero sin ofId no filtra', async () => {
+    const { prisma } = makePrisma();
+    prisma.par = { ...prisma.par, findMany: jest.fn().mockResolvedValue([]) };
+    await new FabricacionService(prisma).tablero(undefined);
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
+});

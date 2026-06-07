@@ -125,4 +125,88 @@ export class FabricacionService {
       });
     });
   }
+
+  listarOF() {
+    return this.prisma.ordenFabricacion.findMany({
+      orderBy: { consecutivo: 'desc' },
+      select: {
+        id: true,
+        consecutivo: true,
+        estado: true,
+        fecha: true,
+        op: { select: { consecutivo: true } },
+        _count: { select: { pares: true } },
+      },
+    });
+  }
+
+  async obtenerOF(id: number) {
+    const of = await this.prisma.ordenFabricacion.findUnique({
+      where: { id },
+      include: {
+        op: { select: { consecutivo: true } },
+        pares: {
+          orderBy: { codigo: 'asc' },
+          select: {
+            id: true,
+            codigo: true,
+            celulaActual: true,
+            estado: true,
+            talla: { select: { valor: true } },
+          },
+        },
+      },
+    });
+    if (!of) throw new NotFoundException(`OF ${id} no existe`);
+    return of;
+  }
+
+  tablero(ofId?: number) {
+    return this.prisma.par.findMany({
+      where: ofId ? { ofId } : {},
+      orderBy: { codigo: 'asc' },
+      select: {
+        id: true,
+        codigo: true,
+        celulaActual: true,
+        estado: true,
+        talla: { select: { valor: true } },
+        of: { select: { consecutivo: true } },
+      },
+    });
+  }
+
+  async obtenerPar(codigo: string) {
+    const par = await this.prisma.par.findUnique({
+      where: { codigo },
+      include: {
+        of: { select: { consecutivo: true } },
+        talla: { select: { valor: true } },
+        productoConfigurado: { select: { id: true } },
+        eventos: {
+          orderBy: { timestamp: 'asc' },
+          include: {
+            operario: { select: { nombre: true } },
+            maquina: { select: { nombre: true } },
+          },
+        },
+      },
+    });
+    if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
+    return par;
+  }
+
+  listarOperarios(celula?: string) {
+    return this.prisma.operario.findMany({
+      where: { activo: true, ...(celula ? { celula: celula as any } : {}) },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  listarMaquinas(celula?: string) {
+    return this.prisma.maquina.findMany({
+      where: { activo: true, ...(celula ? { celula: celula as any } : {}) },
+      orderBy: { nombre: 'asc' },
+    });
+  }
 }
