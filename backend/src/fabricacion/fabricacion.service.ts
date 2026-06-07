@@ -55,6 +55,18 @@ export class FabricacionService {
     const celulaActual = par.celulaActual;
     const siguiente = siguienteCelula(celulaActual);
 
+    // La bodega destino es configuración global (no cambia durante la tx):
+    // se resuelve fuera de la transacción para no alargarla.
+    let bodegaPT: { id: number } | null = null;
+    if (siguiente === null) {
+      bodegaPT = await this.prisma.bodega.findFirst({
+        where: { tipo: 'PROPIA', activo: true },
+        orderBy: { prioridad: 'asc' },
+      });
+      if (!bodegaPT)
+        throw new BadRequestException('No hay bodega PROPIA configurada');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       await tx.eventoTrazabilidad.create({
         data: {
@@ -71,28 +83,24 @@ export class FabricacionService {
           where: { id: par.id },
           data: { estado: 'TERMINADO' },
         });
-        const bodega = await tx.bodega.findFirst({
-          where: { tipo: 'PROPIA', activo: true },
-          orderBy: { prioridad: 'asc' },
-        });
-        if (!bodega)
-          throw new BadRequestException('No hay bodega PROPIA configurada');
         await tx.inventarioPT.upsert({
           where: {
             productoConfiguradoId_tallaId_bodegaId: {
               productoConfiguradoId: par.productoConfiguradoId,
               tallaId: par.tallaId,
-              bodegaId: bodega.id,
+              bodegaId: bodegaPT!.id,
             },
           },
           create: {
             productoConfiguradoId: par.productoConfiguradoId,
             tallaId: par.tallaId,
-            bodegaId: bodega.id,
+            bodegaId: bodegaPT!.id,
             cantDisponible: 1,
           },
           update: { cantDisponible: { increment: 1 } },
         });
+        // El par ya fue marcado TERMINADO en esta misma tx, así que
+        // este count no lo incluye (cuenta solo los que aún siguen en proceso).
         const restantes = await tx.par.count({
           where: { ofId: par.ofId, estado: 'EN_PROCESO' },
         });

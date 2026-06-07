@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { FabricacionService } from './fabricacion.service';
 
+const BODEGA_ID = 7;
+
 function makePrisma(overrides: any = {}) {
   const tx = {
     ordenFabricacion: {
@@ -14,7 +16,6 @@ function makePrisma(overrides: any = {}) {
       count: jest.fn().mockResolvedValue(0),
     },
     eventoTrazabilidad: { create: jest.fn().mockResolvedValue({}) },
-    bodega: { findFirst: jest.fn().mockResolvedValue({ id: 7 }) },
     inventarioPT: { upsert: jest.fn().mockResolvedValue({}) },
     ...overrides.tx,
   };
@@ -23,6 +24,8 @@ function makePrisma(overrides: any = {}) {
       findUnique: jest.fn(),
     },
     par: { findUnique: jest.fn() },
+    // La bodega destino se resuelve fuera de la transacción (config global).
+    bodega: { findFirst: jest.fn().mockResolvedValue({ id: BODEGA_ID }) },
     $transaction: jest.fn(async (cb: any) => cb(tx)),
     ...overrides.root,
   };
@@ -145,7 +148,7 @@ describe('FabricacionService.avanzar', () => {
     );
     expect(tx.inventarioPT.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { productoConfiguradoId_tallaId_bodegaId: { productoConfiguradoId: 10, tallaId: 1, bodegaId: 7 } },
+        where: { productoConfiguradoId_tallaId_bodegaId: { productoConfiguradoId: 10, tallaId: 1, bodegaId: BODEGA_ID } },
         create: expect.objectContaining({ cantDisponible: 1 }),
         update: { cantDisponible: { increment: 1 } },
       }),
@@ -153,6 +156,31 @@ describe('FabricacionService.avanzar', () => {
     expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { estado: 'TERMINADA' } }),
     );
+  });
+
+  it('avance desde célula intermedia no toca el estado de la OF', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 51, ofId: 1, celulaActual: 'GUARNICION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0002', dto);
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'ALMACEN' }) }),
+    );
+    expect(tx.ordenFabricacion.update).not.toHaveBeenCalled();
+  });
+
+  it('desde PT no cierra la OF si quedan pares en proceso', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    tx.par.count.mockResolvedValue(3); // todavía quedan pares
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+    expect(tx.inventarioPT.upsert).toHaveBeenCalled();
+    expect(tx.ordenFabricacion.update).not.toHaveBeenCalled();
   });
 
   it('404 si el par no existe', async () => {
