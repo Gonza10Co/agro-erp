@@ -13,7 +13,9 @@ import { OFListItem } from '../../core/api/models/fabricacion.models';
     <div class="page">
       <div class="page-header"><div class="ph-title">Órdenes de Fabricación</div></div>
       <div class="card"><div class="card-body">
-        @if (ofs().length) {
+        @if (error()) {
+          <div class="empty"><h4>No se pudo cargar las órdenes de fabricación</h4><p class="cell-sub">{{ error() }}</p></div>
+        } @else if (ofs().length) {
           <table class="tbl">
             <thead><tr><th>OF</th><th>OP</th><th>Pares</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
             <tbody>
@@ -46,8 +48,12 @@ export class OfListComponent implements OnInit {
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
   ofs = signal<OFListItem[]>([]);
+  error = signal<string | null>(null);
 
   ngOnInit(): void {
-    this.api.listarOF().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((o) => this.ofs.set(o));
+    this.api.listarOF().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (o) => this.ofs.set(o),
+      error: () => this.error.set('No se pudo cargar las órdenes de fabricación. Intentá de nuevo.'),
+    });
   }
 }

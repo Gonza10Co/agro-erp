@@ -47,7 +47,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
               }
               @if (requerible()) {
-                <button class="btn btn-primary" type="button" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
+                <button class="btn btn-primary" type="button" [class.is-loading]="generandoOF()" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
                 <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
               @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {

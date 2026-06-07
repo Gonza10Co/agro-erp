@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
@@ -22,12 +22,12 @@ import {
         </label>
         <label>Operario
           <select [(ngModel)]="operarioId">
-            @for (o of operarios(); track o.id) { <option [value]="o.id">{{ o.nombre }}</option> }
+            @for (o of operarios(); track o.id) { <option [ngValue]="o.id">{{ o.nombre }}</option> }
           </select>
         </label>
         <label>Máquina
           <select [(ngModel)]="maquinaId">
-            @for (m of maquinas(); track m.id) { <option [value]="m.id">{{ m.nombre }}</option> }
+            @for (m of maquinas(); track m.id) { <option [ngValue]="m.id">{{ m.nombre }}</option> }
           </select>
         </label>
       </div></div>
@@ -68,6 +68,7 @@ import {
   `],
 })
 export class PantallaOperarioComponent implements OnInit {
+  @ViewChild('scan') private scanInput!: ElementRef<HTMLInputElement>;
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -124,6 +125,7 @@ export class PantallaOperarioComponent implements OnInit {
           this.msg.set(`Par ${p.codigo} avanzado ✓`);
           this.par.set(null);
           this.codigo = '';
+          setTimeout(() => this.scanInput?.nativeElement.focus(), 0);
         },
         error: (e) => {
           this.esError.set(true);

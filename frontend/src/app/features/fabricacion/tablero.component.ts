@@ -14,6 +14,9 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/
         <div class="ph-title">Tablero de fabricación</div>
         <button class="btn" (click)="cargar()">Actualizar</button>
       </div>
+      @if (error()) {
+        <div class="empty"><h4>No se pudo cargar el tablero</h4><p class="cell-sub">{{ error() }}</p></div>
+      }
       <div class="kanban">
         @for (c of columnas; track c) {
           <div class="col">
@@ -66,6 +69,7 @@ export class FabricacionTableroComponent implements OnInit {
   readonly columnas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
   private pares = signal<ParTablero[]>([]);
+  error = signal<string | null>(null);
   private ofId?: number;
 
   porCelula = computed(() => {
@@ -86,6 +90,10 @@ export class FabricacionTableroComponent implements OnInit {
   }
 
   cargar(): void {
-    this.api.tablero(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => this.pares.set(p));
+    this.error.set(null);
+    this.api.tablero(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (p) => this.pares.set(p),
+      error: () => this.error.set('No se pudo cargar el tablero. Intentá de nuevo.'),
+    });
   }
 }
