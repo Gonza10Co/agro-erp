@@ -12,7 +12,8 @@ export const ORDEN_CELULAS: Celula[] = [
 /** Devuelve la célula siguiente, o null si `actual` es la última (PT). */
 export function siguienteCelula(actual: Celula): Celula | null {
   const i = ORDEN_CELULAS.indexOf(actual);
-  if (i < 0 || i >= ORDEN_CELULAS.length - 1) return null;
+  if (i < 0) throw new Error(`Célula desconocida: "${actual}"`);
+  if (i >= ORDEN_CELULAS.length - 1) return null;
   return ORDEN_CELULAS[i + 1];
 }
 

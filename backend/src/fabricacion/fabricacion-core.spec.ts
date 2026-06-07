@@ -21,6 +21,10 @@ describe('siguienteCelula', () => {
   it('expone el orden completo de 5 células', () => {
     expect(ORDEN_CELULAS).toEqual(['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT']);
   });
+
+  it('lanza error ante una célula desconocida (no la trata como PT)', () => {
+    expect(() => siguienteCelula('XXX' as never)).toThrow('Célula desconocida');
+  });
 });
 
 describe('esUltimaCelula', () => {
@@ -55,6 +59,7 @@ describe('generarPares', () => {
   it('mapea producto y talla de cada línea', () => {
     const pares = generarPares(5, lineas);
     expect(pares[0]).toMatchObject({ productoConfiguradoId: 10, tallaId: 1 });
+    expect(pares[1]).toMatchObject({ productoConfiguradoId: 10, tallaId: 1 });
     expect(pares[2]).toMatchObject({ productoConfiguradoId: 10, tallaId: 2 });
   });
 
