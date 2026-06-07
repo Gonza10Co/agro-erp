@@ -7,6 +7,7 @@ import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
 import { DespachosApi } from '../../../core/api/despachos.api';
 import { ComprasApi } from '../../../core/api/compras.api';
+import { FabricacionApi } from '../../../core/api/fabricacion.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
@@ -46,6 +47,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
               }
               @if (requerible()) {
+                <button class="btn btn-primary" type="button" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
                 <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
               @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
@@ -218,6 +220,7 @@ export class OpDetalleComponent implements OnInit {
   private readonly comprasApi = inject(ComprasApi);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly fabricacionApi = inject(FabricacionApi);
 
   op = signal<OrdenProduccion | null>(null);
   cargando = signal(true);
@@ -225,6 +228,7 @@ export class OpDetalleComponent implements OnInit {
   error = signal('');
   carteraBloqueada = signal(false);
   motivo = signal('');
+  generandoOF = signal(false);
 
   resumen = computed(() => {
     const o = this.op();
@@ -284,6 +288,15 @@ export class OpDetalleComponent implements OnInit {
     this.comprasApi.calcular(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => { this.accion.set(false); this.router.navigateByUrl('/compras/requerimiento/' + r.id); },
       error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+    });
+  }
+
+  generarOF(opId: number): void {
+    if (this.generandoOF()) return;
+    this.generandoOF.set(true); this.error.set('');
+    this.fabricacionApi.generarOF(opId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (of) => this.router.navigate(['/fabricacion/tablero'], { queryParams: { ofId: of.id } }),
+      error: (e) => { this.generandoOF.set(false); this.error.set(this.msg(e)); },
     });
   }
 
