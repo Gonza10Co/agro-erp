@@ -94,3 +94,79 @@ describe('FabricacionService.generarOF', () => {
     await expect(new FabricacionService(prisma).generarOF(1)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('FabricacionService.avanzar', () => {
+  const dto = { operarioId: 3, maquinaId: 4 };
+
+  it('registra evento en la célula actual y mueve a la siguiente', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'CORTE', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
+    });
+    tx.par.update.mockResolvedValue({ id: 50, celulaActual: 'GUARNICION' });
+    const service = new FabricacionService(prisma);
+
+    await service.avanzar('OF1-0001', dto);
+
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ parId: 50, celula: 'CORTE', operarioId: 3, maquinaId: 4 }),
+      }),
+    );
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION' }) }),
+    );
+  });
+
+  it('al salir de CORTE pasa la OF de ABIERTA a EN_PROCESO', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'CORTE', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'EN_PROCESO' } }),
+    );
+  });
+
+  it('desde PT termina el par y suma 1 a InventarioPT', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    tx.par.count.mockResolvedValue(0); // era el último par en proceso
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'TERMINADO' } }),
+    );
+    expect(tx.inventarioPT.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { productoConfiguradoId_tallaId_bodegaId: { productoConfiguradoId: 10, tallaId: 1, bodegaId: 7 } },
+        create: expect.objectContaining({ cantDisponible: 1 }),
+        update: { cantDisponible: { increment: 1 } },
+      }),
+    );
+    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'TERMINADA' } }),
+    );
+  });
+
+  it('404 si el par no existe', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(null);
+    await expect(new FabricacionService(prisma).avanzar('NOPE', dto)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('409 si el par ya está TERMINADO', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'TERMINADO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await expect(new FabricacionService(prisma).avanzar('OF1-0001', dto)).rejects.toBeInstanceOf(ConflictException);
+  });
+});
