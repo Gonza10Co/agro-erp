@@ -58,6 +58,19 @@ describe('FabricacionService.generarOF', () => {
     expect(res).toEqual({ id: 1, consecutivo: 5, opId: 100, totalPares: 3 });
   });
 
+  it('consecutivo = 1 cuando no hay OFs previas', async () => {
+    const { prisma, tx } = makePrisma();
+    tx.ordenFabricacion.aggregate.mockResolvedValue({ _max: { consecutivo: null } });
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 1, cantAProducir: 1 }] }],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    expect(tx.ordenFabricacion.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ consecutivo: 1 }) }),
+    );
+  });
+
   it('404 si la OP no existe', async () => {
     const { prisma } = makePrisma();
     prisma.ordenProduccion.findUnique.mockResolvedValue(null);
