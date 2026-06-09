@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { amarrarTalla, DisponibilidadBodega } from './amarre';
 
 @Injectable()
@@ -23,10 +24,7 @@ export class OpService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const agg = await tx.ordenProduccion.aggregate({
-        _max: { consecutivo: true },
-      });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
         data: { consecutivo, ocId, estado: 'CREADA' },
       });

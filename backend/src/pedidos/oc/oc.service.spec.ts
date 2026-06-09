@@ -3,8 +3,8 @@ import { OcService } from './oc.service';
 
 describe('OcService', () => {
   const prisma = {
+    $queryRawUnsafe: jest.fn(),
     ordenCompra: {
-      aggregate: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -15,9 +15,7 @@ describe('OcService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('crear asigna consecutivo = max+1 y estado BORRADOR', async () => {
-    prisma.ordenCompra.aggregate.mockResolvedValue({
-      _max: { consecutivo: 3900 },
-    });
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 3901n }]);
     prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 3901 });
     await service.crear({
       clienteId: 7,
@@ -37,9 +35,7 @@ describe('OcService', () => {
   });
 
   it('primer consecutivo es 1 cuando no hay OCs', async () => {
-    prisma.ordenCompra.aggregate.mockResolvedValue({
-      _max: { consecutivo: null },
-    });
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
     await service.crear({
       clienteId: 7,

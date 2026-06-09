@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { DespacharDto } from './dto/despachar.dto';
 import { construirLineasDespacho, ReservaPlana } from './despacho-lineas';
 
@@ -72,8 +73,7 @@ export class DespachoService {
     const lineas = construirLineasDespacho(reservas);
 
     return this.prisma.$transaction(async (tx) => {
-      const agg = await tx.despacho.aggregate({ _max: { consecutivo: true } });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'despacho');
 
       for (const r of reservas) {
         await tx.inventarioPT.update({

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { generarPares, siguienteCelula, LineaProduccion } from './fabricacion-core';
 import { AvanzarDto } from './dto/avanzar.dto';
 
@@ -34,8 +35,7 @@ export class FabricacionService {
       throw new BadRequestException('La OP no tiene producción pendiente');
 
     return this.prisma.$transaction(async (tx) => {
-      const agg = await tx.ordenFabricacion.aggregate({ _max: { consecutivo: true } });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'of');
       const of = await tx.ordenFabricacion.create({ data: { consecutivo, opId } });
       const pares = generarPares(consecutivo, lineas).map((p) => ({ ...p, ofId: of.id }));
       await tx.par.createMany({ data: pares });

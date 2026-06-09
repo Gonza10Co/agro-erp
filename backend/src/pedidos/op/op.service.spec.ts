@@ -3,8 +3,8 @@ import { OpService } from './op.service';
 
 function makeTx() {
   return {
+    $queryRawUnsafe: jest.fn(),
     ordenProduccion: {
-      aggregate: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       findUnique: jest.fn(),
@@ -52,9 +52,7 @@ describe('OpService.generarDesdeOC', () => {
         },
       ],
     });
-    tx.ordenProduccion.aggregate.mockResolvedValue({
-      _max: { consecutivo: 800 },
-    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
     tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
     tx.ordenProduccionLinea.create.mockResolvedValue({ id: 60 });
     tx.inventarioPT.findMany.mockResolvedValue([

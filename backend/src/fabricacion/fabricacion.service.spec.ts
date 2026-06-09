@@ -5,8 +5,8 @@ const BODEGA_ID = 7;
 
 function makePrisma(overrides: any = {}) {
   const tx = {
+    $queryRawUnsafe: jest.fn().mockResolvedValue([{ v: 5n }]),
     ordenFabricacion: {
-      aggregate: jest.fn().mockResolvedValue({ _max: { consecutivo: 4 } }),
       create: jest.fn().mockResolvedValue({ id: 1, consecutivo: 5 }),
       update: jest.fn().mockResolvedValue({}),
     },
@@ -63,7 +63,7 @@ describe('FabricacionService.generarOF', () => {
 
   it('consecutivo = 1 cuando no hay OFs previas', async () => {
     const { prisma, tx } = makePrisma();
-    tx.ordenFabricacion.aggregate.mockResolvedValue({ _max: { consecutivo: null } });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.ordenProduccion.findUnique.mockResolvedValue({
       id: 100, ordenesFabricacion: [],
       lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 1, cantAProducir: 1 }] }],

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
 
@@ -12,10 +13,7 @@ export class OcService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearOCDto) {
-    const agg = await this.prisma.ordenCompra.aggregate({
-      _max: { consecutivo: true },
-    });
-    const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+    const consecutivo = await siguienteConsecutivo(this.prisma, 'oc');
     return this.prisma.ordenCompra.create({
       data: {
         consecutivo,
