@@ -12,6 +12,7 @@ import { DespachoModule } from './despachos/despacho.module';
 import { ComprasModule } from './compras/compras.module';
 import { FabricacionModule } from './fabricacion/fabricacion.module';
 import { CalidadModule } from './calidad/calidad.module';
+import { IndicadoresModule } from './indicadores/indicadores.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CalidadModule } from './calidad/calidad.module';
     ComprasModule,
     FabricacionModule,
     CalidadModule,
+    IndicadoresModule,
   ],
   controllers: [AppController],
 })
