@@ -1,4 +1,4 @@
-import { Celula } from '@prisma/client';
+import { Celula, SubPasoGuarnicion } from '@prisma/client';
 
 /** Orden físico de las células por las que viaja un par. */
 export const ORDEN_CELULAS: Celula[] = [
@@ -34,6 +34,28 @@ export interface ParData {
   codigo: string;
   productoConfiguradoId: number;
   tallaId: number;
+}
+
+export const ORDEN_SUBPASOS: SubPasoGuarnicion[] =
+  ['AREA', 'ARMADO', 'VISTAS', 'CIERRE', 'PREFORMADO', 'PERFORADO', 'REVISION', 'STROBEL', 'AMARRE'];
+
+export interface EstadoPar {
+  celula: Celula;
+  subPaso: SubPasoGuarnicion | null;
+}
+
+/** Única fuente de verdad de la transición (celula, subPaso). null = terminado (sale de PT). */
+export function siguienteEstado(e: EstadoPar): EstadoPar | null {
+  if (e.celula === 'GUARNICION') {
+    const i = ORDEN_SUBPASOS.indexOf(e.subPaso!);
+    if (i < 0) throw new Error(`Sub-paso desconocido: "${e.subPaso}"`);
+    if (i < ORDEN_SUBPASOS.length - 1) return { celula: 'GUARNICION', subPaso: ORDEN_SUBPASOS[i + 1] };
+    return { celula: 'ALMACEN', subPaso: null }; // desde AMARRE: sale la capellada
+  }
+  const sig = siguienteCelula(e.celula); // reusa la cadena célula existente (lanza ante célula desconocida)
+  if (sig === null) return null;
+  if (sig === 'GUARNICION') return { celula: 'GUARNICION', subPaso: 'AREA' };
+  return { celula: sig, subPaso: null };
 }
 
 /**

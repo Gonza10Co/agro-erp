@@ -4,6 +4,8 @@ import {
   esUltimaCelula,
   generarPares,
   LineaProduccion,
+  siguienteEstado,
+  ORDEN_SUBPASOS,
 } from './fabricacion-core';
 
 describe('siguienteCelula', () => {
@@ -32,6 +34,35 @@ describe('esUltimaCelula', () => {
     expect(esUltimaCelula('PT')).toBe(true);
     expect(esUltimaCelula('CORTE')).toBe(false);
     expect(esUltimaCelula('INYECCION')).toBe(false);
+  });
+});
+
+describe('ORDEN_SUBPASOS', () => {
+  it('son 9 sub-pasos en orden, AMARRE último', () => {
+    expect(ORDEN_SUBPASOS).toHaveLength(9);
+    expect(ORDEN_SUBPASOS[0]).toBe('AREA');
+    expect(ORDEN_SUBPASOS[8]).toBe('AMARRE');
+  });
+});
+
+describe('siguienteEstado', () => {
+  it('CORTE entra a Guarnición en AREA', () => {
+    expect(siguienteEstado({ celula: 'CORTE', subPaso: null })).toEqual({ celula: 'GUARNICION', subPaso: 'AREA' });
+  });
+  it('avanza sub-paso a sub-paso dentro de Guarnición', () => {
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AREA' })).toEqual({ celula: 'GUARNICION', subPaso: 'ARMADO' });
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'STROBEL' })).toEqual({ celula: 'GUARNICION', subPaso: 'AMARRE' });
+  });
+  it('desde AMARRE sale la capellada a Almacén (subPaso null)', () => {
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AMARRE' })).toEqual({ celula: 'ALMACEN', subPaso: null });
+  });
+  it('Almacén→Inyección→PT→terminado', () => {
+    expect(siguienteEstado({ celula: 'ALMACEN', subPaso: null })).toEqual({ celula: 'INYECCION', subPaso: null });
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null })).toEqual({ celula: 'PT', subPaso: null });
+    expect(siguienteEstado({ celula: 'PT', subPaso: null })).toBeNull();
+  });
+  it('lanza ante célula desconocida', () => {
+    expect(() => siguienteEstado({ celula: 'XXX' as any, subPaso: null })).toThrow();
   });
 });
 
