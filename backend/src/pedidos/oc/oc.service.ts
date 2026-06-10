@@ -13,27 +13,30 @@ export class OcService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearOCDto) {
-    const consecutivo = await siguienteConsecutivo(this.prisma, 'oc');
-    return this.prisma.ordenCompra.create({
-      data: {
-        consecutivo,
-        clienteId: dto.clienteId,
-        ocCliente: dto.ocCliente,
-        observaciones: dto.observaciones,
-        estado: 'BORRADOR',
-        lineas: {
-          create: dto.lineas.map((l) => ({
-            productoConfiguradoId: l.productoConfiguradoId,
-            tallas: {
-              create: l.tallas.map((t) => ({
-                tallaId: t.tallaId,
-                cantidad: t.cantidad,
-              })),
-            },
-          })),
+    // nextval + create en la misma tx: si el create falla no queda hueco evitable.
+    return this.prisma.$transaction(async (tx) => {
+      const consecutivo = await siguienteConsecutivo(tx, 'oc');
+      return tx.ordenCompra.create({
+        data: {
+          consecutivo,
+          clienteId: dto.clienteId,
+          ocCliente: dto.ocCliente,
+          observaciones: dto.observaciones,
+          estado: 'BORRADOR',
+          lineas: {
+            create: dto.lineas.map((l) => ({
+              productoConfiguradoId: l.productoConfiguradoId,
+              tallas: {
+                create: l.tallas.map((t) => ({
+                  tallaId: t.tallaId,
+                  cantidad: t.cantidad,
+                })),
+              },
+            })),
+          },
         },
-      },
-      include: { lineas: { include: { tallas: true } } },
+        include: { lineas: { include: { tallas: true } } },
+      });
     });
   }
 

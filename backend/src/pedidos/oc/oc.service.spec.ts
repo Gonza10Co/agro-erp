@@ -11,6 +11,8 @@ describe('OcService', () => {
       update: jest.fn(),
     },
   } as any;
+  // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
+  prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
   const service = new OcService(prisma);
   beforeEach(() => jest.clearAllMocks());
 
