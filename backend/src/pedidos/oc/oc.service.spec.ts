@@ -16,7 +16,7 @@ describe('OcService', () => {
   const service = new OcService(prisma);
   beforeEach(() => jest.clearAllMocks());
 
-  it('crear asigna consecutivo = max+1 y estado BORRADOR', async () => {
+  it('crear asigna el consecutivo de la secuencia y estado BORRADOR', async () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 3901n }]);
     prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 3901 });
     await service.crear({
