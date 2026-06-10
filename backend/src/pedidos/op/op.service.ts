@@ -38,6 +38,10 @@ export class OpService {
         });
 
         for (const t of linea.tallas) {
+          // Lock pesimista: serializa amarres concurrentes del mismo producto/talla
+          // para que dos OPs no reserven el mismo stock a la vez.
+          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} FOR UPDATE`;
+
           const stock = await tx.inventarioPT.findMany({
             where: {
               productoConfiguradoId: linea.productoConfiguradoId,

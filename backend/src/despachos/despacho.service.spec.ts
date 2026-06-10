@@ -21,7 +21,7 @@ describe('DespachoService', () => {
     $queryRawUnsafe: jest.fn(),
     ordenProduccion: { findUnique: jest.fn(), update: jest.fn() },
     despacho: { create: jest.fn() },
-    inventarioPT: { update: jest.fn() },
+    inventarioPT: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     reservaInventarioPT: { delete: jest.fn() },
     ordenCompra: { update: jest.fn() },
   };
@@ -68,7 +68,10 @@ describe('DespachoService', () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
     prisma.despacho.create.mockResolvedValue({ id: 1, consecutivo: 5 });
     await service.despachar({ opId: 1 }, operario);
-    expect(prisma.inventarioPT.update).toHaveBeenCalledWith({ where: { id: 50 }, data: { cantDisponible: { decrement: 5 }, cantReservada: { decrement: 5 } } });
+    expect(prisma.inventarioPT.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, cantDisponible: { gte: 5 }, cantReservada: { gte: 5 } },
+      data: { cantDisponible: { decrement: 5 }, cantReservada: { decrement: 5 } },
+    });
     expect(prisma.reservaInventarioPT.delete).toHaveBeenCalledWith({ where: { id: 100 } });
     const createArg = prisma.despacho.create.mock.calls[0][0];
     expect(createArg.data.consecutivo).toBe(5);
@@ -87,5 +90,12 @@ describe('DespachoService', () => {
     const createArg = prisma.despacho.create.mock.calls[0][0];
     expect(createArg.data.autorizadoPorId).toBe(3);
     expect(createArg.data.motivoAutorizacion).toBe('urgente');
+  });
+
+  it('falla con 409 si el inventario ya no alcanza al momento de despachar', async () => {
+    prisma.ordenProduccion.findUnique.mockResolvedValue(opBase());
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+    prisma.inventarioPT.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.despachar({ opId: 1 }, operario)).rejects.toBeInstanceOf(ConflictException);
   });
 });

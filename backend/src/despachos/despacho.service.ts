@@ -76,13 +76,21 @@ export class DespachoService {
       const consecutivo = await siguienteConsecutivo(tx, 'despacho');
 
       for (const r of reservas) {
-        await tx.inventarioPT.update({
-          where: { id: r.inventarioPTId },
+        const res = await tx.inventarioPT.updateMany({
+          where: {
+            id: r.inventarioPTId,
+            cantDisponible: { gte: r.cantidad },
+            cantReservada: { gte: r.cantidad },
+          },
           data: {
             cantDisponible: { decrement: r.cantidad },
             cantReservada: { decrement: r.cantidad },
           },
         });
+        if (res.count === 0)
+          throw new ConflictException(
+            'Inventario insuficiente al despachar — reintentá o revisá reservas',
+          );
         await tx.reservaInventarioPT.delete({ where: { id: r.reservaId } });
       }
 

@@ -4,6 +4,7 @@ import { OpService } from './op.service';
 function makeTx() {
   return {
     $queryRawUnsafe: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     ordenProduccion: {
       create: jest.fn(),
       update: jest.fn(),
@@ -109,6 +110,33 @@ describe('OpService.generarDesdeOC', () => {
       where: { id: 1 },
       data: { estado: 'EN_PRODUCCION' },
     });
+  });
+
+  it('bloquea las filas de InventarioPT (FOR UPDATE) antes de leer disponibilidad', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({
+      id: 1,
+      estado: 'CONFIRMADA',
+      lineas: [
+        {
+          id: 11,
+          productoConfiguradoId: 2,
+          tallas: [{ tallaId: 5, cantidad: 100 }],
+        },
+      ],
+    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccionLinea.create.mockResolvedValue({ id: 60 });
+    tx.inventarioPT.findMany.mockResolvedValue([]);
+    tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 80 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'AMARRADA' });
+
+    const svc = new OpService(prisma);
+    await svc.generarDesdeOC(1);
+
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    const sql = (tx.$queryRaw as jest.Mock).mock.calls[0][0].join('?');
+    expect(sql).toContain('FOR UPDATE');
   });
 });
 
