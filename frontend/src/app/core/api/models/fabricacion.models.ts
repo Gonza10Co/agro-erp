@@ -1,5 +1,7 @@
+import { IncidenciaPar } from './calidad.models';
+
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
-export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO';
+export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO' | 'DADO_DE_BAJA';
 export type EstadoOF = 'ABIERTA' | 'EN_PROCESO' | 'TERMINADA' | 'ANULADA';
 
 export interface OFGenerada {
@@ -43,6 +45,9 @@ export interface ParDetalle {
   of: { consecutivo: number };
   talla: { valor: string };
   eventos: EventoTrazabilidad[];
+  incidencias: IncidenciaPar[];
+  reponeA: { codigo: string } | null;
+  repuestoPor: { codigo: string } | null;
 }
 
 export interface Operario {
@@ -73,3 +78,10 @@ export function siguienteCelulaLabel(c: Celula): string | null {
   if (i < 0 || i >= ORDEN_CELULAS.length - 1) return null;
   return LABEL_CELULA[ORDEN_CELULAS[i + 1]];
 }
+
+export const LABEL_ESTADO_PAR: Record<EstadoPar, string> = {
+  EN_PROCESO: 'en proceso',
+  TERMINADO: 'terminado',
+  CANCELADO: 'cancelado',
+  DADO_DE_BAJA: 'dado de baja',
+};
