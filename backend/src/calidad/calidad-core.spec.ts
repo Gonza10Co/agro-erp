@@ -1,4 +1,4 @@
-import { codigoReposicion, validarReporte } from './calidad-core';
+import { codigoReposicion, validarReporte, agruparIndicadores } from './calidad-core';
 
 describe('codigoReposicion', () => {
   it('par base → -R1', () => {
@@ -30,5 +30,45 @@ describe('validarReporte', () => {
   it('BAJA válida con GERENTE y con ADMIN → null', () => {
     expect(validarReporte('BAJA', 'acta x', 'GERENTE')).toBeNull();
     expect(validarReporte('BAJA', 'acta x', 'ADMIN')).toBeNull();
+  });
+});
+
+describe('agruparIndicadores', () => {
+  const inc = (codigo: string, nombre: string, celulaCausante: any, clase: any) => ({
+    tipoDano: { codigo, nombre, celulaCausante, clase },
+  });
+
+  it('agrupa por célula CAUSANTE (no por detección) y separa bajas de reprocesos', () => {
+    const incidencias = [
+      inc('STROBEL-RASGADO', 'Strobel rasgado', 'GUARNICION', 'REPROCESO'),
+      inc('STROBEL-RASGADO', 'Strobel rasgado', 'GUARNICION', 'REPROCESO'),
+      inc('DANO-ROBOT', 'Daño de robot', 'INYECCION', 'BAJA'),
+    ];
+    const { centros } = agruparIndicadores(incidencias, { GUARNICION: 10, INYECCION: 4 });
+    const guar = centros.find((c) => c.celula === 'GUARNICION')!;
+    expect(guar).toMatchObject({ total: 2, bajas: 0, reprocesos: 2, paresProcesados: 10, pctDano: 0.2 });
+    const iny = centros.find((c) => c.celula === 'INYECCION')!;
+    expect(iny).toMatchObject({ total: 1, bajas: 1, reprocesos: 0, pctDano: 0.25 });
+  });
+
+  it('siempre devuelve los 4 centros de costo, con pctDano null si no hubo pares procesados', () => {
+    const { centros } = agruparIndicadores([], {});
+    expect(centros.map((c) => c.celula)).toEqual(['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION']);
+    expect(centros.every((c) => c.total === 0 && c.pctDano === null)).toBe(true);
+  });
+
+  it('topDanos ordena por frecuencia y corta en 5', () => {
+    const incidencias = [
+      ...Array(3).fill(inc('A', 'A', 'CORTE', 'BAJA')),
+      ...Array(5).fill(inc('B', 'B', 'CORTE', 'REPROCESO')),
+      inc('C', 'C', 'GUARNICION', 'REPROCESO'),
+      inc('D', 'D', 'GUARNICION', 'REPROCESO'),
+      inc('E', 'E', 'INYECCION', 'BAJA'),
+      inc('F', 'F', 'INYECCION', 'BAJA'),
+    ];
+    const { topDanos } = agruparIndicadores(incidencias, {});
+    expect(topDanos).toHaveLength(5);
+    expect(topDanos[0]).toMatchObject({ codigo: 'B', total: 5 });
+    expect(topDanos[1]).toMatchObject({ codigo: 'A', total: 3 });
   });
 });
