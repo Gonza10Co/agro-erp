@@ -7,6 +7,31 @@
 > de eficiencia). La fuente de verdad del avance es el git log. La sección **Demo 9 — Facturación**
 > de abajo sí está al día.
 
+## Demo 10 — Cartera / Cuentas por cobrar (2026-06-10) ✅ — en `develop`
+
+Cierra el círculo financiero: cada factura es una **CxC** con vencimiento y saldo; los pagos la
+saldan; el **`estadoCartera` del cliente se calcula solo** y alimenta la regla de bloqueo de despacho.
+
+- **Schema:** `model Pago` (monto/medio/fecha) + `fechaVencimiento` en Factura. Migración `demo10_cartera`.
+- **Vencimiento** = fecha emisión + díasCrédito(tipoCredito): CONTADO/D30/D60/D90. Se persiste al emitir.
+- **estadoCartera** (recalculado al emitir factura y al registrar pago, en la misma tx): `BLOQUEADO`
+  manual manda; sino `VENCIDO` si hay saldo vencido; sino `AL_DIA`. Helper `recalcularEstadoCartera`
+  compartido por facturas y cartera. Núcleo puro `cartera-core` (díasCrédito/saldo/estado/resumen).
+- **Backend:** módulo `cartera` (`registrarPago` con validaciones de monto/saldo, `listar` CxC con
+  saldo/vencida, `obtenerCliente` con resumen), `GET /cartera`, `POST /cartera/pagos`,
+  `GET /cartera/cliente/:id`. Seed: factura vencida (~45 días, impaga) de Minera El Roble.
+- **Frontend:** `CarteraApi`, `cartera-list` (resumen saldo total/vencido + tabla con filas vencidas
+  resaltadas), `registrar-pago` (drawer, "saldar total"), ruta `/cartera` + ítem en el sidebar.
+- **191 tests backend + 141 frontend verdes**; ambos builds limpios.
+- **Verificado E2E (API + browser) — loop cerrado:** Minera VENCIDO → despachar OP-9002 sin autorizar
+  da `409`; pago total de FAC-1 → saldo $0 → estadoCartera `AL_DIA` → el mismo despacho ahora **pasa**.
+  En UI: cartera muestra la vencida resaltada → registrar pago → la CxC desaparece.
+- Plan: `docs/plans/2026-06-10-demo10-cartera.md`.
+- **Pendiente:** merge a `master` + tag `demo-10`. Abonos a cuenta (no ligados a factura) y un cron
+  para recalcular cartera por mero paso del tiempo quedan como futuro.
+
+---
+
 ## Demo 9 — Facturación (2026-06-10) ✅ — en `develop`
 
 Cierra el ciclo del pedido: **OC → … → Despacho → Factura**.

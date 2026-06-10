@@ -34,6 +34,10 @@ import { AuthService } from '../../core/auth/auth.service';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM8 8h8M8 12h8M8 16h5"/></svg></span>
             <span class="nav-label">Facturas</span>
           </a>
+          <a class="nav-item" routerLink="/cartera" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span>
+            <span class="nav-label">Cartera</span>
+          </a>
           <a class="nav-item" routerLink="/fabricacion/tablero" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16"/><rect x="10" y="4" width="5" height="10"/><rect x="17" y="4" width="4" height="7"/></svg></span>
             <span class="nav-label">Tablero de fabricación</span>

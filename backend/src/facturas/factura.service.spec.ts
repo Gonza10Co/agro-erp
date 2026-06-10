@@ -11,6 +11,8 @@ function despachoBase(over: any = {}) {
     ],
     op: {
       oc: {
+        clienteId: 7,
+        cliente: { id: 7, tipoCredito: 'D30', estadoCartera: 'AL_DIA' },
         lineas: [{ productoConfiguradoId: 10, precioUnitario: 85000 }],
       },
     },
@@ -22,11 +24,16 @@ describe('FacturaService', () => {
   const prisma: any = {
     $queryRawUnsafe: jest.fn(),
     despacho: { findUnique: jest.fn() },
-    factura: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn() },
+    factura: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
+    cliente: { findUnique: jest.fn().mockResolvedValue({ estadoCartera: 'AL_DIA' }), update: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   const service = new FacturaService(prisma);
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.factura.findMany.mockResolvedValue([]);
+    prisma.cliente.findUnique.mockResolvedValue({ estadoCartera: 'AL_DIA' });
+  });
 
   it('404 si el despacho no existe', async () => {
     prisma.despacho.findUnique.mockResolvedValue(null);
@@ -64,6 +71,22 @@ describe('FacturaService', () => {
       { productoConfiguradoId: 10, tallaId: 38, cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
       { productoConfiguradoId: 10, tallaId: 40, cantidad: 2, precioUnitario: 85000, subtotal: 170000 },
     ]);
+  });
+
+  it('setea fechaVencimiento (D30 = fecha + 30 días) y recalcula la cartera del cliente', async () => {
+    prisma.despacho.findUnique.mockResolvedValue(despachoBase());
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 7n }]);
+    prisma.factura.create.mockResolvedValue({ id: 1, consecutivo: 7 });
+
+    await service.facturar({ despachoId: 1 });
+
+    const arg = prisma.factura.create.mock.calls[0][0];
+    const dias = (arg.data.fechaVencimiento.getTime() - arg.data.fecha.getTime()) / 86400000;
+    expect(Math.round(dias)).toBe(30);
+    // recálculo de cartera: consulta facturas del cliente y actualiza el estado
+    expect(prisma.cliente.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 7 } }),
+    );
   });
 
   it('respeta un ivaPct distinto', async () => {

@@ -7,6 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { FacturarDto } from './dto/facturar.dto';
 import { lineasDeFactura, totales } from './factura-core';
+import { diasCredito } from '../cartera/cartera-core';
+import { recalcularEstadoCartera } from '../cartera/recalcular-cartera';
 
 @Injectable()
 export class FacturaService {
@@ -19,7 +21,7 @@ export class FacturaService {
       include: {
         factura: true,
         lineas: true,
-        op: { include: { oc: { include: { lineas: true } } } },
+        op: { include: { oc: { include: { lineas: true, cliente: true } } } },
       },
     });
     if (!despacho)
@@ -44,12 +46,20 @@ export class FacturaService {
     const lineas = lineasDeFactura(despacho.lineas, precioPorProducto);
     const t = totales(lineas, ivaPct);
 
+    // Vencimiento = fecha de emisión + días de crédito del cliente.
+    const cliente = despacho.op.oc.cliente;
+    const fecha = new Date();
+    const fechaVencimiento = new Date(fecha);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + diasCredito(cliente.tipoCredito));
+
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'factura');
-      return tx.factura.create({
+      const factura = await tx.factura.create({
         data: {
           consecutivo,
           despachoId: despacho.id,
+          fecha,
+          fechaVencimiento,
           ivaPct,
           subtotal: t.subtotal,
           iva: t.iva,
@@ -65,6 +75,9 @@ export class FacturaService {
           },
         },
       });
+      // Emitir una CxC puede cambiar el estado de cartera del cliente.
+      await recalcularEstadoCartera(tx, cliente.id, fecha);
+      return factura;
     });
   }
 

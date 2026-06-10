@@ -745,19 +745,33 @@ enum EstadoFactura {
 }
 
 model Factura {
-  id          Int           @id @default(autoincrement())
-  consecutivo Int           @unique
-  despachoId  Int           @unique
-  despacho    Despacho      @relation(fields: [despachoId], references: [id])
-  fecha       DateTime      @default(now())
-  subtotal    Decimal       @db.Decimal(14, 2)
-  ivaPct      Decimal       @db.Decimal(5, 2)
-  iva         Decimal       @db.Decimal(14, 2)
-  total       Decimal       @db.Decimal(14, 2)
-  estado      EstadoFactura @default(EMITIDA)
-  createdAt   DateTime      @default(now())
+  id              Int           @id @default(autoincrement())
+  consecutivo     Int           @unique
+  despachoId      Int           @unique
+  despacho        Despacho      @relation(fields: [despachoId], references: [id])
+  fecha           DateTime      @default(now())
+  fechaVencimiento DateTime?    // fecha + díasCrédito(tipoCredito) al emitir
+  subtotal        Decimal       @db.Decimal(14, 2)
+  ivaPct          Decimal       @db.Decimal(5, 2)
+  iva             Decimal       @db.Decimal(14, 2)
+  total           Decimal       @db.Decimal(14, 2)
+  estado          EstadoFactura @default(EMITIDA)
+  createdAt       DateTime      @default(now())
 
   lineas FacturaLinea[]
+  pagos  Pago[]
+}
+
+model Pago {
+  id        Int      @id @default(autoincrement())
+  facturaId Int
+  factura   Factura  @relation(fields: [facturaId], references: [id])
+  monto     Decimal  @db.Decimal(14, 2)
+  fecha     DateTime @default(now())
+  medio     String?
+  createdAt DateTime @default(now())
+
+  @@index([facturaId])
 }
 
 model FacturaLinea {

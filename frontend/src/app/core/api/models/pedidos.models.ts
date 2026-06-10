@@ -123,6 +123,7 @@ export interface Factura {
   consecutivo: number;
   despachoId: number;
   fecha: string;
+  fechaVencimiento?: string | null;
   subtotal: string;
   ivaPct: string;
   iva: string;
@@ -130,4 +131,41 @@ export interface Factura {
   estado: EstadoFactura;
   despacho?: { consecutivo: number; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
   lineas?: FacturaLinea[];
+}
+
+// ─── Cartera / Cuentas por cobrar ────────────────────────────────────────────
+export interface CarteraItem {
+  facturaId: number;
+  consecutivo: number;
+  cliente: { id: number; nombre: string };
+  total: number;
+  pagado: number;
+  saldo: number;
+  fecha: string;
+  fechaVencimiento: string | null;
+  vencida: boolean;
+}
+
+export interface RegistrarPagoParams { facturaId: number; monto: number; medio?: string; }
+
+export interface Pago { id: number; monto: string; fecha: string; medio?: string | null; }
+
+export interface ResumenCartera { facturado: number; pagado: number; saldo: number; saldoVencido: number; }
+
+export interface CarteraClienteFactura {
+  facturaId: number;
+  consecutivo: number;
+  total: number;
+  pagado: number;
+  saldo: number;
+  fecha: string;
+  fechaVencimiento: string | null;
+  estado: EstadoFactura;
+  pagos: Pago[];
+}
+
+export interface CarteraCliente {
+  clienteId: number;
+  resumen: ResumenCartera;
+  facturas: CarteraClienteFactura[];
 }

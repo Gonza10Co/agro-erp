@@ -632,6 +632,57 @@ async function main() {
 
   console.log(`  OP-9006 (driver Indicadores): ${seqPar} pares históricos, ${eventosTotales} eventos`);
 
+  // ── Historia de cartera: factura VENCIDA e impaga de Minera El Roble (driver de Cartera D10) ──
+  // Venta pasada despachada y facturada hace ~105 días con plazo D60 → venció hace ~45 días.
+  // Da soporte real al estado VENCIDO del cliente y al saldo vencido en el dashboard de cartera.
+  const ocHist = await prisma.ordenCompra.create({
+    data: {
+      consecutivo: 9000,
+      clienteId: clienteVencido.id,
+      estado: 'CERRADA',
+      lineas: {
+        create: [
+          {
+            productoConfiguradoId: prodDiel.id,
+            precioUnitario: 85000,
+            tallas: { create: [{ tallaId: tallaA.id, cantidad: 10 }] },
+          },
+        ],
+      },
+    },
+  });
+  const opHist = await prisma.ordenProduccion.create({
+    data: { consecutivo: 9000, ocId: ocHist.id, estado: 'DESPACHADA' },
+  });
+  const despHist = await prisma.despacho.create({
+    data: {
+      consecutivo: await siguienteConsecutivo(prisma, 'despacho'),
+      opId: opHist.id,
+      lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, bodegaId: ibg.id, cantidad: 10 }] },
+    },
+  });
+  const fechaHist = new Date();
+  fechaHist.setDate(fechaHist.getDate() - 105);
+  const vencHist = new Date(fechaHist);
+  vencHist.setDate(vencHist.getDate() + 60); // D60
+  const subtotalHist = 10 * 85000; // 850.000
+  const ivaHist = Math.round(subtotalHist * 0.19); // 161.500
+  await prisma.factura.create({
+    data: {
+      consecutivo: await siguienteConsecutivo(prisma, 'factura'),
+      despachoId: despHist.id,
+      fecha: fechaHist,
+      fechaVencimiento: vencHist,
+      ivaPct: 19,
+      subtotal: subtotalHist,
+      iva: ivaHist,
+      total: subtotalHist + ivaHist,
+      estado: 'EMITIDA',
+      lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, cantidad: 10, precioUnitario: 85000, subtotal: subtotalHist }] },
+    },
+  });
+  console.log('  Cartera: factura vencida (impaga, ~45 días) de Minera El Roble');
+
   console.log('Seed demo OK:', {
     clientes: clientes.length,
     productos: productos.length,
