@@ -5,6 +5,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ShellComponent } from './shell.component';
 
 describe('ShellComponent', () => {
+  afterEach(() => localStorage.removeItem('accessToken'));
+
   it('muestra el usuario logueado del JWT, no un nombre fijo', () => {
     const payload = btoa(JSON.stringify({ sub: 1, username: 'gerente', role: 'GERENTE' }));
     localStorage.setItem('accessToken', `x.${payload}.y`);
@@ -18,6 +20,5 @@ describe('ShellComponent', () => {
     expect(text).toContain('gerente');
     expect(text).toContain('Gerencia');
     expect(text).not.toContain('Carolina');
-    localStorage.removeItem('accessToken');
   });
 });
