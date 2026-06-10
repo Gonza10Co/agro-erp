@@ -26,7 +26,8 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  despachosAutorizados Despacho[]
+  despachosAutorizados    Despacho[]
+  incidenciasAutorizadas  IncidenciaCalidad[]
 }
 
 model RefreshToken {
@@ -594,6 +595,12 @@ enum EstadoPar {
   EN_PROCESO
   TERMINADO
   CANCELADO
+  DADO_DE_BAJA
+}
+
+enum ClaseDano {
+  BAJA      // daño total: acta + reposición automática
+  REPROCESO // recuperable: solo registro
 }
 
 model OrdenFabricacion {
@@ -622,13 +629,21 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
+  reponeAParId          Int?                // si este par es una reposición, el par dado de baja que repone
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
+
+  reponeA     Par?  @relation("reposicion", fields: [reponeAParId], references: [id])
+  repuestoPor Par[] @relation("reposicion")
+
+  incidencias            IncidenciaCalidad[] @relation("incidencias")
+  reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
 
   eventos EventoTrazabilidad[]
 
   @@index([ofId])
   @@index([celulaActual])
+  @@index([reponeAParId])
 }
 
 model EventoTrazabilidad {
@@ -652,7 +667,8 @@ model Operario {
   celula Celula
   activo Boolean @default(true)
 
-  eventos EventoTrazabilidad[]
+  eventos     EventoTrazabilidad[]
+  incidencias IncidenciaCalidad[]
 }
 
 model Maquina {
@@ -663,4 +679,35 @@ model Maquina {
   activo Boolean @default(true)
 
   eventos EventoTrazabilidad[]
+}
+
+model TipoDano {
+  id             Int       @id @default(autoincrement())
+  codigo         String    @unique
+  nombre         String
+  celulaCausante Celula    // centro de costo al que se imputa
+  clase          ClaseDano
+  activo         Boolean   @default(true)
+
+  incidencias IncidenciaCalidad[]
+}
+
+model IncidenciaCalidad {
+  id              Int      @id @default(autoincrement())
+  parId           Int
+  par             Par      @relation("incidencias", fields: [parId], references: [id])
+  tipoDanoId      Int
+  tipoDano        TipoDano @relation(fields: [tipoDanoId], references: [id])
+  celulaDeteccion Celula   // dónde se detectó (puede ≠ causante)
+  operarioId      Int
+  operario        Operario @relation(fields: [operarioId], references: [id])
+  descripcion     String?  // obligatoria en BAJA (acta) — se valida en el service
+  autorizadoPorId Int?     // solo BAJA: user GERENTE/ADMIN del JWT
+  autorizadoPor   User?    @relation(fields: [autorizadoPorId], references: [id])
+  parReposicionId Int?     @unique // solo BAJA: el par creado para reponer
+  parReposicion   Par?     @relation("reposicionDeIncidencia", fields: [parReposicionId], references: [id])
+  timestamp       DateTime @default(now())
+
+  @@index([parId])
+  @@index([tipoDanoId])
 }
