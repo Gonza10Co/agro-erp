@@ -3,11 +3,13 @@ import {
   Controller,
   Get,
   Param,
+  ParseEnumPipe,
   ParseIntPipe,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Celula } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { FabricacionService } from './fabricacion.service';
 import { AvanzarDto } from './dto/avanzar.dto';
@@ -43,17 +45,17 @@ export class FabricacionController {
   }
 
   @Get('tablero')
-  tablero(@Query('ofId') ofId?: string) {
-    return this.service.tablero(ofId ? Number(ofId) : undefined);
+  tablero(@Query('ofId', new ParseIntPipe({ optional: true })) ofId?: number) {
+    return this.service.tablero(ofId);
   }
 
   @Get('operarios')
-  operarios(@Query('celula') celula?: string) {
+  operarios(@Query('celula', new ParseEnumPipe(Celula, { optional: true })) celula?: Celula) {
     return this.service.listarOperarios(celula);
   }
 
   @Get('maquinas')
-  maquinas(@Query('celula') celula?: string) {
+  maquinas(@Query('celula', new ParseEnumPipe(Celula, { optional: true })) celula?: Celula) {
     return this.service.listarMaquinas(celula);
   }
 }

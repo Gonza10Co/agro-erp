@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum TipoCreditoDto {
@@ -9,9 +9,9 @@ export enum TipoCreditoDto {
 }
 
 export class CrearClienteDto {
-  @IsString() nit!: string;
-  @IsString() nombre!: string;
-  @IsOptional() @IsString() ciudad?: string;
+  @IsString() @MaxLength(20) nit!: string;
+  @IsString() @MaxLength(160) nombre!: string;
+  @IsOptional() @IsString() @MaxLength(80) ciudad?: string;
   @IsOptional() @IsEnum(TipoCreditoDto) tipoCredito?: TipoCreditoDto;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) cupo?: number;
 }

@@ -236,4 +236,28 @@ describe('FabricacionService lecturas', () => {
       expect.objectContaining({ where: {} }),
     );
   });
+
+  it('tablero limita la consulta a 500 pares', async () => {
+    const { prisma } = makePrisma({ root: { par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } } });
+    await new FabricacionService(prisma).tablero();
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 500 }),
+    );
+  });
+});
+
+describe('FabricacionService.avanzar (hardening)', () => {
+  it('400 si el operario o la máquina no existen (P2003)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 1, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'CORTE',
+      ofId: 1, productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    tx.eventoTrazabilidad.create.mockRejectedValue(
+      Object.assign(new Error('FK'), { code: 'P2003' }),
+    );
+    await expect(
+      new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 999, maquinaId: 999 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 });
