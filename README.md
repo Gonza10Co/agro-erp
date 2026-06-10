@@ -8,13 +8,13 @@ ERP + MES para Botas Agroindustrial S.A.S (Ibagué). Monorepo npm workspaces:
 1. **Base de datos** — Postgres en Docker, puerto **5433**:
    `docker run -d --name agro-erp-pg -p 5433:5432 -e POSTGRES_PASSWORD=postgres postgres:16`
    (si ya existe: `docker start agro-erp-pg`)
-2. **Dependencias**: `npm install` en la raiz (instala ambos workspaces).
+2. **Dependencias**: `npm install` en la raíz (instala ambos workspaces).
 3. **Variables**: copiar `backend/.env.example` a `backend/.env` (la `DATABASE_URL` local apunta a `localhost:5433`).
 4. **Migraciones + seed**: desde `backend/`: `npx prisma migrate dev` y `npm run seed`.
 
-## Dia a dia
+## Día a día
 
-| Comando (raiz)        | Que hace                                   |
+| Comando (raíz)        | Qué hace                                   |
 |-----------------------|--------------------------------------------|
 | `npm run dev:back`    | Backend NestJS en **:3001**                |
 | `npm run dev:front`   | Frontend Angular en **:4200**              |
@@ -26,7 +26,7 @@ Usuarios seed: `admin/admin123`, `gerente/gerente123`.
 
 ## Workflow de ramas
 
-- `develop`: construccion adelantada (varias demos pueden convivir).
+- `develop`: construcción adelantada (varias demos pueden convivir).
 - `master`: lo ya mostrado al cliente. Se avanza por demo con merge `--no-ff` + tag `demo-N`.
 
 ## CI
