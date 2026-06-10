@@ -11,6 +11,7 @@ import { OpModule } from './pedidos/op/op.module';
 import { DespachoModule } from './despachos/despacho.module';
 import { ComprasModule } from './compras/compras.module';
 import { FabricacionModule } from './fabricacion/fabricacion.module';
+import { CalidadModule } from './calidad/calidad.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { FabricacionModule } from './fabricacion/fabricacion.module';
     DespachoModule,
     ComprasModule,
     FabricacionModule,
+    CalidadModule,
   ],
   controllers: [AppController],
 })

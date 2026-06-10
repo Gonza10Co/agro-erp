@@ -38,6 +38,10 @@ import { AuthService } from '../../core/auth/auth.service';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l5 5v5h-2M3 7v10h2M9 7V4h4v3"/><circle cx="7" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg></span>
             <span class="nav-label">Puesto de operario</span>
           </a>
+          <a class="nav-item" routerLink="/calidad" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <span class="nav-label">Calidad</span>
+          </a>
           <a class="nav-item" routerLink="/clientes" routerLinkActive="is-active">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.6M21 20a5.5 5.5 0 0 0-4-5.3"/></svg></span>
             <span class="nav-label">Clientes</span>

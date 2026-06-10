@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Celula, ClaseDano } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 
@@ -224,6 +224,9 @@ async function main() {
   // ── Limpieza idempotente (respetar orden de FKs) ─────────────────────────────
 
   // ── Limpieza MES (idempotente) ──
+  await prisma.incidenciaCalidad.deleteMany({
+    where: { par: { of: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } } },
+  });
   await prisma.eventoTrazabilidad.deleteMany({
     where: { par: { of: { op: { consecutivo: { in: [9001, 9002, 9003, 9005] } } } } },
   });
@@ -402,6 +405,25 @@ async function main() {
     });
   }
 
+  // ── Calidad: catálogo de tipos de daño (briefing §5 / §Inyección) ──
+  const tiposDano: { codigo: string; nombre: string; celulaCausante: Celula; clase: ClaseDano }[] = [
+    { codigo: 'CORTE-PEQUENO',       nombre: 'Corte muy pequeño',          celulaCausante: Celula.CORTE,      clase: ClaseDano.BAJA      },
+    { codigo: 'CORTE-GRANDE',        nombre: 'Corte muy grande',           celulaCausante: Celula.CORTE,      clase: ClaseDano.REPROCESO },
+    { codigo: 'PIEZA-DANADA',        nombre: 'Pieza dañada en corte',      celulaCausante: Celula.CORTE,      clase: ClaseDano.BAJA      },
+    { codigo: 'COSTURA-DEFECTUOSA',  nombre: 'Costura defectuosa',         celulaCausante: Celula.GUARNICION, clase: ClaseDano.REPROCESO },
+    { codigo: 'STROBEL-RASGADO',     nombre: 'Strobel rasgado',            celulaCausante: Celula.GUARNICION, clase: ClaseDano.REPROCESO },
+    { codigo: 'STROBEL-TORCIDO',     nombre: 'Strobel torcido',            celulaCausante: Celula.GUARNICION, clase: ClaseDano.REPROCESO },
+    { codigo: 'ECONOMIZADOR-RASGADO',nombre: 'Economizador rasgado',       celulaCausante: Celula.INYECCION,  clase: ClaseDano.REPROCESO },
+    { codigo: 'DANO-ROBOT',          nombre: 'Daño de robot en capellada', celulaCausante: Celula.INYECCION,  clase: ClaseDano.BAJA      },
+  ];
+  for (const t of tiposDano) {
+    await prisma.tipoDano.upsert({
+      where: { codigo: t.codigo },
+      update: { nombre: t.nombre, celulaCausante: t.celulaCausante, clase: t.clase },
+      create: t,
+    });
+  }
+
   // ── OP 9005 — driver del MES (cantidades chicas para el tablero) ──
   const oc9005 = await prisma.ordenCompra.create({
     data: {
@@ -443,6 +465,7 @@ async function main() {
     op9002: `OP#${op9002.consecutivo} → ${clienteVencido.nombre} (VENCIDO) — camino bloqueado`,
     op9003: `OP#${op9003.consecutivo} → ${clienteAlDia.nombre} — 200 pares A PRODUCIR (driver de Compras)`,
     op9005: `OP#${op9005.consecutivo} → ${clienteAlDia.nombre} — 12 pares A PRODUCIR (driver MES)`,
+    tiposDano: tiposDano.length,
     proveedores: `${curtiembre.nombre}, ${quimicos.nombre}, ${herrajes.nombre}`,
     stockInsumos: 'SUELA-BASE=250 (neto 0), MICRO-NEG=12 (parcial), POLIOL=sin stock (todo a comprar)',
   });

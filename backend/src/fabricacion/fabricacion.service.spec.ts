@@ -213,6 +213,16 @@ describe('FabricacionService.avanzar', () => {
       new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 1, maquinaId: 1 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('409 con mensaje específico si el par fue dado de baja', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 1, codigo: 'OF5-0001', estado: 'DADO_DE_BAJA', celulaActual: 'CORTE',
+      of: { estado: 'EN_PROCESO' },
+    });
+    await expect(new FabricacionService(prisma).avanzar('OF5-0001', dto))
+      .rejects.toMatchObject({ message: 'El par fue dado de baja' });
+  });
 });
 
 describe('FabricacionService lecturas', () => {

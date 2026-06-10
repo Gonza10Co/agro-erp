@@ -3,8 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import {
-  Celula, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, siguienteCelulaLabel,
+  Celula, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, LABEL_ESTADO_PAR, siguienteCelulaLabel,
 } from '../../core/api/models/fabricacion.models';
+import { CalidadApi } from '../../core/api/calidad.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { TipoDano } from '../../core/api/models/calidad.models';
 
 @Component({
   selector: 'app-pantalla-operario',
@@ -43,12 +46,45 @@ import {
           <div class="par-card">
             <div class="mono big">{{ p.codigo }}</div>
             <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}</div>
-            @if (p.estado === 'TERMINADO') {
-              <span class="badge badge-accent">ya terminado</span>
-            } @else if (siguiente(p)) {
-              <button class="btn btn-primary" (click)="avanzar(p)">Avanzar a {{ siguiente(p) }} →</button>
+            @if (p.estado !== 'EN_PROCESO') {
+              <span class="badge badge-accent">{{ estadoLabel(p.estado) }}</span>
             } @else {
-              <button class="btn btn-primary" (click)="avanzar(p)">Terminar (cargar a PT) ✓</button>
+              <div class="acciones">
+                @if (siguiente(p)) {
+                  <button class="btn btn-primary" (click)="avanzar(p)">Avanzar a {{ siguiente(p) }} →</button>
+                } @else {
+                  <button class="btn btn-primary" (click)="avanzar(p)">Terminar (cargar a PT) ✓</button>
+                }
+                <button class="btn" (click)="toggleReporte()">
+                  {{ reportando() ? 'Cancelar reporte' : 'Reportar daño ⚠' }}
+                </button>
+              </div>
+              @if (reportando()) {
+                <div class="reporte">
+                  <label>Tipo de daño
+                    <select [(ngModel)]="tipoDanoId">
+                      @for (t of tiposDano(); track t.id) { <option [ngValue]="t.id">{{ t.nombre }}</option> }
+                    </select>
+                  </label>
+                  @if (tipoSel(); as t) {
+                    <div class="cell-sub">
+                      {{ t.clase === 'BAJA' ? 'Daño total: da de baja el par y crea una reposición.' : 'Reproceso: solo registro, el par sigue su flujo.' }}
+                      Se imputa a {{ label(t.celulaCausante) }}.
+                    </div>
+                    <label>Descripción {{ t.clase === 'BAJA' ? '(acta, obligatoria)' : '(opcional)' }}
+                      <textarea [(ngModel)]="descripcion" rows="2" maxlength="500"></textarea>
+                    </label>
+                    @if (t.clase === 'BAJA' && !puedeBaja) {
+                      <div class="msg err">Solo un gerente puede autorizar una baja.</div>
+                    }
+                    <button class="btn btn-primary"
+                            [disabled]="t.clase === 'BAJA' && (!puedeBaja || !descripcion.trim())"
+                            (click)="reportar(p, t)">
+                      {{ t.clase === 'BAJA' ? 'Dar de baja (acta) ✖' : 'Registrar reproceso ⚠' }}
+                    </button>
+                  }
+                </div>
+              }
             }
           </div>
         }
@@ -66,16 +102,78 @@ import {
     .big{font-size:var(--text-xl)}
     .mono{font-family:var(--font-mono)}
     .btn-primary{min-height:48px}
+    .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
+    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font:inherit}
   `],
 })
 export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   @ViewChild('scan') private scanInput!: ElementRef<HTMLInputElement>;
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly calidadApi = inject(CalidadApi);
+  private readonly auth = inject(AuthService);
 
   readonly celulas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
+  estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
   siguiente = (p: ParDetalle) => siguienteCelulaLabel(p.celulaActual);
+
+  tiposDano = signal<TipoDano[]>([]);
+  reportando = signal(false);
+  tipoDanoId?: number;
+  descripcion = '';
+  readonly puedeBaja = ['GERENTE', 'ADMIN'].includes(this.auth.rol() ?? '');
+
+  tipoSel(): TipoDano | undefined {
+    return this.tiposDano().find((t) => t.id === this.tipoDanoId);
+  }
+
+  toggleReporte(): void {
+    this.msg.set(null);
+    if (!this.reportando() && this.tiposDano().length === 0) {
+      this.calidadApi.tiposDano().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (t) => { this.tiposDano.set(t); this.tipoDanoId = t[0]?.id; },
+        error: () => { this.esError.set(true); this.msg.set('No se pudo cargar el catálogo de daños.'); },
+      });
+    }
+    this.reportando.update((v) => !v);
+  }
+
+  reportar(p: ParDetalle, t: TipoDano): void {
+    if (this.operarioId == null) {
+      this.esError.set(true);
+      this.msg.set('Seleccioná operario');
+      return;
+    }
+    this.calidadApi
+      .reportar(p.codigo, {
+        tipoDanoId: t.id,
+        operarioId: this.operarioId,
+        descripcion: this.descripcion.trim() || undefined,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.esError.set(false);
+          this.msg.set(
+            r.parReposicion
+              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en Corte)`
+              : `Reproceso registrado en ${p.codigo} ⚠`,
+          );
+          this.par.set(null);
+          this.codigo = '';
+          this.descripcion = '';
+          this.reportando.set(false);
+          this.enfocarScan();
+        },
+        error: (e) => {
+          this.esError.set(true);
+          this.msg.set(this.msgError(e, e?.error?.message ?? 'No se pudo registrar la incidencia'));
+          this.enfocarScan();
+        },
+      });
+  }
 
   celula: Celula = 'CORTE';
   operarioId?: number;

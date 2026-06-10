@@ -100,7 +100,7 @@ En `model Par`, agregar estos campos (después de `estado`):
   reponeAParId Int? // si este par es una reposición, el par dado de baja que repone
 
   reponeA     Par?  @relation("reposicion", fields: [reponeAParId], references: [id])
-  repuestoPor Par[] @relation("reposicion")
+  repuestoPor Par? @relation("reposicion") // to-one: reponeAParId es @unique (1:1)
 
   incidencias            IncidenciaCalidad[] @relation("incidencias")
   reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
@@ -1177,7 +1177,7 @@ En `frontend/src/app/core/api/models/fabricacion.models.ts`:
 ```ts
   incidencias: IncidenciaPar[];
   reponeA: { codigo: string } | null;
-  repuestoPor: { codigo: string }[];
+  repuestoPor: { codigo: string } | null; // relación to-one: reponeAParId es @unique
 ```
 
 4. Al final del archivo:
@@ -1191,7 +1191,7 @@ export const LABEL_ESTADO_PAR: Record<EstadoPar, string> = {
 };
 ```
 
-> Ojo: los specs front existentes que construyen `ParDetalle` de prueba van a exigir los campos nuevos — agregar `incidencias: [], reponeA: null, repuestoPor: []` a esos objetos mock donde TypeScript lo pida (los señala `ng test` al compilar).
+> Ojo: los specs front existentes que construyen `ParDetalle` de prueba van a exigir los campos nuevos — agregar `incidencias: [], reponeA: null, repuestoPor: null` a esos objetos mock donde TypeScript lo pida (los señala `ng test` al compilar).
 
 - [ ] **Step 2: Spec de `CalidadApi` que falla**
 
@@ -1316,7 +1316,7 @@ Agregar a `pantalla-operario.component.spec.ts` (siguiendo el estilo de los test
 
 Implementarlos con asserts concretos:
 
-1. **Botón visible:** buscar `OF1-0001` (flush de `GET /fabricacion/par/OF1-0001` con `estado: 'EN_PROCESO'`, `incidencias: [], reponeA: null, repuestoPor: []`), `fixture.detectChanges()`, y assert de que existe un botón cuyo texto incluye `Reportar daño`. Con `estado: 'TERMINADO'` el botón NO existe.
+1. **Botón visible:** buscar `OF1-0001` (flush de `GET /fabricacion/par/OF1-0001` con `estado: 'EN_PROCESO'`, `incidencias: [], reponeA: null, repuestoPor: null`), `fixture.detectChanges()`, y assert de que existe un botón cuyo texto incluye `Reportar daño`. Con `estado: 'TERMINADO'` el botón NO existe.
 2. **REPROCESO:** abrir el panel (click en Reportar daño → flush `GET /calidad/tipos-dano` con `TIPOS`), setear `component.tipoDanoId = 4`, click en el botón de envío → expectOne `POST /calidad/pares/OF1-0001/incidencias`, flush `{ incidencia: { id: 1, tipoDano: TIPOS[0] }, parReposicion: null }` → el mensaje (`component.msg()`) contiene `Reproceso registrado`.
 3. **BAJA:** con `tipoDanoId = 8` y `descripcion = ''`, el botón de envío está `disabled`; con `descripcion = 'robot dañó capellada'`, click → flush `{ incidencia: {...}, parReposicion: { codigo: 'OF1-0001-R1' } }` → `component.msg()` contiene `OF1-0001-R1`. (Para que `puedeBaja` sea true, mockear `AuthService.rol` con `spyOn`/provider que devuelva `'GERENTE'`.)
 4. **Rol insuficiente:** provider de `AuthService` cuyo `rol()` devuelve `'VENTAS'` → con `tipoDanoId = 8` el botón de envío está `disabled` y el template muestra `Solo un gerente`.
@@ -1580,7 +1580,7 @@ Agregar al spec de par-detalle (flush del `GET /fabricacion/par/:codigo` con el 
     //  incidencias: [{ id:1, timestamp:'2026-06-10T09:00:00Z', celulaDeteccion:'GUARNICION', descripcion:null,
     //    tipoDano:{ id:4, codigo:'STROBEL-RASGADO', nombre:'Strobel rasgado', celulaCausante:'GUARNICION', clase:'REPROCESO' },
     //    operario:{nombre:'Gloria'}, autorizadoPor:null, parReposicion:null }]
-    //  reponeA: null, repuestoPor: []
+    //  reponeA: null, repuestoPor: null
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('Strobel rasgado');
     expect(el.textContent).toContain('⚠');
@@ -1588,7 +1588,7 @@ Agregar al spec de par-detalle (flush del `GET /fabricacion/par/:codigo` con el 
   });
 
   it('muestra la cadena de reposición y el badge de baja', () => {
-    // flush con estado:'DADO_DE_BAJA', repuestoPor:[{codigo:'OF1-0001-R1'}], y una incidencia BAJA
+    // flush con estado:'DADO_DE_BAJA', repuestoPor:{codigo:'OF1-0001-R1'}, y una incidencia BAJA
     //  con autorizadoPor:{username:'gerente'} y parReposicion:{codigo:'OF1-0001-R1'}
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('dado de baja');
@@ -1646,7 +1646,7 @@ type ItemTimeline =
                 <a class="mono" [routerLink]="['/fabricacion/par', r.codigo]">{{ r.codigo }}</a>
               </div>
             }
-            @for (r of p.repuestoPor; track r.codigo) {
+            @if (p.repuestoPor; as r) {
               <div class="cell-sub">Repuesto por
                 <a class="mono" [routerLink]="['/fabricacion/par', r.codigo]">{{ r.codigo }}</a>
               </div>

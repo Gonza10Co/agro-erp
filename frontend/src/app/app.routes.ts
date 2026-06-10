@@ -23,6 +23,7 @@ export const routes: Routes = [
       { path: 'fabricacion/operario', loadComponent: () => import('./features/fabricacion/pantalla-operario.component').then(m => m.PantallaOperarioComponent) },
       { path: 'fabricacion/tablero', loadComponent: () => import('./features/fabricacion/tablero.component').then(m => m.FabricacionTableroComponent) },
       { path: 'fabricacion/par/:codigo', loadComponent: () => import('./features/fabricacion/par-detalle.component').then(m => m.ParDetalleComponent) },
+      { path: 'calidad', loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'pedidos/oc' },
     ],
   },

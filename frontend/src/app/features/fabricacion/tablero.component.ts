@@ -47,6 +47,21 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/
           </div>
         </div>
       </div>
+      @if (fueraDeFlujo().length) {
+        <div class="fuera">
+          <div class="col-h"><span>Fuera de flujo</span><span class="badge">{{ fueraDeFlujo().length }}</span></div>
+          <div class="fuera-body">
+            @for (p of fueraDeFlujo(); track p.id) {
+              <a class="par-chip" [class.chip-baja]="p.estado === 'DADO_DE_BAJA'"
+                 [routerLink]="['/fabricacion/par', p.codigo]">
+                <span class="mono">{{ p.codigo }}</span>
+                <span class="cell-sub">T{{ p.talla.valor }}</span>
+                <span class="estado">{{ p.estado === 'DADO_DE_BAJA' ? 'baja ✖' : 'cancelado' }}</span>
+              </a>
+            }
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -59,6 +74,10 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/
     .par-chip.done{opacity:.7}
     .mono{font-family:var(--font-mono)}
     .empty-col{text-align:center;padding:var(--sp-2)}
+    .fuera{margin-top:var(--sp-4);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius)}
+    .fuera-body{padding:var(--sp-2);display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+    .chip-baja{border-color:var(--danger)}
+    .chip-baja .estado{color:var(--danger)}
   `],
 })
 export class FabricacionTableroComponent implements OnInit {
@@ -82,6 +101,9 @@ export class FabricacionTableroComponent implements OnInit {
     return map;
   });
   terminados = computed(() => this.pares().filter((p) => p.estado === 'TERMINADO'));
+  fueraDeFlujo = computed(() =>
+    this.pares().filter((p) => p.estado === 'DADO_DE_BAJA' || p.estado === 'CANCELADO'),
+  );
 
   ngOnInit(): void {
     const q = this.route.snapshot.queryParamMap.get('ofId');
