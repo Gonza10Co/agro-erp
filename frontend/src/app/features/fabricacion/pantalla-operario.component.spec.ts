@@ -2,8 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { PantallaOperarioComponent } from './pantalla-operario.component';
+import { AuthService } from '../../core/auth/auth.service';
 
 const BASE = 'http://localhost:3001/fabricacion';
+const CALIDAD = 'http://localhost:3001/calidad';
 
 function setup() {
   TestBed.configureTestingModule({
@@ -17,6 +19,51 @@ function setup() {
   http.expectOne(`${BASE}/maquinas?celula=CORTE`).flush([{ id: 2, codigo: 'M1', nombre: 'Cortadora', celula: 'CORTE', activo: true }]);
   fixture.detectChanges();
   return { fixture, http };
+}
+
+/** Como `puedeBaja` se calcula al construir el componente, hay que fijar el rol ANTES de crearlo. */
+function setupReporte(rol: string) {
+  TestBed.configureTestingModule({
+    imports: [PantallaOperarioComponent],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: AuthService, useValue: { rol: () => rol } },
+    ],
+  });
+  const fixture = TestBed.createComponent(PantallaOperarioComponent);
+  const http = TestBed.inject(HttpTestingController);
+  fixture.detectChanges();
+  http.expectOne(`${BASE}/operarios?celula=CORTE`).flush([{ id: 1, nombre: 'Pedro', celula: 'CORTE', activo: true }]);
+  http.expectOne(`${BASE}/maquinas?celula=CORTE`).flush([{ id: 2, codigo: 'M1', nombre: 'Cortadora', celula: 'CORTE', activo: true }]);
+  fixture.detectChanges();
+  return { fixture, http };
+}
+
+const TIPOS = [
+  { id: 4, codigo: 'STROBEL-RASGADO', nombre: 'Strobel rasgado', celulaCausante: 'GUARNICION', clase: 'REPROCESO' },
+  { id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada', celulaCausante: 'INYECCION', clase: 'BAJA' },
+];
+
+function parInyeccion(estado: 'EN_PROCESO' | 'TERMINADO') {
+  return {
+    id: 1, codigo: 'OF1-0001', celulaActual: 'INYECCION', estado,
+    of: { consecutivo: 1 }, talla: { valor: '38' },
+    eventos: [], incidencias: [], reponeA: null, repuestoPor: null,
+  };
+}
+
+function buscarPar(fixture: ReturnType<typeof setupReporte>['fixture'], http: HttpTestingController, estado: 'EN_PROCESO' | 'TERMINADO') {
+  const comp = fixture.componentInstance;
+  comp.codigo = 'OF1-0001';
+  comp.buscar();
+  http.expectOne(`${BASE}/par/OF1-0001`).flush(parInyeccion(estado));
+  fixture.detectChanges();
+}
+
+function botonPorTexto(fixture: { nativeElement: HTMLElement }, texto: string): HTMLButtonElement | undefined {
+  const botones = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+  return botones.find((b) => (b.textContent ?? '').includes(texto));
 }
 
 describe('PantallaOperarioComponent', () => {
@@ -81,6 +128,94 @@ describe('PantallaOperarioComponent', () => {
     expect(comp.operarioId).toBeUndefined();
     expect(comp.maquinaId).toBeUndefined();
     expect(comp.esError()).toBeTrue();
+    http.verify();
+  });
+});
+
+describe('reporte de daño', () => {
+  it('muestra "Reportar daño" solo con par EN_PROCESO', () => {
+    const { fixture, http } = setupReporte('GERENTE');
+    buscarPar(fixture, http, 'EN_PROCESO');
+    expect(botonPorTexto(fixture, 'Reportar daño')).toBeDefined();
+    http.verify();
+
+    // mismo par pero TERMINADO: el botón no debe existir
+    const comp = fixture.componentInstance;
+    comp.codigo = 'OF1-0001';
+    comp.buscar();
+    http.expectOne(`${BASE}/par/OF1-0001`).flush(parInyeccion('TERMINADO'));
+    fixture.detectChanges();
+    expect(botonPorTexto(fixture, 'Reportar daño')).toBeUndefined();
+    http.verify();
+  });
+
+  it('REPROCESO: postea sin pedir descripción y confirma', () => {
+    const { fixture, http } = setupReporte('GERENTE');
+    buscarPar(fixture, http, 'EN_PROCESO');
+    const comp = fixture.componentInstance;
+
+    botonPorTexto(fixture, 'Reportar daño')!.click();
+    http.expectOne(`${CALIDAD}/tipos-dano`).flush(TIPOS);
+    comp.tipoDanoId = 4;
+    fixture.detectChanges();
+
+    const operarioId = comp.operarioId;
+    expect(operarioId).toBeDefined();
+
+    botonPorTexto(fixture, 'Registrar reproceso')!.click();
+    const req = http.expectOne(`${CALIDAD}/pares/OF1-0001/incidencias`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body.tipoDanoId).toBe(4);
+    expect(req.request.body.operarioId).toBe(operarioId);
+    expect(req.request.body.descripcion).toBeUndefined(); // sin descripción en reproceso
+    req.flush({ incidencia: { id: 1, tipoDano: TIPOS[0] }, parReposicion: null });
+    fixture.detectChanges();
+
+    expect(comp.msg()).toContain('Reproceso registrado');
+    http.verify();
+  });
+
+  it('BAJA: deshabilita envío sin descripción y muestra reposición al éxito', () => {
+    const { fixture, http } = setupReporte('GERENTE');
+    buscarPar(fixture, http, 'EN_PROCESO');
+    const comp = fixture.componentInstance;
+
+    botonPorTexto(fixture, 'Reportar daño')!.click();
+    http.expectOne(`${CALIDAD}/tipos-dano`).flush(TIPOS);
+    comp.tipoDanoId = 8;
+    comp.descripcion = '';
+    fixture.detectChanges();
+
+    expect(botonPorTexto(fixture, 'Dar de baja')!.disabled).toBeTrue();
+
+    comp.descripcion = 'robot dañó capellada';
+    fixture.detectChanges();
+    const boton = botonPorTexto(fixture, 'Dar de baja')!;
+    expect(boton.disabled).toBeFalse();
+    boton.click();
+    http.expectOne(`${CALIDAD}/pares/OF1-0001/incidencias`).flush({
+      incidencia: { id: 1, tipoDano: TIPOS[1] },
+      parReposicion: { codigo: 'OF1-0001-R1' },
+    });
+    fixture.detectChanges();
+
+    expect(comp.msg()).toContain('OF1-0001-R1');
+    http.verify();
+  });
+
+  it('BAJA con rol no gerente: botón deshabilitado y aviso', () => {
+    const { fixture, http } = setupReporte('VENTAS');
+    buscarPar(fixture, http, 'EN_PROCESO');
+    const comp = fixture.componentInstance;
+
+    botonPorTexto(fixture, 'Reportar daño')!.click();
+    http.expectOne(`${CALIDAD}/tipos-dano`).flush(TIPOS);
+    comp.tipoDanoId = 8;
+    comp.descripcion = 'x';
+    fixture.detectChanges();
+
+    expect(botonPorTexto(fixture, 'Dar de baja')!.disabled).toBeTrue();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Solo un gerente');
     http.verify();
   });
 });
