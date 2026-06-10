@@ -25,6 +25,7 @@ async function crearOPAmarrada(opts: {
         create: [
           {
             productoConfiguradoId: opts.productoConfiguradoId,
+            precioUnitario: 85000, // precio pactado por par (bota de seguridad)
             tallas: {
               create: opts.tallas.map((t) => ({
                 tallaId: t.tallaId,
@@ -313,6 +314,7 @@ async function main() {
         create: [
           {
             productoConfiguradoId: prodDiel.id,
+            precioUnitario: 85000,
             tallas: {
               create: [
                 { tallaId: tallaA.id, cantidad: 100 },
@@ -448,6 +450,7 @@ async function main() {
         create: [
           {
             productoConfiguradoId: prodDiel.id,
+            precioUnitario: 85000,
             tallas: { create: [{ tallaId: tallaA.id, cantidad: 6 }, { tallaId: tallaB.id, cantidad: 6 }] },
           },
         ],
@@ -480,6 +483,7 @@ async function main() {
         create: [
           {
             productoConfiguradoId: prodDiel.id,
+            precioUnitario: 85000,
             tallas: { create: [{ tallaId: tallaA.id, cantidad: 6 }] },
           },
         ],

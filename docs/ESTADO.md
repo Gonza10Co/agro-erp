@@ -1,6 +1,35 @@
 # Estado del proyecto — agro-erp (Botas Agroindustrial ERP + MES)
 
-> Handoff al 2026-06-04. Para retomar el trabajo en una sesión nueva.
+> Handoff al 2026-06-10. Para retomar el trabajo en una sesión nueva.
+>
+> **Nota:** la mayor parte de este documento quedó congelada al 2026-06-04 (no refleja las
+> Demos 5–8, que sí están en git: MES/trazabilidad, calidad, detalle de guarnición, indicadores
+> de eficiencia). La fuente de verdad del avance es el git log. La sección **Demo 9 — Facturación**
+> de abajo sí está al día.
+
+## Demo 9 — Facturación (2026-06-10) ✅ — en `develop`
+
+Cierra el ciclo del pedido: **OC → … → Despacho → Factura**.
+
+- **Precio pactado en la línea de OC** (`OrdenCompraLinea.precioUnitario`, Decimal nullable): se captura
+  por producto en el wizard de Nueva OC (paso Curva, input "Precio por par"). El detalle de OC muestra
+  precio/subtotal por línea + total.
+- **Factura sobre el Despacho** (1 Despacho → 1 Factura). Valoriza lo despachado × precio pactado;
+  calcula subtotal + IVA (19% por defecto, configurable) + total. Estados `EMITIDA`/`ANULADA`.
+  Consecutivo `factura` vía secuencia PG.
+- Backend: módulo `facturas` (núcleo puro `factura-core.ts`, `FacturaService.facturar/listar/obtener`,
+  `POST/GET /facturas`). Migración `20260610220440_demo9_facturacion`. Seed demo con precios ($85.000/par).
+- Frontend: `FacturasApi`, `facturas-list` + `factura-detalle` (drawer), botón **"Facturar"** en
+  `despachos-list` (link a la factura si ya existe), ruta `/facturas` + ítem en el sidebar.
+- **174 tests backend + 138 frontend verdes**, ambos builds limpios.
+- **Verificado E2E vía API:** despachar OP-9001 → facturar → FAC-1 ($1.530.000 + IVA $290.700 =
+  $1.820.700); doble facturación → 400; listado y detalle correctos.
+- Plan: `docs/plans/2026-06-10-demo9-facturacion.md`.
+- **Pendiente:** merge `develop`→`master` `--no-ff` + tag `demo-9` (al mostrar la demo).
+  Retenciones (reteFuente/IVA/ICA) quedan fuera de alcance (futuro).
+
+---
+
 
 ## Qué hay hecho (todo en `master`, pusheado a GitHub)
 

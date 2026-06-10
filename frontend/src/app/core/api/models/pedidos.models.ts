@@ -30,6 +30,7 @@ export interface OCLinea {
   id: number;
   productoConfiguradoId: number;
   productoConfigurado?: ProductoConfigurado;
+  precioUnitario?: string | null; // Decimal serializado como string
   tallas: OCLineaTalla[];
 }
 export interface OrdenCompra {
@@ -78,7 +79,7 @@ export interface OrdenProduccion {
 
 export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; tipoCredito?: TipoCredito; cupo?: number; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
-export interface CrearOCLineaDto { productoConfiguradoId: number; tallas: CrearOCTallaDto[]; }
+export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
 export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
@@ -87,6 +88,46 @@ export interface DespachoListItem {
   consecutivo: number;
   fecha: string;
   autorizadoPorId: number | null;
+  factura: { id: number; consecutivo: number } | null;
   op: { consecutivo: number; oc: { cliente: { nombre: string } } };
 }
 export interface Despacho { id: number; consecutivo: number; }
+
+// ─── Facturación ───────────────────────────────────────────────────────────
+export type EstadoFactura = 'EMITIDA' | 'ANULADA';
+
+export interface FacturarParams { despachoId: number; ivaPct?: number; }
+
+export interface FacturaListItem {
+  id: number;
+  consecutivo: number;
+  fecha: string;
+  total: string;
+  estado: EstadoFactura;
+  despacho: { consecutivo: number; op: { consecutivo: number; oc: { cliente: { nombre: string } } } };
+}
+
+export interface FacturaLinea {
+  id: number;
+  productoConfiguradoId: number;
+  productoConfigurado?: ProductoConfigurado;
+  tallaId: number;
+  talla?: Talla;
+  cantidad: number;
+  precioUnitario: string;
+  subtotal: string;
+}
+
+export interface Factura {
+  id: number;
+  consecutivo: number;
+  despachoId: number;
+  fecha: string;
+  subtotal: string;
+  ivaPct: string;
+  iva: string;
+  total: string;
+  estado: EstadoFactura;
+  despacho?: { consecutivo: number; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
+  lineas?: FacturaLinea[];
+}

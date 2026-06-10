@@ -132,6 +132,7 @@ model Talla {
   opLineasTalla  OrdenProduccionLineaTalla[]
   inventarioPT   InventarioPT[]
   lineasDespacho DespachoLinea[]
+  lineasFactura  FacturaLinea[]
   pares          Par[]
 }
 
@@ -301,6 +302,7 @@ model ProductoConfigurado {
   lineasOP       OrdenProduccionLinea[]
   inventarioPT   InventarioPT[]
   lineasDespacho DespachoLinea[]
+  lineasFactura  FacturaLinea[]
   pares          Par[]
 }
 
@@ -402,6 +404,7 @@ model OrdenCompraLinea {
   oc                    OrdenCompra         @relation(fields: [ocId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  precioUnitario        Decimal?            @db.Decimal(14, 2) // precio pactado por par (igual todas las tallas)
 
   tallas OrdenCompraLineaTalla[]
 
@@ -504,7 +507,8 @@ model Despacho {
   motivoAutorizacion String?
   createdAt          DateTime        @default(now())
 
-  lineas DespachoLinea[]
+  lineas  DespachoLinea[]
+  factura Factura?
 }
 
 model DespachoLinea {
@@ -731,4 +735,42 @@ model IncidenciaCalidad {
   @@index([parId])
   @@index([tipoDanoId])
   @@index([operarioId])
+}
+
+// ───────────────────────── Módulo 5: Facturación ─────────────────────────
+
+enum EstadoFactura {
+  EMITIDA
+  ANULADA
+}
+
+model Factura {
+  id          Int           @id @default(autoincrement())
+  consecutivo Int           @unique
+  despachoId  Int           @unique
+  despacho    Despacho      @relation(fields: [despachoId], references: [id])
+  fecha       DateTime      @default(now())
+  subtotal    Decimal       @db.Decimal(14, 2)
+  ivaPct      Decimal       @db.Decimal(5, 2)
+  iva         Decimal       @db.Decimal(14, 2)
+  total       Decimal       @db.Decimal(14, 2)
+  estado      EstadoFactura @default(EMITIDA)
+  createdAt   DateTime      @default(now())
+
+  lineas FacturaLinea[]
+}
+
+model FacturaLinea {
+  id                    Int                 @id @default(autoincrement())
+  facturaId             Int
+  factura               Factura             @relation(fields: [facturaId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  cantidad              Int
+  precioUnitario        Decimal             @db.Decimal(14, 2)
+  subtotal              Decimal             @db.Decimal(14, 2)
+
+  @@index([facturaId])
 }

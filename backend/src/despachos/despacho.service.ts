@@ -124,6 +124,7 @@ export class DespachoService {
         consecutivo: true,
         fecha: true,
         autorizadoPorId: true,
+        factura: { select: { id: true, consecutivo: true } },
         op: {
           select: {
             consecutivo: true,

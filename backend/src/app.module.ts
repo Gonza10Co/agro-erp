@@ -13,6 +13,7 @@ import { ComprasModule } from './compras/compras.module';
 import { FabricacionModule } from './fabricacion/fabricacion.module';
 import { CalidadModule } from './calidad/calidad.module';
 import { IndicadoresModule } from './indicadores/indicadores.module';
+import { FacturasModule } from './facturas/factura.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { IndicadoresModule } from './indicadores/indicadores.module';
     FabricacionModule,
     CalidadModule,
     IndicadoresModule,
+    FacturasModule,
   ],
   controllers: [AppController],
 })

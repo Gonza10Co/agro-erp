@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
-import { OrdenCompra, EstadoOP } from '../../../core/api/models/pedidos.models';
+import { OrdenCompra, OCLinea, EstadoOP } from '../../../core/api/models/pedidos.models';
 import { badgeOC, badgeOP } from './estado-badge';
 
 @Component({
@@ -29,9 +29,10 @@ import { badgeOC, badgeOP } from './estado-badge';
       <div class="drawer-section-h">Líneas</div>
       @for (l of o.lineas || []; track l.id) {
         <div style="margin-bottom:var(--sp-4)">
-          <div style="font-weight:var(--fw-medium);margin-bottom:var(--sp-2)">
-            {{ l.productoConfigurado?.nombreComercial }}
-            <span class="cell-sub cell-mono">{{ l.productoConfigurado?.codigo }}</span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;font-weight:var(--fw-medium);margin-bottom:var(--sp-2)">
+            <span>{{ l.productoConfigurado?.nombreComercial }}
+              <span class="cell-sub cell-mono">{{ l.productoConfigurado?.codigo }}</span></span>
+            <span class="cell-sub cell-mono">{{ l.precioUnitario ? (moneda(precio(l)) + ' /par') : 'sin precio' }}</span>
           </div>
           <table class="data">
             <thead><tr><th>Talla</th><th class="num">Cantidad</th></tr></thead>
@@ -41,8 +42,12 @@ import { badgeOC, badgeOP } from './estado-badge';
               }
             </tbody>
           </table>
+          <div class="kv" style="font-weight:var(--fw-medium)"><span class="k">Subtotal línea</span><span class="v cell-mono">{{ moneda(subtotalLinea(l)) }}</span></div>
         </div>
       }
+      <div class="kv" style="font-weight:var(--fw-semibold);border-top:var(--bw) solid var(--border);padding-top:var(--sp-3)">
+        <span>Total OC (sin IVA)</span><span class="cell-mono">{{ moneda(totalOC()) }}</span>
+      </div>
 
       @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
 
@@ -113,6 +118,14 @@ export class OcDetalleComponent implements OnInit {
 
   badge(o: OrdenCompra) { return badgeOC(o.estado); }
   badgeOp(estado: EstadoOP) { return badgeOP(estado); }
+
+  precio(l: OCLinea): number { return Number(l.precioUnitario ?? 0); }
+  subtotalLinea(l: OCLinea): number {
+    const pares = l.tallas.reduce((acc, t) => acc + t.cantidad, 0);
+    return pares * this.precio(l);
+  }
+  totalOC(): number { return (this.oc()?.lineas ?? []).reduce((acc, l) => acc + this.subtotalLinea(l), 0); }
+  moneda(n: number): string { return '$' + Math.round(n).toLocaleString('es-CO'); }
 
   private msg(e: any): string {
     const m = e?.error?.message;

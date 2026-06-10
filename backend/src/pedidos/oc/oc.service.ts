@@ -26,6 +26,7 @@ export class OcService {
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
+              precioUnitario: l.precioUnitario,
               tallas: {
                 create: l.tallas.map((t) => ({
                   tallaId: t.tallaId,

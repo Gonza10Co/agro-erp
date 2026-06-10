@@ -6,6 +6,7 @@ const SECUENCIAS = {
   of: 'of_consecutivo_seq',
   despacho: 'despacho_consecutivo_seq',
   req: 'req_consecutivo_seq',
+  factura: 'factura_consecutivo_seq',
 } as const;
 
 export type EntidadConsecutivo = keyof typeof SECUENCIAS;
