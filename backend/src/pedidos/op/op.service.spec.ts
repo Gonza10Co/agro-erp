@@ -3,8 +3,9 @@ import { OpService } from './op.service';
 
 function makeTx() {
   return {
+    $queryRawUnsafe: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     ordenProduccion: {
-      aggregate: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       findUnique: jest.fn(),
@@ -52,9 +53,7 @@ describe('OpService.generarDesdeOC', () => {
         },
       ],
     });
-    tx.ordenProduccion.aggregate.mockResolvedValue({
-      _max: { consecutivo: 800 },
-    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
     tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
     tx.ordenProduccionLinea.create.mockResolvedValue({ id: 60 });
     tx.inventarioPT.findMany.mockResolvedValue([
@@ -112,6 +111,33 @@ describe('OpService.generarDesdeOC', () => {
       data: { estado: 'EN_PRODUCCION' },
     });
   });
+
+  it('bloquea las filas de InventarioPT (FOR UPDATE) antes de leer disponibilidad', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({
+      id: 1,
+      estado: 'CONFIRMADA',
+      lineas: [
+        {
+          id: 11,
+          productoConfiguradoId: 2,
+          tallas: [{ tallaId: 5, cantidad: 100 }],
+        },
+      ],
+    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccionLinea.create.mockResolvedValue({ id: 60 });
+    tx.inventarioPT.findMany.mockResolvedValue([]);
+    tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 80 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'AMARRADA' });
+
+    const svc = new OpService(prisma);
+    await svc.generarDesdeOC(1);
+
+    expect(tx.$queryRaw).toHaveBeenCalled();
+    const sql = (tx.$queryRaw as jest.Mock).mock.calls[0][0].join('?');
+    expect(sql).toContain('FOR UPDATE');
+  });
 });
 
 describe('OpService.anular', () => {
@@ -121,6 +147,8 @@ describe('OpService.anular', () => {
       reservaInventarioPT: { deleteMany: jest.fn() },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
     const prisma: any = {
       ordenProduccion: {
@@ -155,6 +183,44 @@ describe('OpService.anular', () => {
     expect(tx.ordenCompra.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: { estado: 'CONFIRMADA' },
+    });
+  });
+
+  it('al anular cancela los pares en proceso y anula las OFs de la OP', async () => {
+    const tx = {
+      inventarioPT: { update: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn() },
+      ordenProduccion: { update: jest.fn() },
+      ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    };
+    const prisma: any = {
+      ordenProduccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50,
+          ocId: 1,
+          estado: 'AMARRADA',
+          lineas: [
+            {
+              tallas: [
+                { id: 80, reservas: [{ inventarioPTId: 70, cantidad: 30 }] },
+              ],
+            },
+          ],
+        }),
+      },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+    const service = new OpService(prisma);
+    await service.anular(50);
+    expect(tx.par.updateMany).toHaveBeenCalledWith({
+      where: { of: { opId: 50 }, estado: 'EN_PROCESO' },
+      data: { estado: 'CANCELADO' },
+    });
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith({
+      where: { opId: 50, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+      data: { estado: 'ANULADA' },
     });
   });
 });

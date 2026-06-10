@@ -19,10 +19,11 @@ function opBase(over: any = {}) {
 
 describe('ComprasService.calcularRequerimiento', () => {
   const prisma: any = {
+    $queryRawUnsafe: jest.fn(),
     ordenProduccion: { findUnique: jest.fn() },
     inventarioMaterial: { findMany: jest.fn() },
     material: { findMany: jest.fn() },
-    requerimientoCompra: { aggregate: jest.fn(), create: jest.fn() },
+    requerimientoCompra: { create: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   const bomLoader: any = { cargarEntrada: jest.fn().mockResolvedValue({}) };
@@ -45,7 +46,7 @@ describe('ComprasService.calcularRequerimiento', () => {
     prisma.material.findMany.mockResolvedValue([
       { id: 1, codigo: 'M1', nombreCanonico: 'Cuero', proveedorId: 7, proveedor: { id: 7, nombre: 'Curtiembre' } },
     ]);
-    prisma.requerimientoCompra.aggregate.mockResolvedValue({ _max: { consecutivo: 0 } });
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.requerimientoCompra.create.mockResolvedValue({ id: 50, consecutivo: 1, opId: 1, fecha: new Date() });
 
     const res = await service.calcularRequerimiento(1);
@@ -63,7 +64,7 @@ describe('ComprasService.calcularRequerimiento', () => {
     const op = opBase();
     op.lineas[0].tallas[0].cantAProducir = 0;
     prisma.ordenProduccion.findUnique.mockResolvedValue(op);
-    prisma.requerimientoCompra.aggregate.mockResolvedValue({ _max: { consecutivo: 0 } });
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.requerimientoCompra.create.mockResolvedValue({ id: 51, consecutivo: 1, opId: 1, fecha: new Date() });
 
     const res = await service.calcularRequerimiento(1);

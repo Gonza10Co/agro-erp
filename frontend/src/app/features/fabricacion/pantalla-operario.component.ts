@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, AfterViewInit, DestroyRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
@@ -59,15 +59,16 @@ import {
     .puesto{display:flex;gap:var(--sp-4);flex-wrap:wrap}
     .puesto label,.scan-label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
     select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-sm)}
-    .scan-input{font-size:var(--text-lg);max-width:280px}
+    .scan-input{font-size:var(--text-lg);max-width:280px;min-height:48px}
     .msg{margin-top:var(--sp-3);color:var(--accent)}
     .msg.err{color:var(--danger)}
     .par-card{margin-top:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2);align-items:flex-start}
     .big{font-size:var(--text-xl)}
     .mono{font-family:var(--font-mono)}
+    .btn-primary{min-height:48px}
   `],
 })
-export class PantallaOperarioComponent implements OnInit {
+export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   @ViewChild('scan') private scanInput!: ElementRef<HTMLInputElement>;
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
@@ -90,14 +91,35 @@ export class PantallaOperarioComponent implements OnInit {
     this.onCelula();
   }
 
+  ngAfterViewInit(): void {
+    this.enfocarScan();
+  }
+
+  /** El scanner físico escribe donde esté el foco: recuperarlo SIEMPRE tras cada acción. */
+  private enfocarScan(): void {
+    requestAnimationFrame(() => this.scanInput?.nativeElement.focus());
+  }
+
+  private msgError(e: { status?: number }, porDefecto: string): string {
+    return e?.status === 0
+      ? 'Sin conexión con el servidor. Verificá la red y volvé a intentar.'
+      : porDefecto;
+  }
+
   onCelula(): void {
-    this.api.operarios(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((o) => {
-      this.operarios.set(o);
-      this.operarioId = o[0]?.id;
+    this.api.operarios(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (o) => { this.operarios.set(o); this.operarioId = o[0]?.id; },
+      error: () => {
+        this.operarios.set([]); this.operarioId = undefined;
+        this.esError.set(true); this.msg.set('No se pudieron cargar los operarios de la célula.');
+      },
     });
-    this.api.maquinas(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
-      this.maquinas.set(m);
-      this.maquinaId = m[0]?.id;
+    this.api.maquinas(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (m) => { this.maquinas.set(m); this.maquinaId = m[0]?.id; },
+      error: () => {
+        this.maquinas.set([]); this.maquinaId = undefined;
+        this.esError.set(true); this.msg.set('No se pudieron cargar las máquinas de la célula.');
+      },
     });
   }
 
@@ -107,8 +129,12 @@ export class PantallaOperarioComponent implements OnInit {
     this.par.set(null);
     this.msg.set(null);
     this.api.par(c).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => this.par.set(p),
-      error: () => { this.esError.set(true); this.msg.set(`Par ${c} no encontrado`); },
+      next: (p) => { this.esError.set(false); this.par.set(p); this.enfocarScan(); },
+      error: (e) => {
+        this.esError.set(true);
+        this.msg.set(this.msgError(e, `Par ${c} no encontrado`));
+        this.enfocarScan(); // el código queda en el input para reintentar con Enter
+      },
     });
   }
 
@@ -125,11 +151,12 @@ export class PantallaOperarioComponent implements OnInit {
           this.msg.set(`Par ${p.codigo} avanzado ✓`);
           this.par.set(null);
           this.codigo = '';
-          setTimeout(() => this.scanInput?.nativeElement.focus(), 0);
+          this.enfocarScan();
         },
         error: (e) => {
           this.esError.set(true);
-          this.msg.set(e?.error?.message ?? 'No se pudo avanzar el par');
+          this.msg.set(this.msgError(e, e?.error?.message ?? 'No se pudo avanzar el par'));
+          this.enfocarScan();
         },
       });
   }

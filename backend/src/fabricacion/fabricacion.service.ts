@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Celula } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { generarPares, siguienteCelula, LineaProduccion } from './fabricacion-core';
 import { AvanzarDto } from './dto/avanzar.dto';
 
@@ -34,8 +36,7 @@ export class FabricacionService {
       throw new BadRequestException('La OP no tiene producción pendiente');
 
     return this.prisma.$transaction(async (tx) => {
-      const agg = await tx.ordenFabricacion.aggregate({ _max: { consecutivo: true } });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'of');
       const of = await tx.ordenFabricacion.create({ data: { consecutivo, opId } });
       const pares = generarPares(consecutivo, lineas).map((p) => ({ ...p, ofId: of.id }));
       await tx.par.createMany({ data: pares });
@@ -49,8 +50,12 @@ export class FabricacionService {
       include: { of: true },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
-    if (par.estado === 'TERMINADO')
-      throw new ConflictException('El par ya está terminado');
+    if (par.estado !== 'EN_PROCESO')
+      throw new ConflictException(
+        par.estado === 'TERMINADO'
+          ? 'El par ya está terminado'
+          : 'El par está cancelado (OP anulada)',
+      );
 
     const celulaActual = par.celulaActual;
     const siguiente = siguienteCelula(celulaActual);
@@ -67,63 +72,83 @@ export class FabricacionService {
         throw new BadRequestException('No hay bodega PROPIA configurada');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.eventoTrazabilidad.create({
-        data: {
-          parId: par.id,
-          celula: celulaActual,
-          operarioId: dto.operarioId,
-          maquinaId: dto.maquinaId,
-        },
-      });
-
-      if (siguiente === null) {
-        // Última célula (PT): terminar el par y sumar a InventarioPT.
-        const updated = await tx.par.update({
-          where: { id: par.id },
-          data: { estado: 'TERMINADO' },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.eventoTrazabilidad.create({
+          data: {
+            parId: par.id,
+            celula: celulaActual,
+            operarioId: dto.operarioId,
+            maquinaId: dto.maquinaId,
+          },
         });
-        await tx.inventarioPT.upsert({
-          where: {
-            productoConfiguradoId_tallaId_bodegaId: {
+
+        if (siguiente === null) {
+          // Última célula (PT): terminar el par y sumar a InventarioPT.
+          const updated = await tx.par.update({
+            where: { id: par.id },
+            data: { estado: 'TERMINADO' },
+          });
+          await tx.inventarioPT.upsert({
+            where: {
+              productoConfiguradoId_tallaId_bodegaId: {
+                productoConfiguradoId: par.productoConfiguradoId,
+                tallaId: par.tallaId,
+                bodegaId: bodegaPT!.id,
+              },
+            },
+            create: {
               productoConfiguradoId: par.productoConfiguradoId,
               tallaId: par.tallaId,
               bodegaId: bodegaPT!.id,
+              cantDisponible: 1,
             },
-          },
-          create: {
-            productoConfiguradoId: par.productoConfiguradoId,
-            tallaId: par.tallaId,
-            bodegaId: bodegaPT!.id,
-            cantDisponible: 1,
-          },
-          update: { cantDisponible: { increment: 1 } },
-        });
-        // El par ya fue marcado TERMINADO en esta misma tx, así que
-        // este count no lo incluye (cuenta solo los que aún siguen en proceso).
-        const restantes = await tx.par.count({
-          where: { ofId: par.ofId, estado: 'EN_PROCESO' },
-        });
-        if (restantes === 0)
+            update: { cantDisponible: { increment: 1 } },
+          });
+          // El par ya fue marcado TERMINADO en esta misma tx, así que
+          // este count no lo incluye (cuenta solo los que aún siguen en proceso).
+          const restantes = await tx.par.count({
+            where: { ofId: par.ofId, estado: 'EN_PROCESO' },
+          });
+          if (restantes === 0)
+            // Condición sobre el estado para no pisar una OF que otra tx
+            // acaba de ANULAR (anulación de OP concurrente al último escaneo).
+            await tx.ordenFabricacion.updateMany({
+              where: { id: par.ofId, estado: { not: 'ANULADA' } },
+              data: { estado: 'TERMINADA' },
+            });
+          return updated;
+        }
+
+        // Avance normal a la siguiente célula.
+        if (celulaActual === 'CORTE' && par.of.estado === 'ABIERTA') {
           await tx.ordenFabricacion.update({
             where: { id: par.ofId },
-            data: { estado: 'TERMINADA' },
+            data: { estado: 'EN_PROCESO' },
           });
-        return updated;
-      }
-
-      // Avance normal a la siguiente célula.
-      if (celulaActual === 'CORTE' && par.of.estado === 'ABIERTA') {
-        await tx.ordenFabricacion.update({
-          where: { id: par.ofId },
-          data: { estado: 'EN_PROCESO' },
+        }
+        return tx.par.update({
+          where: { id: par.id },
+          data: { celulaActual: siguiente },
         });
-      }
-      return tx.par.update({
-        where: { id: par.id },
-        data: { celulaActual: siguiente },
       });
-    });
+    } catch (e: unknown) {
+      // FK inválida del escaneo → 400 con el campo concreto; cualquier otra
+      // violación (p.ej. parId) se relanza para no enmascarar bugs reales.
+      if ((e as { code?: string })?.code === 'P2003') {
+        const campo = String(
+          (e as { meta?: { field_name?: unknown } })?.meta?.field_name ?? '',
+        );
+        if (/operario/i.test(campo))
+          throw new BadRequestException('Operario inexistente');
+        if (/maquina/i.test(campo))
+          throw new BadRequestException('Máquina inexistente');
+        // Sin field_name (depende del driver) asumimos el caso típico del escaneo.
+        if (campo === '')
+          throw new BadRequestException('Operario o máquina inexistente');
+      }
+      throw e;
+    }
   }
 
   listarOF() {
@@ -164,6 +189,8 @@ export class FabricacionService {
   tablero(ofId?: number) {
     return this.prisma.par.findMany({
       where: ofId ? { ofId } : {},
+      // Cap defensivo: el tablero opera por OF; sin filtro, 500 pares es más que una corrida.
+      take: 500,
       orderBy: { codigo: 'asc' },
       select: {
         id: true,
@@ -196,16 +223,16 @@ export class FabricacionService {
     return par;
   }
 
-  listarOperarios(celula?: string) {
+  listarOperarios(celula?: Celula) {
     return this.prisma.operario.findMany({
-      where: { activo: true, ...(celula ? { celula: celula as any } : {}) },
+      where: { activo: true, ...(celula ? { celula } : {}) },
       orderBy: { nombre: 'asc' },
     });
   }
 
-  listarMaquinas(celula?: string) {
+  listarMaquinas(celula?: Celula) {
     return this.prisma.maquina.findMany({
-      where: { activo: true, ...(celula ? { celula: celula as any } : {}) },
+      where: { activo: true, ...(celula ? { celula } : {}) },
       orderBy: { nombre: 'asc' },
     });
   }

@@ -1,5 +1,5 @@
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
-export type EstadoPar = 'EN_PROCESO' | 'TERMINADO';
+export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO';
 export type EstadoOF = 'ABIERTA' | 'EN_PROCESO' | 'TERMINADA' | 'ANULADA';
 
 export interface OFGenerada {

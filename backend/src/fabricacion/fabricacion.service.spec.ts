@@ -5,10 +5,11 @@ const BODEGA_ID = 7;
 
 function makePrisma(overrides: any = {}) {
   const tx = {
+    $queryRawUnsafe: jest.fn().mockResolvedValue([{ v: 5n }]),
     ordenFabricacion: {
-      aggregate: jest.fn().mockResolvedValue({ _max: { consecutivo: 4 } }),
       create: jest.fn().mockResolvedValue({ id: 1, consecutivo: 5 }),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     par: {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -63,7 +64,7 @@ describe('FabricacionService.generarOF', () => {
 
   it('consecutivo = 1 cuando no hay OFs previas', async () => {
     const { prisma, tx } = makePrisma();
-    tx.ordenFabricacion.aggregate.mockResolvedValue({ _max: { consecutivo: null } });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.ordenProduccion.findUnique.mockResolvedValue({
       id: 100, ordenesFabricacion: [],
       lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 1, cantAProducir: 1 }] }],
@@ -153,8 +154,13 @@ describe('FabricacionService.avanzar', () => {
         update: { cantDisponible: { increment: 1 } },
       }),
     );
-    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { estado: 'TERMINADA' } }),
+    // El cierre usa updateMany condicionado para no pisar una OF ANULADA
+    // por una anulación de OP concurrente.
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 1, estado: { not: 'ANULADA' } },
+        data: { estado: 'TERMINADA' },
+      }),
     );
   });
 
@@ -197,6 +203,16 @@ describe('FabricacionService.avanzar', () => {
     });
     await expect(new FabricacionService(prisma).avanzar('OF1-0001', dto)).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('409 si el par está cancelado', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 1, codigo: 'OF5-0001', estado: 'CANCELADO', celulaActual: 'CORTE', of: { estado: 'EN_PROCESO' },
+    });
+    await expect(
+      new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 1, maquinaId: 1 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
 
 describe('FabricacionService lecturas', () => {
@@ -219,5 +235,29 @@ describe('FabricacionService lecturas', () => {
     expect(prisma.par.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: {} }),
     );
+  });
+
+  it('tablero limita la consulta a 500 pares', async () => {
+    const { prisma } = makePrisma({ root: { par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } } });
+    await new FabricacionService(prisma).tablero();
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 500 }),
+    );
+  });
+});
+
+describe('FabricacionService.avanzar (hardening)', () => {
+  it('400 si el operario o la máquina no existen (P2003)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 1, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'CORTE',
+      ofId: 1, productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    tx.eventoTrazabilidad.create.mockRejectedValue(
+      Object.assign(new Error('FK'), { code: 'P2003' }),
+    );
+    await expect(
+      new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 999, maquinaId: 999 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

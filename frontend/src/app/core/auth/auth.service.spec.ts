@@ -61,3 +61,26 @@ describe('AuthService.rol', () => {
     expect(auth.rol()).toBeNull();
   });
 });
+
+describe('AuthService.usuario', () => {
+  let service: AuthService;
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [AuthService, provideHttpClient(), provideHttpClientTesting()] });
+    service = TestBed.inject(AuthService);
+    localStorage.clear();
+  });
+  afterEach(() => localStorage.clear());
+
+  it('usuario() decodifica username y role del JWT', () => {
+    const payload = btoa(JSON.stringify({ sub: 1, username: 'gerente', role: 'GERENTE' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    expect(service.usuario()).toEqual({ username: 'gerente', role: 'GERENTE' });
+  });
+
+  it('usuario() devuelve null sin token o con token corrupto', () => {
+    localStorage.removeItem('accessToken');
+    expect(service.usuario()).toBeNull();
+    localStorage.setItem('accessToken', 'basura');
+    expect(service.usuario()).toBeNull();
+  });
+});

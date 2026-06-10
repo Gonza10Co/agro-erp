@@ -60,8 +60,8 @@ import { AuthService } from '../../core/auth/auth.service';
       </nav>
       <div class="sidebar-foot">
         <div class="user-card">
-          <span class="avatar">CM</span>
-          <span class="user-meta"><b>Carolina M.</b><small>Oficial de ventas</small></span>
+          <span class="avatar">{{ iniciales }}</span>
+          <span class="user-meta"><b>{{ usuario?.username ?? '—' }}</b><small>{{ rolLabel }}</small></span>
           <button class="icon-btn" type="button" title="Salir" (click)="logout()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
           </button>
@@ -82,6 +82,14 @@ import { AuthService } from '../../core/auth/auth.service';
 export class ShellComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+
+  readonly usuario = this.auth.usuario();
+  readonly iniciales = (this.usuario?.username ?? '?').slice(0, 2).toUpperCase();
+  readonly rolLabel =
+    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas' } as Record<string, string>)[
+      this.usuario?.role ?? ''
+    ] ?? (this.usuario?.role ?? '');
+
   logout(): void {
     this.auth.logout();
     this.router.navigateByUrl('/login');

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { amarrarTalla, DisponibilidadBodega } from './amarre';
 
 @Injectable()
@@ -23,10 +24,7 @@ export class OpService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const agg = await tx.ordenProduccion.aggregate({
-        _max: { consecutivo: true },
-      });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
         data: { consecutivo, ocId, estado: 'CREADA' },
       });
@@ -40,6 +38,13 @@ export class OpService {
         });
 
         for (const t of linea.tallas) {
+          // Lock pesimista: serializa amarres concurrentes del mismo producto/talla
+          // para que dos OPs no reserven el mismo stock a la vez. ORDER BY id fija
+          // un orden canónico de adquisición (evita deadlocks entre tx cruzadas).
+          // Limitación conocida: con 0 filas no bloquea inserts nuevos de fabricación
+          // simultánea — el amarre puede no ver ese stock (subóptimo, nunca negativo).
+          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} ORDER BY id FOR UPDATE`;
+
           const stock = await tx.inventarioPT.findMany({
             where: {
               productoConfiguradoId: linea.productoConfiguradoId,
@@ -125,6 +130,17 @@ export class OpService {
           });
         }
       }
+      // Una OP anulada no puede seguir fabricándose: se cancelan pares y OFs vivas.
+      // Decisión de negocio: las OF TERMINADAS no se tocan — lo ya producido
+      // quedó cargado en InventarioPT y puede amarrarse a otra OP.
+      await tx.par.updateMany({
+        where: { of: { opId }, estado: 'EN_PROCESO' },
+        data: { estado: 'CANCELADO' },
+      });
+      await tx.ordenFabricacion.updateMany({
+        where: { opId, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+        data: { estado: 'ANULADA' },
+      });
       await tx.ordenProduccion.update({
         where: { id: opId },
         data: { estado: 'ANULADA' },

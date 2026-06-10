@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { BomLoaderService } from '../catalog/bom/bom-loader.service';
 import { resolverBom } from '../catalog/bom/bom-resolver';
 import { EntradaResolucion } from '../catalog/bom/bom-resolver.types';
@@ -104,10 +105,7 @@ export class ComprasService {
     );
 
     const requerimiento = await this.prisma.$transaction(async (tx) => {
-      const agg = await tx.requerimientoCompra.aggregate({
-        _max: { consecutivo: true },
-      });
-      const consecutivo = (agg._max.consecutivo ?? 0) + 1;
+      const consecutivo = await siguienteConsecutivo(tx, 'req');
       return tx.requerimientoCompra.create({
         data: {
           consecutivo,
