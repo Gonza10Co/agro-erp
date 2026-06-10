@@ -133,8 +133,20 @@ export class FabricacionService {
         });
       });
     } catch (e: unknown) {
-      if ((e as { code?: string })?.code === 'P2003')
-        throw new BadRequestException('Operario o máquina inexistente');
+      // FK inválida del escaneo → 400 con el campo concreto; cualquier otra
+      // violación (p.ej. parId) se relanza para no enmascarar bugs reales.
+      if ((e as { code?: string })?.code === 'P2003') {
+        const campo = String(
+          (e as { meta?: { field_name?: unknown } })?.meta?.field_name ?? '',
+        );
+        if (/operario/i.test(campo))
+          throw new BadRequestException('Operario inexistente');
+        if (/maquina/i.test(campo))
+          throw new BadRequestException('Máquina inexistente');
+        // Sin field_name (depende del driver) asumimos el caso típico del escaneo.
+        if (campo === '')
+          throw new BadRequestException('Operario o máquina inexistente');
+      }
       throw e;
     }
   }
