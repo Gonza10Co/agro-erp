@@ -47,7 +47,10 @@ CREATE INDEX "IncidenciaCalidad_parId_idx" ON "IncidenciaCalidad"("parId");
 CREATE INDEX "IncidenciaCalidad_tipoDanoId_idx" ON "IncidenciaCalidad"("tipoDanoId");
 
 -- CreateIndex
-CREATE INDEX "Par_reponeAParId_idx" ON "Par"("reponeAParId");
+CREATE INDEX "IncidenciaCalidad_operarioId_idx" ON "IncidenciaCalidad"("operarioId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Par_reponeAParId_key" ON "Par"("reponeAParId");
 
 -- AddForeignKey
 ALTER TABLE "Par" ADD CONSTRAINT "Par_reponeAParId_fkey" FOREIGN KEY ("reponeAParId") REFERENCES "Par"("id") ON DELETE SET NULL ON UPDATE CASCADE;

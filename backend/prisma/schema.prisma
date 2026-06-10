@@ -629,12 +629,12 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
-  reponeAParId          Int?                // si este par es una reposición, el par dado de baja que repone
+  reponeAParId          Int?    @unique     // si este par es una reposición, el par dado de baja que repone
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
   reponeA     Par?  @relation("reposicion", fields: [reponeAParId], references: [id])
-  repuestoPor Par[] @relation("reposicion")
+  repuestoPor Par?  @relation("reposicion")
 
   incidencias            IncidenciaCalidad[] @relation("incidencias")
   reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
@@ -643,7 +643,6 @@ model Par {
 
   @@index([ofId])
   @@index([celulaActual])
-  @@index([reponeAParId])
 }
 
 model EventoTrazabilidad {
@@ -710,4 +709,5 @@ model IncidenciaCalidad {
 
   @@index([parId])
   @@index([tipoDanoId])
+  @@index([operarioId])
 }
