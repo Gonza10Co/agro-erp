@@ -15,6 +15,11 @@ describe('calcularTramos', () => {
   it('par sin eventos → sin tramos', () => {
     expect(calcularTramos(new Date(), [])).toEqual([]);
   });
+  it('clampa a 0 si el createdAt es posterior al primer evento (skew)', () => {
+    const createdAt = new Date('2026-06-10T09:00:00Z');
+    const eventos = [{ celula: 'CORTE', subPaso: null, operarioId: 1, operario: { nombre: 'A' }, maquinaId: 1, maquina: { nombre: 'M1' }, timestamp: new Date('2026-06-10T08:00:00Z') }];
+    expect(calcularTramos(createdAt, eventos as any)[0].duracionMin).toBe(0);
+  });
 });
 
 describe('agrupaciones', () => {

@@ -540,6 +540,11 @@ async function main() {
   }) {
     seqPar++;
     const codigo = `OF9006-${String(seqPar).padStart(4, '0')}`;
+    // El primer evento (CORTE, i=0) ocurre `minInicioAtras` min atrás. El par debe
+    // crearse ANTES de ese evento para que el tramo de CORTE sea positivo y realista
+    // (createdAt → primer evento). Lo ubicamos CORTE_MIN antes del primer evento.
+    const CORTE_MIN = 15;
+    const primerEventoTs = new Date(Date.now() - opts.minInicioAtras * 60000);
     const par = await prisma.par.create({
       data: {
         codigo,
@@ -549,6 +554,7 @@ async function main() {
         estado: opts.estadoFinal as any,
         celulaActual: opts.celulaActual as Celula,
         subPasoActual: (opts.subPasoActual as any) ?? null,
+        createdAt: new Date(primerEventoTs.getTime() - CORTE_MIN * 60000),
       },
     });
 

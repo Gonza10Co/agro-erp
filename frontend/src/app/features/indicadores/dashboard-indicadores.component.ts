@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IndicadoresApi } from '../../core/api/indicadores.api';
 import { EtapaIndicador, Indicadores } from '../../core/api/models/indicadores.models';
-import { Celula, LABEL_CELULA, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
+import { LABEL_CELULA, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
 
 @Component({
   selector: 'app-dashboard-indicadores',
@@ -103,7 +103,6 @@ export class DashboardIndicadoresComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   data = signal<Indicadores | null>(null);
   error = signal<string | null>(null);
-  labelCelula = (c: Celula) => LABEL_CELULA[c];
   etapaLabel = (e: Pick<EtapaIndicador, 'celula' | 'subPaso'>) =>
     LABEL_CELULA[e.celula] + (e.subPaso ? ' · ' + LABEL_SUBPASO[e.subPaso] : '');
 

@@ -23,7 +23,7 @@ export interface EventoConRecursos {
 }
 
 const minutosEntre = (desde: Date, hasta: Date): number =>
-  Math.round((hasta.getTime() - desde.getTime()) / 60000);
+  Math.max(0, Math.round((hasta.getTime() - desde.getTime()) / 60000));
 
 /**
  * A partir del createdAt del par y sus eventos ORDENADOS por timestamp,
