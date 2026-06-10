@@ -52,6 +52,21 @@ describe('PantallaOperarioComponent', () => {
     http.verify();
   });
 
+  it('avanzar sin operario/máquina muestra aviso sin llamar a la API', () => {
+    const { fixture, http } = setup();
+    const comp = fixture.componentInstance;
+    comp.operarioId = undefined;
+    comp.maquinaId = undefined;
+    comp.par.set({
+      id: 9, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'CORTE',
+      of: { consecutivo: 5 }, talla: { valor: 38 }, eventos: [],
+    } as never);
+    comp.avanzar(comp.par()!);
+    expect(comp.esError()).toBeTrue();
+    expect(comp.msg()).toContain('Seleccioná operario');
+    http.verify(); // ningún POST debe haberse emitido
+  });
+
   it('si la API de catálogos falla, limpia operario/máquina y avisa', () => {
     TestBed.configureTestingModule({
       imports: [PantallaOperarioComponent],
