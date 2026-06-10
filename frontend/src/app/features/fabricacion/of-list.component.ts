@@ -24,7 +24,7 @@ import { OFListItem } from '../../core/api/models/fabricacion.models';
                   <td class="mono">OF-{{ o.consecutivo }}</td>
                   <td class="mono">OP-{{ o.op.consecutivo }}</td>
                   <td>{{ o._count.pares }}</td>
-                  <td><span class="badge">{{ o.estado }}</span></td>
+                  <td><span class="badge" [class.badge-accent]="o.estado === 'TERMINADA'">{{ o.estado }}</span></td>
                   <td>{{ o.fecha | date:'dd MMM y' }}</td>
                   <td><a class="btn btn-sm" [routerLink]="['/fabricacion/tablero']" [queryParams]="{ ofId: o.id }">Ver tablero</a></td>
                 </tr>
