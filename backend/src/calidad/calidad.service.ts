@@ -81,14 +81,16 @@ export class CalidadService {
   }
 
   async indicadores() {
+    // Lectura sin paginar a propósito: es un dashboard de back-office; el volumen
+    // de incidencias de una fábrica es bajo. Si crece, filtrar por rango de fechas.
     const [incidencias, eventos] = await Promise.all([
       this.prisma.incidenciaCalidad.findMany({ include: { tipoDano: true } }),
       this.prisma.eventoTrazabilidad.groupBy({ by: ['celula'], _count: { _all: true } }),
     ]);
     const eventosPorCelula = Object.fromEntries(
-      eventos.map((e: { celula: string; _count: { _all: number } }) => [e.celula, e._count._all]),
+      eventos.map((e) => [e.celula, e._count._all]),
     );
-    return agruparIndicadores(incidencias as any, eventosPorCelula);
+    return agruparIndicadores(incidencias, eventosPorCelula);
   }
 
   private darDeBaja(
