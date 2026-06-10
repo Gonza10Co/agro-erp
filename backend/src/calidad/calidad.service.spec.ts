@@ -111,6 +111,8 @@ describe('CalidadService.reportar — REPROCESO', () => {
     prisma.incidenciaCalidad.create.mockRejectedValue({ code: 'P2003' });
     await expect(new CalidadService(prisma).reportar('OF1-0001', dto, ventas))
       .rejects.toBeInstanceOf(BadRequestException);
+    await expect(new CalidadService(prisma).reportar('OF1-0001', dto, ventas))
+      .rejects.toMatchObject({ message: 'Operario inexistente' });
   });
 });
 
@@ -170,6 +172,18 @@ describe('CalidadService.reportar — BAJA', () => {
     tx.par.updateMany.mockResolvedValue({ count: 0 });
     await expect(new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente))
       .rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('un P2003 que NO es de operario (p.ej. autorizadoPor) se relanza, no se enmascara', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    tx.incidenciaCalidad.create.mockRejectedValue({
+      code: 'P2003',
+      meta: { field_name: 'IncidenciaCalidad_autorizadoPorId_fkey' },
+    });
+    await expect(new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente))
+      .rejects.not.toBeInstanceOf(BadRequestException);
   });
 
   it('la reposición de una reposición continúa la cadena (-R1 → -R2)', async () => {

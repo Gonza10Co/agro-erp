@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Celula } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { agruparIndicadores, codigoReposicion, validarReporte } from './calidad-core';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
@@ -47,6 +48,9 @@ export class CalidadService {
       throw new BadRequestException('La baja requiere descripción (acta)');
 
     try {
+      // REPROCESO no muta estado: la incidencia es un registro append-only.
+      // El race read-then-create (el par sale de EN_PROCESO entre la lectura y
+      // este insert) se acepta: registra un daño real, no descuadra inventario.
       if (tipo.clase === 'REPROCESO') {
         const incidencia = await this.prisma.incidenciaCalidad.create({
           data: {
@@ -62,9 +66,16 @@ export class CalidadService {
       }
       return await this.darDeBaja(par, tipo.id, dto, user);
     } catch (e: unknown) {
-      // FK inválida del reporte → 400; cualquier otra cosa se relanza (patrón fabricacion).
-      if ((e as { code?: string })?.code === 'P2003')
-        throw new BadRequestException('Operario inexistente');
+      // FK inválida del reporte: solo el operario (input del usuario) → 400.
+      // Cualquier otra FK (productoConfigurado, talla, autorizadoPor, par…) es
+      // un bug de datos y debe aflorar como 500, no enmascararse (patrón fabricacion).
+      if ((e as { code?: string })?.code === 'P2003') {
+        const campo = String(
+          (e as { meta?: { field_name?: unknown } })?.meta?.field_name ?? '',
+        );
+        if (/operario/i.test(campo) || campo === '')
+          throw new BadRequestException('Operario inexistente');
+      }
       throw e;
     }
   }
@@ -76,7 +87,7 @@ export class CalidadService {
       ofId: number;
       productoConfiguradoId: number;
       tallaId: number;
-      celulaActual: any;
+      celulaActual: Celula;
     },
     tipoDanoId: number,
     dto: ReportarIncidenciaDto,
