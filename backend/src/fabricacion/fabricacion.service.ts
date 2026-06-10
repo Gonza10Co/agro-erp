@@ -49,8 +49,12 @@ export class FabricacionService {
       include: { of: true },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
-    if (par.estado === 'TERMINADO')
-      throw new ConflictException('El par ya está terminado');
+    if (par.estado !== 'EN_PROCESO')
+      throw new ConflictException(
+        par.estado === 'TERMINADO'
+          ? 'El par ya está terminado'
+          : 'El par está cancelado (OP anulada)',
+      );
 
     const celulaActual = par.celulaActual;
     const siguiente = siguienteCelula(celulaActual);

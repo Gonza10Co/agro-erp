@@ -197,6 +197,16 @@ describe('FabricacionService.avanzar', () => {
     });
     await expect(new FabricacionService(prisma).avanzar('OF1-0001', dto)).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('409 si el par está cancelado', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 1, codigo: 'OF5-0001', estado: 'CANCELADO', celulaActual: 'CORTE', of: { estado: 'EN_PROCESO' },
+    });
+    await expect(
+      new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 1, maquinaId: 1 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
 
 describe('FabricacionService lecturas', () => {

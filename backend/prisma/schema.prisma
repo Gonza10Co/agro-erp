@@ -593,6 +593,7 @@ enum EstadoOF {
 enum EstadoPar {
   EN_PROCESO
   TERMINADO
+  CANCELADO
 }
 
 model OrdenFabricacion {

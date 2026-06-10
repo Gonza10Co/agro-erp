@@ -130,6 +130,15 @@ export class OpService {
           });
         }
       }
+      // Una OP anulada no puede seguir fabricándose: se cancelan pares y OFs vivas.
+      await tx.par.updateMany({
+        where: { of: { opId }, estado: 'EN_PROCESO' },
+        data: { estado: 'CANCELADO' },
+      });
+      await tx.ordenFabricacion.updateMany({
+        where: { opId, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+        data: { estado: 'ANULADA' },
+      });
       await tx.ordenProduccion.update({
         where: { id: opId },
         data: { estado: 'ANULADA' },

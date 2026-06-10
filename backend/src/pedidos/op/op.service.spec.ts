@@ -147,6 +147,8 @@ describe('OpService.anular', () => {
       reservaInventarioPT: { deleteMany: jest.fn() },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
     const prisma: any = {
       ordenProduccion: {
@@ -181,6 +183,44 @@ describe('OpService.anular', () => {
     expect(tx.ordenCompra.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: { estado: 'CONFIRMADA' },
+    });
+  });
+
+  it('al anular cancela los pares en proceso y anula las OFs de la OP', async () => {
+    const tx = {
+      inventarioPT: { update: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn() },
+      ordenProduccion: { update: jest.fn() },
+      ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    };
+    const prisma: any = {
+      ordenProduccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50,
+          ocId: 1,
+          estado: 'AMARRADA',
+          lineas: [
+            {
+              tallas: [
+                { id: 80, reservas: [{ inventarioPTId: 70, cantidad: 30 }] },
+              ],
+            },
+          ],
+        }),
+      },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+    const service = new OpService(prisma);
+    await service.anular(50);
+    expect(tx.par.updateMany).toHaveBeenCalledWith({
+      where: { of: { opId: 50 }, estado: 'EN_PROCESO' },
+      data: { estado: 'CANCELADO' },
+    });
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith({
+      where: { opId: 50, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+      data: { estado: 'ANULADA' },
     });
   });
 });
