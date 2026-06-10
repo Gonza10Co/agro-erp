@@ -9,14 +9,14 @@ export function codigoReposicion(codigo: string): string {
   return `${m.groups['base']}-R${Number(m.groups['n']) + 1}`;
 }
 
-export type ErrorReporte = 'SIN_DESCRIPCION' | 'ROL_INSUFICIENTE' | null;
+export type ErrorReporte = 'SIN_DESCRIPCION' | 'ROL_INSUFICIENTE';
 
 /** Reglas del acta de baja: rol GERENTE/ADMIN + descripción obligatoria. REPROCESO no exige nada. */
 export function validarReporte(
   clase: ClaseDano,
   descripcion: string | undefined,
   rol: string,
-): ErrorReporte {
+): ErrorReporte | null {
   if (clase !== 'BAJA') return null;
   if (rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
   if (!descripcion?.trim()) return 'SIN_DESCRIPCION';
@@ -47,7 +47,12 @@ export interface TopDano {
   total: number;
 }
 
-/** Imputación por centro de costo + top 5 tipos de daño. Puro. */
+/**
+ * Imputación por centro de costo + top 5 tipos de daño. Puro.
+ * `eventosPorCelula` debe ser el conteo de pares que pasaron por cada célula
+ * (en el flujo actual avanzar crea exactamente un evento por par y célula).
+ * `pctDano` puede superar 1: un mismo par puede acumular varias incidencias.
+ */
 export function agruparIndicadores(
   incidencias: IncidenciaConTipo[],
   eventosPorCelula: Partial<Record<Celula, number>>,
@@ -68,11 +73,19 @@ export function agruparIndicadores(
 
   const porTipo = new Map<string, TopDano>();
   for (const i of incidencias) {
-    const t = porTipo.get(i.tipoDano.codigo) ?? { ...i.tipoDano, total: 0 };
+    const t = porTipo.get(i.tipoDano.codigo) ?? {
+      codigo: i.tipoDano.codigo,
+      nombre: i.tipoDano.nombre,
+      celulaCausante: i.tipoDano.celulaCausante,
+      clase: i.tipoDano.clase,
+      total: 0,
+    };
     t.total++;
     porTipo.set(i.tipoDano.codigo, t);
   }
-  const topDanos = [...porTipo.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+  const topDanos = [...porTipo.values()]
+    .sort((a, b) => b.total - a.total || a.codigo.localeCompare(b.codigo))
+    .slice(0, 5);
 
   return { centros, topDanos };
 }

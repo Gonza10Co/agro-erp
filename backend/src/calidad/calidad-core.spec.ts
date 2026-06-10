@@ -1,3 +1,4 @@
+import { Celula, ClaseDano } from '@prisma/client';
 import { codigoReposicion, validarReporte, agruparIndicadores } from './calidad-core';
 
 describe('codigoReposicion', () => {
@@ -31,10 +32,13 @@ describe('validarReporte', () => {
     expect(validarReporte('BAJA', 'acta x', 'GERENTE')).toBeNull();
     expect(validarReporte('BAJA', 'acta x', 'ADMIN')).toBeNull();
   });
+  it('BAJA con ambas violaciones prioriza ROL_INSUFICIENTE (403 antes que 400)', () => {
+    expect(validarReporte('BAJA', undefined, 'VENTAS')).toBe('ROL_INSUFICIENTE');
+  });
 });
 
 describe('agruparIndicadores', () => {
-  const inc = (codigo: string, nombre: string, celulaCausante: any, clase: any) => ({
+  const inc = (codigo: string, nombre: string, celulaCausante: Celula, clase: ClaseDano) => ({
     tipoDano: { codigo, nombre, celulaCausante, clase },
   });
 
@@ -70,5 +74,14 @@ describe('agruparIndicadores', () => {
     expect(topDanos).toHaveLength(5);
     expect(topDanos[0]).toMatchObject({ codigo: 'B', total: 5 });
     expect(topDanos[1]).toMatchObject({ codigo: 'A', total: 3 });
+  });
+
+  it('desempata topDanos por código (orden determinístico)', () => {
+    const incidencias = [
+      inc('Z-DANO', 'Z', 'CORTE', 'BAJA'),
+      inc('A-DANO', 'A', 'CORTE', 'BAJA'),
+    ];
+    const { topDanos } = agruparIndicadores(incidencias, {});
+    expect(topDanos.map((t) => t.codigo)).toEqual(['A-DANO', 'Z-DANO']);
   });
 });
