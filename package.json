@@ -11,7 +11,7 @@
     "dev:back": "npm run start:dev --workspace backend",
     "dev:front": "npm run start --workspace frontend"
   },
-  "dependencies": {
+  "optionalDependencies": {
     "@unrs/resolver-binding-win32-x64-msvc": "^1.12.2"
   }
 }
