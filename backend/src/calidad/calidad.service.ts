@@ -80,6 +80,17 @@ export class CalidadService {
     }
   }
 
+  async indicadores() {
+    const [incidencias, eventos] = await Promise.all([
+      this.prisma.incidenciaCalidad.findMany({ include: { tipoDano: true } }),
+      this.prisma.eventoTrazabilidad.groupBy({ by: ['celula'], _count: { _all: true } }),
+    ]);
+    const eventosPorCelula = Object.fromEntries(
+      eventos.map((e: { celula: string; _count: { _all: number } }) => [e.celula, e._count._all]),
+    );
+    return agruparIndicadores(incidencias as any, eventosPorCelula);
+  }
+
   private darDeBaja(
     par: {
       id: number;

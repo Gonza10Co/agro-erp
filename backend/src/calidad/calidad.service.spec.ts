@@ -196,3 +196,24 @@ describe('CalidadService.reportar — BAJA', () => {
     );
   });
 });
+
+describe('CalidadService.indicadores', () => {
+  it('arma denominadores desde eventos por célula y delega en agruparIndicadores', async () => {
+    const { prisma } = makePrisma();
+    prisma.incidenciaCalidad.findMany.mockResolvedValue([
+      { tipoDano: { codigo: 'X', nombre: 'X', celulaCausante: 'CORTE', clase: 'BAJA' } },
+    ]);
+    prisma.eventoTrazabilidad.groupBy.mockResolvedValue([
+      { celula: 'CORTE', _count: { _all: 4 } },
+    ]);
+
+    const res = await new CalidadService(prisma).indicadores();
+
+    expect(prisma.eventoTrazabilidad.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ['celula'] }),
+    );
+    const corte = res.centros.find((c: any) => c.celula === 'CORTE')!;
+    expect(corte).toMatchObject({ total: 1, bajas: 1, paresProcesados: 4, pctDano: 0.25 });
+    expect(res.topDanos[0]).toMatchObject({ codigo: 'X', total: 1 });
+  });
+});
