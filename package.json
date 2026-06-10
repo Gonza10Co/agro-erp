@@ -9,7 +9,12 @@
   ],
   "scripts": {
     "dev:back": "npm run start:dev --workspace backend",
-    "dev:front": "npm run start --workspace frontend"
+    "dev:front": "npm run start --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "test": "npm run test:back && npm run test:front",
+    "test:back": "npm test --workspace backend",
+    "test:front": "npm test --workspace frontend -- --watch=false --browsers=ChromeHeadless",
+    "seed": "npm run seed --workspace backend"
   },
   "optionalDependencies": {
     "@unrs/resolver-binding-win32-x64-msvc": "^1.12.2"
