@@ -69,13 +69,56 @@ export class CalidadService {
     }
   }
 
-  // La rama BAJA se implementa en la Task 5; stub para que compile:
   private darDeBaja(
-    par: { id: number; codigo: string; ofId: number; productoConfiguradoId: number; tallaId: number; celulaActual: any },
+    par: {
+      id: number;
+      codigo: string;
+      ofId: number;
+      productoConfiguradoId: number;
+      tallaId: number;
+      celulaActual: any;
+    },
     tipoDanoId: number,
     dto: ReportarIncidenciaDto,
     user: Usuario,
-  ): Promise<never> {
-    throw new Error('BAJA: pendiente (Task 5)');
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // Condición sobre el estado para no pisar un par que otra tx acaba de
+      // terminar/cancelar (mismo patrón que el cierre de OF en fabricacion).
+      const res = await tx.par.updateMany({
+        where: { id: par.id, estado: 'EN_PROCESO' },
+        data: { estado: 'DADO_DE_BAJA' },
+      });
+      if (res.count === 0)
+        throw new ConflictException(
+          'El par cambió de estado durante la baja — recargalo e intentá de nuevo',
+        );
+
+      const parReposicion = await tx.par.create({
+        data: {
+          codigo: codigoReposicion(par.codigo),
+          ofId: par.ofId,
+          productoConfiguradoId: par.productoConfiguradoId,
+          tallaId: par.tallaId,
+          celulaActual: 'CORTE',
+          reponeAParId: par.id,
+        },
+      });
+
+      const incidencia = await tx.incidenciaCalidad.create({
+        data: {
+          parId: par.id,
+          tipoDanoId,
+          celulaDeteccion: par.celulaActual,
+          operarioId: dto.operarioId,
+          descripcion: dto.descripcion,
+          autorizadoPorId: user.sub,
+          parReposicionId: parReposicion.id,
+        },
+        include: { tipoDano: true },
+      });
+
+      return { incidencia, parReposicion };
+    });
   }
 }

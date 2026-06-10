@@ -1,11 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { CalidadService } from './calidad.service';
 
 const ventas = { sub: 7, role: 'VENTAS' };
+const gerente = { sub: 3, role: 'GERENTE' };
+const tipoBaja = {
+  id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada',
+  celulaCausante: 'INYECCION', clase: 'BAJA', activo: true,
+};
+const dtoBaja = { tipoDanoId: 8, operarioId: 9, descripcion: 'Robot rasgó la capellada' };
 
 function makePrisma(overrides: any = {}) {
   const tx = {
@@ -104,5 +111,74 @@ describe('CalidadService.reportar — REPROCESO', () => {
     prisma.incidenciaCalidad.create.mockRejectedValue({ code: 'P2003' });
     await expect(new CalidadService(prisma).reportar('OF1-0001', dto, ventas))
       .rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('CalidadService.reportar — BAJA', () => {
+  it('transacción completa: baja condicionada + par de reposición + acta', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    tx.incidenciaCalidad.create.mockResolvedValue({ id: 1, parReposicionId: 99 });
+
+    const res = await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
+
+    expect(tx.par.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, estado: 'EN_PROCESO' },
+      data: { estado: 'DADO_DE_BAJA' },
+    });
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          codigo: 'OF1-0001-R1', ofId: 1, productoConfiguradoId: 10, tallaId: 2,
+          celulaActual: 'CORTE', reponeAParId: 50,
+        }),
+      }),
+    );
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          parId: 50, tipoDanoId: 8, autorizadoPorId: 3, parReposicionId: 99,
+          descripcion: 'Robot rasgó la capellada',
+        }),
+      }),
+    );
+    expect(res.parReposicion).toMatchObject({ codigo: 'OF1-0001-R1' });
+  });
+
+  it('403 si la sesión no es GERENTE/ADMIN', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await expect(new CalidadService(prisma).reportar('OF1-0001', dtoBaja, ventas))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('400 si la baja viene sin descripción', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await expect(
+      new CalidadService(prisma).reportar('OF1-0001', { tipoDanoId: 8, operarioId: 9 }, gerente),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('409 si otro proceso movió el par entre la lectura y la baja (race)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    tx.par.updateMany.mockResolvedValue({ count: 0 });
+    await expect(new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente))
+      .rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('la reposición de una reposición continúa la cadena (-R1 → -R2)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({ ...parEnProceso, codigo: 'OF1-0001-R1' });
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await new CalidadService(prisma).reportar('OF1-0001-R1', dtoBaja, gerente);
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ codigo: 'OF1-0001-R2' }) }),
+    );
   });
 });
