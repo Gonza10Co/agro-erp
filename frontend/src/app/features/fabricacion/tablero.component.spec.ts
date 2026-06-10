@@ -65,4 +65,26 @@ describe('FabricacionTableroComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('No se pudo cargar el tablero');
     http.verify();
   });
+
+  it('muestra el sub-paso en el chip de Guarnición y enlace al sub-tablero', () => {
+    TestBed.configureTestingModule({
+      imports: [FabricacionTableroComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    const fixture = TestBed.createComponent(FabricacionTableroComponent);
+    const http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/fabricacion/tablero').flush([
+      { id: 1, codigo: 'OF1-0001', celulaActual: 'GUARNICION', subPasoActual: 'STROBEL', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
+    ]);
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    // El chip debe mostrar la etiqueta del sub-paso
+    expect(el.textContent).toContain('Strobel');
+    // El header de Guarnición debe tener un enlace al sub-tablero
+    const link = el.querySelector('a[href*="/fabricacion/guarnicion"]');
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain('ver sub-pasos');
+    http.verify();
+  });
 });
