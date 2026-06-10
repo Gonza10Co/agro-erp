@@ -52,9 +52,11 @@ export class FabricacionService {
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
     if (par.estado !== 'EN_PROCESO')
       throw new ConflictException(
-        par.estado === 'TERMINADO'
-          ? 'El par ya está terminado'
-          : 'El par está cancelado (OP anulada)',
+        {
+          TERMINADO: 'El par ya está terminado',
+          CANCELADO: 'El par está cancelado (OP anulada)',
+          DADO_DE_BAJA: 'El par fue dado de baja',
+        }[par.estado] ?? 'El par no está en proceso',
       );
 
     const celulaActual = par.celulaActual;
@@ -217,6 +219,17 @@ export class FabricacionService {
             maquina: { select: { nombre: true } },
           },
         },
+        incidencias: {
+          orderBy: { timestamp: 'asc' },
+          include: {
+            tipoDano: true,
+            operario: { select: { nombre: true } },
+            autorizadoPor: { select: { username: true } },
+            parReposicion: { select: { codigo: true } },
+          },
+        },
+        reponeA: { select: { codigo: true } },
+        repuestoPor: { select: { codigo: true } },
       },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
