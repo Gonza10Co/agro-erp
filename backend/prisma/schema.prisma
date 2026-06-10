@@ -695,6 +695,12 @@ model Maquina {
   eventos EventoTrazabilidad[]
 }
 
+model UmbralDemora {
+  id      Int    @id @default(autoincrement())
+  celula  Celula @unique
+  minutos Int
+}
+
 model TipoDano {
   id             Int       @id @default(autoincrement())
   codigo         String    @unique

@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'fabricacion/guarnicion', loadComponent: () => import('./features/fabricacion/guarnicion-subtablero.component').then(m => m.GuarnicionSubtableroComponent) },
       { path: 'fabricacion/par/:codigo', loadComponent: () => import('./features/fabricacion/par-detalle.component').then(m => m.ParDetalleComponent) },
       { path: 'calidad', loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
+      { path: 'indicadores', loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'pedidos/oc' },
     ],
   },
