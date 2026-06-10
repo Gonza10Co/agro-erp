@@ -89,7 +89,7 @@ export class DespachoService {
         });
         if (res.count === 0)
           throw new ConflictException(
-            'Inventario insuficiente al despachar — reintentá o revisá reservas',
+            `Inventario insuficiente al despachar (producto ${r.productoConfiguradoId}, talla ${r.tallaId}, bodega ${r.bodegaId}) — reintentá o revisá reservas`,
           );
         await tx.reservaInventarioPT.delete({ where: { id: r.reservaId } });
       }
