@@ -219,3 +219,54 @@ describe('reporte de daño', () => {
     http.verify();
   });
 });
+
+describe('sub-pasos de Guarnición', () => {
+  function buscarParGuarnicion(
+    fixture: ReturnType<typeof setup>['fixture'],
+    http: HttpTestingController,
+    par: Record<string, unknown>,
+  ) {
+    const comp = fixture.componentInstance;
+    comp.codigo = 'OF1-0001';
+    comp.buscar();
+    http.expectOne(`${BASE}/par/OF1-0001`).flush(par);
+    fixture.detectChanges();
+  }
+
+  const EN_PROCESO_BASE = {
+    id: 1, codigo: 'OF1-0001', estado: 'EN_PROCESO',
+    of: { consecutivo: 1 }, talla: { valor: '38' },
+    eventos: [], incidencias: [], reponeA: null, repuestoPor: null,
+  };
+
+  it('en Guarnición · Armado el botón avanza al siguiente sub-paso (Vistas) y el badge muestra el sub-paso', () => {
+    const { fixture, http } = setup();
+    buscarParGuarnicion(fixture, http, { ...EN_PROCESO_BASE, celulaActual: 'GUARNICION', subPasoActual: 'ARMADO' });
+
+    const boton = botonPorTexto(fixture, 'Avanzar');
+    expect(boton).toBeDefined();
+    expect(boton!.textContent).toContain('Vistas');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Armado');
+    http.verify();
+  });
+
+  it('en AMARRE el botón usa la copia de salida a Almacén (capellada)', () => {
+    const { fixture, http } = setup();
+    buscarParGuarnicion(fixture, http, { ...EN_PROCESO_BASE, celulaActual: 'GUARNICION', subPasoActual: 'AMARRE' });
+
+    const boton = botonPorTexto(fixture, 'Almacén');
+    expect(boton).toBeDefined();
+    expect(boton!.textContent).toContain('capellada');
+    http.verify();
+  });
+
+  it('en Corte (sin sub-paso) el botón avanza a Guarnición', () => {
+    const { fixture, http } = setup();
+    buscarParGuarnicion(fixture, http, { ...EN_PROCESO_BASE, celulaActual: 'CORTE', subPasoActual: null });
+
+    const boton = botonPorTexto(fixture, 'Avanzar');
+    expect(boton).toBeDefined();
+    expect(boton!.textContent).toContain('Guarnición');
+    http.verify();
+  });
+});
