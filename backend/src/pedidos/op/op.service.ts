@@ -131,6 +131,8 @@ export class OpService {
         }
       }
       // Una OP anulada no puede seguir fabricándose: se cancelan pares y OFs vivas.
+      // Decisión de negocio: las OF TERMINADAS no se tocan — lo ya producido
+      // quedó cargado en InventarioPT y puede amarrarse a otra OP.
       await tx.par.updateMany({
         where: { of: { opId }, estado: 'EN_PROCESO' },
         data: { estado: 'CANCELADO' },

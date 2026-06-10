@@ -9,6 +9,7 @@ function makePrisma(overrides: any = {}) {
     ordenFabricacion: {
       create: jest.fn().mockResolvedValue({ id: 1, consecutivo: 5 }),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     par: {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -153,8 +154,13 @@ describe('FabricacionService.avanzar', () => {
         update: { cantDisponible: { increment: 1 } },
       }),
     );
-    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { estado: 'TERMINADA' } }),
+    // El cierre usa updateMany condicionado para no pisar una OF ANULADA
+    // por una anulación de OP concurrente.
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 1, estado: { not: 'ANULADA' } },
+        data: { estado: 'TERMINADA' },
+      }),
     );
   });
 

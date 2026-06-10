@@ -109,8 +109,10 @@ export class FabricacionService {
           where: { ofId: par.ofId, estado: 'EN_PROCESO' },
         });
         if (restantes === 0)
-          await tx.ordenFabricacion.update({
-            where: { id: par.ofId },
+          // Condición sobre el estado para no pisar una OF que otra tx
+          // acaba de ANULAR (anulación de OP concurrente al último escaneo).
+          await tx.ordenFabricacion.updateMany({
+            where: { id: par.ofId, estado: { not: 'ANULADA' } },
             data: { estado: 'TERMINADA' },
           });
         return updated;
