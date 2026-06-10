@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
-import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/models/fabricacion.models';
+import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
 
 @Component({
   selector: 'app-fabricacion-tablero',
@@ -23,12 +23,18 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/
             <div class="col-h">
               <span>{{ label(c) }}</span>
               <span class="badge">{{ porCelula()[c].length }}</span>
+              @if (c === 'GUARNICION') {
+                <a class="sub-link" [routerLink]="['/fabricacion/guarnicion']" [queryParams]="ofId ? { ofId } : {}">ver sub-pasos →</a>
+              }
             </div>
             <div class="col-body">
               @for (p of porCelula()[c]; track p.id) {
                 <a class="par-chip" [routerLink]="['/fabricacion/par', p.codigo]">
                   <span class="mono">{{ p.codigo }}</span>
                   <span class="cell-sub">T{{ p.talla.valor }}</span>
+                  @if (c === 'GUARNICION' && p.subPasoActual) {
+                    <span class="cell-sub">{{ subPasoLabel(p.subPasoActual) }}</span>
+                  }
                 </a>
               } @empty {
                 <div class="cell-sub empty-col">—</div>
@@ -78,6 +84,8 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA } from '../../core/api/
     .fuera-body{padding:var(--sp-2);display:flex;flex-wrap:wrap;gap:var(--sp-2)}
     .chip-baja{border-color:var(--danger)}
     .chip-baja .estado{color:var(--danger)}
+    .sub-link{font-size:var(--text-caption);color:var(--accent);text-decoration:none;margin-left:auto}
+    .sub-link:hover{text-decoration:underline}
   `],
 })
 export class FabricacionTableroComponent implements OnInit {
@@ -87,9 +95,10 @@ export class FabricacionTableroComponent implements OnInit {
 
   readonly columnas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
+  subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
   private pares = signal<ParTablero[]>([]);
   error = signal<string | null>(null);
-  private ofId?: number;
+  protected ofId?: number;
 
   porCelula = computed(() => {
     const map: Record<Celula, ParTablero[]> = {

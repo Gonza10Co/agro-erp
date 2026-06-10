@@ -7,7 +7,7 @@ import {
 import { Celula } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
-import { generarPares, siguienteCelula, LineaProduccion } from './fabricacion-core';
+import { generarPares, siguienteEstado, LineaProduccion } from './fabricacion-core';
 import { AvanzarDto } from './dto/avanzar.dto';
 
 @Injectable()
@@ -60,12 +60,15 @@ export class FabricacionService {
       );
 
     const celulaActual = par.celulaActual;
-    const siguiente = siguienteCelula(celulaActual);
+    const next = siguienteEstado({
+      celula: par.celulaActual,
+      subPaso: par.subPasoActual,
+    });
 
     // La bodega destino es configuración global (no cambia durante la tx):
     // se resuelve fuera de la transacción para no alargarla.
     let bodegaPT: { id: number } | null = null;
-    if (siguiente === null) {
+    if (next === null) {
       bodegaPT = await this.prisma.bodega.findFirst({
         where: { tipo: 'PROPIA', activo: true },
         orderBy: { prioridad: 'asc' },
@@ -80,12 +83,13 @@ export class FabricacionService {
           data: {
             parId: par.id,
             celula: celulaActual,
+            subPaso: par.subPasoActual,
             operarioId: dto.operarioId,
             maquinaId: dto.maquinaId,
           },
         });
 
-        if (siguiente === null) {
+        if (next === null) {
           // Última célula (PT): terminar el par y sumar a InventarioPT.
           const updated = await tx.par.update({
             where: { id: par.id },
@@ -131,7 +135,7 @@ export class FabricacionService {
         }
         return tx.par.update({
           where: { id: par.id },
-          data: { celulaActual: siguiente },
+          data: { celulaActual: next.celula, subPasoActual: next.subPaso },
         });
       });
     } catch (e: unknown) {
@@ -198,6 +202,7 @@ export class FabricacionService {
         id: true,
         codigo: true,
         celulaActual: true,
+        subPasoActual: true,
         estado: true,
         talla: { select: { valor: true } },
         of: { select: { consecutivo: true } },

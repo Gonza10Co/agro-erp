@@ -405,6 +405,10 @@ async function main() {
     });
   }
 
+  // Operarios extra de Guarnición para poblar el sub-tablero (D7)
+  await prisma.operario.create({ data: { nombre: 'Sofía Costuras', celula: 'GUARNICION' } });
+  await prisma.operario.create({ data: { nombre: 'Marta Hilván', celula: 'GUARNICION' } });
+
   // ── Calidad: catálogo de tipos de daño (briefing §5 / §Inyección) ──
   const tiposDano: { codigo: string; nombre: string; celulaCausante: Celula; clase: ClaseDano }[] = [
     { codigo: 'CORTE-PEQUENO',       nombre: 'Corte muy pequeño',          celulaCausante: Celula.CORTE,      clase: ClaseDano.BAJA      },

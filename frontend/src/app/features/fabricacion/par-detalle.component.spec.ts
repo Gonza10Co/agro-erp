@@ -90,4 +90,24 @@ describe('ParDetalleComponent', () => {
     expect(text).toContain('gerente');
     http.verify();
   });
+
+  it('muestra el sub-paso en la timeline para eventos de Guarnición', () => {
+    const { fixture, http } = setup();
+    http.expectOne('http://localhost:3001/fabricacion/par/OF5-0001').flush({
+      id: 9, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'GUARNICION',
+      subPasoActual: 'ARMADO',
+      of: { consecutivo: 5 }, talla: { valor: 38 },
+      eventos: [
+        { id: 1, celula: 'GUARNICION', subPaso: 'ARMADO', timestamp: '2026-06-10T08:00:00Z',
+          operario: { nombre: 'Gloria' }, maquina: { nombre: 'Plana' } },
+      ],
+      incidencias: [], reponeA: null, repuestoPor: null,
+    });
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Guarnición');
+    expect(text).toContain('Armado');
+    expect(text).toContain('Gloria');
+    http.verify();
+  });
 });

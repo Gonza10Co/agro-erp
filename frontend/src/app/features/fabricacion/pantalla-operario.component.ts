@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import {
-  Celula, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, LABEL_ESTADO_PAR, siguienteCelulaLabel,
+  Celula, SubPasoGuarnicion, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, LABEL_SUBPASO,
+  LABEL_ESTADO_PAR, siguientePasoLabel,
 } from '../../core/api/models/fabricacion.models';
 import { CalidadApi } from '../../core/api/calidad.api';
 import { AuthService } from '../../core/auth/auth.service';
@@ -45,13 +46,15 @@ import { TipoDano } from '../../core/api/models/calidad.models';
         @if (par(); as p) {
           <div class="par-card">
             <div class="mono big">{{ p.codigo }}</div>
-            <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}</div>
+            <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}@if (p.subPasoActual) { · {{ subPasoLabel(p.subPasoActual) }} }</div>
             @if (p.estado !== 'EN_PROCESO') {
               <span class="badge badge-accent">{{ estadoLabel(p.estado) }}</span>
             } @else {
               <div class="acciones">
-                @if (siguiente(p)) {
-                  <button class="btn btn-primary" (click)="avanzar(p)">Avanzar a {{ siguiente(p) }} →</button>
+                @if (siguiente(p); as sig) {
+                  <button class="btn btn-primary" (click)="avanzar(p)">
+                    {{ p.celulaActual === 'GUARNICION' && p.subPasoActual === 'AMARRE' ? 'Cargar a Almacén (capellada)' : 'Avanzar a ' + sig }} →
+                  </button>
                 } @else {
                   <button class="btn btn-primary" (click)="avanzar(p)">Terminar (cargar a PT) ✓</button>
                 }
@@ -116,8 +119,9 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
 
   readonly celulas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
+  subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
   estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
-  siguiente = (p: ParDetalle) => siguienteCelulaLabel(p.celulaActual);
+  siguiente = (p: ParDetalle) => siguientePasoLabel(p.celulaActual, p.subPasoActual);
 
   tiposDano = signal<TipoDano[]>([]);
   reportando = signal(false);

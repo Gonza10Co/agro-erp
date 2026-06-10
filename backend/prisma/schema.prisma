@@ -584,6 +584,18 @@ enum Celula {
   PT
 }
 
+enum SubPasoGuarnicion {
+  AREA
+  ARMADO
+  VISTAS
+  CIERRE
+  PREFORMADO
+  PERFORADO
+  REVISION
+  STROBEL
+  AMARRE
+}
+
 enum EstadoOF {
   ABIERTA
   EN_PROCESO
@@ -629,6 +641,7 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
+  subPasoActual         SubPasoGuarnicion?  // solo poblado mientras celulaActual = GUARNICION
   reponeAParId          Int?    @unique     // si este par es una reposición, el par dado de baja que repone
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -643,6 +656,7 @@ model Par {
 
   @@index([ofId])
   @@index([celulaActual])
+  @@index([subPasoActual])
 }
 
 model EventoTrazabilidad {
@@ -650,6 +664,7 @@ model EventoTrazabilidad {
   parId      Int
   par        Par      @relation(fields: [parId], references: [id])
   celula     Celula
+  subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
   operarioId Int
   operario   Operario @relation(fields: [operarioId], references: [id])
   maquinaId  Int
