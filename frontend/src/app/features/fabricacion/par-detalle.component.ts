@@ -46,7 +46,7 @@ type ItemTimeline =
             <h4>Recorrido</h4>
             @if (timeline().length) {
               <ul class="timeline">
-                @for (item of timeline(); track item.kind + '-' + ts(item)) {
+                @for (item of timeline(); track item.kind + '-' + itemId(item)) {
                   @if (item.kind === 'evento') {
                     <li>
                       <span class="tl-cel">{{ label(item.evento.celula) }}</span>
@@ -106,6 +106,7 @@ export class ParDetalleComponent implements OnInit {
   label = (c: ParDetalle['celulaActual']) => LABEL_CELULA[c];
   estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
   ts = (i: ItemTimeline) => i.ts;
+  itemId = (i: ItemTimeline) => i.kind === 'evento' ? i.evento.id : i.incidencia.id;
 
   timeline = computed<ItemTimeline[]>(() => {
     const p = this.par();
@@ -118,10 +119,15 @@ export class ParDetalleComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    const codigo = this.route.snapshot.paramMap.get('codigo')!;
-    this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => this.par.set(p),
-      error: () => this.error.set('Par no encontrado'),
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const codigo = params.get('codigo');
+      if (!codigo) return;
+      this.par.set(null);
+      this.error.set(null);
+      this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (p) => this.par.set(p),
+        error: () => this.error.set('Par no encontrado'),
+      });
     });
   }
 }

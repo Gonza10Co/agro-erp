@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { of } from 'rxjs';
 import { ParDetalleComponent } from './par-detalle.component';
 
 describe('ParDetalleComponent', () => {
@@ -10,7 +11,10 @@ describe('ParDetalleComponent', () => {
       imports: [ParDetalleComponent],
       providers: [
         provideHttpClient(), provideHttpClientTesting(),
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ codigo: 'OF5-0001' }) } } },
+        { provide: ActivatedRoute, useValue: {
+          snapshot: { paramMap: convertToParamMap({ codigo: 'OF5-0001' }) },
+          paramMap: of(convertToParamMap({ codigo: 'OF5-0001' })),
+        } },
       ],
     });
     const fixture = TestBed.createComponent(ParDetalleComponent);
