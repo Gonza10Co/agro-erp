@@ -7,6 +7,24 @@
 > de eficiencia). La fuente de verdad del avance es el git log. La sección **Demo 9 — Facturación**
 > de abajo sí está al día.
 
+## Demo 11 — Dashboard gerencial (2026-06-10) ✅ — en `develop`
+
+Home ejecutiva (`/inicio`, ahora la ruta raíz) con los KPIs de todo el sistema, servidos por un
+único endpoint agregador `GET /dashboard` (una llamada, todo calculado en el back).
+
+- **KPIs:** pedidos en curso + por estado; OFs activas y pares EN_PROCESO por célula (barras);
+  despachos del mes; facturación del mes ($ + count); cartera (saldo total/vencido + clientes vencidos).
+- **Backend:** módulo `dashboard` (`DashboardService.resumen` con `Promise.all` de groupBy/count/
+  aggregate, reutiliza `cartera-core` para saldos), núcleo puro `dashboard-core.rangoMes(hoy)`,
+  `GET /dashboard`.
+- **Frontend:** `DashboardApi`, `dashboard.component` (cards KPI con links a cada módulo + barras de
+  producción por célula + grilla de pedidos por estado). Home `/` → `/inicio`; ítem "Inicio" en el menú.
+- **195 tests backend + 143 frontend verdes**; ambos builds limpios.
+- **Verificado** (API + browser, screenshot `demo11-dashboard.png`).
+- **Pendiente:** merge a `master` + tag `demo-11`.
+
+---
+
 ## Demo 10 — Cartera / Cuentas por cobrar (2026-06-10) ✅ — en `develop`
 
 Cierra el círculo financiero: cada factura es una **CxC** con vencimiento y saldo; los pagos la

@@ -18,6 +18,10 @@ import { AuthService } from '../../core/auth/auth.service';
       <nav class="nav">
         <div class="nav-group">
           <div class="nav-group-h">Operación</div>
+          <a class="nav-item" routerLink="/inicio" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg></span>
+            <span class="nav-label">Inicio</span>
+          </a>
           <a class="nav-item" routerLink="/pedidos/oc" routerLinkActive="is-active">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13l3 3v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></span>
             <span class="nav-label">Órdenes de Compra</span>

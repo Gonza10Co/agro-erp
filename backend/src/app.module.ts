@@ -15,6 +15,7 @@ import { CalidadModule } from './calidad/calidad.module';
 import { IndicadoresModule } from './indicadores/indicadores.module';
 import { FacturasModule } from './facturas/factura.module';
 import { CarteraModule } from './cartera/cartera.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CarteraModule } from './cartera/cartera.module';
     IndicadoresModule,
     FacturasModule,
     CarteraModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })
