@@ -130,6 +130,7 @@ export class ComprasService {
       consecutivo: requerimiento.consecutivo,
       opId: requerimiento.opId,
       fecha: requerimiento.fecha,
+      estado: requerimiento.estado ?? 'CALCULADO',
       grupos: agruparPorProveedor(lineasSalida),
     };
   }
@@ -162,6 +163,7 @@ export class ComprasService {
       consecutivo: r.consecutivo,
       opId: r.opId,
       fecha: r.fecha,
+      estado: r.estado,
       grupos: agruparPorProveedor(lineasSalida),
     };
   }

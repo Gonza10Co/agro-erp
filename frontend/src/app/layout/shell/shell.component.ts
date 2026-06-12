@@ -42,6 +42,10 @@ import { AuthService } from '../../core/auth/auth.service';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span>
             <span class="nav-label">Cartera</span>
           </a>
+          <a class="nav-item" routerLink="/compras/ordenes" routerLinkActive="is-active">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6h15l-1.5 9h-12zM6 6L5 3H2"/><circle cx="8" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg></span>
+            <span class="nav-label">Compras</span>
+          </a>
           <a class="nav-item" routerLink="/inventario" routerLinkActive="is-active">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></span>
             <span class="nav-label">Inventario</span>

@@ -19,6 +19,7 @@ export interface Requerimiento {
   consecutivo: number;
   opId: number;
   fecha: string;
+  estado?: 'CALCULADO' | 'CON_ORDEN';
   grupos: GrupoRequerimiento[];
 }
 

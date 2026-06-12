@@ -22,6 +22,8 @@ export const routes: Routes = [
       { path: 'facturas', loadComponent: () => import('./features/facturas/facturas-list.component').then(m => m.FacturasListComponent) },
       { path: 'cartera', loadComponent: () => import('./features/cartera/cartera-list.component').then(m => m.CarteraListComponent) },
       { path: 'compras/requerimiento/:id', loadComponent: () => import('./features/compras/requerimiento.component').then(m => m.RequerimientoComponent) },
+      { path: 'compras/ordenes', loadComponent: () => import('./features/compras/ocp-list.component').then(m => m.OcpListComponent) },
+      { path: 'compras/ordenes/:id', loadComponent: () => import('./features/compras/ocp-detalle.component').then(m => m.OcpDetalleComponent) },
       { path: 'inventario', loadComponent: () => import('./features/inventario/inventario-consolidado.component').then(m => m.InventarioConsolidadoComponent) },
       { path: 'fabricacion', loadComponent: () => import('./features/fabricacion/of-list.component').then(m => m.OfListComponent) },
       { path: 'fabricacion/operario', loadComponent: () => import('./features/fabricacion/pantalla-operario.component').then(m => m.PantallaOperarioComponent) },

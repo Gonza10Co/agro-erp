@@ -7,7 +7,7 @@ import { ComprasApi } from '../../core/api/compras.api';
 import { Requerimiento } from '../../core/api/models/compras.models';
 
 const datos: Requerimiento = {
-  id: 1, consecutivo: 1, opId: 7, fecha: '2026-06-05',
+  id: 1, consecutivo: 1, opId: 7, fecha: '2026-06-05', estado: 'CALCULADO',
   grupos: [
     { proveedor: { id: 7, nombre: 'Curtiembre Andina' }, lineas: [
       { materialId: 1, materialCodigo: 'CUERO-NEGRO', materialNombre: 'Cuero negro', proveedorId: 7, proveedorNombre: 'Curtiembre Andina', cantNecesaria: 100, cantDisponible: 30, cantAComprar: 70 },
@@ -45,6 +45,45 @@ describe('RequerimientoComponent', () => {
   it('muestra estado vacío cuando no hay grupos', () => {
     const el: HTMLElement = setup({ ...datos, grupos: [] }).nativeElement;
     expect(el.textContent).toContain('Nada que comprar');
+  });
+
+  it('muestra "Generar órdenes de compra" cuando está CALCULADO y hay líneas con proveedor', () => {
+    const el: HTMLElement = setup(datos).nativeElement;
+    expect(el.textContent).toContain('Generar órdenes de compra');
+  });
+
+  it('oculta el botón cuando ya está CON_ORDEN', () => {
+    const el: HTMLElement = setup({ ...datos, estado: 'CON_ORDEN' }).nativeElement;
+    expect(el.textContent).not.toContain('Generar órdenes de compra');
+    expect(el.textContent).toContain('Ver órdenes generadas');
+  });
+
+  it('al generar muestra las órdenes creadas y los materiales sin proveedor', () => {
+    const api = {
+      obtener: () => of(datos),
+      generarOrdenes: jasmine.createSpy().and.returnValue(of({
+        ordenes: [{ id: 10, consecutivo: 1, proveedor: { id: 7, nombre: 'Curtiembre Andina' }, totalLineas: 1 }],
+        sinProveedor: [{ materialId: 9, codigo: 'PEGANTE', nombre: 'Pegante', cantAComprar: 5 }],
+      })),
+    };
+    TestBed.configureTestingModule({
+      imports: [RequerimientoComponent],
+      providers: [
+        provideRouter([]),
+        { provide: ComprasApi, useValue: api },
+        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(RequerimientoComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.generar();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(api.generarOrdenes).toHaveBeenCalledWith(1);
+    expect(el.textContent).toContain('OCP-1');
+    expect(el.textContent).toContain('Sin proveedor asignado');
+    expect(el.textContent).toContain('PEGANTE');
+    expect(el.textContent).not.toContain('Generar órdenes de compra');
   });
 
   it('muestra estado de error cuando el fetch falla', () => {
