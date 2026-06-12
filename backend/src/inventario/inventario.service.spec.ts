@@ -126,10 +126,10 @@ describe('InventarioService.kardex', () => {
   const service = new InventarioService(prisma);
   beforeEach(() => jest.clearAllMocks());
 
-  it('lista movimientos descendentes con límite por defecto 50', async () => {
+  it('lista movimientos por fecha descendente con límite por defecto 50', async () => {
     await service.kardex();
     expect(prisma.movimientoInventario.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { id: 'desc' }, take: 50 }),
+      expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50 }),
     );
   });
 

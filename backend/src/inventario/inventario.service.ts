@@ -107,7 +107,8 @@ export class InventarioService {
   kardex(limit = 50) {
     return this.prisma.movimientoInventario.findMany({
       take: Math.min(limit, 200),
-      orderBy: { id: 'desc' },
+      // createdAt primero: los datos históricos/sembrados traen fecha retroactiva.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: {
         material: {
           select: {

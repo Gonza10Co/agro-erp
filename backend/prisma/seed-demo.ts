@@ -635,6 +635,19 @@ async function main() {
   // ── Historia de cartera: factura VENCIDA e impaga de Minera El Roble (driver de Cartera D10) ──
   // Venta pasada despachada y facturada hace ~105 días con plazo D60 → venció hace ~45 días.
   // Da soporte real al estado VENCIDO del cliente y al saldo vencido en el dashboard de cartera.
+
+  // Limpieza idempotente de la cadena histórica 9000 (no estaba en la limpieza
+  // general y rompía la re-ejecución del seed por el unique de consecutivo).
+  await prisma.pago.deleteMany({ where: { factura: { despacho: { op: { consecutivo: 9000 } } } } });
+  await prisma.facturaLinea.deleteMany({ where: { factura: { despacho: { op: { consecutivo: 9000 } } } } });
+  await prisma.factura.deleteMany({ where: { despacho: { op: { consecutivo: 9000 } } } });
+  await prisma.despachoLinea.deleteMany({ where: { despacho: { op: { consecutivo: 9000 } } } });
+  await prisma.despacho.deleteMany({ where: { op: { consecutivo: 9000 } } });
+  await prisma.ordenProduccion.deleteMany({ where: { consecutivo: 9000 } });
+  await prisma.ordenCompraLineaTalla.deleteMany({ where: { ocLinea: { oc: { consecutivo: 9000 } } } });
+  await prisma.ordenCompraLinea.deleteMany({ where: { oc: { consecutivo: 9000 } } });
+  await prisma.ordenCompra.deleteMany({ where: { consecutivo: 9000 } });
+
   const ocHist = await prisma.ordenCompra.create({
     data: {
       consecutivo: 9000,
@@ -682,6 +695,43 @@ async function main() {
     },
   });
   console.log('  Cartera: factura vencida (impaga, ~45 días) de Minera El Roble');
+
+  // ── Demo 12: kardex histórico de materia prima (coherente con el stock) ──
+  // Los movimientos de PT los generan los hooks reales (producción/despacho);
+  // acá solo se siembra la historia de MP. Idempotente: borra y recrea los de MP.
+  await prisma.movimientoInventario.deleteMany({ where: { materialId: { not: null } } });
+  const matPorCodigo = async (codigo: string) =>
+    (await prisma.material.findUnique({ where: { codigo } }))!;
+  const suelaBase = await matPorCodigo('SUELA-BASE');
+  const microNeg = await matPorCodigo('MICRO-NEG');
+  const diasAtras = (d: number) => new Date(Date.now() - d * 24 * 60 * 60000);
+  await prisma.movimientoInventario.createMany({
+    data: [
+      // SUELA-BASE: +300 compra − 50 consumo = 250 (stock actual del seed)
+      {
+        tipo: 'ENTRADA', motivo: 'COMPRA', materialId: suelaBase.id, cantidad: 300,
+        referencia: 'OC-PROV-101', observaciones: 'Recepción completa', createdAt: diasAtras(20),
+      },
+      {
+        tipo: 'SALIDA', motivo: 'CONSUMO_PRODUCCION', materialId: suelaBase.id, cantidad: 50,
+        referencia: 'OF-9001', createdAt: diasAtras(10),
+      },
+      // MICRO-NEG: +20 compra − 5 consumo − 3 devolución = 12 m (stock actual)
+      {
+        tipo: 'ENTRADA', motivo: 'COMPRA', materialId: microNeg.id, cantidad: 20,
+        referencia: 'OC-PROV-102', observaciones: 'Recepción parcial: pedidos 30 m, llegaron 20 m', createdAt: diasAtras(15),
+      },
+      {
+        tipo: 'SALIDA', motivo: 'CONSUMO_PRODUCCION', materialId: microNeg.id, cantidad: 5,
+        referencia: 'OF-9005', createdAt: diasAtras(6),
+      },
+      {
+        tipo: 'SALIDA', motivo: 'DEVOLUCION_PROVEEDOR', materialId: microNeg.id, cantidad: 3,
+        referencia: 'DEV-PROV-01', observaciones: 'Lote con defectos de calidad — devuelto a Curtiembre Andina', createdAt: diasAtras(4),
+      },
+    ],
+  });
+  console.log('  Demo 12: 5 movimientos de kardex MP (compra, recepción parcial, consumo, devolución a proveedor)');
 
   console.log('Seed demo OK:', {
     clientes: clientes.length,
