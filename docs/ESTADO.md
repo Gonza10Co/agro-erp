@@ -1,11 +1,45 @@
 # Estado del proyecto — agro-erp (Botas Agroindustrial ERP + MES)
 
-> Handoff al 2026-06-10. Para retomar el trabajo en una sesión nueva.
+> Handoff al 2026-06-12. Para retomar el trabajo en una sesión nueva.
 >
 > **Nota:** la mayor parte de este documento quedó congelada al 2026-06-04 (no refleja las
 > Demos 5–8, que sí están en git: MES/trazabilidad, calidad, detalle de guarnición, indicadores
-> de eficiencia). La fuente de verdad del avance es el git log. La sección **Demo 9 — Facturación**
-> de abajo sí está al día.
+> de eficiencia). La fuente de verdad del avance es el git log. Las secciones de las
+> Demos 9–13 de abajo sí están al día. La Demo 12 (inventario consolidado + kardex MP) está
+> en git (commits `5de23c7`…`9ff9fad`) sin sección propia acá.
+
+## Demo 13 — Compras lado proveedor (2026-06-12) ✅ — en `develop`
+
+Cierra la cadena de compras que moría en el requerimiento (hueco #3 del kickoff: logística
+inversa). Del requerimiento se generan **OCP** (órdenes de compra a proveedor, una por
+proveedor) con **estado derivado** (PENDIENTE → PARCIAL → COMPLETA); cada llegada es una
+**recepción** (parcial o total = backorder natural) que alimenta `InventarioMaterial` y el
+kardex (`ENTRADA/COMPRA`, ref `OCP-n`); la **devolución a proveedor** por calidad descuenta
+stock con guarda `gte` + kardex (`SALIDA/DEVOLUCION_PROVEEDOR`) sin tocar lo recibido.
+
+- **Schema:** `OrdenCompraProveedor(+Linea)`, `RecepcionCompra(+Linea)`, `DevolucionProveedor(+Linea)`,
+  `EstadoRequerimiento += CON_ORDEN`. Migraciones `demo13_compras_proveedor` + `demo13_consecutivo_seqs`
+  (secuencias `ocp`/`recepcion`/`devolucion`).
+- **Backend:** núcleo puro `compras-proveedor-core` (estadoOcp, validarRecepcion con
+  sobre-recepción rechazada, validarDevolucion) + `ComprasProveedorService` + endpoints
+  `POST /requerimientos/:id/ordenes` (409 si CON_ORDEN; materiales sin proveedor → advertencia),
+  `GET /compras/ordenes(/:id)`, `POST /compras/ordenes/:id/recepciones|devoluciones`.
+  `GET /requerimientos/:id` ahora devuelve `estado`.
+- **Frontend:** `/compras/ordenes` (listado con barra de avance + badge), `/compras/ordenes/:id`
+  (líneas pedido/recibido/pendiente + historial REC-n/DEV-n + drawers de recepción —prellenada
+  con lo pendiente— y devolución con causa), botón **"Generar órdenes de compra"** en el
+  requerimiento con banner de resultado, ítem **Compras** en el sidebar.
+- **248 tests backend + 170 frontend verdes**; ambos builds limpios.
+- **Verificado E2E (API + browser):** requerimiento → generar (OCP por proveedor) → re-generar 409 →
+  sobre-recepción 400 → recepción parcial (PARCIAL) → restante (COMPLETA) → devolución 2 kg →
+  stock y kardex correctos. En UI: listado → detalle → drawer recepción → COMPLETA.
+  Screenshots `demo13-ocp-listado.png` + `demo13-ocp-detalle-completa.png`.
+- Seed: OCP-n PARCIAL de Curtiembre (30 m pedidos / 20 recibidos) con REC y DEV históricos,
+  coherente con el kardex de Demo 12. El requerimiento de OP-9003 queda CALCULADO para
+  demostrar "Generar órdenes" en vivo.
+- Plan: `docs/plans/2026-06-12-demo13-compras-proveedor.md`.
+- **Pendiente:** merge a `master` + tag `demo-13`. Futuro anotado: precio en línea de OCP
+  (costos de compra), nota crédito proveedor (Gálago), anulación de OCP.
 
 ## Demo 11 — Dashboard gerencial (2026-06-10) ✅ — en `develop`
 
