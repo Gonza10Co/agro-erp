@@ -733,6 +733,55 @@ async function main() {
   });
   console.log('  Demo 12: 5 movimientos de kardex MP (compra, recepción parcial, consumo, devolución a proveedor)');
 
+  // ── Demo 13: OCP a proveedor con recepción parcial + devolución ──
+  // Le pone documentos reales a la historia del kardex de Demo 12: la entrada
+  // parcial de 20 m de MICRO-NEG y la devolución de 3 m ahora salen de una OCP.
+  // Idempotente: borra y recrea (hijos primero por FK).
+  await prisma.recepcionCompraLinea.deleteMany({});
+  await prisma.recepcionCompra.deleteMany({});
+  await prisma.devolucionProveedorLinea.deleteMany({});
+  await prisma.devolucionProveedor.deleteMany({});
+  await prisma.ordenCompraProveedorLinea.deleteMany({});
+  await prisma.ordenCompraProveedor.deleteMany({});
+
+  const consecOcp = await siguienteConsecutivo(prisma, 'ocp');
+  const ocpDemo = await prisma.ordenCompraProveedor.create({
+    data: {
+      consecutivo: consecOcp,
+      proveedorId: curtiembre.id,
+      estado: 'PARCIAL', // histórico sembrado; en runtime el estado lo deriva el service
+      fecha: diasAtras(16),
+      observaciones: 'Microfibra negra para producción (pedido 30 m)',
+      lineas: { create: [{ materialId: microNeg.id, cantPedida: 30, cantRecibida: 20 }] },
+    },
+    include: { lineas: true },
+  });
+  await prisma.recepcionCompra.create({
+    data: {
+      consecutivo: await siguienteConsecutivo(prisma, 'recepcion'),
+      ocpId: ocpDemo.id,
+      fecha: diasAtras(15),
+      observaciones: 'Llegaron 20 de 30 m — backorder de 10 m',
+      lineas: { create: [{ ocpLineaId: ocpDemo.lineas[0].id, cantidad: 20 }] },
+    },
+  });
+  await prisma.devolucionProveedor.create({
+    data: {
+      consecutivo: await siguienteConsecutivo(prisma, 'devolucion'),
+      ocpId: ocpDemo.id,
+      fecha: diasAtras(4),
+      causa: 'Lote con defectos de calidad',
+      observaciones: 'Devuelto a Curtiembre Andina',
+      lineas: { create: [{ materialId: microNeg.id, cantidad: 3 }] },
+    },
+  });
+  // Alinear las referencias del kardex de Demo 12 con la OCP real
+  await prisma.movimientoInventario.updateMany({
+    where: { referencia: { in: ['OC-PROV-102', 'DEV-PROV-01'] } },
+    data: { referencia: `OCP-${consecOcp}` },
+  });
+  console.log(`  Demo 13: OCP-${consecOcp} (Curtiembre, 30 m pedidos / 20 recibidos, PARCIAL) + recepción + devolución`);
+
   console.log('Seed demo OK:', {
     clientes: clientes.length,
     productos: productos.length,
