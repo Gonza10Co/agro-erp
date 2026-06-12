@@ -28,6 +28,7 @@ model User {
 
   despachosAutorizados    Despacho[]
   incidenciasAutorizadas  IncidenciaCalidad[]
+  movimientosInventario   MovimientoInventario[]
 }
 
 model RefreshToken {
@@ -108,6 +109,7 @@ model Material {
   overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
   inventario        InventarioMaterial?
   lineasReq         RequerimientoCompraLinea[]
+  movimientos       MovimientoInventario[]
 }
 
 model MaterialAlias {
@@ -433,7 +435,8 @@ model InventarioPT {
   cantDisponible        Int                 @default(0)
   cantReservada         Int                 @default(0)
 
-  reservas ReservaInventarioPT[]
+  reservas    ReservaInventarioPT[]
+  movimientos MovimientoInventario[]
 
   @@unique([productoConfiguradoId, tallaId, bodegaId])
   @@index([productoConfiguradoId, tallaId])
@@ -787,4 +790,45 @@ model FacturaLinea {
   subtotal              Decimal             @db.Decimal(14, 2)
 
   @@index([facturaId])
+}
+
+// ───────────────────────── Módulo 3: Inventario consolidado / Kardex ─────────────────────────
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum MotivoMovimiento {
+  PRODUCCION           // par terminado entra a InventarioPT
+  DESPACHO             // salida de PT por despacho
+  COMPRA               // recepción de materia prima (total o parcial)
+  CONSUMO_PRODUCCION   // consumo de MP por una OF
+  DEVOLUCION_CLIENTE   // reingreso de PT devuelto por cliente
+  DEVOLUCION_PROVEEDOR // salida de MP devuelta a proveedor (calidad)
+  AJUSTE_MANUAL        // conteo físico / corrección
+}
+
+// Kardex unificado: cada fila es un movimiento físico de stock,
+// de materia prima (materialId) XOR de producto terminado (inventarioPTId).
+// `cantidad` siempre positiva; el sentido lo da `tipo`.
+model MovimientoInventario {
+  id             Int              @id @default(autoincrement())
+  tipo           TipoMovimiento
+  motivo         MotivoMovimiento
+  materialId     Int?
+  material       Material?        @relation(fields: [materialId], references: [id])
+  inventarioPTId Int?
+  inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
+  cantidad       Decimal          @db.Decimal(14, 4)
+  referencia     String?          // documento origen: "OF-31", "DSP-12", "REQ-7"…
+  observaciones  String?
+  usuarioId      Int?
+  usuario        User?            @relation(fields: [usuarioId], references: [id])
+  createdAt      DateTime         @default(now())
+
+  @@index([materialId, createdAt])
+  @@index([inventarioPTId, createdAt])
+  @@index([createdAt])
 }
