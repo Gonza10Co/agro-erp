@@ -1,7 +1,7 @@
 # Demo 13 — Compras lado proveedor (OC proveedor + recepción parcial + devolución) · Implementation Plan
 
 > **For agentic workers:** TDD task-by-task. Test primero, implementación mínima, commit frecuente.
-> Mensajes de commit y comentarios en español. Steps con checkbox (`- [ ]`).
+> Mensajes de commit y comentarios en español. Steps con checkbox (`- [x]`).
 
 **Goal:** Cerrar la cadena de compras que hoy muere en el requerimiento: del **Requerimiento** se
 generan **Órdenes de Compra a Proveedor (OCP)** — una por proveedor — con **estados**
@@ -80,40 +80,40 @@ Reusa: `ui-drawer`, `estado-badge`, clases del DS, patrón kardex/guarda de stoc
 # BACKEND
 
 ## Task 1 — Schema + migración
-- [ ] Enum `EstadoOrdenCompraProveedor { PENDIENTE PARCIAL COMPLETA }`; `EstadoRequerimiento += CON_ORDEN`.
-- [ ] `model OrdenCompraProveedor { consecutivo @unique, proveedorId, requerimientoId?, estado @default(PENDIENTE), fecha, observaciones?, lineas[], recepciones[], devoluciones[] }`.
-- [ ] `model OrdenCompraProveedorLinea { ocpId, materialId, cantPedida Decimal(14,4), cantRecibida Decimal(14,4) @default(0) }`.
-- [ ] `model RecepcionCompra { consecutivo @unique, ocpId, fecha, observaciones?, usuarioId?, lineas[{ ocpLineaId, cantidad }] }`.
-- [ ] `model DevolucionProveedor { consecutivo @unique, ocpId, fecha, causa, observaciones?, usuarioId?, lineas[{ materialId, cantidad }] }`.
-- [ ] `npx prisma migrate dev --name demo13_compras_proveedor`.
+- [x] Enum `EstadoOrdenCompraProveedor { PENDIENTE PARCIAL COMPLETA }`; `EstadoRequerimiento += CON_ORDEN`.
+- [x] `model OrdenCompraProveedor { consecutivo @unique, proveedorId, requerimientoId?, estado @default(PENDIENTE), fecha, observaciones?, lineas[], recepciones[], devoluciones[] }`.
+- [x] `model OrdenCompraProveedorLinea { ocpId, materialId, cantPedida Decimal(14,4), cantRecibida Decimal(14,4) @default(0) }`.
+- [x] `model RecepcionCompra { consecutivo @unique, ocpId, fecha, observaciones?, usuarioId?, lineas[{ ocpLineaId, cantidad }] }`.
+- [x] `model DevolucionProveedor { consecutivo @unique, ocpId, fecha, causa, observaciones?, usuarioId?, lineas[{ materialId, cantidad }] }`.
+- [x] `npx prisma migrate dev --name demo13_compras_proveedor`.
 
 ## Task 2 — Núcleo puro `compras-proveedor-core.ts` (TDD)
-- [ ] `estadoOcp(lineas[{cantPedida, cantRecibida}])` → PENDIENTE | PARCIAL | COMPLETA.
-- [ ] `validarRecepcion(lineasOcp, lineasDto)` → string | null: sin líneas; cantidad ≤ 0; línea
+- [x] `estadoOcp(lineas[{cantPedida, cantRecibida}])` → PENDIENTE | PARCIAL | COMPLETA.
+- [x] `validarRecepcion(lineasOcp, lineasDto)` → string | null: sin líneas; cantidad ≤ 0; línea
       inexistente; línea repetida; cantidad > pendiente (sobre-recepción).
-- [ ] `validarDevolucion(lineasDto)` → string | null: sin líneas; cantidad ≤ 0; causa vacía;
+- [x] `validarDevolucion(lineasDto)` → string | null: sin líneas; cantidad ≤ 0; causa vacía;
       material repetido. (El stock se valida en la tx con la guarda `gte`.)
 
 ## Task 3 — `ComprasProveedorService` (TDD, prisma mock)
-- [ ] `generarDesdeRequerimiento(reqId)`: 404 si no existe; 409 si ya está CON_ORDEN; agrupa líneas
+- [x] `generarDesdeRequerimiento(reqId)`: 404 si no existe; 409 si ya está CON_ORDEN; agrupa líneas
       `cantAComprar > 0` por proveedor; tx: crea 1 OCP por proveedor (consecutivo `ocp`) + marca
       requerimiento CON_ORDEN; devuelve `{ ordenes, sinProveedor[] }`.
-- [ ] `listar()`: OCPs con proveedor, estado, totales (Σ pedida, Σ recibida) y origen (REQ-n).
-- [ ] `obtener(id)`: detalle con líneas (material, pedida, recibida, pendiente), recepciones y
+- [x] `listar()`: OCPs con proveedor, estado, totales (Σ pedida, Σ recibida) y origen (REQ-n).
+- [x] `obtener(id)`: detalle con líneas (material, pedida, recibida, pendiente), recepciones y
       devoluciones; 404 si no existe.
-- [ ] `registrarRecepcion(ocpId, dto, user)`: 404; 409 si COMPLETA; valida con el core (400);
+- [x] `registrarRecepcion(ocpId, dto, user)`: 404; 409 si COMPLETA; valida con el core (400);
       tx: consecutivo `recepcion`, crea RecepcionCompra+líneas, incrementa `cantRecibida`,
       upsert `InventarioMaterial`, crea movimientos ENTRADA/COMPRA (ref `OCP-n`), recalcula estado.
-- [ ] `registrarDevolucion(ocpId, dto, user)`: 404; valida (400); tx: consecutivo `devolucion`,
+- [x] `registrarDevolucion(ocpId, dto, user)`: 404; valida (400); tx: consecutivo `devolucion`,
       decrement con guarda `gte` (409 stock insuficiente), crea DevolucionProveedor+líneas +
       movimientos SALIDA/DEVOLUCION_PROVEEDOR (ref `OCP-n`).
 
 ## Task 4 — Controller + módulo + seed
-- [ ] Endpoints (JwtGuard): `POST /requerimientos/:id/ordenes`, `GET /compras/ordenes`,
+- [x] Endpoints (JwtGuard): `POST /requerimientos/:id/ordenes`, `GET /compras/ordenes`,
       `GET /compras/ordenes/:id`, `POST /compras/ordenes/:id/recepciones`,
       `POST /compras/ordenes/:id/devoluciones`.
-- [ ] DTOs con class-validator (ArrayMinSize, IsPositive, etc.).
-- [ ] Seed demo: requerimiento de OP existente → OCP de "Cueros del Tolima" con recepción parcial
+- [x] DTOs con class-validator (ArrayMinSize, IsPositive, etc.).
+- [x] Seed demo: requerimiento de OP existente → OCP de "Cueros del Tolima" con recepción parcial
       (llega la mitad) → estado PARCIAL + kardex con la entrada. Idempotente.
 
 ---
@@ -121,31 +121,31 @@ Reusa: `ui-drawer`, `estado-badge`, clases del DS, patrón kardex/guarda de stoc
 # FRONTEND
 
 ## Task 5 — Modelos + `ComprasApi` (TDD HttpTestingController)
-- [ ] Modelos `OcpResumen`, `OcpDetalle`, `OcpLinea`, `RecepcionCompra`, `DevolucionProveedor`,
+- [x] Modelos `OcpResumen`, `OcpDetalle`, `OcpLinea`, `RecepcionCompra`, `DevolucionProveedor`,
       `ResultadoGenerarOrdenes`.
-- [ ] `generarOrdenes(reqId)`, `listarOrdenes()`, `obtenerOrden(id)`,
+- [x] `generarOrdenes(reqId)`, `listarOrdenes()`, `obtenerOrden(id)`,
       `registrarRecepcion(ocpId, dto)`, `registrarDevolucion(ocpId, dto)`.
 
 ## Task 6 — `ocp-list` + ruta + menú (TDD)
-- [ ] Tabla: OCP-n, proveedor, origen REQ-n, fecha, **estado badge**, recibido/pedido (con barra %).
-- [ ] Fila → `/compras/ordenes/:id`. Ruta + ítem "Compras" en el sidebar.
+- [x] Tabla: OCP-n, proveedor, origen REQ-n, fecha, **estado badge**, recibido/pedido (con barra %).
+- [x] Fila → `/compras/ordenes/:id`. Ruta + ítem "Compras" en el sidebar.
 
 ## Task 7 — `ocp-detalle` + drawers de recepción y devolución (TDD)
-- [ ] Cabecera (OCP-n, proveedor, estado, origen) + tabla de líneas (pedida/recibida/**pendiente**).
-- [ ] Historial: recepciones (REC-n, fecha, líneas) y devoluciones (DEV-n, causa).
-- [ ] Drawer **"Registrar recepción"**: inputs por línea pendiente (prellenados con lo pendiente),
+- [x] Cabecera (OCP-n, proveedor, estado, origen) + tabla de líneas (pedida/recibida/**pendiente**).
+- [x] Historial: recepciones (REC-n, fecha, líneas) y devoluciones (DEV-n, causa).
+- [x] Drawer **"Registrar recepción"**: inputs por línea pendiente (prellenados con lo pendiente),
       valida ≤ pendiente → POST → refresca.
-- [ ] Drawer **"Devolución a proveedor"**: causa (obligatoria) + cantidades por material recibido
+- [x] Drawer **"Devolución a proveedor"**: causa (obligatoria) + cantidades por material recibido
       → POST → refresca.
-- [ ] Botón **"Generar órdenes de compra"** en `requerimiento.component` (oculto si CON_ORDEN);
+- [x] Botón **"Generar órdenes de compra"** en `requerimiento.component` (oculto si CON_ORDEN);
       muestra advertencia de materiales sin proveedor; navega al listado de OCPs.
 
 ## Task 8 — Verificación E2E + cierre
-- [ ] `npm test` (back + front) verde; ambos builds limpios.
-- [ ] E2E (API + browser): requerimiento → generar OCPs → recepción parcial (estado PARCIAL,
+- [x] `npm test` (back + front) verde; ambos builds limpios. (248 back + 170 front)
+- [x] E2E (API + browser): requerimiento → generar OCPs → recepción parcial (estado PARCIAL,
       kardex ENTRADA/COMPRA, stock sube) → segunda recepción (COMPLETA) → devolución por calidad
-      (stock baja, kardex SALIDA/DEVOLUCION_PROVEEDOR). Sobre-recepción → 400.
-- [ ] Actualizar `docs/ESTADO.md`. (Merge a master + tag `demo-13` al mostrar la demo.)
+      (stock baja, kardex SALIDA/DEVOLUCION_PROVEEDOR). Sobre-recepción → 400. Regenerar → 409.
+- [x] Actualizar `docs/ESTADO.md`. (Merge a master + tag `demo-13` al mostrar la demo.)
 
 ---
 
@@ -156,3 +156,5 @@ Reusa: `ui-drawer`, `estado-badge`, clases del DS, patrón kardex/guarda de stoc
   es del catálogo, no de esta demo).
 - `start:dev` del backend crashea: usar `build` + `start:prod` (deuda conocida; limpiar
   tsbuildinfo + dist si dist/main no aparece).
+- Nota post-implementación: en el banner de resultado NO se navega automático al listado;
+  se muestran links a las OCP creadas + advertencia de sin-proveedor (decisión de UX).
