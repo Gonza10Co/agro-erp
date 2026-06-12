@@ -95,7 +95,7 @@ export class FabricacionService {
             where: { id: par.id },
             data: { estado: 'TERMINADO' },
           });
-          await tx.inventarioPT.upsert({
+          const inv = await tx.inventarioPT.upsert({
             where: {
               productoConfiguradoId_tallaId_bodegaId: {
                 productoConfiguradoId: par.productoConfiguradoId,
@@ -110,6 +110,16 @@ export class FabricacionService {
               cantDisponible: 1,
             },
             update: { cantDisponible: { increment: 1 } },
+          });
+          // Kardex: cada par terminado es una ENTRADA de PT trazable al par.
+          await tx.movimientoInventario.create({
+            data: {
+              tipo: 'ENTRADA',
+              motivo: 'PRODUCCION',
+              inventarioPTId: inv.id,
+              cantidad: 1,
+              referencia: par.codigo,
+            },
           });
           // El par ya fue marcado TERMINADO en esta misma tx, así que
           // este count no lo incluye (cuenta solo los que aún siguen en proceso).

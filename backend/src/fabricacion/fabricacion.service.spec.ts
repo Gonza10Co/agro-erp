@@ -17,7 +17,8 @@ function makePrisma(overrides: any = {}) {
       count: jest.fn().mockResolvedValue(0),
     },
     eventoTrazabilidad: { create: jest.fn().mockResolvedValue({}) },
-    inventarioPT: { upsert: jest.fn().mockResolvedValue({}) },
+    inventarioPT: { upsert: jest.fn().mockResolvedValue({ id: 33 }) },
+    movimientoInventario: { create: jest.fn().mockResolvedValue({}) },
     ...overrides.tx,
   };
   const prisma: any = {
@@ -162,6 +163,35 @@ describe('FabricacionService.avanzar', () => {
         data: { estado: 'TERMINADA' },
       }),
     );
+  });
+
+  it('al terminar en PT registra movimiento ENTRADA/PRODUCCION en el kardex', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, codigo: 'OF1-0001', ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+
+    expect(tx.movimientoInventario.create).toHaveBeenCalledWith({
+      data: {
+        tipo: 'ENTRADA',
+        motivo: 'PRODUCCION',
+        inventarioPTId: 33, // el id que devuelve el upsert de InventarioPT
+        cantidad: 1,
+        referencia: 'OF1-0001',
+      },
+    });
+  });
+
+  it('el avance entre células intermedias NO genera movimiento de kardex', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, codigo: 'OF1-0001', ofId: 1, celulaActual: 'CORTE', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+    expect(tx.movimientoInventario.create).not.toHaveBeenCalled();
   });
 
   it('avance desde célula intermedia no toca el estado de la OF', async () => {

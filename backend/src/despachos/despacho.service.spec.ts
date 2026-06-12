@@ -24,6 +24,7 @@ describe('DespachoService', () => {
     inventarioPT: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     reservaInventarioPT: { delete: jest.fn() },
     ordenCompra: { update: jest.fn() },
+    movimientoInventario: { createMany: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   const service = new DespachoService(prisma);
@@ -90,6 +91,26 @@ describe('DespachoService', () => {
     const createArg = prisma.despacho.create.mock.calls[0][0];
     expect(createArg.data.autorizadoPorId).toBe(3);
     expect(createArg.data.motivoAutorizacion).toBe('urgente');
+  });
+
+  it('registra movimientos SALIDA/DESPACHO en el kardex por cada reserva despachada', async () => {
+    prisma.ordenProduccion.findUnique.mockResolvedValue(opBase());
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+    prisma.despacho.create.mockResolvedValue({ id: 1, consecutivo: 5 });
+    await service.despachar({ opId: 1 }, operario);
+
+    expect(prisma.movimientoInventario.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          tipo: 'SALIDA',
+          motivo: 'DESPACHO',
+          inventarioPTId: 50,
+          cantidad: 5,
+          referencia: 'DSP-5',
+          usuarioId: 4,
+        },
+      ],
+    });
   });
 
   it('falla con 409 si el inventario ya no alcanza al momento de despachar', async () => {

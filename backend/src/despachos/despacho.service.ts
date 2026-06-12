@@ -94,6 +94,18 @@ export class DespachoService {
         await tx.reservaInventarioPT.delete({ where: { id: r.reservaId } });
       }
 
+      // Kardex: una SALIDA por reserva despachada, trazable al despacho.
+      await tx.movimientoInventario.createMany({
+        data: reservas.map((r) => ({
+          tipo: 'SALIDA' as const,
+          motivo: 'DESPACHO' as const,
+          inventarioPTId: r.inventarioPTId,
+          cantidad: r.cantidad,
+          referencia: `DSP-${consecutivo}`,
+          usuarioId: user.sub,
+        })),
+      });
+
       const despacho = await tx.despacho.create({
         data: {
           consecutivo,
