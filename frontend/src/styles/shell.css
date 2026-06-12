@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════
-   APP SHELL · layout (sidebar + topbar + main). Importar tras components.css
+   APP SHELL · layout (sidebar colapsable + main). Importar tras components.css
    ════════════════════════════════════════════════════════════════════ */
 .app-body{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+.app-body.sb-collapsed{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
 
 /* ───────── SIDEBAR ───────── */
 .app-sidebar{
@@ -9,7 +10,9 @@
   background:var(--surface);border-right:var(--bw) solid var(--border);
   position:sticky;top:0;height:100vh;
 }
-.brand{display:flex;align-items:center;gap:11px;padding:0 18px;height:var(--topbar-h);border-bottom:var(--bw) solid var(--border);flex:none}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 8px 0 14px;height:var(--topbar-h);border-bottom:var(--bw) solid var(--border);flex:none}
+.sidebar-actions{display:flex;align-items:center;gap:2px;flex:none}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
 .brand-mark{width:30px;height:30px;border-radius:var(--r-sm);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;flex:none}
 .brand-mark svg{width:18px;height:18px}
 .brand-text{display:flex;flex-direction:column;line-height:1}
@@ -36,19 +39,16 @@
 .user-meta b{font-size:var(--text-sm);font-weight:var(--fw-semibold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .user-meta small{font-size:var(--text-micro);color:var(--text-subtle)}
 
-/* ───────── MAIN + TOPBAR ───────── */
+/* ───────── SIDEBAR COLAPSADA (solo iconos) ───────── */
+.sb-collapsed .brand-text,.sb-collapsed .nav-label,.sb-collapsed .nav-group-h,.sb-collapsed .nav-tag,.sb-collapsed .user-meta{display:none}
+.sb-collapsed .sidebar-head{flex-direction:column;justify-content:center;height:auto;padding:12px 0;gap:10px}
+.sb-collapsed .sidebar-actions{flex-direction:column;gap:4px}
+.sb-collapsed .nav-item{justify-content:center;padding:10px}
+.sb-collapsed .nav-item.is-active::before{left:-12px}
+.sb-collapsed .user-card{justify-content:center;padding:8px 0}
+
+/* ───────── MAIN ───────── */
 .app-main{display:flex;flex-direction:column;min-width:0;flex:1}
-.app-topbar{
-  position:sticky;top:0;z-index:var(--z-sticky);
-  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);
-  height:var(--topbar-h);padding:0 var(--sp-6);
-  background:color-mix(in oklch,var(--surface) 86%,transparent);
-  backdrop-filter:blur(10px);
-  border-bottom:var(--bw) solid var(--border);flex:none;
-}
-.topbar-left{display:flex;align-items:center;gap:var(--sp-3);min-width:0}
-.topbar-left h1{margin:0}
-.topbar-right{display:flex;align-items:center;gap:var(--sp-2)}
 
 .page{padding:var(--sp-6);max-width:1440px;width:100%}
 .page-wide{max-width:none}
@@ -57,15 +57,16 @@
 .page-header .ph-sub{font-size:var(--text-sm);color:var(--text-muted);margin-top:4px}
 .page-actions{display:flex;align-items:center;gap:var(--sp-2)}
 
-/* responsive: tablet colapsa sidebar a iconos */
+/* responsive: tablet fuerza sidebar a iconos (sin botón de colapso) */
 @media(max-width:1024px){
   .app-body{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
   .brand-text,.nav-label,.nav-group-h,.nav-tag,.user-meta{display:none}
-  .brand{justify-content:center;padding:0}
+  .sidebar-head{flex-direction:column;justify-content:center;height:auto;padding:12px 0;gap:10px}
+  .sidebar-actions{flex-direction:column;gap:4px}
+  .collapse-btn{display:none}
   .nav-item{justify-content:center;padding:10px}
   .nav-item.is-active::before{left:-12px}
   .user-card{justify-content:center;padding:8px 0}
-  .search{display:none}
 }
 @media(max-width:640px){
   .page{padding:var(--sp-4)}
