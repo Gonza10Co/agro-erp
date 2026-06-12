@@ -1,6 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import {
+  InventarioConsolidado,
+  MovimientoKardex,
+  MovimientoMaterialInput,
+} from './models/inventario.models';
 
 @Injectable({ providedIn: 'root' })
 export class InventarioApi {
@@ -12,5 +17,19 @@ export class InventarioApi {
   }
   registrarStock(dto: { productoConfiguradoId: number; tallaId: number; bodegaId: number; cantidad: number }) {
     return this.http.post(`${this.base}/pt`, dto);
+  }
+
+  consolidado() {
+    return this.http.get<InventarioConsolidado>(`${this.base}/consolidado`);
+  }
+
+  movimientos(limit?: number) {
+    return this.http.get<MovimientoKardex[]>(`${this.base}/movimientos`, {
+      params: limit ? { limit } : {},
+    });
+  }
+
+  movimientoMaterial(dto: MovimientoMaterialInput) {
+    return this.http.post<{ id: number }>(`${this.base}/material/movimiento`, dto);
   }
 }
