@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -16,6 +17,7 @@ export class CrearOCTallaDto {
 
 export class CrearOCLineaDto {
   @Type(() => Number) @IsInt() productoConfiguradoId!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) precioUnitario?: number;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

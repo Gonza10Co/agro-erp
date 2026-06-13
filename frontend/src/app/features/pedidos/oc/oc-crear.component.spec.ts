@@ -35,11 +35,11 @@ describe('OcCrearComponent', () => {
     const c = fixture.componentInstance;
     // simular estado completo
     c.clienteSel.set({ id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } as any);
-    c.lineas.set([{ producto: c.productos()[0], valores: { 1: 12 } }]);
+    c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
     c.crear();
     const req = http.expectOne('http://localhost:3001/pedidos/oc');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ clienteId: 3, ocCliente: undefined, observaciones: undefined, lineas: [{ productoConfiguradoId: 7, tallas: [{ tallaId: 1, cantidad: 12 }] }] });
+    expect(req.request.body).toEqual({ clienteId: 3, ocCliente: undefined, observaciones: undefined, lineas: [{ productoConfiguradoId: 7, precioUnitario: 85000, tallas: [{ tallaId: 1, cantidad: 12 }] }] });
     req.flush({ id: 1, consecutivo: 1, estado: 'BORRADOR' });
     http.verify();
   });

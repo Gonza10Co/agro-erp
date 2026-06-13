@@ -69,6 +69,11 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
               <div style="font-weight:var(--fw-medium);margin-bottom:var(--sp-2)">{{ l.producto.nombreComercial }}
                 <span class="cell-sub cell-mono">curva {{ l.producto.referencia.tallaMin.valor }}–{{ l.producto.referencia.tallaMax.valor }}</span></div>
               <app-talla-grid [tallas]="tallasDe(l.producto)" [valores]="l.valores" (cambio)="setValores(l.producto.id, $event)" />
+              <div style="margin-top:var(--sp-3)">
+                <label class="label">Precio por par (COP) <span style="color:var(--accent)">*</span></label>
+                <input class="input" type="number" min="0" step="100" style="max-width:220px"
+                  [ngModel]="l.precio" (ngModelChange)="setPrecio(l.producto.id, $event)" />
+              </div>
             </div>
           }
         }
@@ -78,9 +83,15 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
           <div class="panel-title">Revisar</div>
           <div class="kv"><span class="k">Cliente</span><span class="v">{{ clienteSel()?.nombre }}</span></div>
           @for (l of lineas(); track l.producto.id) {
-            <div style="margin-top:var(--sp-3)"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares</div>
+            <div class="kv" style="margin-top:var(--sp-3)">
+              <span class="v"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares × {{ moneda(l.precio) }}</span>
+              <span class="v cell-mono">{{ moneda(subtotalLinea(l)) }}</span>
+            </div>
           }
-          <div style="margin-top:var(--sp-3);font-weight:var(--fw-semibold)">Total general: {{ totalGeneral() }} pares</div>
+          <div class="kv" style="margin-top:var(--sp-3);font-weight:var(--fw-semibold)">
+            <span>Total general: {{ totalGeneral() }} pares</span>
+            <span class="cell-mono">{{ moneda(totalPesos()) }}</span>
+          </div>
           @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin-top:var(--sp-3)">{{ error() }}</p> }
         }
       </div></div>
@@ -143,6 +154,7 @@ export class OcCrearComponent implements OnInit {
   });
 
   totalGeneral = computed(() => this.lineas().reduce((acc, l) => acc + totalCurva(l.valores), 0));
+  totalPesos = computed(() => this.lineas().reduce((acc, l) => acc + this.subtotalLinea(l), 0));
 
   ngOnInit(): void {
     this.clientesApi.listar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((c) => this.clientes.set(c));
@@ -152,21 +164,26 @@ export class OcCrearComponent implements OnInit {
 
   tallasDe(p: ProductoConfiguradoFull): Talla[] { return tallasDeProducto(p, this.tallas()); }
   totalLinea(l: LineaWizard): number { return totalCurva(l.valores); }
+  subtotalLinea(l: LineaWizard): number { return totalCurva(l.valores) * (l.precio || 0); }
+  moneda(n: number): string { return '$' + Math.round(n).toLocaleString('es-CO'); }
 
   agregarProducto(p: ProductoConfiguradoFull) {
     if (this.lineas().some((l) => l.producto.id === p.id)) return;
-    this.lineas.update((ls) => [...ls, { producto: p, valores: {} }]);
+    this.lineas.update((ls) => [...ls, { producto: p, precio: 0, valores: {} }]);
   }
   quitarProducto(id: number) { this.lineas.update((ls) => ls.filter((l) => l.producto.id !== id)); }
   setValores(productoId: number, valores: Record<number, number>) {
     this.lineas.update((ls) => ls.map((l) => (l.producto.id === productoId ? { ...l, valores } : l)));
+  }
+  setPrecio(productoId: number, precio: number) {
+    this.lineas.update((ls) => ls.map((l) => (l.producto.id === productoId ? { ...l, precio: Number(precio) || 0 } : l)));
   }
 
   pasoValido(): boolean {
     switch (this.paso()) {
       case 0: return this.clienteSel() !== null;
       case 1: return this.lineas().length >= 1;
-      case 2: return this.lineas().every((l) => totalCurva(l.valores) > 0);
+      case 2: return this.lineas().every((l) => totalCurva(l.valores) > 0 && l.precio > 0);
       default: return this.lineas().length >= 1 && this.clienteSel() !== null;
     }
   }

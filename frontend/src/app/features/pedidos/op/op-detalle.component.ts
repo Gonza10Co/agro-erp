@@ -1,16 +1,21 @@
 import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
+import { DespachosApi } from '../../../core/api/despachos.api';
+import { ComprasApi } from '../../../core/api/compras.api';
+import { FabricacionApi } from '../../../core/api/fabricacion.api';
+import { AuthService } from '../../../core/auth/auth.service';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
 
 @Component({
   selector: 'app-op-detalle',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink, FormsModule],
   template: `
     <div class="page page-wide">
       @if (cargando()) {
@@ -36,12 +41,35 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               </div>
             </div>
           </div>
-          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || requerible()) {
             <div class="page-actions">
-              <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
+              @if (despachable()) {
+                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
+              }
+              @if (requerible()) {
+                <button class="btn btn-primary" type="button" [class.is-loading]="generandoOF()" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
+                <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
+              }
+              @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
+                <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="anular()">Anular OP</button>
+              }
             </div>
           }
         </div>
+
+        @if (carteraBloqueada()) {
+          <div class="card cartera-banner"><div class="card-body">
+            <p style="color:var(--error);font-weight:var(--fw-medium)">⚠ {{ error() }}</p>
+            @if (puedeAutorizar()) {
+              <div style="display:flex;gap:var(--sp-3);align-items:center;margin-top:var(--sp-3)">
+                <input class="cb-input" style="flex:1" placeholder="Motivo de la autorización" [ngModel]="motivo()" (ngModelChange)="motivo.set($event)" />
+                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion() || !motivo().trim()" (click)="despachar(true)">Autorizar y despachar</button>
+              </div>
+            } @else {
+              <p class="cell-sub" style="margin-top:var(--sp-2)">Solo un gerente puede autorizar este despacho.</p>
+            }
+          </div></div>
+        }
 
         <!-- SUMMARY -->
         <div class="summary">
@@ -123,7 +151,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
           </div>
         </div>
 
-        @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
+        @if (error() && !carteraBloqueada()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
         }
       } @else {
         <div class="card"><div class="card-body"><div class="empty"><h4>No se encontró la orden de producción</h4></div></div></div>
@@ -180,17 +208,27 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
     .bod-cell{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
     .bod-zero{color:var(--text-subtle)}
     @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}}
+    .cartera-banner{border-color:color-mix(in oklch,var(--error) 40%,var(--border));margin-bottom:var(--sp-5)}
+    .cb-input{padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
   `],
 })
 export class OpDetalleComponent implements OnInit {
   private readonly api = inject(PedidosApi);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly despachosApi = inject(DespachosApi);
+  private readonly comprasApi = inject(ComprasApi);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly fabricacionApi = inject(FabricacionApi);
 
   op = signal<OrdenProduccion | null>(null);
   cargando = signal(true);
   accion = signal(false);
   error = signal('');
+  carteraBloqueada = signal(false);
+  motivo = signal('');
+  generandoOF = signal(false);
 
   resumen = computed(() => {
     const o = this.op();
@@ -201,6 +239,7 @@ export class OpDetalleComponent implements OnInit {
   vista = signal<'talla' | 'bodega'>('talla');
   porTalla = computed(() => { const o = this.op(); return o ? filasPorTalla(o) : []; });
   porBodega = computed(() => { const o = this.op(); return o ? filasPorBodega(o) : []; });
+  puedeAutorizar = computed(() => { const r = this.auth.rol(); return r === 'GERENTE' || r === 'ADMIN'; });
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {
@@ -212,6 +251,8 @@ export class OpDetalleComponent implements OnInit {
   cargar(id: number): void {
     this.cargando.set(true);
     this.op.set(null);
+    this.carteraBloqueada.set(false);
+    this.motivo.set('');
     this.api.obtenerOP(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: o => { this.op.set(o); this.cargando.set(false); },
       error: () => this.cargando.set(false),
@@ -227,6 +268,51 @@ export class OpDetalleComponent implements OnInit {
     this.api.anularOP(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.accion.set(false); this.cargar(o.id); },
       error: e => { this.accion.set(false); this.error.set(this.msg(e)); },
+    });
+  }
+
+  despachable = computed(() => {
+    const o = this.op();
+    return !!o && o.estado === 'AMARRADA' && this.resumen().producir === 0;
+  });
+
+  requerible = computed(() => {
+    const o = this.op();
+    return !!o && o.estado !== 'ANULADA' && this.resumen().producir > 0;
+  });
+
+  requerir(): void {
+    const o = this.op();
+    if (!o || this.accion()) return;
+    this.accion.set(true); this.error.set('');
+    this.comprasApi.calcular(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (r) => { this.accion.set(false); this.router.navigateByUrl('/compras/requerimiento/' + r.id); },
+      error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+    });
+  }
+
+  generarOF(opId: number): void {
+    if (this.generandoOF()) return;
+    this.generandoOF.set(true); this.error.set('');
+    this.fabricacionApi.generarOF(opId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (of) => this.router.navigate(['/fabricacion/tablero'], { queryParams: { ofId: of.id } }),
+      error: (e) => { this.generandoOF.set(false); this.error.set(this.msg(e)); },
+    });
+  }
+
+  despachar(autorizar = false) {
+    const o = this.op();
+    if (!o || this.accion()) return;
+    this.carteraBloqueada.set(false);
+    this.accion.set(true); this.error.set('');
+    const body = autorizar ? { opId: o.id, autorizar: true, motivo: this.motivo() } : { opId: o.id };
+    this.despachosApi.despachar(body).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.accion.set(false); this.router.navigateByUrl('/despachos'); },
+      error: (e) => {
+        this.accion.set(false);
+        if (e?.status === 409) { this.carteraBloqueada.set(true); this.error.set(this.msg(e)); }
+        else { this.error.set(this.msg(e)); }
+      },
     });
   }
 

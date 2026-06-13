@@ -7,5 +7,6 @@ import { CatalogService } from './catalog.service';
 @Module({
   controllers: [BomController, CatalogController],
   providers: [BomLoaderService, CatalogService],
+  exports: [BomLoaderService],
 })
 export class CatalogModule {}

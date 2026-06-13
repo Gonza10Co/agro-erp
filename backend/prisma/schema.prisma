@@ -25,6 +25,12 @@ model User {
   refreshTokens RefreshToken[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  despachosAutorizados    Despacho[]
+  incidenciasAutorizadas  IncidenciaCalidad[]
+  movimientosInventario   MovimientoInventario[]
+  recepcionesCompra       RecepcionCompra[]
+  devolucionesProveedor   DevolucionProveedor[]
 }
 
 model RefreshToken {
@@ -67,6 +73,11 @@ enum TipoMarca {
   MAQUILA
 }
 
+enum EstadoRequerimiento {
+  CALCULADO
+  CON_ORDEN
+}
+
 model UnidadMedida {
   id         Int        @id @default(autoincrement())
   codigo     String     @unique
@@ -91,12 +102,19 @@ model Material {
   origen         OrigenMaterial
   claseBom       ClaseBom
   activo         Boolean           @default(true)
+  proveedorId    Int?
+  proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
 
   alias             MaterialAlias[]
   bomPropio         Bom?            @relation("BomDeMaterial")
   lineasComoInsumo  BomLinea[]      @relation("InsumoDeLinea")
   overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
   overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
+  inventario        InventarioMaterial?
+  lineasReq         RequerimientoCompraLinea[]
+  movimientos       MovimientoInventario[]
+  lineasOcp         OrdenCompraProveedorLinea[]
+  lineasDevolucion  DevolucionProveedorLinea[]
 }
 
 model MaterialAlias {
@@ -120,6 +138,9 @@ model Talla {
   ocLineasTalla  OrdenCompraLineaTalla[]
   opLineasTalla  OrdenProduccionLineaTalla[]
   inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
+  lineasFactura  FacturaLinea[]
+  pares          Par[]
 }
 
 model Referencia {
@@ -283,10 +304,13 @@ model ProductoConfigurado {
   marca           Marca      @relation(fields: [marcaId], references: [id])
   activo          Boolean    @default(true)
 
-  opciones     ProductoConfiguradoOpcion[]
-  lineasOC     OrdenCompraLinea[]
-  lineasOP     OrdenProduccionLinea[]
-  inventarioPT InventarioPT[]
+  opciones       ProductoConfiguradoOpcion[]
+  lineasOC       OrdenCompraLinea[]
+  lineasOP       OrdenProduccionLinea[]
+  inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
+  lineasFactura  FacturaLinea[]
+  pares          Par[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -331,6 +355,7 @@ enum EstadoOP {
   CREADA
   AMARRADA
   EN_PRODUCCION
+  DESPACHADA
   ANULADA
 }
 
@@ -358,7 +383,8 @@ model Bodega {
   prioridad Int        @default(100)
   activo    Boolean    @default(true)
 
-  inventarioPT InventarioPT[]
+  inventarioPT   InventarioPT[]
+  lineasDespacho DespachoLinea[]
 }
 
 model OrdenCompra {
@@ -385,6 +411,7 @@ model OrdenCompraLinea {
   oc                    OrdenCompra         @relation(fields: [ocId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  precioUnitario        Decimal?            @db.Decimal(14, 2) // precio pactado por par (igual todas las tallas)
 
   tallas OrdenCompraLineaTalla[]
 
@@ -413,7 +440,8 @@ model InventarioPT {
   cantDisponible        Int                 @default(0)
   cantReservada         Int                 @default(0)
 
-  reservas ReservaInventarioPT[]
+  reservas    ReservaInventarioPT[]
+  movimientos MovimientoInventario[]
 
   @@unique([productoConfiguradoId, tallaId, bodegaId])
   @@index([productoConfiguradoId, tallaId])
@@ -429,7 +457,10 @@ model OrdenProduccion {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  lineas OrdenProduccionLinea[]
+  lineas              OrdenProduccionLinea[]
+  despacho            Despacho?
+  requerimientos      RequerimientoCompra[]
+  ordenesFabricacion  OrdenFabricacion[]
 }
 
 model OrdenProduccionLinea {
@@ -469,4 +500,441 @@ model ReservaInventarioPT {
 
   @@index([opLineaTallaId])
   @@index([inventarioPTId])
+}
+
+// ───────────────────────── Módulo 3: Despacho ─────────────────────────
+
+model Despacho {
+  id                 Int             @id @default(autoincrement())
+  consecutivo        Int             @unique
+  opId               Int             @unique
+  op                 OrdenProduccion @relation(fields: [opId], references: [id])
+  fecha              DateTime        @default(now())
+  autorizadoPorId    Int?
+  autorizadoPor      User?           @relation(fields: [autorizadoPorId], references: [id])
+  motivoAutorizacion String?
+  createdAt          DateTime        @default(now())
+
+  lineas  DespachoLinea[]
+  factura Factura?
+}
+
+model DespachoLinea {
+  id                    Int                 @id @default(autoincrement())
+  despachoId            Int
+  despacho              Despacho            @relation(fields: [despachoId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  bodegaId              Int
+  bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  cantidad              Int
+
+  @@index([despachoId])
+}
+
+// ───────────────────────── Módulo 4: Compras / Requerimientos ─────────────────────────
+
+model Proveedor {
+  id        Int      @id @default(autoincrement())
+  nit       String   @unique
+  nombre    String
+  ciudad    String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  materiales Material[]
+  lineasReq  RequerimientoCompraLinea[]
+  ordenesCompra OrdenCompraProveedor[]
+}
+
+model InventarioMaterial {
+  id             Int      @id @default(autoincrement())
+  materialId     Int      @unique
+  material       Material @relation(fields: [materialId], references: [id])
+  cantDisponible Decimal  @default(0) @db.Decimal(14, 4)
+  updatedAt      DateTime @updatedAt
+}
+
+model RequerimientoCompra {
+  id          Int                 @id @default(autoincrement())
+  consecutivo Int                 @unique
+  opId        Int
+  op          OrdenProduccion     @relation(fields: [opId], references: [id])
+  fecha       DateTime            @default(now())
+  estado      EstadoRequerimiento @default(CALCULADO)
+  createdAt   DateTime            @default(now())
+
+  lineas        RequerimientoCompraLinea[]
+  ordenesCompra OrdenCompraProveedor[]
+
+  @@index([opId])
+}
+
+model RequerimientoCompraLinea {
+  id              Int                 @id @default(autoincrement())
+  requerimientoId Int
+  requerimiento   RequerimientoCompra @relation(fields: [requerimientoId], references: [id])
+  materialId      Int
+  material        Material            @relation(fields: [materialId], references: [id])
+  proveedorId     Int?
+  proveedor       Proveedor?          @relation(fields: [proveedorId], references: [id])
+  cantNecesaria   Decimal             @db.Decimal(14, 4)
+  cantDisponible  Decimal             @db.Decimal(14, 4)
+  cantAComprar    Decimal             @db.Decimal(14, 4)
+
+  @@index([requerimientoId])
+}
+
+// ── Demo 13: Compras lado proveedor (OCP + recepciones + devoluciones) ──
+
+// Estado derivado de las líneas (cantRecibida vs cantPedida); nunca se setea a mano.
+enum EstadoOrdenCompraProveedor {
+  PENDIENTE
+  PARCIAL
+  COMPLETA
+}
+
+model OrdenCompraProveedor {
+  id              Int                        @id @default(autoincrement())
+  consecutivo     Int                        @unique
+  proveedorId     Int
+  proveedor       Proveedor                  @relation(fields: [proveedorId], references: [id])
+  requerimientoId Int?
+  requerimiento   RequerimientoCompra?       @relation(fields: [requerimientoId], references: [id])
+  estado          EstadoOrdenCompraProveedor @default(PENDIENTE)
+  fecha           DateTime                   @default(now())
+  observaciones   String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  lineas       OrdenCompraProveedorLinea[]
+  recepciones  RecepcionCompra[]
+  devoluciones DevolucionProveedor[]
+
+  @@index([proveedorId])
+  @@index([requerimientoId])
+}
+
+model OrdenCompraProveedorLinea {
+  id           Int                  @id @default(autoincrement())
+  ocpId        Int
+  ocp          OrdenCompraProveedor @relation(fields: [ocpId], references: [id])
+  materialId   Int
+  material     Material             @relation(fields: [materialId], references: [id])
+  cantPedida   Decimal              @db.Decimal(14, 4)
+  cantRecibida Decimal              @default(0) @db.Decimal(14, 4)
+
+  lineasRecepcion RecepcionCompraLinea[]
+
+  @@index([ocpId])
+}
+
+// Cada llegada de mercancía (parcial o total). N recepciones por OCP = backorder.
+model RecepcionCompra {
+  id            Int                  @id @default(autoincrement())
+  consecutivo   Int                  @unique
+  ocpId         Int
+  ocp           OrdenCompraProveedor @relation(fields: [ocpId], references: [id])
+  fecha         DateTime             @default(now())
+  observaciones String?
+  usuarioId     Int?
+  usuario       User?                @relation(fields: [usuarioId], references: [id])
+
+  lineas RecepcionCompraLinea[]
+
+  @@index([ocpId])
+}
+
+model RecepcionCompraLinea {
+  id          Int                       @id @default(autoincrement())
+  recepcionId Int
+  recepcion   RecepcionCompra           @relation(fields: [recepcionId], references: [id])
+  ocpLineaId  Int
+  ocpLinea    OrdenCompraProveedorLinea @relation(fields: [ocpLineaId], references: [id])
+  cantidad    Decimal                   @db.Decimal(14, 4)
+
+  @@index([recepcionId])
+}
+
+// Devolución por calidad: descuenta stock + kardex; NO toca cantRecibida ni el estado de la OCP.
+model DevolucionProveedor {
+  id            Int                  @id @default(autoincrement())
+  consecutivo   Int                  @unique
+  ocpId         Int
+  ocp           OrdenCompraProveedor @relation(fields: [ocpId], references: [id])
+  fecha         DateTime             @default(now())
+  causa         String
+  observaciones String?
+  usuarioId     Int?
+  usuario       User?                @relation(fields: [usuarioId], references: [id])
+
+  lineas DevolucionProveedorLinea[]
+
+  @@index([ocpId])
+}
+
+model DevolucionProveedorLinea {
+  id           Int                 @id @default(autoincrement())
+  devolucionId Int
+  devolucion   DevolucionProveedor @relation(fields: [devolucionId], references: [id])
+  materialId   Int
+  material     Material            @relation(fields: [materialId], references: [id])
+  cantidad     Decimal             @db.Decimal(14, 4)
+
+  @@index([devolucionId])
+}
+
+// ───────────────────────── Módulo 5: MES / Fabricación ─────────────────────────
+
+enum Celula {
+  CORTE
+  GUARNICION
+  ALMACEN
+  INYECCION
+  PT
+}
+
+enum SubPasoGuarnicion {
+  AREA
+  ARMADO
+  VISTAS
+  CIERRE
+  PREFORMADO
+  PERFORADO
+  REVISION
+  STROBEL
+  AMARRE
+}
+
+enum EstadoOF {
+  ABIERTA
+  EN_PROCESO
+  TERMINADA
+  ANULADA
+}
+
+enum EstadoPar {
+  EN_PROCESO
+  TERMINADO
+  CANCELADO
+  DADO_DE_BAJA
+}
+
+enum ClaseDano {
+  BAJA      // daño total: acta + reposición automática
+  REPROCESO // recuperable: solo registro
+}
+
+model OrdenFabricacion {
+  id          Int             @id @default(autoincrement())
+  consecutivo Int             @unique
+  opId        Int
+  op          OrdenProduccion @relation(fields: [opId], references: [id])
+  fecha       DateTime        @default(now())
+  estado      EstadoOF        @default(ABIERTA)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  pares Par[]
+
+  @@index([opId])
+}
+
+model Par {
+  id                    Int                 @id @default(autoincrement())
+  codigo                String              @unique
+  ofId                  Int
+  of                    OrdenFabricacion    @relation(fields: [ofId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  celulaActual          Celula              @default(CORTE)
+  estado                EstadoPar           @default(EN_PROCESO)
+  subPasoActual         SubPasoGuarnicion?  // solo poblado mientras celulaActual = GUARNICION
+  reponeAParId          Int?    @unique     // si este par es una reposición, el par dado de baja que repone
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  reponeA     Par?  @relation("reposicion", fields: [reponeAParId], references: [id])
+  repuestoPor Par?  @relation("reposicion")
+
+  incidencias            IncidenciaCalidad[] @relation("incidencias")
+  reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
+
+  eventos EventoTrazabilidad[]
+
+  @@index([ofId])
+  @@index([celulaActual])
+  @@index([subPasoActual])
+}
+
+model EventoTrazabilidad {
+  id         Int      @id @default(autoincrement())
+  parId      Int
+  par        Par      @relation(fields: [parId], references: [id])
+  celula     Celula
+  subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
+  operarioId Int
+  operario   Operario @relation(fields: [operarioId], references: [id])
+  maquinaId  Int
+  maquina    Maquina  @relation(fields: [maquinaId], references: [id])
+  timestamp  DateTime @default(now())
+
+  @@index([parId])
+  @@index([celula])
+}
+
+model Operario {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  celula Celula
+  activo Boolean @default(true)
+
+  eventos     EventoTrazabilidad[]
+  incidencias IncidenciaCalidad[]
+}
+
+model Maquina {
+  id     Int     @id @default(autoincrement())
+  codigo String  @unique
+  nombre String
+  celula Celula
+  activo Boolean @default(true)
+
+  eventos EventoTrazabilidad[]
+}
+
+model UmbralDemora {
+  id      Int    @id @default(autoincrement())
+  celula  Celula @unique
+  minutos Int
+}
+
+model TipoDano {
+  id             Int       @id @default(autoincrement())
+  codigo         String    @unique
+  nombre         String
+  celulaCausante Celula    // centro de costo al que se imputa
+  clase          ClaseDano
+  activo         Boolean   @default(true)
+
+  incidencias IncidenciaCalidad[]
+}
+
+model IncidenciaCalidad {
+  id              Int      @id @default(autoincrement())
+  parId           Int
+  par             Par      @relation("incidencias", fields: [parId], references: [id])
+  tipoDanoId      Int
+  tipoDano        TipoDano @relation(fields: [tipoDanoId], references: [id])
+  celulaDeteccion Celula   // dónde se detectó (puede ≠ causante)
+  operarioId      Int
+  operario        Operario @relation(fields: [operarioId], references: [id])
+  descripcion     String?  // obligatoria en BAJA (acta) — se valida en el service
+  autorizadoPorId Int?     // solo BAJA: user GERENTE/ADMIN del JWT
+  autorizadoPor   User?    @relation(fields: [autorizadoPorId], references: [id])
+  parReposicionId Int?     @unique // solo BAJA: el par creado para reponer
+  parReposicion   Par?     @relation("reposicionDeIncidencia", fields: [parReposicionId], references: [id])
+  timestamp       DateTime @default(now())
+
+  @@index([parId])
+  @@index([tipoDanoId])
+  @@index([operarioId])
+}
+
+// ───────────────────────── Módulo 5: Facturación ─────────────────────────
+
+enum EstadoFactura {
+  EMITIDA
+  ANULADA
+}
+
+model Factura {
+  id              Int           @id @default(autoincrement())
+  consecutivo     Int           @unique
+  despachoId      Int           @unique
+  despacho        Despacho      @relation(fields: [despachoId], references: [id])
+  fecha           DateTime      @default(now())
+  fechaVencimiento DateTime?    // fecha + díasCrédito(tipoCredito) al emitir
+  subtotal        Decimal       @db.Decimal(14, 2)
+  ivaPct          Decimal       @db.Decimal(5, 2)
+  iva             Decimal       @db.Decimal(14, 2)
+  total           Decimal       @db.Decimal(14, 2)
+  estado          EstadoFactura @default(EMITIDA)
+  createdAt       DateTime      @default(now())
+
+  lineas FacturaLinea[]
+  pagos  Pago[]
+}
+
+model Pago {
+  id        Int      @id @default(autoincrement())
+  facturaId Int
+  factura   Factura  @relation(fields: [facturaId], references: [id])
+  monto     Decimal  @db.Decimal(14, 2)
+  fecha     DateTime @default(now())
+  medio     String?
+  createdAt DateTime @default(now())
+
+  @@index([facturaId])
+}
+
+model FacturaLinea {
+  id                    Int                 @id @default(autoincrement())
+  facturaId             Int
+  factura               Factura             @relation(fields: [facturaId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  cantidad              Int
+  precioUnitario        Decimal             @db.Decimal(14, 2)
+  subtotal              Decimal             @db.Decimal(14, 2)
+
+  @@index([facturaId])
+}
+
+// ───────────────────────── Módulo 3: Inventario consolidado / Kardex ─────────────────────────
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum MotivoMovimiento {
+  PRODUCCION           // par terminado entra a InventarioPT
+  DESPACHO             // salida de PT por despacho
+  COMPRA               // recepción de materia prima (total o parcial)
+  CONSUMO_PRODUCCION   // consumo de MP por una OF
+  DEVOLUCION_CLIENTE   // reingreso de PT devuelto por cliente
+  DEVOLUCION_PROVEEDOR // salida de MP devuelta a proveedor (calidad)
+  AJUSTE_MANUAL        // conteo físico / corrección
+}
+
+// Kardex unificado: cada fila es un movimiento físico de stock,
+// de materia prima (materialId) XOR de producto terminado (inventarioPTId).
+// `cantidad` siempre positiva; el sentido lo da `tipo`.
+model MovimientoInventario {
+  id             Int              @id @default(autoincrement())
+  tipo           TipoMovimiento
+  motivo         MotivoMovimiento
+  materialId     Int?
+  material       Material?        @relation(fields: [materialId], references: [id])
+  inventarioPTId Int?
+  inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
+  cantidad       Decimal          @db.Decimal(14, 4)
+  referencia     String?          // documento origen: "OF-31", "DSP-12", "REQ-7"…
+  observaciones  String?
+  usuarioId      Int?
+  usuario        User?            @relation(fields: [usuarioId], references: [id])
+  createdAt      DateTime         @default(now())
+
+  @@index([materialId, createdAt])
+  @@index([inventarioPTId, createdAt])
+  @@index([createdAt])
 }

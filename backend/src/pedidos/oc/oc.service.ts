@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
 
@@ -12,30 +13,31 @@ export class OcService {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearOCDto) {
-    const agg = await this.prisma.ordenCompra.aggregate({
-      _max: { consecutivo: true },
-    });
-    const consecutivo = (agg._max.consecutivo ?? 0) + 1;
-    return this.prisma.ordenCompra.create({
-      data: {
-        consecutivo,
-        clienteId: dto.clienteId,
-        ocCliente: dto.ocCliente,
-        observaciones: dto.observaciones,
-        estado: 'BORRADOR',
-        lineas: {
-          create: dto.lineas.map((l) => ({
-            productoConfiguradoId: l.productoConfiguradoId,
-            tallas: {
-              create: l.tallas.map((t) => ({
-                tallaId: t.tallaId,
-                cantidad: t.cantidad,
-              })),
-            },
-          })),
+    // nextval + create en la misma tx: si el create falla no queda hueco evitable.
+    return this.prisma.$transaction(async (tx) => {
+      const consecutivo = await siguienteConsecutivo(tx, 'oc');
+      return tx.ordenCompra.create({
+        data: {
+          consecutivo,
+          clienteId: dto.clienteId,
+          ocCliente: dto.ocCliente,
+          observaciones: dto.observaciones,
+          estado: 'BORRADOR',
+          lineas: {
+            create: dto.lineas.map((l) => ({
+              productoConfiguradoId: l.productoConfiguradoId,
+              precioUnitario: l.precioUnitario,
+              tallas: {
+                create: l.tallas.map((t) => ({
+                  tallaId: t.tallaId,
+                  cantidad: t.cantidad,
+                })),
+              },
+            })),
+          },
         },
-      },
-      include: { lineas: { include: { tallas: true } } },
+        include: { lineas: { include: { tallas: true } } },
+      });
     });
   }
 

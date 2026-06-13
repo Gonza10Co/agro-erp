@@ -1,0 +1,130 @@
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FabricacionApi } from '../../core/api/fabricacion.api';
+import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
+
+@Component({
+  selector: 'app-fabricacion-tablero',
+  standalone: true,
+  imports: [RouterLink],
+  template: `
+    <div class="page">
+      <div class="page-header">
+        <div class="ph-title">Tablero de fabricación</div>
+        <button class="btn" (click)="cargar()">Actualizar</button>
+      </div>
+      @if (error()) {
+        <div class="empty"><h4>No se pudo cargar el tablero</h4><p class="cell-sub">{{ error() }}</p></div>
+      }
+      <div class="kanban">
+        @for (c of columnas; track c) {
+          <div class="col">
+            <div class="col-h">
+              <span>{{ label(c) }}</span>
+              <span class="badge">{{ porCelula()[c].length }}</span>
+              @if (c === 'GUARNICION') {
+                <a class="sub-link" [routerLink]="['/fabricacion/guarnicion']" [queryParams]="ofId ? { ofId } : {}">ver sub-pasos →</a>
+              }
+            </div>
+            <div class="col-body">
+              @for (p of porCelula()[c]; track p.id) {
+                <a class="par-chip" [routerLink]="['/fabricacion/par', p.codigo]">
+                  <span class="mono">{{ p.codigo }}</span>
+                  <span class="cell-sub">T{{ p.talla.valor }}</span>
+                  @if (c === 'GUARNICION' && p.subPasoActual) {
+                    <span class="cell-sub">{{ subPasoLabel(p.subPasoActual) }}</span>
+                  }
+                </a>
+              } @empty {
+                <div class="cell-sub empty-col">—</div>
+              }
+            </div>
+          </div>
+        }
+        <div class="col col-done">
+          <div class="col-h"><span>Terminados</span><span class="badge badge-accent">{{ terminados().length }}</span></div>
+          <div class="col-body">
+            @for (p of terminados(); track p.id) {
+              <a class="par-chip done" [routerLink]="['/fabricacion/par', p.codigo]">
+                <span class="mono">{{ p.codigo }}</span><span class="cell-sub">T{{ p.talla.valor }}</span>
+              </a>
+            }
+          </div>
+        </div>
+      </div>
+      @if (fueraDeFlujo().length) {
+        <div class="fuera">
+          <div class="col-h"><span>Fuera de flujo</span><span class="badge">{{ fueraDeFlujo().length }}</span></div>
+          <div class="fuera-body">
+            @for (p of fueraDeFlujo(); track p.id) {
+              <a class="par-chip" [class.chip-baja]="p.estado === 'DADO_DE_BAJA'"
+                 [routerLink]="['/fabricacion/par', p.codigo]">
+                <span class="mono">{{ p.codigo }}</span>
+                <span class="cell-sub">T{{ p.talla.valor }}</span>
+                <span class="estado">{{ p.estado === 'DADO_DE_BAJA' ? 'baja ✖' : 'cancelado' }}</span>
+              </a>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  `,
+  styles: [`
+    .kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--sp-3);align-items:start}
+    .col{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius);min-height:120px}
+    .col-h{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-2) var(--sp-3);border-bottom:var(--bw) solid var(--border);font-weight:var(--fw-medium);font-size:var(--text-sm)}
+    .col-body{padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2)}
+    .par-chip{display:flex;justify-content:space-between;gap:var(--sp-2);padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-caption);text-decoration:none;color:inherit}
+    .par-chip:hover{border-color:var(--accent)}
+    .par-chip.done{opacity:.7}
+    .mono{font-family:var(--font-mono)}
+    .empty-col{text-align:center;padding:var(--sp-2)}
+    .fuera{margin-top:var(--sp-4);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius)}
+    .fuera-body{padding:var(--sp-2);display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+    .chip-baja{border-color:var(--danger)}
+    .chip-baja .estado{color:var(--danger)}
+    .sub-link{font-size:var(--text-caption);color:var(--accent);text-decoration:none;margin-left:auto}
+    .sub-link:hover{text-decoration:underline}
+  `],
+})
+export class FabricacionTableroComponent implements OnInit {
+  private readonly api = inject(FabricacionApi);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly columnas: Celula[] = ORDEN_CELULAS;
+  label = (c: Celula) => LABEL_CELULA[c];
+  subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
+  private pares = signal<ParTablero[]>([]);
+  error = signal<string | null>(null);
+  protected ofId?: number;
+
+  porCelula = computed(() => {
+    const map: Record<Celula, ParTablero[]> = {
+      CORTE: [], GUARNICION: [], ALMACEN: [], INYECCION: [], PT: [],
+    };
+    for (const p of this.pares()) {
+      if (p.estado === 'EN_PROCESO') map[p.celulaActual].push(p);
+    }
+    return map;
+  });
+  terminados = computed(() => this.pares().filter((p) => p.estado === 'TERMINADO'));
+  fueraDeFlujo = computed(() =>
+    this.pares().filter((p) => p.estado === 'DADO_DE_BAJA' || p.estado === 'CANCELADO'),
+  );
+
+  ngOnInit(): void {
+    const q = this.route.snapshot.queryParamMap.get('ofId');
+    this.ofId = q ? Number(q) : undefined;
+    this.cargar();
+  }
+
+  cargar(): void {
+    this.error.set(null);
+    this.api.tablero(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (p) => this.pares.set(p),
+      error: () => this.error.set('No se pudo cargar el tablero. Intentá de nuevo.'),
+    });
+  }
+}

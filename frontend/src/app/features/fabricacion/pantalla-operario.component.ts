@@ -1,0 +1,265 @@
+import { Component, AfterViewInit, DestroyRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FabricacionApi } from '../../core/api/fabricacion.api';
+import {
+  Celula, SubPasoGuarnicion, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, LABEL_SUBPASO,
+  LABEL_ESTADO_PAR, siguientePasoLabel,
+} from '../../core/api/models/fabricacion.models';
+import { CalidadApi } from '../../core/api/calidad.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { TipoDano } from '../../core/api/models/calidad.models';
+
+@Component({
+  selector: 'app-pantalla-operario',
+  standalone: true,
+  imports: [FormsModule],
+  template: `
+    <div class="page">
+      <div class="page-header"><div class="ph-title">Puesto de trabajo</div></div>
+
+      <div class="card"><div class="card-body puesto">
+        <label>Célula
+          <select [(ngModel)]="celula" (ngModelChange)="onCelula()">
+            @for (c of celulas; track c) { <option [value]="c">{{ label(c) }}</option> }
+          </select>
+        </label>
+        <label>Operario
+          <select [(ngModel)]="operarioId">
+            @for (o of operarios(); track o.id) { <option [ngValue]="o.id">{{ o.nombre }}</option> }
+          </select>
+        </label>
+        <label>Máquina
+          <select [(ngModel)]="maquinaId">
+            @for (m of maquinas(); track m.id) { <option [ngValue]="m.id">{{ m.nombre }}</option> }
+          </select>
+        </label>
+      </div></div>
+
+      <div class="card"><div class="card-body">
+        <label class="scan-label">Escanear código del par
+          <input #scan class="scan-input mono" [(ngModel)]="codigo"
+                 (keyup.enter)="buscar()" placeholder="OF5-0001" autofocus />
+        </label>
+        @if (msg(); as m) { <div class="msg" [class.err]="esError()">{{ m }}</div> }
+
+        @if (par(); as p) {
+          <div class="par-card">
+            <div class="mono big">{{ p.codigo }}</div>
+            <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}@if (p.subPasoActual) { · {{ subPasoLabel(p.subPasoActual) }} }</div>
+            @if (p.estado !== 'EN_PROCESO') {
+              <span class="badge badge-accent">{{ estadoLabel(p.estado) }}</span>
+            } @else {
+              <div class="acciones">
+                @if (siguiente(p); as sig) {
+                  <button class="btn btn-primary" (click)="avanzar(p)">
+                    {{ p.celulaActual === 'GUARNICION' && p.subPasoActual === 'AMARRE' ? 'Cargar a Almacén (capellada)' : 'Avanzar a ' + sig }} →
+                  </button>
+                } @else {
+                  <button class="btn btn-primary" (click)="avanzar(p)">Terminar (cargar a PT) ✓</button>
+                }
+                <button class="btn" (click)="toggleReporte()">
+                  {{ reportando() ? 'Cancelar reporte' : 'Reportar daño ⚠' }}
+                </button>
+              </div>
+              @if (reportando()) {
+                <div class="reporte">
+                  <label>Tipo de daño
+                    <select [(ngModel)]="tipoDanoId">
+                      @for (t of tiposDano(); track t.id) { <option [ngValue]="t.id">{{ t.nombre }}</option> }
+                    </select>
+                  </label>
+                  @if (tipoSel(); as t) {
+                    <div class="cell-sub">
+                      {{ t.clase === 'BAJA' ? 'Daño total: da de baja el par y crea una reposición.' : 'Reproceso: solo registro, el par sigue su flujo.' }}
+                      Se imputa a {{ label(t.celulaCausante) }}.
+                    </div>
+                    <label>Descripción {{ t.clase === 'BAJA' ? '(acta, obligatoria)' : '(opcional)' }}
+                      <textarea [(ngModel)]="descripcion" rows="2" maxlength="500"></textarea>
+                    </label>
+                    @if (t.clase === 'BAJA' && !puedeBaja) {
+                      <div class="msg err">Solo un gerente puede autorizar una baja.</div>
+                    }
+                    <button class="btn btn-primary"
+                            [disabled]="t.clase === 'BAJA' && (!puedeBaja || !descripcion.trim())"
+                            (click)="reportar(p, t)">
+                      {{ t.clase === 'BAJA' ? 'Dar de baja (acta) ✖' : 'Registrar reproceso ⚠' }}
+                    </button>
+                  }
+                </div>
+              }
+            }
+          </div>
+        }
+      </div></div>
+    </div>
+  `,
+  styles: [`
+    .puesto{display:flex;gap:var(--sp-4);flex-wrap:wrap}
+    .puesto label,.scan-label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
+    select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-sm)}
+    .scan-input{font-size:var(--text-lg);max-width:280px;min-height:48px}
+    .msg{margin-top:var(--sp-3);color:var(--accent)}
+    .msg.err{color:var(--danger)}
+    .par-card{margin-top:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2);align-items:flex-start}
+    .big{font-size:var(--text-xl)}
+    .mono{font-family:var(--font-mono)}
+    .btn-primary{min-height:48px}
+    .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
+    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font:inherit}
+  `],
+})
+export class PantallaOperarioComponent implements OnInit, AfterViewInit {
+  @ViewChild('scan') private scanInput!: ElementRef<HTMLInputElement>;
+  private readonly api = inject(FabricacionApi);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly calidadApi = inject(CalidadApi);
+  private readonly auth = inject(AuthService);
+
+  readonly celulas: Celula[] = ORDEN_CELULAS;
+  label = (c: Celula) => LABEL_CELULA[c];
+  subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
+  estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
+  siguiente = (p: ParDetalle) => siguientePasoLabel(p.celulaActual, p.subPasoActual);
+
+  tiposDano = signal<TipoDano[]>([]);
+  reportando = signal(false);
+  tipoDanoId?: number;
+  descripcion = '';
+  readonly puedeBaja = ['GERENTE', 'ADMIN'].includes(this.auth.rol() ?? '');
+
+  tipoSel(): TipoDano | undefined {
+    return this.tiposDano().find((t) => t.id === this.tipoDanoId);
+  }
+
+  toggleReporte(): void {
+    this.msg.set(null);
+    if (!this.reportando() && this.tiposDano().length === 0) {
+      this.calidadApi.tiposDano().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (t) => { this.tiposDano.set(t); this.tipoDanoId = t[0]?.id; },
+        error: () => { this.esError.set(true); this.msg.set('No se pudo cargar el catálogo de daños.'); },
+      });
+    }
+    this.reportando.update((v) => !v);
+  }
+
+  reportar(p: ParDetalle, t: TipoDano): void {
+    if (this.operarioId == null) {
+      this.esError.set(true);
+      this.msg.set('Seleccioná operario');
+      return;
+    }
+    this.calidadApi
+      .reportar(p.codigo, {
+        tipoDanoId: t.id,
+        operarioId: this.operarioId,
+        descripcion: this.descripcion.trim() || undefined,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.esError.set(false);
+          this.msg.set(
+            r.parReposicion
+              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en Corte)`
+              : `Reproceso registrado en ${p.codigo} ⚠`,
+          );
+          this.par.set(null);
+          this.codigo = '';
+          this.descripcion = '';
+          this.reportando.set(false);
+          this.enfocarScan();
+        },
+        error: (e) => {
+          this.esError.set(true);
+          this.msg.set(this.msgError(e, e?.error?.message ?? 'No se pudo registrar la incidencia'));
+          this.enfocarScan();
+        },
+      });
+  }
+
+  celula: Celula = 'CORTE';
+  operarioId?: number;
+  maquinaId?: number;
+  codigo = '';
+  operarios = signal<Operario[]>([]);
+  maquinas = signal<Maquina[]>([]);
+  par = signal<ParDetalle | null>(null);
+  msg = signal<string | null>(null);
+  esError = signal(false);
+
+  ngOnInit(): void {
+    this.onCelula();
+  }
+
+  ngAfterViewInit(): void {
+    this.enfocarScan();
+  }
+
+  /** El scanner físico escribe donde esté el foco: recuperarlo SIEMPRE tras cada acción. */
+  private enfocarScan(): void {
+    requestAnimationFrame(() => this.scanInput?.nativeElement.focus());
+  }
+
+  private msgError(e: { status?: number }, porDefecto: string): string {
+    return e?.status === 0
+      ? 'Sin conexión con el servidor. Verificá la red y volvé a intentar.'
+      : porDefecto;
+  }
+
+  onCelula(): void {
+    this.api.operarios(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (o) => { this.operarios.set(o); this.operarioId = o[0]?.id; },
+      error: () => {
+        this.operarios.set([]); this.operarioId = undefined;
+        this.esError.set(true); this.msg.set('No se pudieron cargar los operarios de la célula.');
+      },
+    });
+    this.api.maquinas(this.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (m) => { this.maquinas.set(m); this.maquinaId = m[0]?.id; },
+      error: () => {
+        this.maquinas.set([]); this.maquinaId = undefined;
+        this.esError.set(true); this.msg.set('No se pudieron cargar las máquinas de la célula.');
+      },
+    });
+  }
+
+  buscar(): void {
+    const c = this.codigo.trim();
+    if (!c) return;
+    this.par.set(null);
+    this.msg.set(null);
+    this.api.par(c).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (p) => { this.esError.set(false); this.par.set(p); this.enfocarScan(); },
+      error: (e) => {
+        this.esError.set(true);
+        this.msg.set(this.msgError(e, `Par ${c} no encontrado`));
+        this.enfocarScan(); // el código queda en el input para reintentar con Enter
+      },
+    });
+  }
+
+  avanzar(p: ParDetalle): void {
+    if (this.operarioId == null || this.maquinaId == null) {
+      this.esError.set(true);
+      this.msg.set('Seleccioná operario y máquina');
+      return;
+    }
+    this.api.avanzar(p.codigo, this.operarioId, this.maquinaId)
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => {
+          this.esError.set(false);
+          this.msg.set(`Par ${p.codigo} avanzado ✓`);
+          this.par.set(null);
+          this.codigo = '';
+          this.enfocarScan();
+        },
+        error: (e) => {
+          this.esError.set(true);
+          this.msg.set(this.msgError(e, e?.error?.message ?? 'No se pudo avanzar el par'));
+          this.enfocarScan();
+        },
+      });
+  }
+}

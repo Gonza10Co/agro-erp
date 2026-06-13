@@ -3,6 +3,7 @@ import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.model
 
 export interface LineaWizard {
   producto: ProductoConfiguradoFull;
+  precio: number;
   valores: Record<number, number>;
 }
 
@@ -24,6 +25,7 @@ export function construirDto(args: {
     observaciones: args.observaciones ? args.observaciones : undefined,
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
+      precioUnitario: l.precio > 0 ? l.precio : undefined,
       tallas: Object.entries(l.valores)
         .map(([tallaId, cantidad]) => ({ tallaId: Number(tallaId), cantidad }))
         .filter((t) => t.cantidad > 0),

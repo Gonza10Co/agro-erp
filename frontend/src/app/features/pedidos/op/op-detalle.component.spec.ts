@@ -1,10 +1,64 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { OpDetalleComponent } from './op-detalle.component';
+
+describe('OpDetalleComponent — despacho', () => {
+  let http: HttpTestingController;
+  function crear() {
+    TestBed.configureTestingModule({
+      imports: [OpDetalleComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    const fixture = TestBed.createComponent(OpDetalleComponent);
+    http = TestBed.inject(HttpTestingController);
+    return fixture;
+  }
+  afterEach(() => { localStorage.clear(); });
+
+  it('despachar POSTea a /despachos con el opId', () => {
+    const fixture = crear();
+    const cmp = fixture.componentInstance;
+    cmp.op.set({ id: 7, consecutivo: 12, estado: 'AMARRADA', ocId: 9 } as any);
+    cmp.despachar();
+    const req = http.expectOne('http://localhost:3001/despachos');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ opId: 7 });
+    req.flush({ id: 1, consecutivo: 1 });
+    http.verify();
+  });
+
+  it('requerir() POSTea el requerimiento y navega a la vista', () => {
+    const fixture = crear();
+    const cmp = fixture.componentInstance;
+    const router = TestBed.inject(Router);
+    const navSpy = spyOn(router, 'navigateByUrl');
+    cmp.op.set({
+      id: 7, consecutivo: 12, estado: 'AMARRADA', ocId: 9,
+      lineas: [{ tallas: [{ tallaId: 36, cantPedida: 60, cantAmarrada: 10, cantAProducir: 50 }] }],
+    } as any);
+    cmp.requerir();
+    const req = http.expectOne('http://localhost:3001/ops/7/requerimiento');
+    expect(req.request.method).toBe('POST');
+    req.flush({ id: 99, consecutivo: 1, opId: 7, fecha: '', grupos: [] });
+    expect(navSpy).toHaveBeenCalledWith('/compras/requerimiento/99');
+    http.verify();
+  });
+
+  it('un 409 de cartera activa el banner de bloqueo', () => {
+    const fixture = crear();
+    const cmp = fixture.componentInstance;
+    cmp.op.set({ id: 7, consecutivo: 12, estado: 'AMARRADA', ocId: 9 } as any);
+    cmp.despachar();
+    const req = http.expectOne('http://localhost:3001/despachos');
+    req.flush({ message: 'Cliente con cartera VENCIDO — requiere autorización del gerente' }, { status: 409, statusText: 'Conflict' });
+    expect(cmp.carteraBloqueada()).toBe(true);
+    http.verify();
+  });
+});
 
 describe('OpDetalleComponent', () => {
   function setup(opId = '12') {
