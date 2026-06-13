@@ -185,9 +185,9 @@ cartera; dashboard con KPIs; deploy del frontend a Railway.
 # DB (Docker): contenedor agro-erp-pg en localhost:5433
 docker start agro-erp-pg      # (bin: "C:\Program Files\Docker\Docker\resources\bin")
 
-# Backend (:3001) — OJO: usar build + start:prod (start:dev crashea, ver deuda)
+# Backend (:3001) — start:dev ya funciona (fix tsBuildInfoFile, 2026-06-13)
 cd agro-erp/backend
-npm run build && npm run start:prod
+npm run start:dev    # (o build + start:prod para correr el compilado)
 # seeds (si la DB está limpia): npm run seed (usuario admin) ; npm run seed:catalogo ; npm run seed:demo
 
 # Frontend (:4200)
@@ -197,15 +197,17 @@ npm start
 ```
 
 ## Deudas técnicas anotadas (no bloquean, encarar en el camino)
-- Backend `npm run start:dev` (nest --watch) crashea ("Cannot find module dist/main").
-  Workaround: `build` + `start:prod`. Arreglar la config del watcher.
-- Shell: título del topbar y avatar/usuario hardcodeados → conectar a ruta activa y al JWT.
+- ~~Backend `npm run start:dev` (nest --watch) crashea ("Cannot find module dist/main").~~
+  ✅ RESUELTO (2026-06-13): el `.tsbuildinfo` vivía en la raíz y sobrevivía al `deleteOutDir`
+  de nest-cli, así `tsc --incremental` no re-emitía `dist/main.js`. Fix: `tsBuildInfoFile`
+  apuntando dentro de `dist/` (tsconfig.json) → se borra junto con `dist/`. Esto arregla
+  también el "nest build no emite dist/" (misma raíz). `start:dev` y builds repetidos OK.
+- ~~Shell: título del topbar y avatar/usuario hardcodeados.~~ ✅ RESUELTO: el topbar se eliminó
+  y el user-card del sidebar lee del JWT (`auth.usuario()`, iniciales + rol mapeado).
 - ~~Falta interceptor de errores HTTP global (401 → login)~~ ✅ HECHO (auth-error.interceptor).
-  Falta aún un **sistema de toasts** para otros errores (500, validaciones) — sigue pendiente.
-- Backend: si `nest build` no emite `dist/` (sale exit 0 pero no hay JS), es la **caché incremental
-  obsoleta**: borrar `tsconfig.build.tsbuildinfo` y reconstruir. Pasa porque `deleteOutDir:true`
-  borra `dist/` pero `tsc --incremental` cree que ya está compilado. (Relacionado con la deuda del
-  watcher.) El entry compilado es `dist/main.js` → `start:prod` (`node dist/main`) está OK.
+- ~~Falta un **sistema de toasts** para otros errores (500, validaciones).~~ ✅ HECHO (2026-06-13):
+  `ToastService` + `errorToastInterceptor` global (toastea todo error con el mensaje del backend,
+  excluye 401 y login) + `ToasterComponent` en app-root.
 - `InventarioApi` sin tipos de retorno (tipar al definir modelos Bodega/InventarioPT).
 - Antes del primer deploy del front: crear `environment.prod.ts` + `fileReplacements` en
   `angular.json` con la URL de Railway.
