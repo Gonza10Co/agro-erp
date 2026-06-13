@@ -1,12 +1,21 @@
 import { Component, input, output } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
 
 @Component({
   selector: 'app-drawer',
   standalone: true,
+  imports: [A11yModule],
   template: `
     @if (open()) {
       <div class="scrim" (click)="closed.emit()"></div>
-      <aside class="drawer" role="dialog" aria-modal="true">
+      <aside
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        cdkTrapFocus
+        [cdkTrapFocusAutoCapture]="true"
+        (keydown.escape)="closed.emit()"
+      >
         <div class="drawer-head">
           <h3 class="t-h3">{{ title() }}</h3>
           <button class="icon-btn" type="button" title="Cerrar" (click)="closed.emit()">
