@@ -88,13 +88,14 @@ Cada demo está implementada con TDD y verificada de punta a punta (API + browse
 
 | Servicio | Plataforma | Deploy | Estado |
 |----------|-----------|--------|--------|
-| Frontend (Angular) | Vercel | Auto desde `master` (GitHub) | 🟡 Atrasado (commit setup inicial `985495e`) — falta re-deploy |
-| Backend (NestJS) | Railway | Auto desde `master` (GitHub, conectado 2026-06-16) | ✅ Al día hasta Demo 13, DB migrada |
+| Frontend (Angular) | Vercel | Auto desde `master` (GitHub, conectado 2026-06-16) | ✅ Al día, con gating por rol |
+| Backend (NestJS) | Railway | Auto desde `master` (GitHub, conectado 2026-06-16) | ✅ Al día, DB migrada |
 | DB (PostgreSQL) | Railway | Servicio `postgres-ssl:18` | ✅ Activo |
 
-**Hito 2026-06-16:** el servicio `backend` se conectó a `Gonza10Co/agro-erp@master` (antes `source.repo=null`, deploy manual). El primer auto-deploy (commit `a39ebe5c`, Demo 13) aplicó **13 migraciones pendientes** (`migrate deploy` del Dockerfile) y arrancó OK; `POST /auth/login` responde 401 contra la DB. Producción backend pasó de ~Demo 4 (5-jun) a Demo 13.
-
-> ⚠️ **Desbalance vivo:** backend en Demo 13, frontend (Vercel) aún en el setup inicial. Re-desplegar el frontend para igualar antes de mostrar en prod.
+**Hito 2026-06-16 — CI/CD integrado:** ambos servicios auto-despliegan desde `master`.
+- **Backend:** conectado a `Gonza10Co/agro-erp@master` vía Railway MCP (antes `source.repo=null`). El `Dockerfile` corre `migrate deploy` al arrancar → cada deploy aplica migraciones solo.
+- **Frontend:** conectado a GitHub vía `vercel git connect` (antes era deploy manual por CLI). Root Directory = `frontend/`.
+- **Gating por rol en prod:** usuario `cliente`/`botas2026` (rol CLIENTE) ve solo demos 1-2; `admin`/`admin123` (ADMIN) ve todo. Verificado: login de ambos responde con su rol. Credenciales en memoria `credenciales-demo-prod`.
 
 - **URLs y logins demo:** ver memoria `urls-produccion`.
 - **Backend Railway:** proyecto `agro-erp` (renombrado el 2026-06-16, antes `considerate-compassion`), servicio `backend`, dominio `backend-production-a89d.up.railway.app`. El CORS se autoriza por env var `CORS_ORIGINS` (no commiteada).
