@@ -80,6 +80,10 @@ const SIDEBAR_KEY = 'agro-sidebar';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg></span>
             <span class="nav-label">Indicadores</span>
           </a>
+          <a class="nav-item" routerLink="/reportes/diario" routerLinkActive="is-active" title="Reporte diario">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+            <span class="nav-label">Reporte diario</span>
+          </a>
           <a class="nav-item" routerLink="/clientes" routerLinkActive="is-active" title="Clientes">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0M16 5.5a3 3 0 0 1 0 5.6M21 20a5.5 5.5 0 0 0-4-5.3"/></svg></span>
             <span class="nav-label">Clientes</span>

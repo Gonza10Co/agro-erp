@@ -32,6 +32,7 @@ export const routes: Routes = [
       { path: 'fabricacion/par/:codigo', loadComponent: () => import('./features/fabricacion/par-detalle.component').then(m => m.ParDetalleComponent) },
       { path: 'calidad', loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
+      { path: 'reportes/diario', loadComponent: () => import('./features/reportes/reporte-diario.component').then(m => m.ReporteDiarioComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'inicio' },
     ],
   },
