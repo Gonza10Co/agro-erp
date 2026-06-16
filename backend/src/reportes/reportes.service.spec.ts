@@ -17,7 +17,7 @@ describe('ReportesService', () => {
         { celula: 'INYECCION', timestamp: new Date('2026-06-02T09:00:00Z') },
       ]);
       prisma.factura.findMany.mockResolvedValue([
-        { fecha: new Date('2026-06-02T12:00:00Z'), total: 5100000, lineas: [{ cantidad: 50 }, { cantidad: 10 }] },
+        { fecha: new Date('2026-06-02T12:00:00Z'), subtotal: 5100000, lineas: [{ cantidad: 50 }, { cantidad: 10 }] },
       ]);
       prisma.movimientoInventario.findMany.mockResolvedValue([
         { tipo: 'SALIDA', motivo: 'DESPACHO', cantidad: 60, createdAt: new Date('2026-06-02T12:30:00Z') },

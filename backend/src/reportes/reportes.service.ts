@@ -30,7 +30,7 @@ export class ReportesService {
       }),
       this.prisma.factura.findMany({
         where: { fecha: { gte: desde, lt: hasta }, estado: 'EMITIDA' },
-        select: { fecha: true, total: true, lineas: { select: { cantidad: true } } },
+        select: { fecha: true, subtotal: true, lineas: { select: { cantidad: true } } },
       }),
       this.prisma.movimientoInventario.findMany({
         where: { inventarioPTId: { not: null }, createdAt: { gte: desde, lt: hasta } },
@@ -60,7 +60,7 @@ export class ReportesService {
       ventas: facturas.map((f) => ({
         fecha: f.fecha,
         pares: f.lineas.reduce((acc, l) => acc + l.cantidad, 0),
-        valor: Number(f.total),
+        valor: Number(f.subtotal), // valor de venta sin IVA, para comparar contra la meta comercial
       })),
       metas: metas.map((m) => ({ tipo: m.tipo as TipoMeta, valor: Number(m.valor) })),
       saldoInicialPT,

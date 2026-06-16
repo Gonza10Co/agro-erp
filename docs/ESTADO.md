@@ -20,20 +20,23 @@ capturados. El dashboard de Demo 11 tiene KPIs distintos; esta demo cubre ESE re
 - **Backend:** núcleo puro `reportes/reporte-diario-core` (filas diarias + acumulado +
   metas con % + kardex PT con saldo arrastrado; Guarnición cuenta solo sub-paso AMARRE
   para no sobrecontar). `ReportesService.diario(anio, mes)` (Promise.all de eventos +
-  facturas + movimientos PT + saldo previo + metas) + `listarMetas`/`guardarMetas`
-  (upsert). Endpoints `GET /reportes/diario?anio&mes`, `GET/PUT /reportes/metas`
-  (periodo por defecto = mes actual).
+  facturas + movimientos PT + saldo previo + metas; **valor = subtotal sin IVA** para
+  comparar contra la meta comercial) + `listarMetas`/`guardarMetas` (upsert). Endpoints
+  `GET /reportes/diario?anio&mes`, `GET/PUT /reportes/metas` (periodo por defecto = mes actual).
 - **Frontend:** `ReportesApi`, `reporte-diario.component` (4 tarjetas de metas con % +
   tabla estilo Excel con fila ACUMULADO resaltada + kardex PT + selector de mes +
   drawer "Editar metas"). Columnas EXTERNO/SEGUNDAS/SERVICIOS van en 0 con nota honesta
   ("pendiente de captura"). Ruta `/reportes/diario` + ítem "Reporte diario" en el sidebar.
-- **Seed:** metas del mes + OP 9014 (40 pares en 10 días con eventos por célula) +
-  3 cadenas de venta 9015-9017 (19 pares vendidos). Idempotente.
+- **Seed:** metas **reales del Excel** (20.160 / 20.160 / 30.240 / $1.445.895.360) +
+  OP 9014 con ~19.926 pares producidos en 14 días (≈1.440/día, eventos por célula en lotes,
+  movimiento de kardex agregado por día + saldo inicial 30.000) + 3 cadenas de venta
+  9015-9017 (25.500 pares al precio medio implícito $47.814). Idempotente.
 - **263 tests backend + 189 frontend verdes**; ambos builds limpios.
-- **Verificado E2E (API + browser):** acumulado 46/44/43/43, 19 vendidos, $1.921.850;
-  metas 73.3/71.7/76/80.1%; kardex arranca en 500 y arrastra. En UI: tabla + metas +
-  kardex + drawer que precarga y guarda. Screenshots `demo14-reporte-diario.png` +
-  `demo14-metas-drawer.png`.
+- **Verificado E2E (API + browser):** acumulado guarnición 19.924 / inyección 19.923,
+  25.500 vendidos, $1.219.257.000; metas **98.8 / 98.8 / 84.3 / 84.3%** (≈ Excel real
+  99.8/106.7/85.4/84.1); kardex arranca en 30.000 y termina en 24.420. Latencia ~1,0 s
+  con ~100k eventos; dashboard/fabricación <0,1 s. En UI: tabla + metas + kardex + drawer
+  que precarga y guarda. Screenshots `demo14-reporte-diario.png` + `demo14-metas-drawer.png`.
 - Plan: `docs/plans/2026-06-16-demo14-reporte-diario.md`.
 - **Pendiente:** merge a `master` + tag `demo-14`. Definir con cliente EXTERNO
   (¿tercerización?), SERVICIOS/MANTENIMIENTO y SEGUNDAS (categoría de calidad vendible).

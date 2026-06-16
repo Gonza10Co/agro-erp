@@ -809,12 +809,12 @@ async function main() {
   const mesRep = ahora.getUTCMonth() + 1; // 1..12
   const diaUTC = (d: number, h = 8) => new Date(Date.UTC(anioRep, mesRep - 1, d, h, 0, 0));
 
-  // Metas del mes (idempotente por unique anio+mes+tipo). Calibradas a ~76-80% de cumplimiento.
+  // Metas reales del mes según el Excel del dueño (idempotente por unique anio+mes+tipo).
   const metasDemo = [
-    { tipo: 'GUARNICION' as const, valor: 60 },
-    { tipo: 'INYECCION' as const, valor: 60 },
-    { tipo: 'FACTURACION_PARES' as const, valor: 25 },
-    { tipo: 'FACTURACION_VALOR' as const, valor: 2400000 },
+    { tipo: 'GUARNICION' as const, valor: 20160 },
+    { tipo: 'INYECCION' as const, valor: 20160 },
+    { tipo: 'FACTURACION_PARES' as const, valor: 30240 },
+    { tipo: 'FACTURACION_VALOR' as const, valor: 1445895360 },
   ];
   for (const m of metasDemo) {
     await prisma.meta.upsert({
@@ -860,16 +860,27 @@ async function main() {
     },
   });
 
-  // Pares terminados, 4 por día hábil, recorriendo todas las células ese mismo día.
-  const DIAS_ACTIVOS = [2, 3, 4, 5, 6, 9, 10, 11, 12, 13];
-  const PARES_DIA = 4;
+  // Producción del mes: cantidades por día hábil (≈ Excel del dueño, ~20.000 pares para
+  // que el % contra las metas reales sea creíble). Cada par recorre las 5 células ese día.
+  const PRODUCCION_DIA: { d: number; cant: number }[] = [
+    { d: 2, cant: 1200 }, { d: 3, cant: 1440 }, { d: 4, cant: 1440 }, { d: 5, cant: 1522 },
+    { d: 6, cant: 1440 }, { d: 9, cant: 1276 }, { d: 10, cant: 1608 }, { d: 11, cant: 1440 },
+    { d: 12, cant: 1440 }, { d: 13, cant: 1440 }, { d: 16, cant: 1343 }, { d: 17, cant: 1440 },
+    { d: 18, cant: 1440 }, { d: 19, cant: 1451 },
+  ];
+
+  async function enLotes<T>(items: T[], tam: number, fn: (lote: T[]) => Promise<unknown>) {
+    for (let i = 0; i < items.length; i += tam) await fn(items.slice(i, i + tam));
+  }
+
+  // 1) Pares terminados (en lotes para no exceder el límite de parámetros de Postgres).
   let seqD14 = 0;
-  for (const d of DIAS_ACTIVOS) {
-    const paresData = [];
-    for (let i = 0; i < PARES_DIA; i++) {
+  const paresData: any[] = [];
+  for (const { d, cant } of PRODUCCION_DIA) {
+    for (let i = 0; i < cant; i++) {
       seqD14++;
       paresData.push({
-        codigo: `OF9014-${String(seqD14).padStart(4, '0')}`,
+        codigo: `OF9014-${String(seqD14).padStart(5, '0')}`,
         ofId: of9014.id,
         productoConfiguradoId: prodDiel.id,
         tallaId: tallaA.id,
@@ -878,11 +889,11 @@ async function main() {
         createdAt: diaUTC(d, 5),
       });
     }
-    await prisma.par.createMany({ data: paresData });
   }
+  await enLotes(paresData, 2000, (lote) => prisma.par.createMany({ data: lote }));
   const paresD14 = await prisma.par.findMany({ where: { ofId: of9014.id }, select: { id: true, createdAt: true } });
 
-  // Un evento por par en cada célula, todos en el día del par (distintas horas).
+  // 2) Un evento por par en cada célula (Guarnición solo AMARRE), todos en el día del par.
   const ETAPAS: { cel: Celula; sub: string | null; h: number }[] = [
     { cel: Celula.CORTE, sub: null, h: 6 },
     { cel: Celula.GUARNICION, sub: 'AMARRE', h: 8 },
@@ -890,8 +901,7 @@ async function main() {
     { cel: Celula.INYECCION, sub: null, h: 12 },
     { cel: Celula.PT, sub: null, h: 14 },
   ];
-  const eventosD14 = [];
-  const movProdD14 = [];
+  const eventosD14: any[] = [];
   for (const p of paresD14) {
     const dia = new Date(p.createdAt).getUTCDate();
     for (const e of ETAPAS) {
@@ -904,37 +914,41 @@ async function main() {
         timestamp: diaUTC(dia, e.h),
       });
     }
-    // Cada par que llega a PT genera una entrada de producción al kardex.
-    movProdD14.push({
-      tipo: 'ENTRADA' as const,
-      motivo: 'PRODUCCION' as const,
-      inventarioPTId: invPT.id,
-      cantidad: 1,
-      referencia: 'D14-PROD',
-      createdAt: diaUTC(dia, 14),
-    });
   }
-  await prisma.eventoTrazabilidad.createMany({ data: eventosD14 });
+  await enLotes(eventosD14, 5000, (lote) => prisma.eventoTrazabilidad.createMany({ data: lote }));
+
+  // 3) Entrada de producción al kardex de PT: una agregada por día (no una por par).
+  const movProdD14 = PRODUCCION_DIA.map(({ d, cant }) => ({
+    tipo: 'ENTRADA' as const,
+    motivo: 'PRODUCCION' as const,
+    inventarioPTId: invPT.id,
+    cantidad: cant,
+    referencia: 'D14-PROD',
+    createdAt: diaUTC(d, 14),
+  }));
   await prisma.movimientoInventario.createMany({ data: movProdD14 });
 
-  // Saldo inicial de PT al arrancar el mes (entrada de ajuste el último día del mes previo).
+  // Saldo inicial de bodega al arrancar el mes (último día del mes previo), para soportar
+  // ventas que salen de stock acumulado (como en el Excel: la bodega ronda ~25.000 pares).
   await prisma.movimientoInventario.create({
     data: {
       tipo: 'ENTRADA',
       motivo: 'PRODUCCION',
       inventarioPTId: invPT.id,
-      cantidad: 500,
+      cantidad: 30000,
       referencia: 'D14-SALDOINI',
-      createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)), // día 0 = último del mes anterior
+      createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)),
     },
   });
 
   // Ventas del mes: 3 cadenas OC→OP→Despacho→Factura (Despacho tiene opId único,
-  // por eso cada venta lleva su propia OP) en días dispersos.
+  // por eso cada venta lleva su propia OP) en días dispersos. ~25.500 pares (≈84% de la
+  // meta) al precio medio implícito en la meta del Excel ($1.445.895.360 / 30.240).
+  const PRECIO_PAR = 47814;
   const VENTAS_D14 = [
-    { cons: 9015, d: 5, cant: 8 },
-    { cons: 9016, d: 9, cant: 6 },
-    { cons: 9017, d: 12, cant: 5 },
+    { cons: 9015, d: 6, cant: 9000 },
+    { cons: 9016, d: 12, cant: 9000 },
+    { cons: 9017, d: 19, cant: 7500 },
   ];
   for (const v of VENTAS_D14) {
     const ocv = await prisma.ordenCompra.create({
@@ -946,7 +960,7 @@ async function main() {
           create: [
             {
               productoConfiguradoId: prodDiel.id,
-              precioUnitario: 85000,
+              precioUnitario: PRECIO_PAR,
               tallas: { create: [{ tallaId: tallaA.id, cantidad: v.cant }] },
             },
           ],
@@ -964,7 +978,7 @@ async function main() {
         lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, bodegaId: ibg.id, cantidad: v.cant }] },
       },
     });
-    const subtotal = v.cant * 85000;
+    const subtotal = v.cant * PRECIO_PAR;
     const iva = Math.round(subtotal * 0.19);
     const venc = diaUTC(v.d, 16);
     venc.setUTCDate(venc.getUTCDate() + 30);
@@ -979,7 +993,7 @@ async function main() {
         iva,
         total: subtotal + iva,
         estado: 'EMITIDA',
-        lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, cantidad: v.cant, precioUnitario: 85000, subtotal }] },
+        lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, cantidad: v.cant, precioUnitario: PRECIO_PAR, subtotal }] },
       },
     });
     await prisma.movimientoInventario.create({
@@ -993,8 +1007,9 @@ async function main() {
       },
     });
   }
+  const totalVendidos = VENTAS_D14.reduce((a, v) => a + v.cant, 0);
   console.log(
-    `  Demo 14 (reporte diario): metas del mes ${mesRep}/${anioRep} + ${paresD14.length} pares en ${DIAS_ACTIVOS.length} días, 3 facturas (19 pares vendidos)`,
+    `  Demo 14 (reporte diario): metas Excel del mes ${mesRep}/${anioRep} + ${paresD14.length} pares producidos en ${PRODUCCION_DIA.length} días, ${VENTAS_D14.length} facturas (${totalVendidos} pares vendidos)`,
   );
 
   console.log('Seed demo OK:', {

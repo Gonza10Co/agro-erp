@@ -35,8 +35,9 @@ pares en proceso); NO replicaba este reporte. Demo 14 lo cubre.
     (salida real de la célula) para no sobrecontar los sub-pasos.
   - Columnas pendientes en 0 vía `COLUMNAS_PENDIENTES`.
 - **Service** `ReportesService` (3 tests): `diario(anio, mes)` con `Promise.all` de
-  EventoTrazabilidad + Factura (pares = Σ líneas) + MovimientoInventario PT + saldo previo
-  (groupBy) + Meta. `listarMetas` / `guardarMetas` (upsert por `anio_mes_tipo`).
+  EventoTrazabilidad + Factura (pares = Σ líneas, **valor = subtotal sin IVA** para comparar
+  contra la meta comercial) + MovimientoInventario PT + saldo previo (groupBy) + Meta.
+  `listarMetas` / `guardarMetas` (upsert por `anio_mes_tipo`).
 - **Controller** `GET /reportes/diario?anio&mes`, `GET /reportes/metas`, `PUT /reportes/metas`
   (DTO `GuardarMetasDto` validado). Periodo por defecto = mes actual (UTC).
 - Registrado en `app.module.ts`.
@@ -52,18 +53,23 @@ pares en proceso); NO replicaba este reporte. Demo 14 lo cubre.
 - Ruta `/reportes/diario` + ítem "Reporte diario" en el sidebar.
 
 ### Seed (Demo 14)
-- Metas del mes en curso (calibradas a ~76-80% de cumplimiento).
-- Actividad distribuida: OP 9014 con 40 pares en 10 días (eventos por célula),
-  movimientos de PT (producción + saldo inicial), y 3 cadenas OC→OP→Despacho→Factura
-  (9015-9017, Despacho tiene `opId` único) = 19 pares vendidos en días dispersos.
+- **Metas reales del Excel del dueño**: Guarnición 20.160, Inyección 20.160,
+  Facturación 30.240 pares / $1.445.895.360.
+- Actividad a escala real: OP 9014 con ~19.926 pares producidos en 14 días hábiles
+  (cantidades ≈ Excel, ~1.440/día), eventos por célula (en lotes), movimiento de
+  producción agregado por día + saldo inicial de bodega 30.000. 3 cadenas
+  OC→OP→Despacho→Factura (9015-9017, Despacho tiene `opId` único) = 25.500 pares vendidos
+  al precio medio implícito en la meta ($47.814 = $1.445.895.360 / 30.240).
 - Idempotente; la limpieza de la 9014 va antes del borrado global de máquinas/operarios.
 
 ## Verificación
 
 - **263 tests backend + 189 frontend verdes**; ambos builds limpios.
-- **E2E (API)**: `GET /reportes/diario` con seed → acumulado troquelado 46 / guarnición 44
-  / inyección 43 / bodega 43, pares vendidos 19, valor $1.921.850; metas 73.3% / 71.7% /
-  76% / 80.1%; kardex PT arranca en 500 y arrastra.
+- **E2E (API)**: `GET /reportes/diario` con seed → acumulado guarnición 19.924 /
+  inyección 19.923 / bodega 19.923, pares vendidos 25.500, valor $1.219.257.000; metas
+  **98.8% / 98.8% / 84.3% / 84.3%** (casi calcadas al Excel real: 99.8 / 106.7 / 85.4 /
+  84.1%); kardex PT arranca en 30.000 y termina en 24.420. Latencia ~1,0 s con ~100k
+  eventos; dashboard/fabricación siguen <0,1 s (sin degradación por el volumen).
 - **E2E (browser)**: login → `/reportes/diario` renderiza metas, tabla con ACUMULADO y
   kardex; drawer de metas precarga y guarda (PUT) y recarga. Screenshots
   `demo14-reporte-diario.png` + `demo14-metas-drawer.png`.
