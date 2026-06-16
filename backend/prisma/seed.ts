@@ -17,6 +17,12 @@ async function main() {
     update: {},
     create: { name: 'OPERARIO' },
   });
+  // Rol acotado para compartir con el cliente: ve solo demos 1-2 (gating en el front).
+  const cliente = await prisma.role.upsert({
+    where: { name: 'CLIENTE' },
+    update: {},
+    create: { name: 'CLIENTE' },
+  });
 
   const passwordHash = await argon2.hash('admin123');
   await prisma.user.upsert({
@@ -25,7 +31,14 @@ async function main() {
     create: { username: 'admin', passwordHash, roleId: admin.id },
   });
 
-  console.log('Seed completo: roles ADMIN/OPERARIO + usuario admin (admin123)');
+  const clienteHash = await argon2.hash('botas2026');
+  await prisma.user.upsert({
+    where: { username: 'cliente' },
+    update: {},
+    create: { username: 'cliente', passwordHash: clienteHash, roleId: cliente.id },
+  });
+
+  console.log('Seed completo: roles ADMIN/OPERARIO/CLIENTE + usuarios admin (admin123) y cliente (botas2026)');
 }
 
 main()
