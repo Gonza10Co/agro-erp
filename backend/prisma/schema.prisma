@@ -938,3 +938,25 @@ model MovimientoInventario {
   @@index([inventarioPTId, createdAt])
   @@index([createdAt])
 }
+
+// ───────────────────────── Demo 14: Metas gerenciales / Reporte diario ─────────────────────────
+
+enum TipoMeta {
+  GUARNICION         // meta de pares producidos en Guarnición (mensual)
+  INYECCION          // meta de pares inyectados (mensual)
+  FACTURACION_PARES  // meta de pares facturados (mensual)
+  FACTURACION_VALOR  // meta de $ facturado (mensual)
+}
+
+// Meta mensual configurable por tipo. Alimenta el % de cumplimiento del reporte diario.
+model Meta {
+  id        Int      @id @default(autoincrement())
+  anio      Int
+  mes       Int      // 1..12
+  tipo      TipoMeta
+  valor     Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([anio, mes, tipo])
+}
