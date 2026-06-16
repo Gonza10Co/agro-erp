@@ -60,8 +60,8 @@ Cada demo está implementada con TDD y verificada de punta a punta (API + browse
 > ⚠️ Estos tres conceptos hay que **definirlos con el cliente** antes de modelar.
 
 ### 2) Deploy a producción
-- [ ] **Migración del Módulo 2 (pedidos) NO aplicada en Railway** — solo está en local. `prisma migrate deploy`. **Bloqueante para subir Demo 1 y 2 a prod.**
-- [ ] **`environment.prod.ts` del front** — hoy apunta a `localhost`; falta `fileReplacements` con la URL de Railway en `angular.json`.
+- [ ] **Conectar el servicio `backend` de Railway a GitHub (branch `master`)** — hoy `source.repo = null`: el backend se despliega a mano con `railway up`, NO se entera de los merges a `master`. Conectarlo lo alinea con Vercel. (Settings → Source → Connect Repo → `Gonza10Co/agro-erp`, branch `master`.)
+- [ ] **Re-desplegar el backend** una vez `master` esté al día — el `Dockerfile` ya corre `npx prisma migrate deploy` al arrancar, así que el próximo deploy **aplica solo** la migración del Módulo 2 (pedidos) y las demás pendientes. No hay paso manual de migración.
 - [ ] **Definir datos de prod** — ¿semilla demo o datos reales del cliente? (decisión + seed/limpieza).
 
 ### 3) Git — `develop` muy adelantado vs `master`
@@ -78,12 +78,25 @@ Cada demo está implementada con TDD y verificada de punta a punta (API + browse
 
 ## 🚀 PRODUCCIÓN
 
-| Item | Estado |
-|------|--------|
-| Frontend (Vercel) | Desplegado — ver memoria `urls-produccion` |
-| Backend (Railway) | Desplegado — ver memoria `urls-produccion` |
-| Migración Módulo 2 en Railway | ❌ **Pendiente** (bloquea pedidos en prod) |
-| Demos realmente operables en prod | Por confirmar tras aplicar migración + definir datos |
+**Flujo de deploy real** (verificado 2026-06-16):
+
+```
+   merge demo-N → master
+        ├──► Vercel (frontend)  ✅ AUTO-DEPLOY desde master (conectado a GitHub)
+        └──► Railway (backend)  ⚠️ HOY deploy MANUAL (railway up); source.repo=null
+                                   → objetivo: conectarlo a master (ver backlog)
+```
+
+| Servicio | Plataforma | Deploy | Estado |
+|----------|-----------|--------|--------|
+| Frontend (Angular) | Vercel | Auto desde `master` (GitHub) | 🟡 Congelado en Demo 1 (1 solo deployment) |
+| Backend (NestJS) | Railway | **Manual** `railway up` (sin conexión a GitHub) | 🟡 Falta re-deploy con `master` al día |
+| DB (PostgreSQL) | Railway | Servicio `postgres-ssl:18` | ✅ Activo |
+
+- **URLs y logins demo:** ver memoria `urls-produccion`.
+- **Backend Railway:** proyecto `agro-erp` (renombrado el 2026-06-16, antes `considerate-compassion`), servicio `backend`, dominio `backend-production-a89d.up.railway.app`. El CORS se autoriza por env var `CORS_ORIGINS` (no commiteada).
+- **Migraciones:** el `Dockerfile` corre `npx prisma migrate deploy` al arrancar → cada deploy del backend aplica las migraciones pendientes (idempotente). No hay paso manual.
+- **Para subir una demo a prod operable:** (1) `master` al día hasta esa demo, (2) backend conectado a `master` o `railway up` a mano, (3) el deploy aplica migraciones solo.
 
 ---
 
