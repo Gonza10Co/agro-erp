@@ -58,6 +58,47 @@ describe('ShellComponent', () => {
     expect(localStorage.getItem('agro-sidebar')).toBe('expandida');
   });
 
+  it('un rol CLIENTE solo ve los ítems de demos 1-2', () => {
+    const payload = btoa(JSON.stringify({ sub: 9, username: 'cliente', role: 'CLIENTE' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    TestBed.configureTestingModule({
+      imports: [ShellComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(ShellComponent);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    // visibles (demos 1-2)
+    expect(text).toContain('Órdenes de Compra');
+    expect(text).toContain('Órdenes de Producción');
+    expect(text).toContain('Clientes');
+    expect(text).toContain('Configurador de BOM');
+    // ocultos (demos posteriores)
+    expect(text).not.toContain('Inicio');
+    expect(text).not.toContain('Despachos');
+    expect(text).not.toContain('Facturas');
+    expect(text).not.toContain('Cartera');
+    expect(text).not.toContain('Indicadores');
+    expect(text).not.toContain('Reporte diario');
+    expect(text).not.toContain('Próximamente');
+  });
+
+  it('un rol interno (ADMIN) ve los módulos restringidos', () => {
+    const payload = btoa(JSON.stringify({ sub: 1, username: 'admin', role: 'ADMIN' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    TestBed.configureTestingModule({
+      imports: [ShellComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(ShellComponent);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Inicio');
+    expect(text).toContain('Facturas');
+    expect(text).toContain('Indicadores');
+    expect(text).toContain('Reporte diario');
+  });
+
   it('arranca colapsada si la preferencia guardada es "colapsada"', () => {
     localStorage.setItem('agro-sidebar', 'colapsada');
     TestBed.configureTestingModule({

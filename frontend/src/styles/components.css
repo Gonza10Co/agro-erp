@@ -272,6 +272,10 @@ table.data .cell-sub{color:var(--text-muted);font-size:var(--text-caption)}
 .toast.success .t-ic{color:var(--success)} .toast.error .t-ic{color:var(--error)} .toast.info .t-ic{color:var(--info)} .toast.warning .t-ic{color:var(--warning)}
 .toast .t-title{font-size:var(--text-sm);font-weight:var(--fw-semibold)}
 .toast .t-desc{font-size:var(--text-caption);color:var(--text-muted);margin-top:2px}
+.toast .t-msg{flex:1;font-size:var(--text-sm);line-height:var(--lh-sm);color:var(--text)}
+.toast .t-close{flex:none;width:20px;height:20px;display:grid;place-items:center;border:0;background:transparent;color:var(--text-subtle);cursor:pointer;border-radius:var(--r-xs);margin:-2px -4px 0 0}
+.toast .t-close:hover{background:var(--surface-hover);color:var(--text)}
+.toast .t-close svg{width:14px;height:14px}
 .toast-accent{border-left:3px solid var(--accent)}
 
 /* ════════════════════════════ TOOLTIP ════════════════════════════ */

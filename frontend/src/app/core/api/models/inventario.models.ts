@@ -28,6 +28,26 @@ export interface InventarioConsolidado {
   pt: PtStock[];
 }
 
+/** Registro escalar de Bodega devuelto por POST /inventario/bodegas. */
+export interface Bodega {
+  id: number;
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  prioridad: number;
+  activo: boolean;
+}
+
+/** Registro escalar de InventarioPT devuelto por POST /inventario/pt. */
+export interface InventarioPTRow {
+  id: number;
+  productoConfiguradoId: number;
+  tallaId: number;
+  bodegaId: number;
+  cantDisponible: number;
+  cantReservada: number;
+}
+
 export type TipoMovimiento = 'ENTRADA' | 'SALIDA' | 'AJUSTE';
 export type MotivoMovimiento =
   | 'PRODUCCION'
