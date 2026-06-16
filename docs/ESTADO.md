@@ -8,6 +8,36 @@
 > Demos 9–13 de abajo sí están al día. La Demo 12 (inventario consolidado + kardex MP) está
 > en git (commits `5de23c7`…`9ff9fad`) sin sección propia acá.
 
+## Demo 14 — Reporte Diario Gerencial (2026-06-16) ✅ — en `develop`
+
+Replica el Excel maestro "que el dueño revisa a diario" (producción por célula/día,
+acumulado, metas vs. real con % y kardex de PT), generado solo desde datos ya
+capturados. El dashboard de Demo 11 tiene KPIs distintos; esta demo cubre ESE reporte.
+
+- **Schema:** `model Meta(anio, mes, tipo, valor)` + `enum TipoMeta` (GUARNICION,
+  INYECCION, FACTURACION_PARES, FACTURACION_VALOR), unique `(anio, mes, tipo)`.
+  Migración `demo14_metas`.
+- **Backend:** núcleo puro `reportes/reporte-diario-core` (filas diarias + acumulado +
+  metas con % + kardex PT con saldo arrastrado; Guarnición cuenta solo sub-paso AMARRE
+  para no sobrecontar). `ReportesService.diario(anio, mes)` (Promise.all de eventos +
+  facturas + movimientos PT + saldo previo + metas) + `listarMetas`/`guardarMetas`
+  (upsert). Endpoints `GET /reportes/diario?anio&mes`, `GET/PUT /reportes/metas`
+  (periodo por defecto = mes actual).
+- **Frontend:** `ReportesApi`, `reporte-diario.component` (4 tarjetas de metas con % +
+  tabla estilo Excel con fila ACUMULADO resaltada + kardex PT + selector de mes +
+  drawer "Editar metas"). Columnas EXTERNO/SEGUNDAS/SERVICIOS van en 0 con nota honesta
+  ("pendiente de captura"). Ruta `/reportes/diario` + ítem "Reporte diario" en el sidebar.
+- **Seed:** metas del mes + OP 9014 (40 pares en 10 días con eventos por célula) +
+  3 cadenas de venta 9015-9017 (19 pares vendidos). Idempotente.
+- **263 tests backend + 189 frontend verdes**; ambos builds limpios.
+- **Verificado E2E (API + browser):** acumulado 46/44/43/43, 19 vendidos, $1.921.850;
+  metas 73.3/71.7/76/80.1%; kardex arranca en 500 y arrastra. En UI: tabla + metas +
+  kardex + drawer que precarga y guarda. Screenshots `demo14-reporte-diario.png` +
+  `demo14-metas-drawer.png`.
+- Plan: `docs/plans/2026-06-16-demo14-reporte-diario.md`.
+- **Pendiente:** merge a `master` + tag `demo-14`. Definir con cliente EXTERNO
+  (¿tercerización?), SERVICIOS/MANTENIMIENTO y SEGUNDAS (categoría de calidad vendible).
+
 ## Demo 13 — Compras lado proveedor (2026-06-12) ✅ — en `develop`
 
 Cierra la cadena de compras que moría en el requerimiento (hueco #3 del kickoff: logística
