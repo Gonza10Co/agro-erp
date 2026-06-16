@@ -238,6 +238,24 @@ async function main() {
   await prisma.ordenFabricacion.deleteMany({
     where: { op: { consecutivo: { in: [9001, 9002, 9003, 9005, 9006] } } },
   });
+  // Limpieza idempotente de la actividad Demo 14: OP de producción 9014 + cadenas
+  // de venta 9015-9017 + movimientos D14-*. Va ANTES del borrado global de
+  // máquinas/operarios: los eventos de la 9014 los referencian.
+  const CONS_D14 = [9014, 9015, 9016, 9017];
+  await prisma.pago.deleteMany({ where: { factura: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } } });
+  await prisma.facturaLinea.deleteMany({ where: { factura: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } } });
+  await prisma.factura.deleteMany({ where: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } });
+  await prisma.movimientoInventario.deleteMany({ where: { referencia: { startsWith: 'D14-' } } });
+  await prisma.despachoLinea.deleteMany({ where: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } });
+  await prisma.despacho.deleteMany({ where: { op: { consecutivo: { in: CONS_D14 } } } });
+  await prisma.eventoTrazabilidad.deleteMany({ where: { par: { of: { op: { consecutivo: 9014 } } } } });
+  await prisma.par.deleteMany({ where: { of: { op: { consecutivo: 9014 } } } });
+  await prisma.ordenFabricacion.deleteMany({ where: { op: { consecutivo: 9014 } } });
+  await prisma.ordenProduccion.deleteMany({ where: { consecutivo: { in: CONS_D14 } } });
+  await prisma.ordenCompraLineaTalla.deleteMany({ where: { ocLinea: { oc: { consecutivo: { in: CONS_D14 } } } } });
+  await prisma.ordenCompraLinea.deleteMany({ where: { oc: { consecutivo: { in: CONS_D14 } } } });
+  await prisma.ordenCompra.deleteMany({ where: { consecutivo: { in: CONS_D14 } } });
+
   await prisma.maquina.deleteMany({});
   await prisma.operario.deleteMany({});
 
@@ -781,6 +799,203 @@ async function main() {
     data: { referencia: `OCP-${consecOcp}` },
   });
   console.log(`  Demo 13: OCP-${consecOcp} (Curtiembre, 30 m pedidos / 20 recibidos, PARCIAL) + recepción + devolución`);
+
+  // ───────── Demo 14: Reporte diario gerencial — metas + actividad del mes ─────────
+  // Genera actividad distribuida a lo largo del MES ACTUAL (el que el endpoint
+  // consulta por defecto) para que el reporte luzca como el Excel del dueño:
+  // producción por célula/día, pares vendidos + valor, kardex PT y % de metas.
+  const ahora = new Date();
+  const anioRep = ahora.getUTCFullYear();
+  const mesRep = ahora.getUTCMonth() + 1; // 1..12
+  const diaUTC = (d: number, h = 8) => new Date(Date.UTC(anioRep, mesRep - 1, d, h, 0, 0));
+
+  // Metas del mes (idempotente por unique anio+mes+tipo). Calibradas a ~76-80% de cumplimiento.
+  const metasDemo = [
+    { tipo: 'GUARNICION' as const, valor: 60 },
+    { tipo: 'INYECCION' as const, valor: 60 },
+    { tipo: 'FACTURACION_PARES' as const, valor: 25 },
+    { tipo: 'FACTURACION_VALOR' as const, valor: 2400000 },
+  ];
+  for (const m of metasDemo) {
+    await prisma.meta.upsert({
+      where: { anio_mes_tipo: { anio: anioRep, mes: mesRep, tipo: m.tipo } },
+      update: { valor: m.valor },
+      create: { anio: anioRep, mes: mesRep, tipo: m.tipo, valor: m.valor },
+    });
+  }
+
+  // (La limpieza idempotente de la OP 9014 ocurre arriba, junto a la limpieza MES,
+  //  para liberar las FKs de máquinas/operarios antes de su borrado global.)
+  const oc9014 = await prisma.ordenCompra.create({
+    data: {
+      consecutivo: 9014,
+      clienteId: clienteAlDia.id,
+      estado: 'EN_PRODUCCION',
+      lineas: {
+        create: [
+          {
+            productoConfiguradoId: prodDiel.id,
+            precioUnitario: 85000,
+            tallas: { create: [{ tallaId: tallaA.id, cantidad: 60 }] },
+          },
+        ],
+      },
+    },
+  });
+  const op9014 = await prisma.ordenProduccion.create({
+    data: { consecutivo: 9014, ocId: oc9014.id, estado: 'EN_PRODUCCION' },
+  });
+  const of9014 = await prisma.ordenFabricacion.create({
+    data: { consecutivo: await siguienteConsecutivo(prisma, 'of'), opId: op9014.id, estado: 'TERMINADA' },
+  });
+
+  // inventarioPT destino (talla A del producto DIEL en Ibagué — tiene stock por el seed).
+  const invPT = await prisma.inventarioPT.findUniqueOrThrow({
+    where: {
+      productoConfiguradoId_tallaId_bodegaId: {
+        productoConfiguradoId: prodDiel.id,
+        tallaId: tallaA.id,
+        bodegaId: ibg.id,
+      },
+    },
+  });
+
+  // Pares terminados, 4 por día hábil, recorriendo todas las células ese mismo día.
+  const DIAS_ACTIVOS = [2, 3, 4, 5, 6, 9, 10, 11, 12, 13];
+  const PARES_DIA = 4;
+  let seqD14 = 0;
+  for (const d of DIAS_ACTIVOS) {
+    const paresData = [];
+    for (let i = 0; i < PARES_DIA; i++) {
+      seqD14++;
+      paresData.push({
+        codigo: `OF9014-${String(seqD14).padStart(4, '0')}`,
+        ofId: of9014.id,
+        productoConfiguradoId: prodDiel.id,
+        tallaId: tallaA.id,
+        estado: 'TERMINADO' as const,
+        celulaActual: Celula.PT,
+        createdAt: diaUTC(d, 5),
+      });
+    }
+    await prisma.par.createMany({ data: paresData });
+  }
+  const paresD14 = await prisma.par.findMany({ where: { ofId: of9014.id }, select: { id: true, createdAt: true } });
+
+  // Un evento por par en cada célula, todos en el día del par (distintas horas).
+  const ETAPAS: { cel: Celula; sub: string | null; h: number }[] = [
+    { cel: Celula.CORTE, sub: null, h: 6 },
+    { cel: Celula.GUARNICION, sub: 'AMARRE', h: 8 },
+    { cel: Celula.ALMACEN, sub: null, h: 10 },
+    { cel: Celula.INYECCION, sub: null, h: 12 },
+    { cel: Celula.PT, sub: null, h: 14 },
+  ];
+  const eventosD14 = [];
+  const movProdD14 = [];
+  for (const p of paresD14) {
+    const dia = new Date(p.createdAt).getUTCDate();
+    for (const e of ETAPAS) {
+      eventosD14.push({
+        parId: p.id,
+        celula: e.cel,
+        subPaso: (e.sub as any) ?? null,
+        operarioId: ids[e.cel].op,
+        maquinaId: ids[e.cel].maq,
+        timestamp: diaUTC(dia, e.h),
+      });
+    }
+    // Cada par que llega a PT genera una entrada de producción al kardex.
+    movProdD14.push({
+      tipo: 'ENTRADA' as const,
+      motivo: 'PRODUCCION' as const,
+      inventarioPTId: invPT.id,
+      cantidad: 1,
+      referencia: 'D14-PROD',
+      createdAt: diaUTC(dia, 14),
+    });
+  }
+  await prisma.eventoTrazabilidad.createMany({ data: eventosD14 });
+  await prisma.movimientoInventario.createMany({ data: movProdD14 });
+
+  // Saldo inicial de PT al arrancar el mes (entrada de ajuste el último día del mes previo).
+  await prisma.movimientoInventario.create({
+    data: {
+      tipo: 'ENTRADA',
+      motivo: 'PRODUCCION',
+      inventarioPTId: invPT.id,
+      cantidad: 500,
+      referencia: 'D14-SALDOINI',
+      createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)), // día 0 = último del mes anterior
+    },
+  });
+
+  // Ventas del mes: 3 cadenas OC→OP→Despacho→Factura (Despacho tiene opId único,
+  // por eso cada venta lleva su propia OP) en días dispersos.
+  const VENTAS_D14 = [
+    { cons: 9015, d: 5, cant: 8 },
+    { cons: 9016, d: 9, cant: 6 },
+    { cons: 9017, d: 12, cant: 5 },
+  ];
+  for (const v of VENTAS_D14) {
+    const ocv = await prisma.ordenCompra.create({
+      data: {
+        consecutivo: v.cons,
+        clienteId: clienteAlDia.id,
+        estado: 'CERRADA',
+        lineas: {
+          create: [
+            {
+              productoConfiguradoId: prodDiel.id,
+              precioUnitario: 85000,
+              tallas: { create: [{ tallaId: tallaA.id, cantidad: v.cant }] },
+            },
+          ],
+        },
+      },
+    });
+    const opv = await prisma.ordenProduccion.create({
+      data: { consecutivo: v.cons, ocId: ocv.id, estado: 'DESPACHADA' },
+    });
+    const desp = await prisma.despacho.create({
+      data: {
+        consecutivo: await siguienteConsecutivo(prisma, 'despacho'),
+        opId: opv.id,
+        fecha: diaUTC(v.d, 15),
+        lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, bodegaId: ibg.id, cantidad: v.cant }] },
+      },
+    });
+    const subtotal = v.cant * 85000;
+    const iva = Math.round(subtotal * 0.19);
+    const venc = diaUTC(v.d, 16);
+    venc.setUTCDate(venc.getUTCDate() + 30);
+    await prisma.factura.create({
+      data: {
+        consecutivo: await siguienteConsecutivo(prisma, 'factura'),
+        despachoId: desp.id,
+        fecha: diaUTC(v.d, 16),
+        fechaVencimiento: venc,
+        ivaPct: 19,
+        subtotal,
+        iva,
+        total: subtotal + iva,
+        estado: 'EMITIDA',
+        lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, cantidad: v.cant, precioUnitario: 85000, subtotal }] },
+      },
+    });
+    await prisma.movimientoInventario.create({
+      data: {
+        tipo: 'SALIDA',
+        motivo: 'DESPACHO',
+        inventarioPTId: invPT.id,
+        cantidad: v.cant,
+        referencia: 'D14-DESP',
+        createdAt: diaUTC(v.d, 15),
+      },
+    });
+  }
+  console.log(
+    `  Demo 14 (reporte diario): metas del mes ${mesRep}/${anioRep} + ${paresD14.length} pares en ${DIAS_ACTIVOS.length} días, 3 facturas (19 pares vendidos)`,
+  );
 
   console.log('Seed demo OK:', {
     clientes: clientes.length,
