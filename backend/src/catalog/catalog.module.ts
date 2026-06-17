@@ -12,6 +12,8 @@ import { ReferenciaController } from './referencia/referencia.controller';
 import { ReferenciaAbmService } from './referencia/referencia.service';
 import { GrupoOpcionController } from './grupo-opcion/grupo-opcion.controller';
 import { GrupoOpcionService } from './grupo-opcion/grupo-opcion.service';
+import { ProductoConfiguradoController } from './producto-configurado/producto-configurado.controller';
+import { ProductoConfiguradoService } from './producto-configurado/producto-configurado.service';
 
 @Module({
   controllers: [
@@ -21,6 +23,7 @@ import { GrupoOpcionService } from './grupo-opcion/grupo-opcion.service';
     MaterialController,
     ReferenciaController,
     GrupoOpcionController,
+    ProductoConfiguradoController,
   ],
   providers: [
     BomLoaderService,
@@ -30,6 +33,7 @@ import { GrupoOpcionService } from './grupo-opcion/grupo-opcion.service';
     MaterialService,
     ReferenciaAbmService,
     GrupoOpcionService,
+    ProductoConfiguradoService,
   ],
   exports: [BomLoaderService, BomVersionService],
 })

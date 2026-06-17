@@ -41,6 +41,15 @@ describe('CatalogoApi', () => {
     req.flush({});
   });
 
+  it('crearProducto hace POST /catalog/productos con el payload', () => {
+    const payload = { referenciaId: 1, marcaId: 5, opcionIds: [8, 9] };
+    api.crearProducto(payload).subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/productos');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(payload);
+    req.flush({ id: 1, codigo: 'X', nombreComercial: 'X' });
+  });
+
   it('listarMateriales hace GET /catalog/materiales', () => {
     api.listarMateriales().subscribe();
     const req = http.expectOne('http://localhost:3001/catalog/materiales');

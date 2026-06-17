@@ -13,6 +13,9 @@ export class CatalogoApi {
   private readonly base = `${environment.apiUrl}/catalog`;
 
   listarProductos() { return this.http.get<ProductoConfiguradoFull[]>(`${this.base}/productos`); }
+  crearProducto(payload: { referenciaId: number; marcaId: number; opcionIds: number[] }) {
+    return this.http.post<{ id: number; codigo: string; nombreComercial: string }>(`${this.base}/productos`, payload);
+  }
   listarTallas() { return this.http.get<Talla[]>(`${this.base}/tallas`); }
   listarMateriales() { return this.http.get<MaterialItem[]>(`${this.base}/materiales`); }
 
