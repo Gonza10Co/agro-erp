@@ -113,6 +113,12 @@ const SIDEBAR_KEY = 'agro-sidebar';
             <span class="nav-label">Clientes</span>
           </a>
           }
+          @if (puedeVer('proveedores')) {
+          <a class="nav-item" routerLink="/proveedores" routerLinkActive="is-active" title="Proveedores">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l5 5v5h-2M3 7v10h2M9 7V4h4v3"/><circle cx="7" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg></span>
+            <span class="nav-label">Proveedores</span>
+          </a>
+          }
         </div>
         @if (puedeVer('catalogo')) {
         <div class="nav-group">

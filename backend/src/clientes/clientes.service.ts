@@ -1,6 +1,7 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CrearClienteDto } from './dto/crear-cliente.dto';
+import { ActualizarClienteDto } from './dto/actualizar-cliente.dto';
 
 @Injectable()
 export class ClientesService {
@@ -29,5 +30,29 @@ export class ClientesService {
 
   obtener(id: number) {
     return this.prisma.cliente.findUnique({ where: { id } });
+  }
+
+  async actualizar(id: number, dto: ActualizarClienteDto) {
+    await this.existeOFalla(id);
+    return this.prisma.cliente.update({
+      where: { id },
+      data: {
+        nombre: dto.nombre,
+        ciudad: dto.ciudad,
+        tipoCredito: dto.tipoCredito,
+        cupo: dto.cupo,
+      },
+    });
+  }
+
+  async desactivar(id: number) {
+    await this.existeOFalla(id);
+    return this.prisma.cliente.update({ where: { id }, data: { activo: false } });
+  }
+
+  private async existeOFalla(id: number) {
+    const c = await this.prisma.cliente.findUnique({ where: { id } });
+    if (!c) throw new NotFoundException(`Cliente ${id} no existe`);
+    return c;
   }
 }

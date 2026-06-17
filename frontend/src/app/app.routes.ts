@@ -19,6 +19,7 @@ export const routes: Routes = [
       { path: 'pedidos/op', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/op/op-list.component').then(m => m.OpListComponent) },
       { path: 'pedidos/op/:id', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/op/op-detalle.component').then(m => m.OpDetalleComponent) },
       { path: 'clientes', data: { modulo: 'clientes' }, loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
+      { path: 'proveedores', data: { modulo: 'proveedores' }, loadComponent: () => import('./features/proveedores/proveedores-list.component').then(m => m.ProveedoresListComponent) },
       { path: 'catalog/configurador', data: { modulo: 'catalogo' }, loadComponent: () => import('./features/catalog/configurador/configurador.component').then(m => m.ConfiguradorComponent) },
       { path: 'catalog/bom/:referenciaId/editar', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/bom-editor/bom-editor.component').then(m => m.BomEditorComponent) },
       { path: 'catalog/marcas', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/marcas/marcas-list.component').then(m => m.MarcasListComponent) },

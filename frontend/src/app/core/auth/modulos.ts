@@ -8,6 +8,7 @@ export type Modulo =
   | 'inicio'
   | 'pedidos'
   | 'clientes'
+  | 'proveedores'
   | 'catalogo'
   | 'maestros'
   | 'despachos'

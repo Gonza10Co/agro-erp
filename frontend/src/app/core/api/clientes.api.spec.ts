@@ -27,4 +27,19 @@ describe('ClientesApi', () => {
     expect(req.request.body).toEqual({ nit: '900', nombre: 'ACME' });
     req.flush({ id: 1 });
   });
+
+  it('actualizar hace PATCH /clientes/:id', () => {
+    api.actualizar(7, { nombre: 'NUEVO' }).subscribe();
+    const req = http.expectOne('http://localhost:3001/clientes/7');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ nombre: 'NUEVO' });
+    req.flush({ id: 7 });
+  });
+
+  it('desactivar hace PATCH /clientes/:id/desactivar', () => {
+    api.desactivar(7).subscribe();
+    const req = http.expectOne('http://localhost:3001/clientes/7/desactivar');
+    expect(req.request.method).toBe('PATCH');
+    req.flush({ id: 7 });
+  });
 });
