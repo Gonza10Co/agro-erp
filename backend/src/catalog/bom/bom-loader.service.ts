@@ -119,7 +119,9 @@ export class BomLoaderService {
       const filas = await this.prisma.material.findMany({
         where: { id: { in: pendientes } },
         include: {
-          bomPropio: {
+          // Solo el BOM propio ACTIVO del sub-ensamble (puede haber versiones inactivas).
+          bomsPropios: {
+            where: { activo: true },
             include: {
               lineas: {
                 include: { lineasTalla: { include: { talla: true } } },
@@ -130,8 +132,8 @@ export class BomLoaderService {
       });
       const nuevos: number[] = [];
       for (const m of filas as any[]) {
-        const subBom: LineaBase[] = (m.bomPropio?.lineas ?? []).map((l: any) =>
-          this.mapLinea(l),
+        const subBom: LineaBase[] = (m.bomsPropios?.[0]?.lineas ?? []).map(
+          (l: any) => this.mapLinea(l),
         );
         materiales[m.id] = { id: m.id, origen: m.origen, subBom };
         for (const l of subBom)

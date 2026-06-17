@@ -48,24 +48,26 @@ describe('BomLoaderService.cargarEntrada', () => {
       },
     ]);
     const TODOS_MATERIALES: Record<number, any> = {
-      10: { id: 10, origen: 'COMPRADO', bomPropio: null },
-      30: { id: 30, origen: 'COMPRADO', bomPropio: null },
+      10: { id: 10, origen: 'COMPRADO', bomsPropios: [] },
+      30: { id: 30, origen: 'COMPRADO', bomsPropios: [] },
       40: {
         id: 40,
         origen: 'FABRICADO',
-        bomPropio: {
-          lineas: [
-            {
-              materialId: 50,
-              claseConsumo: 'FIJO',
-              consumoFijo: dec(0.04),
-              mermaPct: null,
-              lineasTalla: [],
-            },
-          ],
-        },
+        bomsPropios: [
+          {
+            lineas: [
+              {
+                materialId: 50,
+                claseConsumo: 'FIJO',
+                consumoFijo: dec(0.04),
+                mermaPct: null,
+                lineasTalla: [],
+              },
+            ],
+          },
+        ],
       },
-      50: { id: 50, origen: 'COMPRADO', bomPropio: null },
+      50: { id: 50, origen: 'COMPRADO', bomsPropios: [] },
     };
     prisma.material.findMany.mockImplementation((args: any) =>
       Promise.resolve(
@@ -121,7 +123,7 @@ describe('BomLoaderService.cargarEntrada', () => {
       },
     ]);
     prisma.material.findMany.mockResolvedValue([
-      { id: 99, origen: 'COMPRADO', bomPropio: null },
+      { id: 99, origen: 'COMPRADO', bomsPropios: [] },
     ]);
 
     const entrada = await service.cargarEntrada({
