@@ -6,3 +6,8 @@ node_modules
 
 # Build artifacts
 *.tsbuildinfo
+
+# Data real del cliente (Basarili) exportada del Drive — SENSIBLE, no se commitea.
+# Las plantillas *.example.csv sí se versionan como documentación del formato.
+prisma/data/basarili/*.csv
+!prisma/data/basarili/*.example.csv

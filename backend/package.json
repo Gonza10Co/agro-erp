@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.js",
     "seed": "tsx prisma/seed.ts",
     "seed:catalogo": "tsx prisma/seed-catalogo.ts",
-    "seed:demo": "tsx prisma/seed-demo.ts"
+    "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:basarili": "tsx prisma/seed-basarili.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
