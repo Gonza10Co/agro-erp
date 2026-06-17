@@ -17,11 +17,6 @@ export class CatalogController {
     return this.catalog.listarTallas();
   }
 
-  @Get('materiales')
-  materiales() {
-    return this.catalog.listarMateriales();
-  }
-
   @Get('referencias')
   referencias() {
     return this.catalog.listarReferencias();
