@@ -1,6 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { ConfiguradorComponent } from './configurador.component';
 import { ReferenciaConfig } from '../../../core/api/models/catalogo.models';
 
@@ -16,7 +17,7 @@ describe('ConfiguradorComponent', () => {
   function crear() {
     TestBed.configureTestingModule({
       imports: [ConfiguradorComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     const fixture = TestBed.createComponent(ConfiguradorComponent);
     http = TestBed.inject(HttpTestingController);

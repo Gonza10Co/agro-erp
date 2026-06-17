@@ -20,6 +20,7 @@ export const routes: Routes = [
       { path: 'pedidos/op/:id', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/op/op-detalle.component').then(m => m.OpDetalleComponent) },
       { path: 'clientes', data: { modulo: 'clientes' }, loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
       { path: 'catalog/configurador', data: { modulo: 'catalogo' }, loadComponent: () => import('./features/catalog/configurador/configurador.component').then(m => m.ConfiguradorComponent) },
+      { path: 'catalog/bom/:referenciaId/editar', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/bom-editor/bom-editor.component').then(m => m.BomEditorComponent) },
       { path: 'despachos', data: { modulo: 'despachos' }, loadComponent: () => import('./features/despachos/despachos-list.component').then(m => m.DespachosListComponent) },
       { path: 'facturas', data: { modulo: 'facturas' }, loadComponent: () => import('./features/facturas/facturas-list.component').then(m => m.FacturasListComponent) },
       { path: 'cartera', data: { modulo: 'cartera' }, loadComponent: () => import('./features/cartera/cartera-list.component').then(m => m.CarteraListComponent) },

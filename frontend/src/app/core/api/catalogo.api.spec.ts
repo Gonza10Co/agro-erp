@@ -41,6 +41,29 @@ describe('CatalogoApi', () => {
     req.flush({});
   });
 
+  it('listarMateriales hace GET /catalog/materiales', () => {
+    api.listarMateriales().subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/materiales');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('versionesBom hace GET /catalog/bom/:id/versiones', () => {
+    api.versionesBom(7).subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/bom/7/versiones');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('crearVersionBom hace POST /catalog/bom/version con el payload', () => {
+    const payload = { referenciaId: 7, lineas: [{ materialId: 3, claseConsumo: 'FIJO' as const, consumoFijo: 1 }] };
+    api.crearVersionBom(payload).subscribe();
+    const req = http.expectOne('http://localhost:3001/catalog/bom/version');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(payload);
+    req.flush({});
+  });
+
   it('resolver arma los query params (referenciaId, talla, marcaId, opcionIds[])', () => {
     api.resolver({ referenciaId: 1, talla: 42, marcaId: 5, opcionIds: [8, 9] }).subscribe();
     const req = http.expectOne((r) => r.url === 'http://localhost:3001/catalog/bom/resolve');

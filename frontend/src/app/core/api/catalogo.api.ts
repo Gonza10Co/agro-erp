@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   ProductoConfiguradoFull, ReferenciaListItem, ReferenciaConfig, BomResuelto, ResolverParams,
+  MaterialItem, BomVersionData, CrearBomVersionPayload,
 } from './models/catalogo.models';
 import { Talla } from './models/pedidos.models';
 
@@ -13,9 +14,17 @@ export class CatalogoApi {
 
   listarProductos() { return this.http.get<ProductoConfiguradoFull[]>(`${this.base}/productos`); }
   listarTallas() { return this.http.get<Talla[]>(`${this.base}/tallas`); }
+  listarMateriales() { return this.http.get<MaterialItem[]>(`${this.base}/materiales`); }
 
   listarReferencias() { return this.http.get<ReferenciaListItem[]>(`${this.base}/referencias`); }
   configReferencia(id: number) { return this.http.get<ReferenciaConfig>(`${this.base}/referencias/${id}/config`); }
+
+  versionesBom(referenciaId: number) {
+    return this.http.get<BomVersionData[]>(`${this.base}/bom/${referenciaId}/versiones`);
+  }
+  crearVersionBom(payload: CrearBomVersionPayload) {
+    return this.http.post<BomVersionData>(`${this.base}/bom/version`, payload);
+  }
 
   resolver(p: ResolverParams) {
     let params = new HttpParams()
