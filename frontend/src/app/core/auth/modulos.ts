@@ -8,7 +8,9 @@ export type Modulo =
   | 'inicio'
   | 'pedidos'
   | 'clientes'
+  | 'proveedores'
   | 'catalogo'
+  | 'maestros'
   | 'despachos'
   | 'facturas'
   | 'cartera'
@@ -19,7 +21,11 @@ export type Modulo =
   | 'indicadores'
   | 'reportes';
 
-/** Módulos que ve el rol CLIENTE (demos 1-2: pedidos + clientes + catálogo/BOM). */
+/**
+ * Módulos que ve el rol CLIENTE (demos 1-2: pedidos + clientes + catálogo/BOM).
+ * NOTA: 'maestros' (ABM de catálogo, edición de BOM) queda fuera a propósito —
+ * mantenimiento de datos maestros es solo para roles internos.
+ */
 const MODULOS_CLIENTE: ReadonlySet<Modulo> = new Set<Modulo>(['clientes', 'pedidos', 'catalogo']);
 
 /** Un rol restringido ve solo su subconjunto; cualquier otro rol ve todo. */

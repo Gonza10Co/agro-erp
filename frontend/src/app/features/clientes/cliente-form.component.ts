@@ -1,4 +1,4 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ClientesApi } from '../../core/api/clientes.api';
 import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/pedidos.models';
@@ -35,12 +35,16 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
         <input class="input" id="cupo" name="cupo" type="number" [(ngModel)]="cupo" />
       </div>
       @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin-bottom:var(--sp-3)">{{ error() }}</p> }
-      <button class="btn btn-primary btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">Crear cliente</button>
+      <button class="btn btn-primary btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">
+        {{ editar() ? 'Guardar cambios' : 'Crear cliente' }}
+      </button>
     </form>
   `,
 })
 export class ClienteFormComponent {
   private readonly api = inject(ClientesApi);
+  // Si viene un cliente, el form entra en modo edición (el NIT no se cambia).
+  editar = input<Cliente | null>(null);
   created = output<Cliente>();
 
   nit = '';
@@ -51,6 +55,19 @@ export class ClienteFormComponent {
   loading = signal(false);
   error = signal('');
 
+  constructor() {
+    effect(() => {
+      const c = this.editar();
+      if (c) {
+        this.nit = c.nit;
+        this.nombre = c.nombre;
+        this.ciudad = c.ciudad ?? '';
+        this.tipoCredito = c.tipoCredito;
+        this.cupo = c.cupo != null ? Number(c.cupo) : undefined;
+      }
+    });
+  }
+
   guardar(): void {
     if (!this.nit.trim() || !this.nombre.trim()) {
       this.error.set('NIT y Nombre son obligatorios');
@@ -59,6 +76,7 @@ export class ClienteFormComponent {
     if (this.loading()) return;
     this.error.set('');
     this.loading.set(true);
+    const editando = this.editar();
     const dto: CrearClienteDto = {
       nit: this.nit.trim(),
       nombre: this.nombre.trim(),
@@ -66,9 +84,12 @@ export class ClienteFormComponent {
       tipoCredito: this.tipoCredito,
       cupo: this.cupo,
     };
-    this.api.crear(dto).subscribe({
+    const op = editando
+      ? this.api.actualizar(editando.id, { nombre: dto.nombre, ciudad: dto.ciudad, tipoCredito: dto.tipoCredito, cupo: dto.cupo })
+      : this.api.crear(dto);
+    op.subscribe({
       next: (c) => { this.loading.set(false); this.created.emit(c); },
-      error: (e) => { this.loading.set(false); this.error.set(e?.error?.message ?? 'No se pudo crear el cliente'); },
+      error: (e) => { this.loading.set(false); this.error.set(e?.error?.message ?? 'No se pudo guardar el cliente'); },
     });
   }
 }

@@ -1,6 +1,8 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import { EMPTY, Subject, catchError, debounceTime, map, of, switchMap } from 'rxjs';
+import { AuthService } from '../../../core/auth/auth.service';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
 import {
   BomResuelto, MarcaOpt, ReferenciaConfig, ReferenciaListItem, ResolverParams,
@@ -49,6 +51,12 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
             <select class="input" (change)="elegirTalla($event)">
               @for (t of tallas(); track t) { <option [value]="t" [selected]="t === tallaSel()">{{ t }}</option> }
             </select>
+
+            @if (esInterno) {
+              <button class="btn btn-ghost btn-block" type="button" style="margin-top:var(--sp-5)" (click)="editarBom()">
+                ✎ Editar BOM de esta referencia
+              </button>
+            }
           }
         </div></div>
 
@@ -79,6 +87,14 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
               }
             }
           }
+
+          @if (esInterno && marcaSel() && !faltantes().length) {
+            <button class="btn btn-primary btn-block" type="button" style="margin-top:var(--sp-5)"
+              [disabled]="creandoProducto()" (click)="crearProducto()">
+              {{ creandoProducto() ? 'Creando…' : '+ Crear producto de esta combinación' }}
+            </button>
+            @if (productoMsg()) { <p class="cell-sub" style="margin-top:var(--sp-2)">{{ productoMsg() }}</p> }
+          }
         </div></div>
       </div>
     </div>
@@ -97,6 +113,35 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
 export class ConfiguradorComponent implements OnInit {
   private readonly api = inject(CatalogoApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+
+  // ABM de BOM solo para roles internos (el backend además exige @Roles).
+  readonly esInterno = ['ADMIN', 'GERENTE'].includes(this.auth.rol() ?? '');
+
+  creandoProducto = signal(false);
+  productoMsg = signal('');
+
+  editarBom(): void {
+    const ref = this.refSel();
+    if (ref) this.router.navigate(['/catalog/bom', ref.id, 'editar']);
+  }
+
+  crearProducto(): void {
+    const ref = this.refSel();
+    const marca = this.marcaSel();
+    if (!ref || !marca || this.creandoProducto()) return;
+    this.creandoProducto.set(true);
+    this.productoMsg.set('');
+    this.api.crearProducto({
+      referenciaId: ref.id,
+      marcaId: marca.id,
+      opcionIds: opcionIdsSel(this.opcionesSel()),
+    }).subscribe({
+      next: (p) => { this.creandoProducto.set(false); this.productoMsg.set(`Producto creado: ${p.codigo}`); },
+      error: (e) => { this.creandoProducto.set(false); this.productoMsg.set(e?.error?.message ?? 'No se pudo crear el producto'); },
+    });
+  }
 
   referencias = signal<ReferenciaListItem[]>([]);
   refSel = signal<ReferenciaListItem | null>(null);

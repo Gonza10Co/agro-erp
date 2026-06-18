@@ -27,6 +27,15 @@ describe('PedidosApi', () => {
     req.flush({ id: 5, estado: 'CONFIRMADA' });
   });
 
+  it('actualizarOC hace PATCH /pedidos/oc/:id con el dto', () => {
+    const dto = { clienteId: 7, lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 3 }] }] };
+    api.actualizarOC(5, dto).subscribe();
+    const req = http.expectOne('http://localhost:3001/pedidos/oc/5');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual(dto);
+    req.flush({ id: 5 });
+  });
+
   it('generarOP hace POST /pedidos/op/desde-oc/:ocId', () => {
     api.generarOP(5).subscribe();
     const req = http.expectOne('http://localhost:3001/pedidos/op/desde-oc/5');

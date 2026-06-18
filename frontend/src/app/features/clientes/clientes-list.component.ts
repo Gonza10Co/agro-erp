@@ -34,7 +34,7 @@ import { ClienteFormComponent } from './cliente-form.component';
         <div class="card">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>NIT</th><th>Nombre</th><th>Ciudad</th><th>Crédito</th><th>Cartera</th></tr></thead>
+              <thead><tr><th>NIT</th><th>Nombre</th><th>Ciudad</th><th>Crédito</th><th>Cartera</th><th></th></tr></thead>
               <tbody>
                 @for (c of clientes(); track c.id) {
                   <tr>
@@ -43,6 +43,10 @@ import { ClienteFormComponent } from './cliente-form.component';
                     <td class="cell-sub">{{ c.ciudad || '—' }}</td>
                     <td>{{ c.tipoCredito }}</td>
                     <td><span class="badge badge-neutral"><span class="dot"></span>{{ c.estadoCartera }}</span></td>
+                    <td style="text-align:right;white-space:nowrap">
+                      <button class="btn btn-ghost btn-sm" type="button" (click)="editarCliente(c)">Editar</button>
+                      <button class="btn btn-ghost btn-sm" type="button" (click)="desactivar(c)">Desactivar</button>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -52,8 +56,8 @@ import { ClienteFormComponent } from './cliente-form.component';
       }
     </div>
 
-    <app-drawer [open]="drawerAbierto()" title="Nuevo cliente" (closed)="cerrar()">
-      <app-cliente-form (created)="onCreado()" />
+    <app-drawer [open]="drawerAbierto()" [title]="editando() ? 'Editar cliente' : 'Nuevo cliente'" (closed)="cerrar()">
+      <app-cliente-form [editar]="editando()" (created)="onCreado()" />
     </app-drawer>
   `,
 })
@@ -62,6 +66,7 @@ export class ClientesListComponent {
   clientes = signal<Cliente[]>([]);
   cargando = signal(true);
   drawerAbierto = signal(false);
+  editando = signal<Cliente | null>(null);
 
   constructor() {
     this.cargar();
@@ -75,7 +80,11 @@ export class ClientesListComponent {
     });
   }
 
-  abrir(): void { this.drawerAbierto.set(true); }
+  abrir(): void { this.editando.set(null); this.drawerAbierto.set(true); }
+  editarCliente(c: Cliente): void { this.editando.set(c); this.drawerAbierto.set(true); }
+  desactivar(c: Cliente): void {
+    this.api.desactivar(c.id).subscribe({ next: () => this.cargar() });
+  }
   cerrar(): void { this.drawerAbierto.set(false); }
   onCreado(): void { this.cerrar(); this.cargar(); }
 }

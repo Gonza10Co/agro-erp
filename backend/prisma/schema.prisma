@@ -106,7 +106,7 @@ model Material {
   proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
 
   alias             MaterialAlias[]
-  bomPropio         Bom?            @relation("BomDeMaterial")
+  bomsPropios       Bom[]           @relation("BomDeMaterial")
   lineasComoInsumo  BomLinea[]      @relation("InsumoDeLinea")
   overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
   overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
@@ -153,24 +153,31 @@ model Referencia {
   tallaMax      Talla   @relation("TallaMax", fields: [tallaMaxId], references: [id])
   activo        Boolean @default(true)
 
-  bom                   Bom?
+  boms                  Bom[]
   overrides             ReglaOverride[]
   ejes                  ReferenciaEje[]
   marcas                ReferenciaMarca[]
   productosConfigurados ProductoConfigurado[]
 }
 
+// Versionado: una referencia (o material FABRICADO) puede tener varias versiones de
+// BOM en el histórico, pero solo UNA activa a la vez. La unicidad de "un solo activo"
+// se garantiza con un índice ÚNICO PARCIAL (WHERE activo = true) creado en la
+// migración SQL a mano — Prisma no soporta índices parciales en @@unique de forma nativa.
 model Bom {
   id           Int         @id @default(autoincrement())
-  referenciaId Int?        @unique
+  referenciaId Int?
   referencia   Referencia? @relation(fields: [referenciaId], references: [id])
-  materialId   Int?        @unique
+  materialId   Int?
   material     Material?   @relation("BomDeMaterial", fields: [materialId], references: [id])
   version      Int         @default(1)
   vigenteDesde DateTime    @default(now())
   activo       Boolean     @default(true)
 
   lineas BomLinea[]
+
+  @@index([referenciaId])
+  @@index([materialId])
 }
 
 model BomLinea {

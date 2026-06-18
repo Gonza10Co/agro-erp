@@ -4,7 +4,7 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-06-16** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-06-17** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 
 ---
@@ -18,7 +18,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** ~263 backend + ~189 frontend, verdes 🟢 · ambos builds limpios.
+**Tests:** ~320 backend + ~247 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -41,11 +41,28 @@ Cada demo está implementada con TDD y verificada de punta a punta (API + browse
 | 13 | **Compras lado proveedor** — OCP por proveedor, recepción parcial (backorder), devolución a proveedor | ✅ |
 | 14 | **Reporte Diario Gerencial** — replica el Excel del dueño: producción por célula/día, acumulado, metas vs. real con %, kardex PT | ✅ |
 
+### 🏭 Bloque "Núcleo Real" (2026-06-17) — de demo a producto usable con data real
+
+Paquete para que el cliente **opere con su catálogo real**. Todo en `develop`, TDD, 7 commits.
+
+| Fase | Entrega | Estado |
+|------|---------|--------|
+| 0 | **Seguridad backend** — `RolesGuard` activo; escritura de maestros solo ADMIN/GERENTE (el gating dejó de ser solo de UI) | ✅ |
+| 1 | **Versionado de BOM** — índice único parcial (un BOM activo por ref) + editor de BOM con curva de tallas y drawer | ✅ |
+| 2 | **ABM de catálogo** — marcas, materiales (+alias), referencias, grupos/opciones (back + 4 pantallas, menú Maestros) | ✅ |
+| 3 | **Clientes editable + Proveedores** — PATCH/desactivar clientes; módulo Proveedores nuevo | ✅ |
+| 4 | **ProductoConfigurado real** — crear producto desde el configurador (valida ejes/marca), habilita OCs reales | ✅ |
+| 5 | **Carga de data real del Drive** — cargador `seed-basarili` + ETL del Drive: 110 marcas · 319 materiales · 5 referencias · 5 BOMs | ✅ |
+| 6 | **Editar OC en BORRADOR** — ajustar cantidades/precios antes de confirmar (inline en oc-detalle) | ✅ |
+
+> ⚠️ **Consumos de BOM:** el MRP del Drive no traía cantidades → los 5 BOMs se cargaron con
+> consumo placeholder (1). Los consumos reales se capturan en el **editor de BOM** (fase 1).
+
 ---
 
 ## 🔨 EN CURSO
 
-- Nada activo en este momento. La Demo 14 cerró el 2026-06-16 (en `develop`).
+- Nada activo. El bloque "Núcleo Real" (fases 0-6) cerró el 2026-06-17 (en `develop`).
 
 ---
 
@@ -62,7 +79,9 @@ Cada demo está implementada con TDD y verificada de punta a punta (API + browse
 ### 2) Deploy a producción
 - [x] **Conectar el servicio `backend` de Railway a GitHub (branch `master`)** ✅ 2026-06-16 — backend auto-despliega desde `master` e igual que Vercel; el primer deploy aplicó las 13 migraciones pendientes (DB al día).
 - [ ] **Re-desplegar el frontend (Vercel)** — quedó atrás del backend (commit setup inicial). Redeploy en Vercel o push a `master`.
-- [ ] **Definir datos de prod** — ¿semilla demo o datos reales del cliente? (decisión + seed/limpieza).
+- [x] **Datos de prod definidos** ✅ 2026-06-17 — catálogo real del cliente cargado en local vía `seed:basarili` (CSVs del Drive). En prod se corre el seed **una vez** contra Railway.
+- [ ] **Capturar consumos de BOM** — los 5 BOMs reales están con placeholder; el cliente carga los consumos por talla en el editor de BOM.
+- [ ] **ABM de usuarios** (diferido) — hoy operan con usuarios sembrados; falta pantalla para que el cliente cree sus operarios/gerentes.
 
 ### 3) Git — `develop` muy adelantado vs `master`
 - [ ] Tags presentes: **solo `demo-1` y `demo-13`**. Faltan/verificar: `demo-9`, `demo-10`, `demo-11`, `demo-12`, `demo-14`.

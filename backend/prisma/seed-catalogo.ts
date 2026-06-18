@@ -49,10 +49,11 @@ async function main() {
   const plantillaPU = await mat('PLANT-PU', 'PLANTILLA PU', catSemi.id, uPar.id, 'FABRICADO', 'DIRECTO_FIJO');
   const poliol = await mat('POLIOL', 'POLIOL JF', catSemi.id, uKg.id, 'COMPRADO', 'DIRECTO_FIJO');
 
-  // BOM propio de la plantilla (FABRICADO): 0.04 kg de poliol por par
-  const bomPlantilla = await prisma.bom.upsert({
-    where: { materialId: plantillaPU.id }, update: {}, create: { materialId: plantillaPU.id },
-  });
+  // BOM propio de la plantilla (FABRICADO): 0.04 kg de poliol por par.
+  // referenciaId/materialId ya no son únicos (versionado): buscar el activo o crear.
+  const bomPlantilla =
+    (await prisma.bom.findFirst({ where: { materialId: plantillaPU.id, activo: true } })) ??
+    (await prisma.bom.create({ data: { materialId: plantillaPU.id } }));
   // Idempotencia: limpiar líneas previas de este BOM (y sus tallas) antes de recrear.
   await prisma.bomLineaTalla.deleteMany({ where: { bomLinea: { bomId: bomPlantilla.id } } });
   await prisma.bomLinea.deleteMany({ where: { bomId: bomPlantilla.id } });
@@ -68,9 +69,9 @@ async function main() {
   });
 
   // BOM base de la 101: micropiel negra (curva) + suela base (fija)
-  const bom101 = await prisma.bom.upsert({
-    where: { referenciaId: ref.id }, update: {}, create: { referenciaId: ref.id },
-  });
+  const bom101 =
+    (await prisma.bom.findFirst({ where: { referenciaId: ref.id, activo: true } })) ??
+    (await prisma.bom.create({ data: { referenciaId: ref.id } }));
   // Idempotencia: limpiar líneas previas de este BOM (y sus tallas) antes de recrear.
   await prisma.bomLineaTalla.deleteMany({ where: { bomLinea: { bomId: bom101.id } } });
   await prisma.bomLinea.deleteMany({ where: { bomId: bom101.id } });

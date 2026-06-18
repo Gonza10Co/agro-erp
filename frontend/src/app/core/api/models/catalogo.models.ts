@@ -27,3 +27,27 @@ export interface NodoBom {
 export interface CompradoBom { materialId: number; codigo: string; nombre: string; unidad: string; consumo: number; }
 export interface BomResuelto { arbol: NodoBom[]; comprados: CompradoBom[]; }
 export interface ResolverParams { referenciaId: number; talla: number; marcaId?: number; opcionIds?: number[]; }
+
+// --- Edición / versionado de BOM ---
+export interface MaterialItem {
+  id: number; codigo: string; nombreCanonico: string;
+  origen: 'COMPRADO' | 'FABRICADO'; unidad: string;
+}
+// Decimales de Prisma llegan como string por JSON; el editor los normaliza con Number().
+export interface BomLineaTallaData { tallaId: number; consumo: number | string; }
+export interface BomLineaData {
+  id: number; materialId: number; claseConsumo: 'CURVA' | 'FIJO';
+  consumoFijo: number | string | null; mermaPct: number | string | null;
+  lineasTalla: BomLineaTallaData[];
+}
+export interface BomVersionData {
+  id: number; version: number; activo: boolean; vigenteDesde: string; lineas: BomLineaData[];
+}
+export interface BomLineaInput {
+  materialId: number; claseConsumo: 'CURVA' | 'FIJO';
+  consumoFijo?: number; mermaPct?: number;
+  tallas?: { tallaId: number; consumo: number }[];
+}
+export interface CrearBomVersionPayload {
+  referenciaId?: number; materialId?: number; lineas: BomLineaInput[];
+}

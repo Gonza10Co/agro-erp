@@ -11,4 +11,6 @@ export class ClientesApi {
   listar() { return this.http.get<Cliente[]>(this.base); }
   obtener(id: number) { return this.http.get<Cliente>(`${this.base}/${id}`); }
   crear(dto: CrearClienteDto) { return this.http.post<Cliente>(this.base, dto); }
+  actualizar(id: number, dto: Partial<CrearClienteDto>) { return this.http.patch<Cliente>(`${this.base}/${id}`, dto); }
+  desactivar(id: number) { return this.http.patch<Cliente>(`${this.base}/${id}/desactivar`, {}); }
 }

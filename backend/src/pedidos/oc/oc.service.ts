@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
+import { ActualizarOCDto } from './dto/actualizar-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
 
 @Injectable()
@@ -23,6 +24,43 @@ export class OcService {
           ocCliente: dto.ocCliente,
           observaciones: dto.observaciones,
           estado: 'BORRADOR',
+          lineas: {
+            create: dto.lineas.map((l) => ({
+              productoConfiguradoId: l.productoConfiguradoId,
+              precioUnitario: l.precioUnitario,
+              tallas: {
+                create: l.tallas.map((t) => ({
+                  tallaId: t.tallaId,
+                  cantidad: t.cantidad,
+                })),
+              },
+            })),
+          },
+        },
+        include: { lineas: { include: { tallas: true } } },
+      });
+    });
+  }
+
+  // Edición de una OC en BORRADOR: reemplaza cabecera y líneas en una transacción.
+  // Una OC ya CONFIRMADA (o en estados posteriores) no se edita: solo se anula.
+  async actualizar(id: number, dto: ActualizarOCDto) {
+    const oc = await this.prisma.ordenCompra.findUnique({ where: { id } });
+    if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+    if (oc.estado !== 'BORRADOR') {
+      throw new BadRequestException(
+        'Solo se puede editar una OC en estado BORRADOR',
+      );
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.ordenCompraLineaTalla.deleteMany({ where: { ocLinea: { ocId: id } } });
+      await tx.ordenCompraLinea.deleteMany({ where: { ocId: id } });
+      return tx.ordenCompra.update({
+        where: { id },
+        data: {
+          clienteId: dto.clienteId,
+          ocCliente: dto.ocCliente,
+          observaciones: dto.observaciones,
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,

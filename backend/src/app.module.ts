@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ClientesModule } from './clientes/clientes.module';
+import { ProveedoresModule } from './proveedores/proveedores.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { OcModule } from './pedidos/oc/oc.module';
 import { OpModule } from './pedidos/op/op.module';
@@ -25,6 +26,7 @@ import { ReportesModule } from './reportes/reportes.module';
     AuthModule,
     CatalogModule,
     ClientesModule,
+    ProveedoresModule,
     InventarioModule,
     OcModule,
     OpModule,

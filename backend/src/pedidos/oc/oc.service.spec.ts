@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OcService } from './oc.service';
 
 describe('OcService', () => {
@@ -10,6 +10,8 @@ describe('OcService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    ordenCompraLinea: { deleteMany: jest.fn() },
+    ordenCompraLineaTalla: { deleteMany: jest.fn() },
   } as any;
   // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
   prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
@@ -129,5 +131,37 @@ describe('OcService', () => {
     prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, lineas: [] });
     const r = await service.obtener(1);
     expect(r).toMatchObject({ id: 1 });
+  });
+
+  it('actualizar recrea las líneas y la cabecera de una OC en BORRADOR', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'BORRADOR' });
+    prisma.ordenCompra.update.mockResolvedValue({ id: 1, estado: 'BORRADOR' });
+    await service.actualizar(1, {
+      clienteId: 7,
+      observaciones: 'editada',
+      lineas: [{ productoConfiguradoId: 2, precioUnitario: 90000, tallas: [{ tallaId: 5, cantidad: 12 }] }],
+    });
+    // borra tallas y líneas viejas antes de recrear
+    expect(prisma.ordenCompraLineaTalla.deleteMany).toHaveBeenCalledWith({ where: { ocLinea: { ocId: 1 } } });
+    expect(prisma.ordenCompraLinea.deleteMany).toHaveBeenCalledWith({ where: { ocId: 1 } });
+    const arg = prisma.ordenCompra.update.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: 1 });
+    expect(arg.data.observaciones).toBe('editada');
+    expect(arg.data.lineas.create[0].precioUnitario).toBe(90000);
+  });
+
+  it('actualizar rechaza una OC que no está en BORRADOR', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'CONFIRMADA' });
+    await expect(
+      service.actualizar(1, { clienteId: 7, lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 1 }] }] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.ordenCompra.update).not.toHaveBeenCalled();
+  });
+
+  it('actualizar lanza NotFound si la OC no existe', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue(null);
+    await expect(
+      service.actualizar(99, { clienteId: 7, lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 1 }] }] }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

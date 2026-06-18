@@ -31,6 +31,28 @@ export class CatalogService {
     return this.prisma.talla.findMany({ orderBy: { orden: 'asc' } });
   }
 
+  // Materiales activos para selectores (editor de BOM, ABM). Incluye el código de unidad.
+  async listarMateriales() {
+    const filas = await this.prisma.material.findMany({
+      where: { activo: true },
+      orderBy: { nombreCanonico: 'asc' },
+      select: {
+        id: true,
+        codigo: true,
+        nombreCanonico: true,
+        origen: true,
+        unidadMedida: { select: { codigo: true } },
+      },
+    });
+    return filas.map((m) => ({
+      id: m.id,
+      codigo: m.codigo,
+      nombreCanonico: m.nombreCanonico,
+      origen: m.origen,
+      unidad: m.unidadMedida?.codigo ?? '',
+    }));
+  }
+
   listarReferencias() {
     return this.prisma.referencia.findMany({
       where: { activo: true },
