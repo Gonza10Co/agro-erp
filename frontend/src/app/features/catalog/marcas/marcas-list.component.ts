@@ -59,7 +59,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
       <form (ngSubmit)="guardar()">
         <div class="field">
           <label class="label" for="codigo">Código <span class="req">*</span></label>
-          <input class="input" id="codigo" name="codigo" [(ngModel)]="codigo" autocomplete="off" [disabled]="editando()" />
+          <input class="input" id="codigo" name="codigo" [(ngModel)]="codigo" autocomplete="off" [disabled]="!!editando()" />
         </div>
         <div class="field">
           <label class="label" for="nombre">Nombre <span class="req">*</span></label>
