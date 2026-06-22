@@ -10,7 +10,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
       @if (abierto() && filtrados().length) {
         <div class="bsc-list">
           @for (item of filtrados(); track $index) {
-            <button type="button" class="bsc-opt" (click)="elegir(item)">
+            <button type="button" class="bsc-opt" (mousedown)="$event.preventDefault()" (click)="elegir(item)">
               <span class="bsc-main">{{ etiqueta()(item) }}</span>
               @if (sub(); as s) { <span class="bsc-sub">{{ s(item) }}</span> }
             </button>
