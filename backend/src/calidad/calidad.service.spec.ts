@@ -195,6 +195,21 @@ describe('CalidadService.reportar — BAJA', () => {
       expect.objectContaining({ data: expect.objectContaining({ codigo: 'OF1-0001-R2' }) }),
     );
   });
+
+  it('la reposición de un par de línea Externa re-arranca en INYECCION, no en CORTE', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      ...parEnProceso,
+      productoConfigurado: { marca: { linea: { celulaInicial: 'INYECCION' } } },
+    });
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null }),
+      }),
+    );
+  });
 });
 
 describe('CalidadService.indicadores', () => {

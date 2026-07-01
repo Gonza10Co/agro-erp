@@ -22,11 +22,21 @@ export function esUltimaCelula(c: Celula): boolean {
   return siguienteCelula(c) === null;
 }
 
+/**
+ * Sub-paso inicial al arrancar en una célula. Solo Guarnición arranca dentro de
+ * un sub-paso (AREA); cualquier otro punto de entrada (CORTE, INYECCION…) es null.
+ */
+export function subPasoInicial(celula: Celula): SubPasoGuarnicion | null {
+  return celula === 'GUARNICION' ? 'AREA' : null;
+}
+
 /** Línea de producción pendiente de la OP (lo que hay que fabricar). */
 export interface LineaProduccion {
   productoConfiguradoId: number;
   tallaId: number;
   cantAProducir: number;
+  /** Célula donde arranca la línea. Default CORTE; la línea Externa entra en INYECCION. */
+  celulaInicial?: Celula;
 }
 
 /** Par a materializar (lo que va a la tabla Par, sin ofId). */
@@ -34,6 +44,8 @@ export interface ParData {
   codigo: string;
   productoConfiguradoId: number;
   tallaId: number;
+  celulaInicial: Celula;
+  subPasoInicial: SubPasoGuarnicion | null;
 }
 
 export const ORDEN_SUBPASOS: SubPasoGuarnicion[] =
@@ -70,12 +82,16 @@ export function generarPares(
   const out: ParData[] = [];
   let seq = 0;
   for (const l of lineas) {
+    const celulaInicial = l.celulaInicial ?? 'CORTE';
+    const subPaso = subPasoInicial(celulaInicial);
     for (let i = 0; i < l.cantAProducir; i++) {
       seq++;
       out.push({
         codigo: `OF${consecutivoOF}-${String(seq).padStart(4, '0')}`,
         productoConfiguradoId: l.productoConfiguradoId,
         tallaId: l.tallaId,
+        celulaInicial,
+        subPasoInicial: subPaso,
       });
     }
   }
