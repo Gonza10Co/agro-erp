@@ -200,13 +200,13 @@ describe('CalidadService.reportar — BAJA', () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
       ...parEnProceso,
-      productoConfigurado: { marca: { linea: { celulaInicial: 'INYECCION' } } },
+      productoConfigurado: { marca: { lineaId: 4, linea: { celulaInicial: 'INYECCION' } } },
     });
     prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
     await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
     expect(tx.par.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null }),
+        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null, lineaId: 4 }),
       }),
     );
   });

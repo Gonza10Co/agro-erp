@@ -37,6 +37,8 @@ export interface LineaProduccion {
   cantAProducir: number;
   /** Célula donde arranca la línea. Default CORTE; la línea Externa entra en INYECCION. */
   celulaInicial?: Celula;
+  /** Id de la línea de negocio (denormalizado en el par para reportes). Null si la marca no tiene línea. */
+  lineaId?: number | null;
 }
 
 /** Par a materializar (lo que va a la tabla Par, sin ofId). */
@@ -46,6 +48,7 @@ export interface ParData {
   tallaId: number;
   celulaInicial: Celula;
   subPasoInicial: SubPasoGuarnicion | null;
+  lineaId: number | null;
 }
 
 export const ORDEN_SUBPASOS: SubPasoGuarnicion[] =
@@ -92,6 +95,7 @@ export function generarPares(
         tallaId: l.tallaId,
         celulaInicial,
         subPasoInicial: subPaso,
+        lineaId: l.lineaId ?? null,
       });
     }
   }

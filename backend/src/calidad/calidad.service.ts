@@ -69,9 +69,10 @@ export class CalidadService {
         });
         return { incidencia, parReposicion: null };
       }
-      const celulaInicial =
-        (par as any).productoConfigurado?.marca?.linea?.celulaInicial ?? 'CORTE';
-      return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial);
+      const marca = (par as any).productoConfigurado?.marca;
+      const celulaInicial = marca?.linea?.celulaInicial ?? 'CORTE';
+      const lineaId = marca?.lineaId ?? null;
+      return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial, lineaId);
     } catch (e: unknown) {
       // FK inválida del reporte: solo el operario (input del usuario) → 400.
       // Cualquier otra FK (productoConfigurado, talla, autorizadoPor, par…) es
@@ -113,6 +114,7 @@ export class CalidadService {
     dto: ReportarIncidenciaDto,
     user: Usuario,
     celulaInicial: Celula,
+    lineaId: number | null,
   ) {
     return this.prisma.$transaction(async (tx) => {
       // Condición sobre el estado para no pisar un par que otra tx acaba de
@@ -134,6 +136,7 @@ export class CalidadService {
           tallaId: par.tallaId,
           celulaActual: celulaInicial,
           subPasoActual: subPasoInicial(celulaInicial),
+          lineaId,
           reponeAParId: par.id,
         },
       });

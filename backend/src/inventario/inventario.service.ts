@@ -52,7 +52,9 @@ export class InventarioService {
   }
 
   // Foto única del flujo físico: materia prima → WIP por célula → producto terminado.
-  async consolidado() {
+  // lineaId opcional: filtra el WIP (pares en proceso) por línea de producción.
+  // Materiales y PT quedan globales (materia prima compartida entre líneas).
+  async consolidado(lineaId?: number) {
     const [materiales, wipPorCelula, pt] = await Promise.all([
       this.prisma.inventarioMaterial.findMany({
         include: {
@@ -64,7 +66,7 @@ export class InventarioService {
       }),
       this.prisma.par.groupBy({
         by: ['celulaActual'],
-        where: { estado: 'EN_PROCESO' },
+        where: { estado: 'EN_PROCESO', ...(lineaId ? { lineaId } : {}) },
         _count: { _all: true },
       }),
       this.prisma.inventarioPT.findMany({

@@ -14,8 +14,11 @@ import {
 export class IndicadoresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async indicadores(now: Date = new Date()) {
+  // lineaId opcional: restringe los indicadores (etapas, operarios, máquinas,
+  // alertas de demora) a los pares de una línea de producción.
+  async indicadores(now: Date = new Date(), lineaId?: number) {
     const pares = await this.prisma.par.findMany({
+      where: lineaId ? { lineaId } : {},
       select: {
         codigo: true,
         createdAt: true,

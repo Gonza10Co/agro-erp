@@ -106,7 +106,7 @@ describe('FabricacionService.generarOF', () => {
       lineas: [
         {
           productoConfiguradoId: 10,
-          productoConfigurado: { marca: { linea: { celulaInicial: 'INYECCION' } } },
+          productoConfigurado: { marca: { lineaId: 4, linea: { celulaInicial: 'INYECCION' } } },
           tallas: [{ tallaId: 1, cantAProducir: 2 }],
         },
       ],
@@ -114,7 +114,7 @@ describe('FabricacionService.generarOF', () => {
     await new FabricacionService(prisma).generarOF(100);
     const data = tx.par.createMany.mock.calls[0][0].data;
     expect(data).toHaveLength(2);
-    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.subPasoActual === null)).toBe(true);
+    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.subPasoActual === null && p.lineaId === 4)).toBe(true);
   });
 
   it('sin línea asignada los pares siguen arrancando en CORTE (cero regresión)', async () => {

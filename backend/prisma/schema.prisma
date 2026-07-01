@@ -244,6 +244,7 @@ model Linea {
   activo        Boolean @default(true)
 
   marcas Marca[]
+  pares  Par[]
 }
 
 model Marca {
@@ -779,6 +780,8 @@ model Par {
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
   subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
+  lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
+  linea                 Linea?              @relation(fields: [lineaId], references: [id])
   reponeAParId          Int?                @unique // si este par es una reposición, el par dado de baja que repone
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -794,6 +797,7 @@ model Par {
   @@index([ofId])
   @@index([celulaActual])
   @@index([subPasoActual])
+  @@index([lineaId])
 }
 
 model EventoTrazabilidad {

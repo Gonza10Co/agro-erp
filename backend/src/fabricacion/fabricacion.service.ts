@@ -41,6 +41,7 @@ export class FabricacionService {
           cantAProducir: t.cantAProducir,
           // Sin línea asignada → CORTE (comportamiento histórico, cero regresión).
           celulaInicial: l.productoConfigurado?.marca?.linea?.celulaInicial ?? 'CORTE',
+          lineaId: l.productoConfigurado?.marca?.lineaId ?? null,
         })),
     );
     if (lineas.length === 0)
@@ -56,6 +57,7 @@ export class FabricacionService {
         tallaId: p.tallaId,
         celulaActual: p.celulaInicial,
         subPasoActual: p.subPasoInicial,
+        lineaId: p.lineaId,
       }));
       await tx.par.createMany({ data: pares });
       return { id: of.id, consecutivo, opId, totalPares: pares.length };
