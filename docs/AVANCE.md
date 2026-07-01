@@ -4,7 +4,7 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-06-17** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-07-01** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 
 ---
@@ -18,7 +18,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** ~320 backend + ~247 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
+**Tests:** ~338 backend + ~256 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -58,23 +58,46 @@ Paquete para que el cliente **opere con su catálogo real**. Todo en `develop`, 
 > ⚠️ **Consumos de BOM:** el MRP del Drive no traía cantidades → los 5 BOMs se cargaron con
 > consumo placeholder (1). Los consumos reales se capturan en el **editor de BOM** (fase 1).
 
+### 🧵 Bloque "Líneas de producción" (2026-07-01) — 4 líneas independientes
+
+Don Gabriel (dueño) decidió NO unificar Basarili+Agro y mantener **4 líneas independientes**:
+Basarili · Agro · Alta (costura alta, nueva) · Externa (capellada de Bogotá, se inyecta acá).
+"Independiente" = **solo separar reportes** (misma empresa; inventario/cartera/facturación
+compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b881a`.
+
+> 🔑 **Decisión de modelado:** la "línea" NO es `Marca`. El catálogo real tiene ~110 marcas
+> (nombres comerciales: AGRO, PODEROSA…) y una línea agrupa varias. Se creó la entidad
+> **`Linea`** (1→N marcas) con `celulaInicial`; `Marca.lineaId` es nullable.
+
+| Fase | Entrega | Estado |
+|------|---------|--------|
+| A1+0 | **Entidad `Linea`** (codigo, nombre, celulaInicial, activo) + `Marca.lineaId?` + migración; seed de las 4 líneas (Externa → INYECCION) | ✅ |
+| A2 | **Arranque de par configurable** — el par toma su célula inicial de la línea; la Externa entra directo en INYECCIÓN. Fix: el 1er escaneo activa la OF en cualquier célula (antes solo CORTE → OF Externa quedaba ABIERTA). Reposición re-arranca en la célula de la línea | ✅ |
+| B1 | **`Par.lineaId` denormalizado** (+ backfill) + `inventario/consolidado?lineaId` e `indicadores?lineaId` filtran producción por línea | ✅ |
+| A3/B2 | **CRUD `catalog/lineas`** + ABM `/catalog/lineas` (menú Maestros) + dropdown de línea en ABM Marca + selector de línea en Inventario/Indicadores + aviso de reposición con célula real | ✅ |
+
+> ⚠️ **Pendiente del cliente:** falta el **mapeo marca→línea** (qué marca va en qué línea).
+> Hasta entonces `Par.lineaId` = NULL y los filtros por línea no devuelven datos; tras la
+> asignación hay que **re-sincronizar los pares existentes**.
+
 ---
 
 ## 🔨 EN CURSO
 
-- Nada activo. El bloque "Núcleo Real" (fases 0-6) cerró el 2026-06-17 (en `develop`).
+- Nada activo. El bloque "Líneas de producción" (fases A1/0/A2/B1/A3-B2) cerró el 2026-07-01 (en `develop`).
 
 ---
 
 ## ⏳ FALTA (backlog priorizado)
 
 ### 1) Modelado de negocio — conceptos del Excel aún sin modelar
-- [ ] **EXTERNO / tercerización** — hoy la columna va en 0 con nota "pendiente de captura".
+- [x] **EXTERNO / tercerización** ✅ 2026-07-01 — modelado como **línea Externa** (capellada de Bogotá que arranca en INYECCIÓN). Falta el **mapeo marca→línea** que entrega el cliente + re-sincronizar `Par.lineaId`.
+- [ ] **Reporte Diario Gerencial POR LÍNEA** — la Demo 14 ya existe pero agrega todo junto; falta segmentar producción/metas por las 4 líneas (el `Par.lineaId` ya está listo para ello).
 - [ ] **SEGUNDAS** — categoría de calidad vendible; no existe en el modelo.
 - [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada.
 - [ ] **Metas por célula** — el Reporte usa metas mensuales por tipo; falta el desglose por célula.
 
-> ⚠️ Estos tres conceptos hay que **definirlos con el cliente** antes de modelar.
+> ⚠️ Segundas, servicios y metas-por-célula hay que **definirlos con el cliente** antes de modelar.
 
 ### 2) Deploy a producción
 - [x] **Conectar el servicio `backend` de Railway a GitHub (branch `master`)** ✅ 2026-06-16 — backend auto-despliega desde `master` e igual que Vercel; el primer deploy aplicó las 13 migraciones pendientes (DB al día).
@@ -136,6 +159,8 @@ npm run start:dev
 #   npm run seed          # usuario admin / admin123
 #   npm run seed:catalogo
 #   npm run seed:demo
+#   npm run seed:basarili # catálogo real del Drive + las 4 líneas de producción
+#                         # (Basarili/Agro/Alta/Externa; Externa arranca en INYECCIÓN)
 
 # Frontend (:4200)
 cd agro-erp/frontend

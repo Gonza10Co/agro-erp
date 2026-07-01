@@ -21,6 +21,8 @@ ERP + MES para fábrica de botas de seguridad (make-to-order). Monorepo npm work
 
 OC (pedido del cliente) → OP (producción, amarra stock PT) → OF (corrida de fabricación) → pares con código `OF{n}-{seq}` escaneados por célula (CORTE→GUARNICION→ALMACEN→INYECCION→PT) → InventarioPT → Despacho (regla de cartera: cliente vencido bloquea, autoriza solo GERENTE/ADMIN).
 
+**Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea Externa (capellada de Bogotá) arranca en INYECCIÓN, no en CORTE. `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). El mapeo marca→línea lo entrega el cliente; hasta entonces `Par.lineaId` = NULL.
+
 ## Workflow
 
 - `develop` = construcción adelantada; `master` = lo mostrado al cliente (merge `--no-ff` + tag `demo-N`).
