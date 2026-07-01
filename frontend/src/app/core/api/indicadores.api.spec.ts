@@ -22,4 +22,9 @@ describe('IndicadoresApi', () => {
     api.indicadores().subscribe();
     http.expectOne(`${base}/indicadores`).flush({ etapas: [], operarios: [], maquinas: [], alertas: [] });
   });
+
+  it('indicadores con lineaId manda el query param', () => {
+    api.indicadores(3).subscribe();
+    http.expectOne(`${base}/indicadores?lineaId=3`).flush({ etapas: [], operarios: [], maquinas: [], alertas: [] });
+  });
 });

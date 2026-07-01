@@ -1,19 +1,29 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { IndicadoresApi } from '../../core/api/indicadores.api';
+import { LineasApi, Linea } from '../../core/api/lineas.api';
 import { EtapaIndicador, Indicadores } from '../../core/api/models/indicadores.models';
 import { LABEL_CELULA, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
 
 @Component({
   selector: 'app-dashboard-indicadores',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   template: `
     <div class="page">
       <div class="page-header">
         <div class="ph-title">Indicadores · eficiencia</div>
-        <button class="btn" (click)="cargar()">Actualizar</button>
+        <div class="ph-actions">
+          <select class="btn" [ngModel]="lineaSeleccionada()" (ngModelChange)="cambiarLinea($event)" title="Filtrar por línea">
+            <option [ngValue]="null">Todas las líneas</option>
+            @for (l of lineas(); track l.id) {
+              <option [ngValue]="l.id">{{ l.nombre }}</option>
+            }
+          </select>
+          <button class="btn" (click)="cargar()">Actualizar</button>
+        </div>
       </div>
       @if (error()) {
         <div class="empty"><h4>No se pudieron cargar los indicadores</h4><p class="cell-sub">{{ error() }}</p></div>
@@ -96,23 +106,36 @@ import { LABEL_CELULA, LABEL_SUBPASO } from '../../core/api/models/fabricacion.m
     .alerta-cod{font-weight:var(--fw-medium);color:var(--danger)}
     .alerta-etapa{color:var(--text-subtle)}
     .alerta-tiempo{margin-left:auto;color:var(--danger)}
+    .ph-actions{display:flex;gap:var(--sp-2)}
   `],
 })
 export class DashboardIndicadoresComponent implements OnInit {
   private readonly api = inject(IndicadoresApi);
+  private readonly lineasApi = inject(LineasApi);
   private readonly destroyRef = inject(DestroyRef);
   data = signal<Indicadores | null>(null);
   error = signal<string | null>(null);
+  lineas = signal<Linea[]>([]);
+  lineaSeleccionada = signal<number | null>(null);
   etapaLabel = (e: Pick<EtapaIndicador, 'celula' | 'subPaso'>) =>
     LABEL_CELULA[e.celula] + (e.subPaso ? ' · ' + LABEL_SUBPASO[e.subPaso] : '');
 
   ngOnInit(): void {
+    this.lineasApi.listar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (ls) => this.lineas.set(ls),
+      error: () => {},
+    });
+    this.cargar();
+  }
+
+  cambiarLinea(id: number | null): void {
+    this.lineaSeleccionada.set(id);
     this.cargar();
   }
 
   cargar(): void {
     this.error.set(null);
-    this.api.indicadores().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.indicadores(this.lineaSeleccionada() ?? undefined).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (d) => this.data.set(d),
       error: () => this.error.set('Intentá de nuevo.'),
     });

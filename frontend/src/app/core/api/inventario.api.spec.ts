@@ -20,6 +20,13 @@ describe('InventarioApi', () => {
     req.flush({ materiales: [], wip: [], pt: [] });
   });
 
+  it('consolidado con lineaId manda el query param', () => {
+    api.consolidado(4).subscribe();
+    const req = http.expectOne('http://localhost:3001/inventario/consolidado?lineaId=4');
+    expect(req.request.method).toBe('GET');
+    req.flush({ materiales: [], wip: [], pt: [] });
+  });
+
   it('movimientos hace GET /inventario/movimientos con limit', () => {
     api.movimientos(80).subscribe();
     const req = http.expectOne('http://localhost:3001/inventario/movimientos?limit=80');

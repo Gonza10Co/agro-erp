@@ -8,7 +8,9 @@ export class IndicadoresApi {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
-  indicadores() {
-    return this.http.get<Indicadores>(`${this.base}/indicadores`);
+  indicadores(lineaId?: number) {
+    return this.http.get<Indicadores>(`${this.base}/indicadores`, {
+      params: lineaId ? { lineaId } : {},
+    });
   }
 }

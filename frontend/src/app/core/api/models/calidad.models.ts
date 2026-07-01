@@ -23,7 +23,7 @@ export interface IncidenciaPar {
 
 export interface ReporteResultado {
   incidencia: { id: number; tipoDano: TipoDano };
-  parReposicion: { codigo: string } | null;
+  parReposicion: { codigo: string; celulaActual: Celula } | null;
 }
 
 export interface CentroIndicador {

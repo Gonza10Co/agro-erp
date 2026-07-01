@@ -3,6 +3,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { InventarioApi } from '../../core/api/inventario.api';
+import { LineasApi, Linea } from '../../core/api/lineas.api';
 import {
   InventarioConsolidado,
   LABEL_MOTIVO,
@@ -21,6 +22,12 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
       <div class="page-header">
         <div class="ph-title">Inventario consolidado</div>
         <div class="ph-actions">
+          <select class="btn" [ngModel]="lineaSeleccionada()" (ngModelChange)="cambiarLinea($event)" title="Filtrar WIP por línea">
+            <option [ngValue]="null">Todas las líneas</option>
+            @for (l of lineas(); track l.id) {
+              <option [ngValue]="l.id">{{ l.nombre }}</option>
+            }
+          </select>
           <button class="btn" (click)="cargar()">Actualizar</button>
           <button class="btn btn-primary" (click)="formAbierto.set(!formAbierto())">
             {{ formAbierto() ? 'Cerrar' : 'Movimiento de materia prima' }}
@@ -198,11 +205,14 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
 })
 export class InventarioConsolidadoComponent implements OnInit {
   private readonly api = inject(InventarioApi);
+  private readonly lineasApi = inject(LineasApi);
   private readonly destroyRef = inject(DestroyRef);
 
   data = signal<InventarioConsolidado | null>(null);
   kardex = signal<MovimientoKardex[]>([]);
   error = signal<string | null>(null);
+  lineas = signal<Linea[]>([]);
+  lineaSeleccionada = signal<number | null>(null);
 
   // Form de movimiento manual de MP
   formAbierto = signal(false);
@@ -220,12 +230,21 @@ export class InventarioConsolidadoComponent implements OnInit {
   motivosDisponibles = computed(() => MOTIVOS_MANUALES[this.fTipo()]);
 
   ngOnInit(): void {
+    this.lineasApi.listar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (ls) => this.lineas.set(ls),
+      error: () => {},
+    });
+    this.cargar();
+  }
+
+  cambiarLinea(id: number | null): void {
+    this.lineaSeleccionada.set(id);
     this.cargar();
   }
 
   cargar(): void {
     this.error.set(null);
-    this.api.consolidado().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.consolidado(this.lineaSeleccionada() ?? undefined).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (d) => this.data.set(d),
       error: () => this.error.set('Intentá de nuevo.'),
     });

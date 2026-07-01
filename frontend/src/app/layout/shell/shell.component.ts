@@ -144,6 +144,10 @@ const SIDEBAR_KEY = 'agro-sidebar';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
             <span class="nav-label">Marcas</span>
           </a>
+          <a class="nav-item" routerLink="/catalog/lineas" routerLinkActive="is-active" title="Líneas de producción">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
+            <span class="nav-label">Líneas</span>
+          </a>
           <a class="nav-item" routerLink="/catalog/grupos-opcion" routerLinkActive="is-active" title="Grupos de opción">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="10" cy="18" r="1.5"/></svg></span>
             <span class="nav-label">Grupos de opción</span>

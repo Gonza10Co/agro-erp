@@ -6,6 +6,8 @@ import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { MarcaController } from './marca/marca.controller';
 import { MarcaService } from './marca/marca.service';
+import { LineaController } from './linea/linea.controller';
+import { LineaService } from './linea/linea.service';
 import { MaterialController } from './material/material.controller';
 import { MaterialService } from './material/material.service';
 import { ReferenciaController } from './referencia/referencia.controller';
@@ -20,6 +22,7 @@ import { ProductoConfiguradoService } from './producto-configurado/producto-conf
     BomController,
     CatalogController,
     MarcaController,
+    LineaController,
     MaterialController,
     ReferenciaController,
     GrupoOpcionController,
@@ -30,6 +33,7 @@ import { ProductoConfiguradoService } from './producto-configurado/producto-conf
     BomVersionService,
     CatalogService,
     MarcaService,
+    LineaService,
     MaterialService,
     ReferenciaAbmService,
     GrupoOpcionService,

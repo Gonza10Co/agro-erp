@@ -18,4 +18,5 @@ export class CrearMarcaDto {
   @IsString() @IsNotEmpty() @MaxLength(120) nombre!: string;
   @IsEnum(TipoMarcaDto) tipo!: TipoMarcaDto;
   @IsOptional() @Type(() => Number) @IsInt() clienteId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
 }

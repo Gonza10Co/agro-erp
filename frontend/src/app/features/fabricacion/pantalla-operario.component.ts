@@ -162,7 +162,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
           this.esError.set(false);
           this.msg.set(
             r.parReposicion
-              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en Corte)`
+              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en ${this.label(r.parReposicion.celulaActual)})`
               : `Reproceso registrado en ${p.codigo} ⚠`,
           );
           this.par.set(null);

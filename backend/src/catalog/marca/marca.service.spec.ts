@@ -32,6 +32,7 @@ describe('MarcaService', () => {
         nombre: 'Basarili',
         tipo: TipoMarcaDto.PROPIA,
         clienteId: undefined,
+        lineaId: undefined,
       },
     });
     expect(r).toMatchObject({ id: 1, codigo: 'M001' });
@@ -51,10 +52,10 @@ describe('MarcaService', () => {
   it('actualiza una marca existente', async () => {
     prisma.marca.findUnique.mockResolvedValue({ id: 1, codigo: 'M001' });
     prisma.marca.update.mockResolvedValue({ id: 1, nombre: 'Nuevo nombre' });
-    const r = await service.actualizar(1, { nombre: 'Nuevo nombre' });
+    const r = await service.actualizar(1, { nombre: 'Nuevo nombre', lineaId: 4 });
     expect(prisma.marca.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { nombre: 'Nuevo nombre', tipo: undefined, clienteId: undefined },
+      data: { nombre: 'Nuevo nombre', tipo: undefined, clienteId: undefined, lineaId: 4 },
     });
     expect(r).toMatchObject({ id: 1, nombre: 'Nuevo nombre' });
   });
