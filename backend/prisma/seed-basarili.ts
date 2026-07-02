@@ -177,6 +177,28 @@ async function main() {
     bomsCargados++;
   }
   console.log(`  · BOMs: ${bomsCargados}`);
+
+  // 8. Inventario de materia prima (stock actual). codigo, cantDisponible.
+  // Fuente: pestaña INVENTARIO del "CONTROL MATERIA PRIMA E INSUMOS" del cliente.
+  // Idempotente: upsert por materialId (1:1). NO carga costo/proveedor (fase de costeo aparte).
+  let stockMp = 0, stockOmitido = 0;
+  for (const f of leerCsv(ruta('inventario-material.csv'))) {
+    const materialId = materialPorCodigo.get(f.codigo);
+    if (!materialId) {
+      console.warn(`  · inventario MP ${f.codigo}: material inexistente, omitido`);
+      stockOmitido++;
+      continue;
+    }
+    const cantDisponible = num(f.cantDisponible) ?? 0;
+    await prisma.inventarioMaterial.upsert({
+      where: { materialId },
+      update: { cantDisponible },
+      create: { materialId, cantDisponible },
+    });
+    stockMp++;
+  }
+  console.log(`  · inventario MP: ${stockMp}${stockOmitido ? ` (omitidos: ${stockOmitido})` : ''}`);
+
   console.log('Seed Basarili OK ✅');
 }
 
