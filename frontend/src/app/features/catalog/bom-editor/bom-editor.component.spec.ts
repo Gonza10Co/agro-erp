@@ -100,4 +100,31 @@ describe('BomEditorComponent', () => {
     expect(cmp.lineas().length).toBe(2);
     expect(cmp.drawerAbierto()).toBe(false);
   });
+
+  it('onGuardarClick pide confirmación con versión vigente y no guarda hasta confirmar', () => {
+    const fixture = crear();
+    cargar(http);
+    const cmp = fixture.componentInstance;
+    cmp.onGuardarClick();
+    expect(cmp.confirmando()).toBe(true);
+    http.expectNone(`${BASE}/bom/version`); // aún no hace POST
+    cmp.guardar();
+    const req = http.expectOne(`${BASE}/bom/version`);
+    expect(req.request.method).toBe('POST');
+    req.flush({ id: 10, version: 3, activo: true, vigenteDesde: '', lineas: [] });
+    expect(cmp.confirmando()).toBe(false);
+  });
+
+  it('no permite agregar un material que ya está en el BOM', () => {
+    const fixture = crear();
+    cargar(http);
+    const cmp = fixture.componentInstance;
+    cmp.abrirNueva();
+    cmp.setBorrador('materialId', 30); // 30 ya está en la línea original
+    cmp.setClase('FIJO');
+    cmp.setBorrador('consumoFijo', 2);
+    cmp.aplicarLinea();
+    expect(cmp.errorDrawer()).toContain('ya está');
+    expect(cmp.lineas().length).toBe(1);
+  });
 });

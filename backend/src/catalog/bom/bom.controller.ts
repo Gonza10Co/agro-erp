@@ -41,9 +41,10 @@ export class BomController {
     return enriquecer(resuelto, meta);
   }
 
-  // Crear una nueva versión del BOM (desactiva la vigente). Solo roles internos.
+  // Crear una nueva versión del BOM (desactiva la vigente). Se entrega en la demo
+  // al CLIENTE (fábrica) además de los roles internos; OPERARIO queda fuera.
   @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'GERENTE')
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
   @Post('version')
   crearVersion(@Body() dto: CrearBomVersionDto) {
     return this.version.crearNuevaVersion(dto);

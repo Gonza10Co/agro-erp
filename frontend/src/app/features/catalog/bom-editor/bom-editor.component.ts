@@ -75,10 +75,22 @@ const nuevaLinea = (): LineaEdit => ({
           }
           @if (error()) { <p class="msg-err">{{ error() }}</p> }
           @if (okMsg()) { <p class="msg-ok">{{ okMsg() }}</p> }
-          <button class="btn btn-primary btn-block" type="button" [disabled]="guardando()" (click)="guardar()"
-            style="margin-top:var(--sp-4)">
-            {{ guardando() ? 'Guardando…' : 'Guardar nueva versión' }}
-          </button>
+          @if (confirmando()) {
+            <div class="confirm">
+              <p class="cell-sub">Se creará una nueva versión y se desactivará la v{{ versionActiva() }} vigente. ¿Continuar?</p>
+              <div class="confirm-acc">
+                <button class="btn btn-ghost" type="button" [disabled]="guardando()" (click)="cancelarGuardar()">Cancelar</button>
+                <button class="btn btn-primary" type="button" [disabled]="guardando()" (click)="guardar()">
+                  {{ guardando() ? 'Guardando…' : 'Sí, guardar' }}
+                </button>
+              </div>
+            </div>
+          } @else {
+            <button class="btn btn-primary btn-block" type="button" [disabled]="guardando()" (click)="onGuardarClick()"
+              style="margin-top:var(--sp-4)">
+              {{ guardando() ? 'Guardando…' : 'Guardar nueva versión' }}
+            </button>
+          }
           @if (versionActiva(); as v) { <p class="cell-sub" style="margin-top:var(--sp-2)">Versión activa actual: v{{ v }}</p> }
         </div></div>
       </div>
@@ -153,6 +165,8 @@ const nuevaLinea = (): LineaEdit => ({
     .ginput{width:64px;text-align:center;padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-family:var(--font-mono)}
     .msg-err{color:var(--error);font-size:var(--text-sm)}
     .msg-ok{color:var(--success, #2e7d32);font-size:var(--text-sm)}
+    .confirm{margin-top:var(--sp-4);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface)}
+    .confirm-acc{display:flex;gap:var(--sp-2);justify-content:flex-end;margin-top:var(--sp-3)}
     @media (max-width:860px){.ed{grid-template-columns:1fr}}
   `],
 })
@@ -176,6 +190,7 @@ export class BomEditorComponent implements OnInit {
   error = signal('');
   okMsg = signal('');
   errorDrawer = signal('');
+  confirmando = signal(false);
 
   private readonly matIndex = computed(() => {
     const map = new Map<number, MaterialItem>();
@@ -211,8 +226,10 @@ export class BomEditorComponent implements OnInit {
 
   resumen(l: LineaEdit): string {
     const u = l.materialId != null ? (this.matIndex().get(l.materialId)?.unidad ?? '') : '';
-    if (l.claseConsumo === 'FIJO') return `${l.consumoFijo ?? 0} ${u}`;
-    return `curva (${Object.keys(l.tallas).length} tallas)`;
+    const base = l.claseConsumo === 'FIJO'
+      ? `${l.consumoFijo ?? 0} ${u}`
+      : `curva (${Object.keys(l.tallas).length} tallas)`;
+    return l.mermaPct ? `${base} · +${l.mermaPct}% merma` : base;
   }
 
   abrirNueva(): void {
@@ -230,6 +247,7 @@ export class BomEditorComponent implements OnInit {
   }
 
   quitar(idx: number): void {
+    this.okMsg.set('');
     this.lineas.update((ls) => ls.filter((_, i) => i !== idx));
   }
 
@@ -259,6 +277,10 @@ export class BomEditorComponent implements OnInit {
       this.errorDrawer.set('Carga al menos una talla con consumo'); return;
     }
     const idx = this.editIdx();
+    if (this.lineas().some((l, i) => l.materialId === b.materialId && i !== idx)) {
+      this.errorDrawer.set('Ese material ya está en el BOM'); return;
+    }
+    this.okMsg.set('');
     this.lineas.update((ls) => {
       const copia = [...ls];
       if (idx === null) copia.push(b); else copia[idx] = b;
@@ -267,9 +289,21 @@ export class BomEditorComponent implements OnInit {
     this.drawerAbierto.set(false);
   }
 
+  // Clic en el botón principal: si hay una versión vigente que se desactivará,
+  // pide confirmación (la creación de versión es irreversible). Si no, guarda directo.
+  onGuardarClick(): void {
+    if (this.guardando()) return;
+    if (this.lineas().length === 0) { this.error.set('El BOM necesita al menos una línea'); return; }
+    if (this.versionActiva() != null && !this.confirmando()) { this.error.set(''); this.confirmando.set(true); return; }
+    this.guardar();
+  }
+
+  cancelarGuardar(): void { this.confirmando.set(false); }
+
   guardar(): void {
     if (this.guardando()) return;
     if (this.lineas().length === 0) { this.error.set('El BOM necesita al menos una línea'); return; }
+    this.confirmando.set(false);
     this.error.set(''); this.okMsg.set(''); this.guardando.set(true);
     const payload: CrearBomVersionPayload = {
       referenciaId: this.referenciaId,
