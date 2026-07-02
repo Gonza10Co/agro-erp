@@ -26,11 +26,11 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  despachosAutorizados    Despacho[]
-  incidenciasAutorizadas  IncidenciaCalidad[]
-  movimientosInventario   MovimientoInventario[]
-  recepcionesCompra       RecepcionCompra[]
-  devolucionesProveedor   DevolucionProveedor[]
+  despachosAutorizados   Despacho[]
+  incidenciasAutorizadas IncidenciaCalidad[]
+  movimientosInventario  MovimientoInventario[]
+  recepcionesCompra      RecepcionCompra[]
+  devolucionesProveedor  DevolucionProveedor[]
 }
 
 model RefreshToken {
@@ -106,10 +106,10 @@ model Material {
   proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
 
   alias             MaterialAlias[]
-  bomsPropios       Bom[]           @relation("BomDeMaterial")
-  lineasComoInsumo  BomLinea[]      @relation("InsumoDeLinea")
-  overridesObjetivo ReglaOverride[] @relation("MaterialObjetivo")
-  overridesNuevo    ReglaOverride[] @relation("MaterialNuevo")
+  bomsPropios       Bom[]                       @relation("BomDeMaterial")
+  lineasComoInsumo  BomLinea[]                  @relation("InsumoDeLinea")
+  overridesObjetivo ReglaOverride[]             @relation("MaterialObjetivo")
+  overridesNuevo    ReglaOverride[]             @relation("MaterialNuevo")
   inventario        InventarioMaterial?
   lineasReq         RequerimientoCompraLinea[]
   movimientos       MovimientoInventario[]
@@ -233,11 +233,27 @@ model Opcion {
   @@unique([grupoOpcionId, codigo])
 }
 
+// Línea de producción/negocio (Basarili, Agro, Alta, Externa). Agrupa marcas
+// comerciales y define el punto de arranque en el flujo de células: la línea
+// Externa (capellada de Bogotá) entra directo en INYECCION, no en CORTE.
+model Linea {
+  id            Int     @id @default(autoincrement())
+  codigo        String  @unique
+  nombre        String
+  celulaInicial Celula  @default(CORTE)
+  activo        Boolean @default(true)
+
+  marcas Marca[]
+  pares  Par[]
+}
+
 model Marca {
   id        Int       @id @default(autoincrement())
   codigo    String    @unique
   nombre    String
   tipo      TipoMarca
+  lineaId   Int? // mapeo marca→línea lo entrega el cliente; nullable hasta entonces
+  linea     Linea?    @relation(fields: [lineaId], references: [id])
   clienteId Int?
   cliente   Cliente?  @relation(fields: [clienteId], references: [id])
   activo    Boolean   @default(true)
@@ -245,6 +261,8 @@ model Marca {
   overrides             ReglaOverride[]
   referenciaMarcas      ReferenciaMarca[]
   productosConfigurados ProductoConfigurado[]
+
+  @@index([lineaId])
 }
 
 model ReglaOverride {
@@ -464,10 +482,10 @@ model OrdenProduccion {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  lineas              OrdenProduccionLinea[]
-  despacho            Despacho?
-  requerimientos      RequerimientoCompra[]
-  ordenesFabricacion  OrdenFabricacion[]
+  lineas             OrdenProduccionLinea[]
+  despacho           Despacho?
+  requerimientos     RequerimientoCompra[]
+  ordenesFabricacion OrdenFabricacion[]
 }
 
 model OrdenProduccionLinea {
@@ -552,8 +570,8 @@ model Proveedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  materiales Material[]
-  lineasReq  RequerimientoCompraLinea[]
+  materiales    Material[]
+  lineasReq     RequerimientoCompraLinea[]
   ordenesCompra OrdenCompraProveedor[]
 }
 
@@ -731,7 +749,7 @@ enum EstadoPar {
 }
 
 enum ClaseDano {
-  BAJA      // daño total: acta + reposición automática
+  BAJA // daño total: acta + reposición automática
   REPROCESO // recuperable: solo registro
 }
 
@@ -761,13 +779,15 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
-  subPasoActual         SubPasoGuarnicion?  // solo poblado mientras celulaActual = GUARNICION
-  reponeAParId          Int?    @unique     // si este par es una reposición, el par dado de baja que repone
+  subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
+  lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
+  linea                 Linea?              @relation(fields: [lineaId], references: [id])
+  reponeAParId          Int?                @unique // si este par es una reposición, el par dado de baja que repone
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
 
-  reponeA     Par?  @relation("reposicion", fields: [reponeAParId], references: [id])
-  repuestoPor Par?  @relation("reposicion")
+  reponeA     Par? @relation("reposicion", fields: [reponeAParId], references: [id])
+  repuestoPor Par? @relation("reposicion")
 
   incidencias            IncidenciaCalidad[] @relation("incidencias")
   reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
@@ -777,19 +797,20 @@ model Par {
   @@index([ofId])
   @@index([celulaActual])
   @@index([subPasoActual])
+  @@index([lineaId])
 }
 
 model EventoTrazabilidad {
-  id         Int      @id @default(autoincrement())
+  id         Int                @id @default(autoincrement())
   parId      Int
-  par        Par      @relation(fields: [parId], references: [id])
+  par        Par                @relation(fields: [parId], references: [id])
   celula     Celula
   subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
   operarioId Int
-  operario   Operario @relation(fields: [operarioId], references: [id])
+  operario   Operario           @relation(fields: [operarioId], references: [id])
   maquinaId  Int
-  maquina    Maquina  @relation(fields: [maquinaId], references: [id])
-  timestamp  DateTime @default(now())
+  maquina    Maquina            @relation(fields: [maquinaId], references: [id])
+  timestamp  DateTime           @default(now())
 
   @@index([parId])
   @@index([celula])
@@ -825,7 +846,7 @@ model TipoDano {
   id             Int       @id @default(autoincrement())
   codigo         String    @unique
   nombre         String
-  celulaCausante Celula    // centro de costo al que se imputa
+  celulaCausante Celula // centro de costo al que se imputa
   clase          ClaseDano
   activo         Boolean   @default(true)
 
@@ -838,11 +859,11 @@ model IncidenciaCalidad {
   par             Par      @relation("incidencias", fields: [parId], references: [id])
   tipoDanoId      Int
   tipoDano        TipoDano @relation(fields: [tipoDanoId], references: [id])
-  celulaDeteccion Celula   // dónde se detectó (puede ≠ causante)
+  celulaDeteccion Celula // dónde se detectó (puede ≠ causante)
   operarioId      Int
   operario        Operario @relation(fields: [operarioId], references: [id])
-  descripcion     String?  // obligatoria en BAJA (acta) — se valida en el service
-  autorizadoPorId Int?     // solo BAJA: user GERENTE/ADMIN del JWT
+  descripcion     String? // obligatoria en BAJA (acta) — se valida en el service
+  autorizadoPorId Int? // solo BAJA: user GERENTE/ADMIN del JWT
   autorizadoPor   User?    @relation(fields: [autorizadoPorId], references: [id])
   parReposicionId Int?     @unique // solo BAJA: el par creado para reponer
   parReposicion   Par?     @relation("reposicionDeIncidencia", fields: [parReposicionId], references: [id])
@@ -861,18 +882,18 @@ enum EstadoFactura {
 }
 
 model Factura {
-  id              Int           @id @default(autoincrement())
-  consecutivo     Int           @unique
-  despachoId      Int           @unique
-  despacho        Despacho      @relation(fields: [despachoId], references: [id])
-  fecha           DateTime      @default(now())
-  fechaVencimiento DateTime?    // fecha + díasCrédito(tipoCredito) al emitir
-  subtotal        Decimal       @db.Decimal(14, 2)
-  ivaPct          Decimal       @db.Decimal(5, 2)
-  iva             Decimal       @db.Decimal(14, 2)
-  total           Decimal       @db.Decimal(14, 2)
-  estado          EstadoFactura @default(EMITIDA)
-  createdAt       DateTime      @default(now())
+  id               Int           @id @default(autoincrement())
+  consecutivo      Int           @unique
+  despachoId       Int           @unique
+  despacho         Despacho      @relation(fields: [despachoId], references: [id])
+  fecha            DateTime      @default(now())
+  fechaVencimiento DateTime? // fecha + díasCrédito(tipoCredito) al emitir
+  subtotal         Decimal       @db.Decimal(14, 2)
+  ivaPct           Decimal       @db.Decimal(5, 2)
+  iva              Decimal       @db.Decimal(14, 2)
+  total            Decimal       @db.Decimal(14, 2)
+  estado           EstadoFactura @default(EMITIDA)
+  createdAt        DateTime      @default(now())
 
   lineas FacturaLinea[]
   pagos  Pago[]
@@ -914,13 +935,13 @@ enum TipoMovimiento {
 }
 
 enum MotivoMovimiento {
-  PRODUCCION           // par terminado entra a InventarioPT
-  DESPACHO             // salida de PT por despacho
-  COMPRA               // recepción de materia prima (total o parcial)
-  CONSUMO_PRODUCCION   // consumo de MP por una OF
-  DEVOLUCION_CLIENTE   // reingreso de PT devuelto por cliente
+  PRODUCCION // par terminado entra a InventarioPT
+  DESPACHO // salida de PT por despacho
+  COMPRA // recepción de materia prima (total o parcial)
+  CONSUMO_PRODUCCION // consumo de MP por una OF
+  DEVOLUCION_CLIENTE // reingreso de PT devuelto por cliente
   DEVOLUCION_PROVEEDOR // salida de MP devuelta a proveedor (calidad)
-  AJUSTE_MANUAL        // conteo físico / corrección
+  AJUSTE_MANUAL // conteo físico / corrección
 }
 
 // Kardex unificado: cada fila es un movimiento físico de stock,
@@ -935,7 +956,7 @@ model MovimientoInventario {
   inventarioPTId Int?
   inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
   cantidad       Decimal          @db.Decimal(14, 4)
-  referencia     String?          // documento origen: "OF-31", "DSP-12", "REQ-7"…
+  referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?
   usuario        User?            @relation(fields: [usuarioId], references: [id])
@@ -949,17 +970,17 @@ model MovimientoInventario {
 // ───────────────────────── Demo 14: Metas gerenciales / Reporte diario ─────────────────────────
 
 enum TipoMeta {
-  GUARNICION         // meta de pares producidos en Guarnición (mensual)
-  INYECCION          // meta de pares inyectados (mensual)
-  FACTURACION_PARES  // meta de pares facturados (mensual)
-  FACTURACION_VALOR  // meta de $ facturado (mensual)
+  GUARNICION // meta de pares producidos en Guarnición (mensual)
+  INYECCION // meta de pares inyectados (mensual)
+  FACTURACION_PARES // meta de pares facturados (mensual)
+  FACTURACION_VALOR // meta de $ facturado (mensual)
 }
 
 // Meta mensual configurable por tipo. Alimenta el % de cumplimiento del reporte diario.
 model Meta {
   id        Int      @id @default(autoincrement())
   anio      Int
-  mes       Int      // 1..12
+  mes       Int // 1..12
   tipo      TipoMeta
   valor     Decimal  @db.Decimal(14, 2)
   createdAt DateTime @default(now())

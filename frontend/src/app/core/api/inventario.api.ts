@@ -21,8 +21,10 @@ export class InventarioApi {
     return this.http.post<InventarioPTRow>(`${this.base}/pt`, dto);
   }
 
-  consolidado() {
-    return this.http.get<InventarioConsolidado>(`${this.base}/consolidado`);
+  consolidado(lineaId?: number) {
+    return this.http.get<InventarioConsolidado>(`${this.base}/consolidado`, {
+      params: lineaId ? { lineaId } : {},
+    });
   }
 
   movimientos(limit?: number) {

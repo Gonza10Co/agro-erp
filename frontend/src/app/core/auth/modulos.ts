@@ -23,8 +23,9 @@ export type Modulo =
 
 /**
  * Módulos que ve el rol CLIENTE (demos 1-2: pedidos + clientes + catálogo/BOM).
- * NOTA: 'maestros' (ABM de catálogo, edición de BOM) queda fuera a propósito —
- * mantenimiento de datos maestros es solo para roles internos.
+ * El Configurador y el Editor de BOM viven en 'catalogo' y SÍ se entregan al
+ * cliente. 'maestros' (ABM de marcas/materiales/referencias/líneas) queda fuera
+ * a propósito — es mantenimiento adelantado para demos futuras.
  */
 const MODULOS_CLIENTE: ReadonlySet<Modulo> = new Set<Modulo>(['clientes', 'pedidos', 'catalogo']);
 

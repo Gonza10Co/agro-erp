@@ -5,6 +5,7 @@ import {
   generarPares,
   LineaProduccion,
   siguienteEstado,
+  subPasoInicial,
   ORDEN_SUBPASOS,
 } from './fabricacion-core';
 
@@ -101,5 +102,39 @@ describe('generarPares', () => {
     ]);
     expect(pares).toHaveLength(2);
     expect(pares[0].codigo).toBe('OF9-0001');
+  });
+
+  it('sin celulaInicial arranca en CORTE con subPaso null (comportamiento histórico)', () => {
+    const pares = generarPares(5, lineas);
+    expect(pares[0]).toMatchObject({ celulaInicial: 'CORTE', subPasoInicial: null });
+  });
+
+  it('propaga la celulaInicial y el lineaId de la línea a cada par (Externa arranca en INYECCION)', () => {
+    const pares = generarPares(7, [
+      { productoConfiguradoId: 20, tallaId: 3, cantAProducir: 2, celulaInicial: 'INYECCION', lineaId: 4 },
+    ]);
+    expect(pares).toHaveLength(2);
+    expect(pares.every((p) => p.celulaInicial === 'INYECCION' && p.subPasoInicial === null && p.lineaId === 4)).toBe(true);
+  });
+
+  it('sin lineaId el par queda con lineaId null', () => {
+    const pares = generarPares(5, lineas);
+    expect(pares[0].lineaId).toBeNull();
+  });
+
+  it('arrancar en GUARNICION deja el par en el sub-paso AREA', () => {
+    const pares = generarPares(8, [
+      { productoConfiguradoId: 30, tallaId: 1, cantAProducir: 1, celulaInicial: 'GUARNICION' },
+    ]);
+    expect(pares[0]).toMatchObject({ celulaInicial: 'GUARNICION', subPasoInicial: 'AREA' });
+  });
+});
+
+describe('subPasoInicial', () => {
+  it('solo GUARNICION arranca en un sub-paso (AREA); el resto en null', () => {
+    expect(subPasoInicial('GUARNICION')).toBe('AREA');
+    expect(subPasoInicial('CORTE')).toBeNull();
+    expect(subPasoInicial('INYECCION')).toBeNull();
+    expect(subPasoInicial('PT')).toBeNull();
   });
 });

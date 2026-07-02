@@ -28,7 +28,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
           <div class="empty">
             <span class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span>
             <h4>Sin referencias todavía</h4>
-            <p>Creá la primera referencia para empezar a configurar productos.</p>
+            <p>Crea la primera referencia para empezar a configurar productos.</p>
           </div>
         </div></div>
       } @else {
@@ -75,7 +75,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
         <div class="field">
           <label class="label" for="tallaMinId">Talla mínima <span class="req">*</span></label>
           <select class="select" id="tallaMinId" name="tallaMinId" [(ngModel)]="tallaMinId">
-            <option [ngValue]="undefined">Seleccioná…</option>
+            <option [ngValue]="undefined">Selecciona…</option>
             @for (t of tallas(); track t.id) {
               <option [ngValue]="t.id">{{ t.valor }}</option>
             }
@@ -84,7 +84,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
         <div class="field">
           <label class="label" for="tallaMaxId">Talla máxima <span class="req">*</span></label>
           <select class="select" id="tallaMaxId" name="tallaMaxId" [(ngModel)]="tallaMaxId">
-            <option [ngValue]="undefined">Seleccioná…</option>
+            <option [ngValue]="undefined">Selecciona…</option>
             @for (t of tallas(); track t.id) {
               <option [ngValue]="t.id">{{ t.valor }}</option>
             }

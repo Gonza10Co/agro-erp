@@ -104,4 +104,20 @@ describe('IndicadoresService', () => {
     expect(res.alertas).toHaveLength(1);
     expect(res.alertas[0]).toMatchObject({ codigo: 'P3', celula: 'CORTE' });
   });
+
+  it('filtra los pares por línea cuando se pasa lineaId', async () => {
+    const prisma = makePrisma();
+    await new IndicadoresService(prisma).indicadores(new Date('2026-06-10T08:00:00Z'), 4);
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { lineaId: 4 } }),
+    );
+  });
+
+  it('sin lineaId no filtra por línea', async () => {
+    const prisma = makePrisma();
+    await new IndicadoresService(prisma).indicadores(new Date('2026-06-10T08:00:00Z'));
+    expect(prisma.par.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
 });

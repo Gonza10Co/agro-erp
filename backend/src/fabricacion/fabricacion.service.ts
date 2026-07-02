@@ -17,7 +17,16 @@ export class FabricacionService {
   async generarOF(opId: number) {
     const op = await this.prisma.ordenProduccion.findUnique({
       where: { id: opId },
-      include: { lineas: { include: { tallas: true } }, ordenesFabricacion: true },
+      include: {
+        // La línea del producto define el punto de arranque del par (célula inicial).
+        lineas: {
+          include: {
+            tallas: true,
+            productoConfigurado: { include: { marca: { include: { linea: true } } } },
+          },
+        },
+        ordenesFabricacion: true,
+      },
     });
     if (!op) throw new NotFoundException(`OP ${opId} no existe`);
     if (op.ordenesFabricacion.length > 0)
@@ -30,6 +39,9 @@ export class FabricacionService {
           productoConfiguradoId: l.productoConfiguradoId,
           tallaId: t.tallaId,
           cantAProducir: t.cantAProducir,
+          // Sin línea asignada → CORTE (comportamiento histórico, cero regresión).
+          celulaInicial: l.productoConfigurado?.marca?.linea?.celulaInicial ?? 'CORTE',
+          lineaId: l.productoConfigurado?.marca?.lineaId ?? null,
         })),
     );
     if (lineas.length === 0)
@@ -38,7 +50,15 @@ export class FabricacionService {
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'of');
       const of = await tx.ordenFabricacion.create({ data: { consecutivo, opId } });
-      const pares = generarPares(consecutivo, lineas).map((p) => ({ ...p, ofId: of.id }));
+      const pares = generarPares(consecutivo, lineas).map((p) => ({
+        ofId: of.id,
+        codigo: p.codigo,
+        productoConfiguradoId: p.productoConfiguradoId,
+        tallaId: p.tallaId,
+        celulaActual: p.celulaInicial,
+        subPasoActual: p.subPasoInicial,
+        lineaId: p.lineaId,
+      }));
       await tx.par.createMany({ data: pares });
       return { id: of.id, consecutivo, opId, totalPares: pares.length };
     });
@@ -89,6 +109,15 @@ export class FabricacionService {
           },
         });
 
+        // El primer escaneo de cualquier par activa la OF, sin importar en qué
+        // célula arranque (la línea Externa entra en INYECCION, no en CORTE).
+        if (par.of.estado === 'ABIERTA') {
+          await tx.ordenFabricacion.update({
+            where: { id: par.ofId },
+            data: { estado: 'EN_PROCESO' },
+          });
+        }
+
         if (next === null) {
           // Última célula (PT): terminar el par y sumar a InventarioPT.
           const updated = await tx.par.update({
@@ -136,13 +165,8 @@ export class FabricacionService {
           return updated;
         }
 
-        // Avance normal a la siguiente célula.
-        if (celulaActual === 'CORTE' && par.of.estado === 'ABIERTA') {
-          await tx.ordenFabricacion.update({
-            where: { id: par.ofId },
-            data: { estado: 'EN_PROCESO' },
-          });
-        }
+        // Avance normal a la siguiente célula (la activación de la OF ya se
+        // resolvió arriba, en el primer escaneo).
         return tx.par.update({
           where: { id: par.id },
           data: { celulaActual: next.celula, subPasoActual: next.subPaso },

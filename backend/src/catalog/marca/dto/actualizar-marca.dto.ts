@@ -7,4 +7,5 @@ export class ActualizarMarcaDto {
   @IsOptional() @IsString() @MaxLength(120) nombre?: string;
   @IsOptional() @IsEnum(TipoMarcaDto) tipo?: TipoMarcaDto;
   @IsOptional() @Type(() => Number) @IsInt() clienteId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
 }

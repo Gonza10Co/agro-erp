@@ -147,7 +147,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   reportar(p: ParDetalle, t: TipoDano): void {
     if (this.operarioId == null) {
       this.esError.set(true);
-      this.msg.set('Seleccioná operario');
+      this.msg.set('Selecciona operario');
       return;
     }
     this.calidadApi
@@ -162,7 +162,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
           this.esError.set(false);
           this.msg.set(
             r.parReposicion
-              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en Corte)`
+              ? `Par ${p.codigo} dado de baja ✖ — repuesto por ${r.parReposicion.codigo} (en ${this.label(r.parReposicion.celulaActual)})`
               : `Reproceso registrado en ${p.codigo} ⚠`,
           );
           this.par.set(null);
@@ -243,7 +243,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   avanzar(p: ParDetalle): void {
     if (this.operarioId == null || this.maquinaId == null) {
       this.esError.set(true);
-      this.msg.set('Seleccioná operario y máquina');
+      this.msg.set('Selecciona operario y máquina');
       return;
     }
     this.api.avanzar(p.codigo, this.operarioId, this.maquinaId)

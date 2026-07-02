@@ -41,12 +41,12 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               </div>
             </div>
           </div>
-          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || requerible()) {
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || (puedeOperarProduccion && requerible())) {
             <div class="page-actions">
-              @if (despachable()) {
+              @if (despachable() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
               }
-              @if (requerible()) {
+              @if (requerible() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="generandoOF()" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
                 <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
@@ -240,6 +240,9 @@ export class OpDetalleComponent implements OnInit {
   porTalla = computed(() => { const o = this.op(); return o ? filasPorTalla(o) : []; });
   porBodega = computed(() => { const o = this.op(); return o ? filasPorBodega(o) : []; });
   puedeAutorizar = computed(() => { const r = this.auth.rol(); return r === 'GERENTE' || r === 'ADMIN'; });
+  // Generar OF / Calcular requerimientos / Despachar saltan a módulos aún no entregados
+  // (fabricación/compras/despachos). Para el CLIENTE la OP es seguimiento del amarre + anular.
+  readonly puedeOperarProduccion = ['ADMIN', 'GERENTE'].includes(this.auth.rol() ?? '');
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {

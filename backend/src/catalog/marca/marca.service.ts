@@ -23,6 +23,7 @@ export class MarcaService {
         nombre: dto.nombre,
         tipo: dto.tipo,
         clienteId: dto.clienteId,
+        lineaId: dto.lineaId,
       },
     });
   }
@@ -47,6 +48,7 @@ export class MarcaService {
         nombre: dto.nombre,
         tipo: dto.tipo,
         clienteId: dto.clienteId,
+        lineaId: dto.lineaId,
       },
     });
   }

@@ -110,7 +110,7 @@ describe('PantallaOperarioComponent', () => {
     } as never);
     comp.avanzar(comp.par()!);
     expect(comp.esError()).toBeTrue();
-    expect(comp.msg()).toContain('Seleccioná operario');
+    expect(comp.msg()).toContain('Selecciona operario');
     http.verify(); // ningún POST debe haberse emitido
   });
 
@@ -195,11 +195,13 @@ describe('reporte de daño', () => {
     boton.click();
     http.expectOne(`${CALIDAD}/pares/OF1-0001/incidencias`).flush({
       incidencia: { id: 1, tipoDano: TIPOS[1] },
-      parReposicion: { codigo: 'OF1-0001-R1' },
+      parReposicion: { codigo: 'OF1-0001-R1', celulaActual: 'INYECCION' },
     });
     fixture.detectChanges();
 
     expect(comp.msg()).toContain('OF1-0001-R1');
+    // El mensaje refleja la célula real de arranque de la reposición (Externa → Inyección).
+    expect(comp.msg()).toContain('Inyección');
     http.verify();
   });
 

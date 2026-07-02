@@ -51,6 +51,24 @@ async function main() {
   }
   console.log(`  · categorías: ${categoriaPorNombre.size}`);
 
+  // 3b. Líneas de producción (Basarili, Agro, Alta, Externa). Datos maestros fijos.
+  // Externa (capellada de Bogotá) arranca en INYECCION; las demás en CORTE.
+  // El mapeo marca→línea lo entrega el cliente aparte; acá NO se clasifica.
+  const lineas: Array<{ codigo: string; nombre: string; celulaInicial: 'CORTE' | 'INYECCION' }> = [
+    { codigo: 'BASARILI', nombre: 'Basarili', celulaInicial: 'CORTE' },
+    { codigo: 'AGRO', nombre: 'Agro', celulaInicial: 'CORTE' },
+    { codigo: 'ALTA', nombre: 'Alta', celulaInicial: 'CORTE' },
+    { codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' },
+  ];
+  for (const l of lineas) {
+    await prisma.linea.upsert({
+      where: { codigo: l.codigo },
+      update: { nombre: l.nombre, celulaInicial: l.celulaInicial },
+      create: l,
+    });
+  }
+  console.log(`  · líneas: ${lineas.length}`);
+
   // 4. Marcas (codigo, nombre, tipo)
   let marcas = 0;
   for (const f of leerCsv(ruta('marcas.csv'))) {
@@ -159,6 +177,28 @@ async function main() {
     bomsCargados++;
   }
   console.log(`  · BOMs: ${bomsCargados}`);
+
+  // 8. Inventario de materia prima (stock actual). codigo, cantDisponible.
+  // Fuente: pestaña INVENTARIO del "CONTROL MATERIA PRIMA E INSUMOS" del cliente.
+  // Idempotente: upsert por materialId (1:1). NO carga costo/proveedor (fase de costeo aparte).
+  let stockMp = 0, stockOmitido = 0;
+  for (const f of leerCsv(ruta('inventario-material.csv'))) {
+    const materialId = materialPorCodigo.get(f.codigo);
+    if (!materialId) {
+      console.warn(`  · inventario MP ${f.codigo}: material inexistente, omitido`);
+      stockOmitido++;
+      continue;
+    }
+    const cantDisponible = num(f.cantDisponible) ?? 0;
+    await prisma.inventarioMaterial.upsert({
+      where: { materialId },
+      update: { cantDisponible },
+      create: { materialId, cantDisponible },
+    });
+    stockMp++;
+  }
+  console.log(`  · inventario MP: ${stockMp}${stockOmitido ? ` (omitidos: ${stockOmitido})` : ''}`);
+
   console.log('Seed Basarili OK ✅');
 }
 

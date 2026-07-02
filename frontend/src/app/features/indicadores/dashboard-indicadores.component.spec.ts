@@ -32,6 +32,7 @@ describe('DashboardIndicadoresComponent', () => {
       maquinas: [{ maquinaId: 1, nombre: 'Plana', tramos: 5, promedioMin: 10 }],
       alertas: [{ codigo: 'OF9006-0004', celula: 'GUARNICION', subPaso: 'STROBEL', minutosEnEtapa: 181, umbralMin: 30 }],
     });
+    http.expectOne(`${base}/catalog/lineas`).flush([]);
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.textContent).toContain('Strobel');
@@ -44,6 +45,7 @@ describe('DashboardIndicadoresComponent', () => {
   it('muestra estado vacío de alertas cuando no hay', () => {
     const fixture = crear();
     http.expectOne(`${base}/indicadores`).flush({ etapas: [], operarios: [], maquinas: [], alertas: [] });
+    http.expectOne(`${base}/catalog/lineas`).flush([]);
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sin alertas');
   });
@@ -51,6 +53,7 @@ describe('DashboardIndicadoresComponent', () => {
   it('muestra el error si el endpoint falla', () => {
     const fixture = crear();
     http.expectOne(`${base}/indicadores`).flush('x', { status: 500, statusText: 'err' });
+    http.expectOne(`${base}/catalog/lineas`).flush([]);
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('No se pudieron cargar');
   });

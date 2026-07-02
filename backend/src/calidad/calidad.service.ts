@@ -8,6 +8,7 @@ import {
 import { Celula } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { agruparIndicadores, codigoReposicion, validarReporte } from './calidad-core';
+import { subPasoInicial } from '../fabricacion/fabricacion-core';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 
 interface Usuario {
@@ -33,7 +34,11 @@ export class CalidadService {
   }
 
   async reportar(codigo: string, dto: ReportarIncidenciaDto, user: Usuario) {
-    const par = await this.prisma.par.findUnique({ where: { codigo } });
+    const par = await this.prisma.par.findUnique({
+      where: { codigo },
+      // La línea del par define dónde re-arranca la reposición (Externa → INYECCION).
+      include: { productoConfigurado: { include: { marca: { include: { linea: true } } } } },
+    });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
     const tipo = await this.prisma.tipoDano.findUnique({ where: { id: dto.tipoDanoId } });
     if (!tipo || !tipo.activo)
@@ -64,7 +69,10 @@ export class CalidadService {
         });
         return { incidencia, parReposicion: null };
       }
-      return await this.darDeBaja(par, tipo.id, dto, user);
+      const marca = (par as any).productoConfigurado?.marca;
+      const celulaInicial = marca?.linea?.celulaInicial ?? 'CORTE';
+      const lineaId = marca?.lineaId ?? null;
+      return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial, lineaId);
     } catch (e: unknown) {
       // FK inválida del reporte: solo el operario (input del usuario) → 400.
       // Cualquier otra FK (productoConfigurado, talla, autorizadoPor, par…) es
@@ -105,6 +113,8 @@ export class CalidadService {
     tipoDanoId: number,
     dto: ReportarIncidenciaDto,
     user: Usuario,
+    celulaInicial: Celula,
+    lineaId: number | null,
   ) {
     return this.prisma.$transaction(async (tx) => {
       // Condición sobre el estado para no pisar un par que otra tx acaba de
@@ -124,7 +134,9 @@ export class CalidadService {
           ofId: par.ofId,
           productoConfiguradoId: par.productoConfiguradoId,
           tallaId: par.tallaId,
-          celulaActual: 'CORTE',
+          celulaActual: celulaInicial,
+          subPasoActual: subPasoInicial(celulaInicial),
+          lineaId,
           reponeAParId: par.id,
         },
       });

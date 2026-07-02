@@ -79,7 +79,7 @@ export class RegistrarDevolucionComponent {
       .map((l) => ({ materialId: l.materialId, cantidad: Number(this.cantidades()[l.materialId] ?? 0) }))
       .filter((l) => l.cantidad > 0);
     if (!lineas.length) {
-      this.error.set('Ingresá al menos una cantidad a devolver');
+      this.error.set('Ingresa al menos una cantidad a devolver');
       return;
     }
     this.enviando.set(true);

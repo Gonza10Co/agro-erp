@@ -10,6 +10,7 @@ export interface Marca {
   nombre: string;
   tipo: TipoMarca;
   clienteId?: number | null;
+  lineaId?: number | null;
   activo: boolean;
 }
 
@@ -18,12 +19,14 @@ export interface CrearMarcaDto {
   nombre: string;
   tipo: TipoMarca;
   clienteId?: number;
+  lineaId?: number;
 }
 
 export interface ActualizarMarcaDto {
   nombre?: string;
   tipo?: TipoMarca;
   clienteId?: number;
+  lineaId?: number;
 }
 
 @Injectable({ providedIn: 'root' })

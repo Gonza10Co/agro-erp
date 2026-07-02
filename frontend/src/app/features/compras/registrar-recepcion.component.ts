@@ -71,7 +71,7 @@ export class RegistrarRecepcionComponent {
       .map((l) => ({ ocpLineaId: l.id, cantidad: Number(this.cantidades()[l.id] ?? l.pendiente) }))
       .filter((l) => l.cantidad > 0);
     if (!lineas.length) {
-      this.error.set('Ingresá al menos una cantidad recibida');
+      this.error.set('Ingresa al menos una cantidad recibida');
       return;
     }
     for (const l of lineas) {

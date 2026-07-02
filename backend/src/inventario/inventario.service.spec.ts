@@ -117,6 +117,13 @@ describe('InventarioService.consolidado', () => {
       expect.objectContaining({ where: { estado: 'EN_PROCESO' } }),
     );
   });
+
+  it('filtra el WIP por línea cuando se pasa lineaId', async () => {
+    await service.consolidado(4);
+    expect(prisma.par.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { estado: 'EN_PROCESO', lineaId: 4 } }),
+    );
+  });
 });
 
 describe('InventarioService.kardex', () => {

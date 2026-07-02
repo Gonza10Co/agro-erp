@@ -26,6 +26,8 @@ describe('MarcasListComponent', () => {
     req.flush([
       { id: 1, codigo: 'BAS', nombre: 'Basarili', tipo: 'PROPIA', clienteId: null, activo: true },
     ]);
+    // El constructor también carga las líneas para el dropdown.
+    http.expectOne('http://localhost:3001/catalog/lineas').flush([]);
     expect(fixture.componentInstance.marcas().length).toBe(1);
     expect(fixture.componentInstance.cargando()).toBe(false);
   });
@@ -34,6 +36,7 @@ describe('MarcasListComponent', () => {
     const fixture = setup();
     fixture.detectChanges();
     http.expectOne('http://localhost:3001/catalog/marcas').flush([]);
+    http.expectOne('http://localhost:3001/catalog/lineas').flush([]);
 
     const cmp = fixture.componentInstance;
     cmp.abrirNueva();
@@ -52,5 +55,27 @@ describe('MarcasListComponent', () => {
     expect(reload.request.method).toBe('GET');
     reload.flush([]);
     expect(cmp.drawerAbierto()).toBe(false);
+  });
+
+  it('al asignar una línea el PATCH incluye lineaId', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/catalog/marcas').flush([
+      { id: 5, codigo: 'AGRO', nombre: 'Agro', tipo: 'PROPIA', lineaId: null, activo: true },
+    ]);
+    http.expectOne('http://localhost:3001/catalog/lineas').flush([
+      { id: 2, codigo: 'AGRO', nombre: 'Agro', celulaInicial: 'CORTE', activo: true },
+    ]);
+
+    const cmp = fixture.componentInstance;
+    cmp.abrirEditar({ id: 5, codigo: 'AGRO', nombre: 'Agro', tipo: 'PROPIA', lineaId: null, activo: true });
+    cmp.lineaId = 2;
+    cmp.guardar();
+
+    const patch = http.expectOne('http://localhost:3001/catalog/marcas/5');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({ nombre: 'Agro', tipo: 'PROPIA', lineaId: 2 });
+    patch.flush({ id: 5 });
+    http.expectOne('http://localhost:3001/catalog/marcas').flush([]);
   });
 });

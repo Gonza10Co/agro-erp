@@ -27,8 +27,10 @@ export class InventarioController {
     return this.inventario.registrarStock(dto);
   }
 
-  @Get('consolidado') consolidado() {
-    return this.inventario.consolidado();
+  @Get('consolidado') consolidado(
+    @Query('lineaId', new ParseIntPipe({ optional: true })) lineaId?: number,
+  ) {
+    return this.inventario.consolidado(lineaId);
   }
 
   @Get('movimientos') movimientos(

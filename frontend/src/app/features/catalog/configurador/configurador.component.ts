@@ -52,7 +52,7 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
               @for (t of tallas(); track t) { <option [value]="t" [selected]="t === tallaSel()">{{ t }}</option> }
             </select>
 
-            @if (esInterno) {
+            @if (puedeEditarBom) {
               <button class="btn btn-ghost btn-block" type="button" style="margin-top:var(--sp-5)" (click)="editarBom()">
                 ✎ Editar BOM de esta referencia
               </button>
@@ -65,9 +65,9 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
           <div class="panel-title">BOM resuelto @if (tallaSel(); as t) { <span class="cell-sub">· talla {{ t }}</span> }</div>
 
           @if (!config()) {
-            <p class="cell-sub">Elegí una referencia para empezar.</p>
+            <p class="cell-sub">Elige una referencia para empezar.</p>
           } @else if (faltantes().length) {
-            <p class="cell-sub">Elegí: {{ faltantes().join(', ') }}</p>
+            <p class="cell-sub">Elige: {{ faltantes().join(', ') }}</p>
           } @else if (cargando()) {
             <p class="cell-sub">Resolviendo…</p>
           } @else if (error()) {
@@ -116,8 +116,11 @@ export class ConfiguradorComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
-  // ABM de BOM solo para roles internos (el backend además exige @Roles).
+  // "Crear producto de esta combinación" queda solo para roles internos.
   readonly esInterno = ['ADMIN', 'GERENTE'].includes(this.auth.rol() ?? '');
+  // Editar el BOM se entrega en la demo también al CLIENTE (fábrica); el backend
+  // además valida con @Roles. OPERARIO no edita BOM.
+  readonly puedeEditarBom = ['ADMIN', 'GERENTE', 'CLIENTE'].includes(this.auth.rol() ?? '');
 
   creandoProducto = signal(false);
   productoMsg = signal('');

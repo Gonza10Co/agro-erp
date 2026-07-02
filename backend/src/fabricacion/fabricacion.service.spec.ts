@@ -98,6 +98,34 @@ describe('FabricacionService.generarOF', () => {
     });
     await expect(new FabricacionService(prisma).generarOF(1)).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('los pares de una línea Externa arrancan en INYECCION (capellada de Bogotá)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineas: [
+        {
+          productoConfiguradoId: 10,
+          productoConfigurado: { marca: { lineaId: 4, linea: { celulaInicial: 'INYECCION' } } },
+          tallas: [{ tallaId: 1, cantAProducir: 2 }],
+        },
+      ],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    const data = tx.par.createMany.mock.calls[0][0].data;
+    expect(data).toHaveLength(2);
+    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.subPasoActual === null && p.lineaId === 4)).toBe(true);
+  });
+
+  it('sin línea asignada los pares siguen arrancando en CORTE (cero regresión)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 1, cantAProducir: 1 }] }],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ celulaActual: 'CORTE', subPasoActual: null });
+  });
 });
 
 describe('FabricacionService.avanzar', () => {
@@ -133,6 +161,22 @@ describe('FabricacionService.avanzar', () => {
     await new FabricacionService(prisma).avanzar('OF1-0001', dto);
     expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { estado: 'EN_PROCESO' } }),
+    );
+  });
+
+  it('el primer escaneo activa la OF aunque el par arranque en INYECCION (línea Externa)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'INYECCION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
+    });
+    tx.par.update.mockResolvedValue({ id: 50, celulaActual: 'PT' });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'EN_PROCESO' } }),
+    );
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'PT' }) }),
     );
   });
 
