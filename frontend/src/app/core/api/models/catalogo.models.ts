@@ -21,10 +21,10 @@ export interface ReferenciaConfig {
   ejes: EjeConfig[];
 }
 export interface NodoBom {
-  materialId: number; codigo: string; nombre: string; unidad: string;
+  materialId: number; codigo: string; nombre: string; unidad: string; categoria: string;
   origen: 'COMPRADO' | 'FABRICADO'; consumo: number; hijos: NodoBom[];
 }
-export interface CompradoBom { materialId: number; codigo: string; nombre: string; unidad: string; consumo: number; }
+export interface CompradoBom { materialId: number; codigo: string; nombre: string; unidad: string; categoria: string; consumo: number; }
 export interface BomResuelto { arbol: NodoBom[]; comprados: CompradoBom[]; }
 export interface ResolverParams { referenciaId: number; talla: number; marcaId?: number; opcionIds?: number[]; }
 

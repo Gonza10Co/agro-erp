@@ -4,6 +4,7 @@ export interface MetaMaterial {
   codigo: string;
   nombre: string;
   unidad: string;
+  categoria: string;
 }
 
 export interface NodoConMeta {
@@ -11,6 +12,7 @@ export interface NodoConMeta {
   codigo: string;
   nombre: string;
   unidad: string;
+  categoria: string;
   origen: OrigenMaterial;
   consumo: number;
   hijos: NodoConMeta[];
@@ -21,6 +23,7 @@ export interface CompradoConMeta {
   codigo: string;
   nombre: string;
   unidad: string;
+  categoria: string;
   consumo: number;
 }
 
@@ -29,7 +32,7 @@ export interface BomConMeta {
   comprados: CompradoConMeta[];
 }
 
-const FALTANTE: MetaMaterial = { codigo: '?', nombre: '(desconocido)', unidad: '' };
+const FALTANTE: MetaMaterial = { codigo: '?', nombre: '(desconocido)', unidad: '', categoria: '' };
 
 export function idsDeResuelto(r: BomResuelto): number[] {
   const ids = new Set<number>();
@@ -55,6 +58,7 @@ export function enriquecer(
       codigo: m.codigo,
       nombre: m.nombre,
       unidad: m.unidad,
+      categoria: m.categoria,
       origen: n.origen,
       consumo: n.consumo,
       hijos: n.hijos.map(decorar),
@@ -64,7 +68,7 @@ export function enriquecer(
     arbol: r.arbol.map(decorar),
     comprados: r.comprados.map((c) => {
       const m = meta[c.materialId] ?? FALTANTE;
-      return { materialId: c.materialId, codigo: m.codigo, nombre: m.nombre, unidad: m.unidad, consumo: c.consumo };
+      return { materialId: c.materialId, codigo: m.codigo, nombre: m.nombre, unidad: m.unidad, categoria: m.categoria, consumo: c.consumo };
     }),
   };
 }

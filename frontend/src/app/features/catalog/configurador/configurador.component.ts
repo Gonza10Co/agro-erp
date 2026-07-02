@@ -5,7 +5,7 @@ import { EMPTY, Subject, catchError, debounceTime, map, of, switchMap } from 'rx
 import { AuthService } from '../../../core/auth/auth.service';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
 import {
-  BomResuelto, MarcaOpt, ReferenciaConfig, ReferenciaListItem, ResolverParams,
+  BomResuelto, CompradoBom, MarcaOpt, ReferenciaConfig, ReferenciaListItem, ResolverParams,
 } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
 import { BomArbolComponent } from './bom-arbol/bom-arbol.component';
@@ -77,13 +77,37 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
               @if (!r.arbol.length) {
                 <p class="cell-sub">Sin BOM cargado para esta selección.</p>
               } @else {
-                <app-bom-arbol [nodos]="r.arbol" />
-                <div class="panel-title" style="margin-top:var(--sp-5)">Materiales comprados ({{ r.comprados.length }})</div>
-                <table class="tbl"><tbody>
-                  @for (c of r.comprados; track c.materialId) {
-                    <tr><td>{{ c.nombre }}</td><td class="num">{{ c.consumo }} {{ c.unidad }}</td></tr>
-                  }
-                </tbody></table>
+                <div class="bom-toolbar">
+                  <input class="input bom-search" type="search" placeholder="Buscar material…"
+                    [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
+                  <span class="bom-total">{{ r.comprados.length }} materiales</span>
+                  <button class="tgl" type="button" [class.on]="vistaArbol()" (click)="vistaArbol.set(!vistaArbol())">
+                    {{ vistaArbol() ? '☰ Ver tabla' : '⌗ Ver estructura' }}
+                  </button>
+                </div>
+                @if (vistaArbol()) {
+                  <app-bom-arbol [nodos]="r.arbol" />
+                } @else if (!grupos().length) {
+                  <p class="cell-sub">Sin coincidencias para “{{ busqueda() }}”.</p>
+                } @else {
+                  <table class="bom-table">
+                    <thead><tr><th>Material</th><th class="num">Cantidad</th><th>Unidad</th></tr></thead>
+                    @for (g of grupos(); track g.categoria) {
+                      <tbody>
+                        <tr class="group-row">
+                          <td colspan="3">{{ g.categoria }}<span class="badge-count">{{ g.items.length }}</span></td>
+                        </tr>
+                        @for (it of g.items; track it.materialId) {
+                          <tr>
+                            <td>{{ it.nombre }}</td>
+                            <td class="num">{{ it.consumo }}</td>
+                            <td class="u">{{ it.unidad }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    }
+                  </table>
+                }
               }
             }
           }
@@ -104,9 +128,19 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
     .panel-title{font-size:var(--text-h3);font-weight:var(--fw-semibold);margin-bottom:var(--sp-4)}
     .label{display:block;font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--sp-2)}
     .input{width:100%;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
-    .tbl{width:100%;border-collapse:collapse}
-    .tbl td{padding:var(--sp-2) 0;border-bottom:var(--bw) solid var(--border);font-size:var(--text-sm)}
-    .tbl .num{text-align:right;font-family:var(--font-mono);color:var(--text-subtle)}
+    .bom-toolbar{display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-4)}
+    .bom-search{flex:1;min-width:0}
+    .bom-total{font-size:var(--text-caption);color:var(--text-subtle);white-space:nowrap}
+    .tgl{white-space:nowrap;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-muted);cursor:pointer;font-size:var(--text-sm)}
+    .tgl.on{background:var(--primary-subtle);color:var(--primary);border-color:transparent}
+    .bom-table{width:100%;border-collapse:collapse}
+    .bom-table thead th{text-align:left;font-size:var(--text-caption);color:var(--text-muted);font-weight:var(--fw-medium);padding:0 var(--sp-3) var(--sp-2);border-bottom:var(--bw) solid var(--border)}
+    .bom-table th.num{text-align:right}
+    .bom-table td{padding:var(--sp-2) var(--sp-3);font-size:var(--text-sm);border-bottom:var(--bw) solid var(--border)}
+    .bom-table td.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+    .bom-table td.u{color:var(--text-subtle);font-family:var(--font-mono);font-size:var(--text-caption)}
+    .bom-table .group-row td{background:var(--surface-sunken);font-weight:var(--fw-semibold);font-size:var(--text-caption);text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)}
+    .bom-table .badge-count{margin-left:var(--sp-2)}
     @media (max-width:860px){.cfg{grid-template-columns:1fr}}
   `],
 })
@@ -155,9 +189,30 @@ export class ConfiguradorComponent implements OnInit {
   resultado = signal<BomResuelto | null>(null);
   cargando = signal(false);
   error = signal('');
+  busqueda = signal('');
+  vistaArbol = signal(false);
 
   tallas = computed(() => { const c = this.config(); return c ? tallasDeRef(c) : []; });
   faltantes = computed(() => { const c = this.config(); return c ? obligatoriosFaltantes(c.ejes, this.opcionesSel()) : []; });
+
+  // Materiales comprados agrupados por categoría (proceso), filtrados por el buscador.
+  grupos = computed<{ categoria: string; items: CompradoBom[] }[]>(() => {
+    const r = this.resultado();
+    if (!r) return [];
+    const q = this.busqueda().trim().toLowerCase();
+    const items = q
+      ? r.comprados.filter((c) => c.nombre.toLowerCase().includes(q) || c.codigo.toLowerCase().includes(q))
+      : r.comprados;
+    const map = new Map<string, CompradoBom[]>();
+    for (const c of items) {
+      const cat = c.categoria || 'Sin categoría';
+      const arr = map.get(cat) ?? map.set(cat, []).get(cat)!;
+      arr.push(c);
+    }
+    return [...map.entries()]
+      .map(([categoria, items]) => ({ categoria, items }))
+      .sort((a, b) => a.categoria.localeCompare(b.categoria));
+  });
 
   etiquetaRef = (r: ReferenciaListItem) => `${r.codigo} · ${r.nombreInterno}`;
   subRef = (r: ReferenciaListItem) => r.codigo;
