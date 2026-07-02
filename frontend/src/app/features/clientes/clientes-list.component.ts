@@ -27,7 +27,7 @@ import { ClienteFormComponent } from './cliente-form.component';
           <div class="empty">
             <span class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/></svg></span>
             <h4>Sin clientes todavía</h4>
-            <p>Creá el primer cliente para empezar a registrar pedidos.</p>
+            <p>Crea el primer cliente para empezar a registrar pedidos.</p>
           </div>
         </div></div>
       } @else {

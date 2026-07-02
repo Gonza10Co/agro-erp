@@ -110,7 +110,7 @@ describe('PantallaOperarioComponent', () => {
     } as never);
     comp.avanzar(comp.par()!);
     expect(comp.esError()).toBeTrue();
-    expect(comp.msg()).toContain('Seleccioná operario');
+    expect(comp.msg()).toContain('Selecciona operario');
     http.verify(); // ningún POST debe haberse emitido
   });
 

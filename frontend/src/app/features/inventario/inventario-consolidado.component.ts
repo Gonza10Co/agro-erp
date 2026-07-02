@@ -46,7 +46,7 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
             <div>
               <label class="label">Material</label>
               <select class="input" [ngModel]="fMaterialId()" (ngModelChange)="fMaterialId.set($event)">
-                <option [ngValue]="0" disabled>Elegí un material…</option>
+                <option [ngValue]="0" disabled>Elige un material…</option>
                 @for (m of data()?.materiales ?? []; track m.materialId) {
                   <option [ngValue]="m.materialId">{{ m.codigo }} — {{ m.nombre }}</option>
                 }

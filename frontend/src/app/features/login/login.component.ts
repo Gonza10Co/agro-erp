@@ -75,7 +75,7 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
         }
         <div class="lead">
           <h2>Ingresar</h2>
-          <p>Accedé con tu cuenta corporativa para gestionar pedidos y producción.</p>
+          <p>Accede con tu cuenta corporativa para gestionar pedidos y producción.</p>
         </div>
         <div class="field">
           <label class="label" for="u">Usuario</label>
@@ -94,7 +94,7 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
         </div>
         <button class="btn btn-primary btn-lg btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">Ingresar</button>
         @if (error()) { <p class="login-error">{{ error() }}</p> }
-        <div class="login-foot">¿Problemas para entrar? <a class="link">Contactá a TI</a></div>
+        <div class="login-foot">¿Problemas para entrar? <a class="link">Contacta a TI</a></div>
       </form>
     </div>
   `,

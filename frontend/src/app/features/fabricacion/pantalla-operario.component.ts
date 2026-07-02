@@ -147,7 +147,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   reportar(p: ParDetalle, t: TipoDano): void {
     if (this.operarioId == null) {
       this.esError.set(true);
-      this.msg.set('Seleccioná operario');
+      this.msg.set('Selecciona operario');
       return;
     }
     this.calidadApi
@@ -243,7 +243,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   avanzar(p: ParDetalle): void {
     if (this.operarioId == null || this.maquinaId == null) {
       this.esError.set(true);
-      this.msg.set('Seleccioná operario y máquina');
+      this.msg.set('Selecciona operario y máquina');
       return;
     }
     this.api.avanzar(p.codigo, this.operarioId, this.maquinaId)

@@ -26,7 +26,7 @@ import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
           <div class="empty">
             <span class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/></svg></span>
             <h4>Sin proveedores todavía</h4>
-            <p>Creá el primer proveedor para empezar a registrar compras.</p>
+            <p>Crea el primer proveedor para empezar a registrar compras.</p>
           </div>
         </div></div>
       } @else {

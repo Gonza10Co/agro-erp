@@ -26,7 +26,7 @@ import { GruposOpcionApi, GrupoOpcion } from '../../../core/api/grupos-opcion.ap
           <div class="empty">
             <span class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg></span>
             <h4>Sin grupos todavía</h4>
-            <p>Creá el primer grupo de opción para configurar referencias.</p>
+            <p>Crea el primer grupo de opción para configurar referencias.</p>
           </div>
         </div></div>
       } @else {
