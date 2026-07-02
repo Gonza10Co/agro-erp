@@ -19,16 +19,16 @@ describe('bom-enriquecer', () => {
     expect(idsDeResuelto(RESUELTO).sort()).toEqual([1, 2, 3]);
   });
 
-  it('enriquecer decora árbol e hijos con codigo/nombre/unidad', () => {
+  it('enriquecer decora árbol e hijos con codigo/nombre/unidad/categoria', () => {
     const meta = {
-      1: { codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M' },
-      2: { codigo: 'PLANT-PU', nombre: 'PLANTILLA PU', unidad: 'PAR' },
-      3: { codigo: 'POLIOL', nombre: 'POLIOL JF', unidad: 'KG' },
+      1: { codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M', categoria: 'GUARNICIÓN' },
+      2: { codigo: 'PLANT-PU', nombre: 'PLANTILLA PU', unidad: 'PAR', categoria: 'INYECCIÓN' },
+      3: { codigo: 'POLIOL', nombre: 'POLIOL JF', unidad: 'KG', categoria: 'INYECCIÓN' },
     };
     const r = enriquecer(RESUELTO, meta);
-    expect(r.arbol[0]).toEqual({ materialId: 1, codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M', origen: 'COMPRADO', consumo: 0.112, hijos: [] });
+    expect(r.arbol[0]).toEqual({ materialId: 1, codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M', categoria: 'GUARNICIÓN', origen: 'COMPRADO', consumo: 0.112, hijos: [] });
     expect(r.arbol[1].hijos[0].nombre).toBe('POLIOL JF');
-    expect(r.comprados[0]).toEqual({ materialId: 1, codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M', consumo: 0.112 });
+    expect(r.comprados[0]).toEqual({ materialId: 1, codigo: 'MICRO-CAF', nombre: 'MICROPIEL CAFÉ', unidad: 'M', categoria: 'GUARNICIÓN', consumo: 0.112 });
   });
 
   it('enriquecer usa un placeholder si falta meta de un material', () => {
