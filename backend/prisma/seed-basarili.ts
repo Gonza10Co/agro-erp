@@ -51,23 +51,27 @@ async function main() {
   }
   console.log(`  · categorías: ${categoriaPorNombre.size}`);
 
-  // 3b. Líneas de producción (Basarili, Agro, Alta, Externa). Datos maestros fijos.
-  // Externa (capellada de Bogotá) arranca en INYECCION; las demás en CORTE.
-  // El mapeo marca→línea lo entrega el cliente aparte; acá NO se clasifica.
+  // 3b. Líneas de producción (Basarili, Agro, Alta, Feroz). Datos maestros fijos.
+  // Feroz (capellada de Bogotá; hoy solo se le presta servicio de inyección)
+  // arranca en INYECCION; las demás en CORTE. La línea de un pedido la decide
+  // el cliente al pedir (una misma marca puede fabricarse por cualquier línea).
   const lineas: Array<{ codigo: string; nombre: string; celulaInicial: 'CORTE' | 'INYECCION' }> = [
     { codigo: 'BASARILI', nombre: 'Basarili', celulaInicial: 'CORTE' },
     { codigo: 'AGRO', nombre: 'Agro', celulaInicial: 'CORTE' },
     { codigo: 'ALTA', nombre: 'Alta', celulaInicial: 'CORTE' },
-    { codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' },
+    { codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION' },
   ];
   for (const l of lineas) {
     await prisma.linea.upsert({
       where: { codigo: l.codigo },
-      update: { nombre: l.nombre, celulaInicial: l.celulaInicial },
+      update: { nombre: l.nombre, celulaInicial: l.celulaInicial, activo: true },
       create: l,
     });
   }
-  console.log(`  · líneas: ${lineas.length}`);
+  // La línea EXTERNA del kickoff murió (cliente, 2026-07-06): esos cortes no
+  // vuelven y Feroz la reemplaza. En bases que ya la tienen queda desactivada.
+  await prisma.linea.updateMany({ where: { codigo: 'EXTERNA' }, data: { activo: false } });
+  console.log(`  · líneas: ${lineas.length} (+EXTERNA desactivada si existía)`);
 
   // 4. Marcas (codigo, nombre, tipo)
   let marcas = 0;

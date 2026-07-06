@@ -36,7 +36,7 @@ export class CalidadService {
   async reportar(codigo: string, dto: ReportarIncidenciaDto, user: Usuario) {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
-      // La línea del par define dónde re-arranca la reposición (Externa → INYECCION).
+      // La línea del par define dónde re-arranca la reposición (Feroz → INYECCION).
       include: { productoConfigurado: { include: { marca: { include: { linea: true } } } } },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);

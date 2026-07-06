@@ -200,7 +200,7 @@ describe('reporte de daño', () => {
     fixture.detectChanges();
 
     expect(comp.msg()).toContain('OF1-0001-R1');
-    // El mensaje refleja la célula real de arranque de la reposición (Externa → Inyección).
+    // El mensaje refleja la célula real de arranque de la reposición (Feroz → Inyección).
     expect(comp.msg()).toContain('Inyección');
     http.verify();
   });

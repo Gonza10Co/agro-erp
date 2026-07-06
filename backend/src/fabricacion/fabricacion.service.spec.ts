@@ -99,7 +99,7 @@ describe('FabricacionService.generarOF', () => {
     await expect(new FabricacionService(prisma).generarOF(1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('los pares de una línea Externa arrancan en INYECCION (capellada de Bogotá)', async () => {
+  it('los pares de una línea Feroz arrancan en INYECCION (capellada de Bogotá)', async () => {
     const { prisma, tx } = makePrisma();
     prisma.ordenProduccion.findUnique.mockResolvedValue({
       id: 100, ordenesFabricacion: [],
@@ -164,7 +164,7 @@ describe('FabricacionService.avanzar', () => {
     );
   });
 
-  it('el primer escaneo activa la OF aunque el par arranque en INYECCION (línea Externa)', async () => {
+  it('el primer escaneo activa la OF aunque el par arranque en INYECCION (línea Feroz)', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
       id: 50, ofId: 1, celulaActual: 'INYECCION', estado: 'EN_PROCESO',

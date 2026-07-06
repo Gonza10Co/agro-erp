@@ -61,7 +61,8 @@ Paquete para que el cliente **opere con su catálogo real**. Todo en `develop`, 
 ### 🧵 Bloque "Líneas de producción" (2026-07-01) — 4 líneas independientes
 
 Don Gabriel (dueño) decidió NO unificar Basarili+Agro y mantener **4 líneas independientes**:
-Basarili · Agro · Alta (costura alta, nueva) · Externa (capellada de Bogotá, se inyecta acá).
+Basarili · Agro · Alta (costura alta, nueva) · Externa (capellada de Bogotá, se inyecta acá;
+**reemplazada por Feroz el 2026-07-06**, ver actualización abajo).
 "Independiente" = **solo separar reportes** (misma empresa; inventario/cartera/facturación
 compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b881a`.
 
@@ -76,9 +77,23 @@ compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b
 | B1 | **`Par.lineaId` denormalizado** (+ backfill) + `inventario/consolidado?lineaId` e `indicadores?lineaId` filtran producción por línea | ✅ |
 | A3/B2 | **CRUD `catalog/lineas`** + ABM `/catalog/lineas` (menú Maestros) + dropdown de línea en ABM Marca + selector de línea en Inventario/Indicadores + aviso de reposición con célula real | ✅ |
 
-> ⚠️ **Pendiente del cliente:** falta el **mapeo marca→línea** (qué marca va en qué línea).
-> Hasta entonces `Par.lineaId` = NULL y los filtros por línea no devuelven datos; tras la
-> asignación hay que **re-sincronizar los pares existentes**.
+> ⚠️ ~~Pendiente del cliente: falta el mapeo marca→línea~~ **ANULADO (JP, 2026-07-06):**
+> el mapeo marca→línea **NO es fijo** — la marquilla es la marca del cliente y esa misma
+> marca puede fabricarla Agro, Alta o Basarili **según el pedido**. La línea debe
+> capturarse a nivel de **OC/OP** (la marca a lo sumo da un default) y `Par.lineaId`
+> heredarse de la OP. **Pendiente de diseñar/implementar** ("línea por pedido").
+
+#### Actualización 2026-07-06 — Externa muere, nace Feroz (audios de JP)
+
+- Eran dos cosas: unos "cortes aparte" (la Externa del kickoff) y Feroz. Los cortes aparte
+  **no vuelven** → JP: "no es necesario montarle toda la infraestructura". La línea
+  **EXTERNA quedó desactivada** en el seed y nació **FEROZ** (celulaInicial=INYECCION).
+- Feroz hoy: llega la **capellada completa** de Bogotá y la fábrica **presta el servicio de
+  inyección** (maquila → conecta con el pendiente SERVICIOS). Posible futuro: Bogotá manda
+  el despiece y acá se guarnece+inyecta → solo cambiar `celulaInicial` a GUARNICION en el ABM.
+- Líneas de bota vivas: **Basarili · Agro · Alta · Feroz**. Además existen las líneas de
+  insumo con doble rol (Marquillas · Punteras · Plantillas), que producen por lote y venden
+  a terceros — aún sin modelar (ver backlog).
 
 ---
 
@@ -91,10 +106,12 @@ compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b
 ## ⏳ FALTA (backlog priorizado)
 
 ### 1) Modelado de negocio — conceptos del Excel aún sin modelar
-- [x] **EXTERNO / tercerización** ✅ 2026-07-01 — modelado como **línea Externa** (capellada de Bogotá que arranca en INYECCIÓN). Falta el **mapeo marca→línea** que entrega el cliente + re-sincronizar `Par.lineaId`.
+- [x] **EXTERNO / tercerización** ✅ 2026-07-01 — modelado como línea con `celulaInicial=INYECCION`; desde 2026-07-06 esa línea es **Feroz** (la Externa original quedó desactivada; JP confirmó que esos cortes no vuelven).
+- [ ] **Línea por pedido** ⚠️ NUEVO 2026-07-06 — la línea se decide en la OC/OP, no por marca (JP: una misma marca la puede fabricar Agro/Alta/Basarili según el pedido). Capturar `lineaId` al crear el pedido, heredarla al par; `Marca.lineaId` queda solo como default sugerido.
 - [ ] **Reporte Diario Gerencial POR LÍNEA** — la Demo 14 ya existe pero agrega todo junto; falta segmentar producción/metas por las 4 líneas (el `Par.lineaId` ya está listo para ello).
-- [ ] **SEGUNDAS** — categoría de calidad vendible; no existe en el modelo.
-- [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada.
+- [ ] **SEGUNDAS** — categoría de calidad vendible; no existe en el modelo. Dato real: Feroz ya maneja "SEGUNDAS FEROZ" como inventario aparte (336 segundas vs 263 primeras al 03-jul-2026).
+- [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada. Caso real: Feroz = servicio de inyección a la capellada de Bogotá (maquila).
+- [ ] **Líneas de insumo (Marquillas/Punteras/Plantillas)** — producción **por lote** (no par/QR): transformación MP→PT con rendimiento/merma (plantillas: lámina→preforma→troquel por talla, hoy NO se registra ese eslabón), venta a terceros (catálogo de clientes externos ya visto en los Excel) y doble rol como `Material` de las líneas de bota.
 - [ ] **Metas por célula** — el Reporte usa metas mensuales por tipo; falta el desglose por célula.
 
 > ⚠️ Segundas, servicios y metas-por-célula hay que **definirlos con el cliente** antes de modelar.
@@ -160,7 +177,8 @@ npm run start:dev
 #   npm run seed:catalogo
 #   npm run seed:demo
 #   npm run seed:basarili # catálogo real del Drive + las 4 líneas de producción
-#                         # (Basarili/Agro/Alta/Externa; Externa arranca en INYECCIÓN)
+#                         # (Basarili/Agro/Alta/Feroz; Feroz arranca en INYECCIÓN,
+#                         #  EXTERNA queda desactivada si existía)
 
 # Frontend (:4200)
 cd agro-erp/frontend

@@ -196,7 +196,7 @@ describe('CalidadService.reportar — BAJA', () => {
     );
   });
 
-  it('la reposición de un par de línea Externa re-arranca en INYECCION, no en CORTE', async () => {
+  it('la reposición de un par de línea Feroz re-arranca en INYECCION, no en CORTE', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
       ...parEnProceso,

@@ -24,7 +24,7 @@ describe('LineasListComponent', () => {
     const req = http.expectOne('http://localhost:3001/catalog/lineas');
     expect(req.request.method).toBe('GET');
     req.flush([
-      { id: 4, codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION', activo: true },
+      { id: 4, codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION', activo: true },
     ]);
     expect(fixture.componentInstance.lineas().length).toBe(1);
     expect(fixture.componentInstance.cargando()).toBe(false);
@@ -37,14 +37,14 @@ describe('LineasListComponent', () => {
 
     const cmp = fixture.componentInstance;
     cmp.abrirNueva();
-    cmp.codigo = 'EXTERNA';
-    cmp.nombre = 'Externa';
+    cmp.codigo = 'FEROZ';
+    cmp.nombre = 'Feroz';
     cmp.celulaInicial = 'INYECCION';
     cmp.guardar();
 
     const post = http.expectOne('http://localhost:3001/catalog/lineas');
     expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' });
+    expect(post.request.body).toEqual({ codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION' });
     post.flush({ id: 4 });
 
     const reload = http.expectOne('http://localhost:3001/catalog/lineas');
