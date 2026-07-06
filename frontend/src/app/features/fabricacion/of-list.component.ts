@@ -32,7 +32,7 @@ import { OFListItem } from '../../core/api/models/fabricacion.models';
             </tbody>
           </table>
         } @else {
-          <div class="empty"><h4>Sin OF todavía</h4><p class="cell-sub">Generá una OF desde el detalle de una OP con producción pendiente.</p></div>
+          <div class="empty"><h4>Sin OF todavía</h4><p class="cell-sub">Genera una OF desde el detalle de una OP con producción pendiente.</p></div>
         }
       </div></div>
     </div>

@@ -20,9 +20,10 @@ import { ActualizarClienteDto } from './dto/actualizar-cliente.dto';
 export class ClientesController {
   constructor(private readonly clientes: ClientesService) {}
 
-  // Gestión comercial: solo roles internos. El CLIENTE crea pedidos, no clientes.
+  // Gestión comercial: se entrega al CLIENTE (fábrica) para el piloto —
+  // administra sus compradores. OPERARIO queda fuera.
   @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'GERENTE')
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
   @Post() crear(@Body() dto: CrearClienteDto) {
     return this.clientes.crear(dto);
   }
@@ -34,7 +35,7 @@ export class ClientesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'GERENTE')
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
   @Patch(':id') actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarClienteDto,
@@ -43,7 +44,7 @@ export class ClientesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('ADMIN', 'GERENTE')
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.clientes.desactivar(id);
   }

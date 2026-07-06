@@ -6,8 +6,10 @@ import { ProductoConfiguradoService } from './producto-configurado.service';
 import { CrearProductoDto } from './dto/crear-producto.dto';
 
 // El GET /catalog/productos (listado) vive en CatalogController. Aquí solo escritura.
+// Se entrega al CLIENTE (fábrica) para el piloto: crea productos desde el
+// Configurador. OPERARIO queda fuera.
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN', 'GERENTE')
+@Roles('ADMIN', 'GERENTE', 'CLIENTE')
 @Controller('catalog/productos')
 export class ProductoConfiguradoController {
   constructor(private readonly productos: ProductoConfiguradoService) {}
