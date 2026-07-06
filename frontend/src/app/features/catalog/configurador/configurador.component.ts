@@ -112,7 +112,7 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
             }
           }
 
-          @if (esInterno && marcaSel() && !faltantes().length) {
+          @if (puedeCrearProducto && marcaSel() && !faltantes().length) {
             <button class="btn btn-primary btn-block" type="button" style="margin-top:var(--sp-5)"
               [disabled]="creandoProducto()" (click)="crearProducto()">
               {{ creandoProducto() ? 'Creando…' : '+ Crear producto de esta combinación' }}
@@ -150,8 +150,9 @@ export class ConfiguradorComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
-  // "Crear producto de esta combinación" queda solo para roles internos.
-  readonly esInterno = ['ADMIN', 'GERENTE'].includes(this.auth.rol() ?? '');
+  // "Crear producto de esta combinación" se entrega también al CLIENTE (fábrica)
+  // para el piloto; el backend además valida con @Roles. OPERARIO queda fuera.
+  readonly puedeCrearProducto = ['ADMIN', 'GERENTE', 'CLIENTE'].includes(this.auth.rol() ?? '');
   // Editar el BOM se entrega en la demo también al CLIENTE (fábrica); el backend
   // además valida con @Roles. OPERARIO no edita BOM.
   readonly puedeEditarBom = ['ADMIN', 'GERENTE', 'CLIENTE'].includes(this.auth.rol() ?? '');

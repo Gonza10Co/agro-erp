@@ -21,18 +21,18 @@ describe('LineasApi', () => {
   });
 
   it('crear hace POST /catalog/lineas con el dto', () => {
-    api.crear({ codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' }).subscribe();
+    api.crear({ codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION' }).subscribe();
     const req = http.expectOne('http://localhost:3001/catalog/lineas');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' });
+    expect(req.request.body).toEqual({ codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION' });
     req.flush({ id: 1 });
   });
 
   it('actualizar hace PATCH /catalog/lineas/:id con el dto', () => {
-    api.actualizar(4, { nombre: 'Externa', celulaInicial: 'INYECCION' }).subscribe();
+    api.actualizar(4, { nombre: 'Feroz', celulaInicial: 'INYECCION' }).subscribe();
     const req = http.expectOne('http://localhost:3001/catalog/lineas/4');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ nombre: 'Externa', celulaInicial: 'INYECCION' });
+    expect(req.request.body).toEqual({ nombre: 'Feroz', celulaInicial: 'INYECCION' });
     req.flush({ id: 4 });
   });
 

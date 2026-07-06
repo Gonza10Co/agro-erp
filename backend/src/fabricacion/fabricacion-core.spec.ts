@@ -109,7 +109,7 @@ describe('generarPares', () => {
     expect(pares[0]).toMatchObject({ celulaInicial: 'CORTE', subPasoInicial: null });
   });
 
-  it('propaga la celulaInicial y el lineaId de la línea a cada par (Externa arranca en INYECCION)', () => {
+  it('propaga la celulaInicial y el lineaId de la línea a cada par (Feroz arranca en INYECCION)', () => {
     const pares = generarPares(7, [
       { productoConfiguradoId: 20, tallaId: 3, cantAProducir: 2, celulaInicial: 'INYECCION', lineaId: 4 },
     ]);

@@ -110,7 +110,7 @@ export class FabricacionService {
         });
 
         // El primer escaneo de cualquier par activa la OF, sin importar en qué
-        // célula arranque (la línea Externa entra en INYECCION, no en CORTE).
+        // célula arranque (la línea Feroz entra en INYECCION, no en CORTE).
         if (par.of.estado === 'ABIERTA') {
           await tx.ordenFabricacion.update({
             where: { id: par.ofId },

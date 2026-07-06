@@ -21,7 +21,7 @@ import { badgeOcp } from './ocp-badge';
           <div class="empty">
             <span class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6h15l-1.5 9h-12zM6 6L5 3H2M8 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM18 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg></span>
             <h4>Sin órdenes de compra</h4>
-            <p>Generá órdenes desde un requerimiento de compra de una OP.</p>
+            <p>Genera órdenes desde un requerimiento de compra de una OP.</p>
           </div>
         </div></div>
       } @else {

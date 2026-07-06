@@ -3,8 +3,8 @@ import { BomArbolComponent } from './bom-arbol.component';
 import { NodoBom } from '../../../../core/api/models/catalogo.models';
 
 const NODOS: NodoBom[] = [
-  { materialId: 2, codigo: 'PLANT-PU', nombre: 'PLANTILLA PU', unidad: 'PAR', origen: 'FABRICADO', consumo: 1, hijos: [
-    { materialId: 3, codigo: 'POLIOL', nombre: 'POLIOL JF', unidad: 'KG', origen: 'COMPRADO', consumo: 0.04, hijos: [] },
+  { materialId: 2, codigo: 'PLANT-PU', nombre: 'PLANTILLA PU', unidad: 'PAR', categoria: 'PLANTILLAS', origen: 'FABRICADO', consumo: 1, hijos: [
+    { materialId: 3, codigo: 'POLIOL', nombre: 'POLIOL JF', unidad: 'KG', categoria: 'QUIMICOS', origen: 'COMPRADO', consumo: 0.04, hijos: [] },
   ] },
 ];
 

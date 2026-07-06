@@ -35,7 +35,7 @@ export interface LineaProduccion {
   productoConfiguradoId: number;
   tallaId: number;
   cantAProducir: number;
-  /** Célula donde arranca la línea. Default CORTE; la línea Externa entra en INYECCION. */
+  /** Célula donde arranca la línea. Default CORTE; la línea Feroz entra en INYECCION. */
   celulaInicial?: Celula;
   /** Id de la línea de negocio (denormalizado en el par para reportes). Null si la marca no tiene línea. */
   lineaId?: number | null;

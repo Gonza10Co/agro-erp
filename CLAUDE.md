@@ -21,7 +21,7 @@ ERP + MES para fábrica de botas de seguridad (make-to-order). Monorepo npm work
 
 OC (pedido del cliente) → OP (producción, amarra stock PT) → OF (corrida de fabricación) → pares con código `OF{n}-{seq}` escaneados por célula (CORTE→GUARNICION→ALMACEN→INYECCION→PT) → InventarioPT → Despacho (regla de cartera: cliente vencido bloquea, autoriza solo GERENTE/ADMIN).
 
-**Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea Externa (capellada de Bogotá) arranca en INYECCIÓN, no en CORTE. `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). El mapeo marca→línea lo entrega el cliente; hasta entonces `Par.lineaId` = NULL.
+**Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea **Feroz** (capellada de Bogotá; hoy solo servicio de inyección) arranca en INYECCIÓN, no en CORTE. La línea EXTERNA del kickoff quedó **desactivada** (cliente 2026-07-06: esos cortes no vuelven; Feroz la reemplaza). `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). **OJO (cliente 2026-07-06): el mapeo marca→línea NO es fijo** — una misma marca puede fabricarse por Agro, Alta o Basarili según el pedido; la línea debe decidirse a nivel de OC/OP (pendiente de implementar; hoy `Marca.lineaId` y `Par.lineaId` siguen NULL).
 
 ## Workflow
 

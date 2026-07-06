@@ -11,12 +11,12 @@ describe('LineaService', () => {
 
   it('crea una línea con los datos provistos', async () => {
     prisma.linea.findUnique.mockResolvedValue(null);
-    prisma.linea.create.mockResolvedValue({ id: 1, codigo: 'EXTERNA' });
-    const r = await service.crear({ codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: CelulaDto.INYECCION });
+    prisma.linea.create.mockResolvedValue({ id: 1, codigo: 'FEROZ' });
+    const r = await service.crear({ codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: CelulaDto.INYECCION });
     expect(prisma.linea.create).toHaveBeenCalledWith({
-      data: { codigo: 'EXTERNA', nombre: 'Externa', celulaInicial: 'INYECCION' },
+      data: { codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION' },
     });
-    expect(r).toMatchObject({ id: 1, codigo: 'EXTERNA' });
+    expect(r).toMatchObject({ id: 1, codigo: 'FEROZ' });
   });
 
   it('rechaza código duplicado', async () => {
@@ -35,11 +35,11 @@ describe('LineaService', () => {
   });
 
   it('actualiza nombre y célula inicial de una línea existente', async () => {
-    prisma.linea.findUnique.mockResolvedValue({ id: 1, codigo: 'EXTERNA' });
-    prisma.linea.update.mockResolvedValue({ id: 1, nombre: 'Externa Bogotá' });
-    const r = await service.actualizar(1, { nombre: 'Externa Bogotá', celulaInicial: CelulaDto.INYECCION });
+    prisma.linea.findUnique.mockResolvedValue({ id: 1, codigo: 'FEROZ' });
+    prisma.linea.update.mockResolvedValue({ id: 1, nombre: 'Feroz Bogotá' });
+    const r = await service.actualizar(1, { nombre: 'Feroz Bogotá', celulaInicial: CelulaDto.INYECCION });
     expect(prisma.linea.update).toHaveBeenCalledWith({
-      where: { id: 1 }, data: { nombre: 'Externa Bogotá', celulaInicial: 'INYECCION' },
+      where: { id: 1 }, data: { nombre: 'Feroz Bogotá', celulaInicial: 'INYECCION' },
     });
     expect(r).toMatchObject({ id: 1 });
   });

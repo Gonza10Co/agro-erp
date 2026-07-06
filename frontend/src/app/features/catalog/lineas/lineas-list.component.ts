@@ -36,7 +36,7 @@ const LABEL: Record<Celula, string> = Object.fromEntries(
         <div class="card"><div class="card-body">
           <div class="empty">
             <h4>Sin líneas todavía</h4>
-            <p>Crea la primera línea de producción (Basarili, Agro, Alta, Externa…).</p>
+            <p>Crea la primera línea de producción (Basarili, Agro, Alta, Feroz…).</p>
           </div>
         </div></div>
       } @else {
