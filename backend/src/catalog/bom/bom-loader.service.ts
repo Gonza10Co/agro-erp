@@ -20,6 +20,7 @@ const num = (d: DecimalLike): number | null =>
 
 interface LineaRaw {
   materialId: number;
+  piezaId?: number | null;
   claseConsumo: 'CURVA' | 'FIJO';
   consumoFijo: DecimalLike;
   mermaPct: DecimalLike;
@@ -59,6 +60,7 @@ export class BomLoaderService {
       consumoPorTalla[lt.talla.valor] = num(lt.consumo) as number;
     return {
       materialId: l.materialId,
+      piezaId: l.piezaId ?? null,
       claseConsumo: l.claseConsumo,
       consumoFijo: num(l.consumoFijo),
       consumoPorTalla,

@@ -22,6 +22,9 @@ export class BomLineaTallaInput {
 
 export class BomLineaInput {
   @Type(() => Number) @IsInt() materialId!: number;
+  // Pieza del despiece a la que va este material. Omitir = bota completa.
+  // El mismo material puede repetirse en varias piezas con consumos distintos.
+  @IsOptional() @Type(() => Number) @IsInt() piezaId?: number;
   @IsEnum(ClaseConsumoDto) claseConsumo!: ClaseConsumoDto;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) consumoFijo?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) mermaPct?: number;

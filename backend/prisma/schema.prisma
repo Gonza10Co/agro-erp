@@ -182,12 +182,28 @@ model Bom {
   @@index([materialId])
 }
 
+/// Pieza del despiece de la bota (capellada, lateral, talón, lengüeta…). Catálogo global:
+/// el mismo material puede consumirse en varias piezas con consumos distintos, así que la
+/// receta lleva una línea por (material, pieza) en vez de una sola línea sumada.
+model Pieza {
+  id     Int     @id @default(autoincrement())
+  codigo String  @unique
+  nombre String
+  orden  Int     @default(100) // orden natural del despiece, para listar
+  activo Boolean @default(true)
+
+  lineasBom BomLinea[]
+}
+
 model BomLinea {
   id           Int          @id @default(autoincrement())
   bomId        Int
   bom          Bom          @relation(fields: [bomId], references: [id])
   materialId   Int
   material     Material     @relation("InsumoDeLinea", fields: [materialId], references: [id])
+  // NULL = el material va a la bota completa, sin despiezar (así quedan los BOM viejos).
+  piezaId      Int?
+  pieza        Pieza?       @relation(fields: [piezaId], references: [id])
   claseConsumo ClaseConsumo
   consumoFijo  Decimal?
   mermaPct     Decimal?
@@ -197,6 +213,7 @@ model BomLinea {
 
   @@index([bomId])
   @@index([materialId])
+  @@index([piezaId])
 }
 
 model BomLineaTalla {
