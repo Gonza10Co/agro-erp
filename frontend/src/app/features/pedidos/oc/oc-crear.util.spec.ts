@@ -24,6 +24,7 @@ describe('oc-crear.util', () => {
       clienteId: 3,
       ocCliente: 'PO-1',
       observaciones: undefined,
+      direccionDespacho: undefined,
       lineas: [{ productoConfiguradoId: 7, precioUnitario: 85000, tallas: [{ tallaId: 2, cantidad: 10 }, { tallaId: 99, cantidad: 5 }] }],
     });
   });

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
+  costoPromedioMovil,
   estadoOcp,
   validarDevolucion,
   validarRecepcion,
@@ -248,23 +249,56 @@ export class ComprasProveedorService {
           where: { id: l.ocpLineaId },
           data: { cantRecibida: { increment: l.cantidad } },
         });
+
+        // Costo promedio móvil: solo se recalcula si la recepción trae costo.
+        // Se lee el stock ANTES de incrementarlo (es el "stock previo" de la fórmula).
+        const costoUnitario = l.costoUnitario ?? null;
+        if (costoUnitario != null) {
+          const material = await tx.material.findUnique({
+            where: { id: materialId },
+            select: {
+              costoPromedio: true,
+              costoBase: true,
+              inventario: { select: { cantDisponible: true } },
+            },
+          });
+          const stockPrevio = num(material?.inventario?.cantDisponible ?? null);
+          const costoPrevio =
+            num(material?.costoPromedio ?? null) ||
+            num(material?.costoBase ?? null) ||
+            costoUnitario;
+          const nuevoPromedio = costoPromedioMovil(
+            stockPrevio,
+            costoPrevio,
+            l.cantidad,
+            costoUnitario,
+          );
+          await tx.material.update({
+            where: { id: materialId },
+            data: { costoPromedio: nuevoPromedio },
+          });
+        }
+
         await tx.inventarioMaterial.upsert({
           where: { materialId },
           create: { materialId, cantDisponible: l.cantidad },
           update: { cantDisponible: { increment: l.cantidad } },
         });
+
+        // Kardex ENTRADA/COMPRA, valorizado si se capturó el costo.
+        await tx.movimientoInventario.create({
+          data: {
+            tipo: 'ENTRADA',
+            motivo: 'COMPRA',
+            materialId,
+            cantidad: l.cantidad,
+            costoUnitario: costoUnitario ?? undefined,
+            referencia,
+            observaciones: dto.observaciones,
+            usuarioId: user.sub,
+          },
+        });
       }
-      await tx.movimientoInventario.createMany({
-        data: dto.lineas.map((l) => ({
-          tipo: 'ENTRADA',
-          motivo: 'COMPRA',
-          materialId: porLineaId.get(l.ocpLineaId)!.materialId,
-          cantidad: l.cantidad,
-          referencia,
-          observaciones: dto.observaciones,
-          usuarioId: user.sub,
-        })),
-      });
 
       // Estado derivado: se calcula en memoria con las cantidades ya incrementadas.
       const recibidoPorLinea = new Map(dto.lineas.map((l) => [l.ocpLineaId, l.cantidad]));

@@ -17,6 +17,12 @@ export class LineaRecepcionDto {
   @IsNumber()
   @IsPositive()
   cantidad!: number;
+
+  // Costo al que llegó esta línea. Si se captura, alimenta el costo promedio del material.
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  costoUnitario?: number;
 }
 
 export class RegistrarRecepcionDto {

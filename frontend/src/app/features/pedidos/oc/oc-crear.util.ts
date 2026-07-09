@@ -17,12 +17,14 @@ export function construirDto(args: {
   clienteId: number;
   ocCliente?: string;
   observaciones?: string;
+  direccionDespacho?: string;
   lineas: LineaWizard[];
 }): CrearOCDto {
   return {
     clienteId: args.clienteId,
     ocCliente: args.ocCliente ? args.ocCliente : undefined,
     observaciones: args.observaciones ? args.observaciones : undefined,
+    direccionDespacho: args.direccionDespacho ? args.direccionDespacho : undefined,
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
       precioUnitario: l.precio > 0 ? l.precio : undefined,

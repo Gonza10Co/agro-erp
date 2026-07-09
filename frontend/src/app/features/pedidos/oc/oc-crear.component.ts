@@ -39,11 +39,16 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
           <div class="panel-title">Cliente</div>
           <label class="label">Cliente <span style="color:var(--accent)">*</span></label>
           <app-buscador-select [items]="clientes()" [etiqueta]="nombreCliente" [sub]="nitCliente"
-            placeholder="Buscar cliente…" (seleccionar)="clienteSel.set($event)" />
+            placeholder="Buscar cliente…" (seleccionar)="onClienteSel($event)" />
           @if (clienteSel(); as cl) { <p class="cell-sub" style="margin-top:var(--sp-2)">Seleccionado: <b>{{ cl.nombre }}</b> · {{ cl.nit }}</p> }
           <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-top:var(--sp-4)">
             <div><label class="label">OC del cliente (opcional)</label><input class="input" [ngModel]="ocCliente()" (ngModelChange)="ocCliente.set($event)" /></div>
             <div><label class="label">Observaciones (opcional)</label><input class="input" [ngModel]="observaciones()" (ngModelChange)="observaciones.set($event)" /></div>
+          </div>
+          <div style="margin-top:var(--sp-4)">
+            <label class="label">Dirección de despacho</label>
+            <input class="input" [ngModel]="direccionDespacho()" (ngModelChange)="direccionDespacho.set($event)" placeholder="Dónde se entrega este pedido" />
+            <p class="cell-sub" style="margin-top:var(--sp-2)">Se toma la del cliente; puedes cambiarla para este pedido.</p>
           </div>
         }
 
@@ -82,6 +87,7 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
         @if (paso() === 3) {
           <div class="panel-title">Revisar</div>
           <div class="kv"><span class="k">Cliente</span><span class="v">{{ clienteSel()?.nombre }}</span></div>
+          <div class="kv"><span class="k">Entrega en</span><span class="v">{{ direccionDespacho() || '—' }}</span></div>
           @for (l of lineas(); track l.producto.id) {
             <div class="kv" style="margin-top:var(--sp-3)">
               <span class="v"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares × {{ moneda(l.precio) }}</span>
@@ -138,10 +144,17 @@ export class OcCrearComponent implements OnInit {
   clienteSel = signal<Cliente | null>(null);
   ocCliente = signal('');
   observaciones = signal('');
+  direccionDespacho = signal('');
   lineas = signal<LineaWizard[]>([]);
   paso = signal<0 | 1 | 2 | 3>(0);
   enviando = signal(false);
   error = signal('');
+
+  onClienteSel(c: Cliente) {
+    this.clienteSel.set(c);
+    // Prellena con la dirección de despacho del cliente (editable para este pedido).
+    this.direccionDespacho.set(c.direccionDespacho ?? '');
+  }
 
   nombreCliente = (c: Cliente) => c.nombre;
   nitCliente = (c: Cliente) => c.nit;
@@ -195,7 +208,7 @@ export class OcCrearComponent implements OnInit {
     const cl = this.clienteSel();
     if (!cl || this.enviando() || !this.pasoValido()) return;
     this.enviando.set(true); this.error.set('');
-    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), lineas: this.lineas() });
+    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), direccionDespacho: this.direccionDespacho(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
       error: (e) => { this.enviando.set(false); this.error.set(this.msg(e)); },

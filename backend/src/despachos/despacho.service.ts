@@ -110,6 +110,8 @@ export class DespachoService {
         data: {
           consecutivo,
           opId: op.id,
+          // Destino sellado en el momento del despacho: la de la OC o, si no, la del cliente.
+          direccionEntrega: op.oc.direccionDespacho ?? op.oc.cliente.direccionDespacho ?? null,
           autorizadoPorId: bloqueada ? user.sub : null,
           motivoAutorizacion: bloqueada ? (dto.motivo ?? null) : null,
           lineas: { create: lineas },
@@ -135,6 +137,7 @@ export class DespachoService {
         id: true,
         consecutivo: true,
         fecha: true,
+        direccionEntrega: true,
         autorizadoPorId: true,
         factura: { select: { id: true, consecutivo: true } },
         op: {

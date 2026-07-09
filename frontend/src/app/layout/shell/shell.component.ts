@@ -187,7 +187,7 @@ export class ShellComponent {
   readonly usuario = this.auth.usuario();
   readonly iniciales = (this.usuario?.username ?? '?').slice(0, 2).toUpperCase();
   readonly rolLabel =
-    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente' } as Record<string, string>)[
+    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage' } as Record<string, string>)[
       this.usuario?.role ?? ''
     ] ?? (this.usuario?.role ?? '');
 

@@ -16,13 +16,14 @@ import { DespachoListItem } from '../../core/api/models/pedidos.models';
       <div class="card"><div class="card-body">
         @if (despachos().length) {
           <table class="tbl">
-            <thead><tr><th>Despacho</th><th>OP</th><th>Cliente</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
+            <thead><tr><th>Despacho</th><th>OP</th><th>Cliente</th><th>Entrega en</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
             <tbody>
               @for (d of despachos(); track d.id) {
                 <tr>
                   <td class="mono">DSP-{{ d.consecutivo }}</td>
                   <td class="mono">OP-{{ d.op.consecutivo }}</td>
                   <td>{{ d.op.oc.cliente.nombre }}</td>
+                  <td>{{ d.direccionEntrega || '—' }}</td>
                   <td>{{ d.fecha | date:'dd MMM y' }}</td>
                   <td>@if (d.autorizadoPorId) { <span class="badge badge-accent">autorizado</span> } @else { <span class="cell-sub">—</span> }</td>
                   <td>

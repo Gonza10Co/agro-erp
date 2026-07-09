@@ -8,6 +8,7 @@ import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { ActualizarOCDto } from './dto/actualizar-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
+import { estadoDemora } from './oc-demora';
 
 @Injectable()
 export class OcService {
@@ -17,12 +18,22 @@ export class OcService {
     // nextval + create en la misma tx: si el create falla no queda hueco evitable.
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'oc');
+      // Si el pedido no trae dirección de entrega, hereda la del cliente.
+      let direccionDespacho = dto.direccionDespacho;
+      if (direccionDespacho == null) {
+        const cliente = await tx.cliente.findUnique({
+          where: { id: dto.clienteId },
+          select: { direccionDespacho: true },
+        });
+        direccionDespacho = cliente?.direccionDespacho ?? undefined;
+      }
       return tx.ordenCompra.create({
         data: {
           consecutivo,
           clienteId: dto.clienteId,
           ocCliente: dto.ocCliente,
           observaciones: dto.observaciones,
+          direccionDespacho,
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -61,6 +72,7 @@ export class OcService {
           clienteId: dto.clienteId,
           ocCliente: dto.ocCliente,
           observaciones: dto.observaciones,
+          direccionDespacho: dto.direccionDespacho,
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
@@ -116,19 +128,27 @@ export class OcService {
 
     return this.prisma.ordenCompra.update({
       where: { id },
-      data: { estado: 'CONFIRMADA' },
+      // Se sella la fecha de confirmación: desde acá corre el reloj de demora.
+      data: { estado: 'CONFIRMADA', fechaConfirmacion: new Date() },
     });
   }
 
-  listar() {
-    return this.prisma.ordenCompra.findMany({
+  async listar() {
+    const ocs = await this.prisma.ordenCompra.findMany({
       orderBy: { consecutivo: 'desc' },
       include: {
-        cliente: { select: { id: true, nit: true, nombre: true } },
+        cliente: { select: { id: true, nit: true, nombre: true, estadoCartera: true } },
         ordenProduccion: {
           select: { id: true, consecutivo: true, estado: true },
         },
       },
+    });
+    // El semáforo de demora se calcula al vuelo (no se persiste): días desde la
+    // confirmación cruzados con la cartera del cliente.
+    const ahora = new Date();
+    return ocs.map((oc) => {
+      const demora = estadoDemora(oc.fechaConfirmacion, ahora, oc.cliente.estadoCartera, oc.estado);
+      return { ...oc, diasDemora: demora.dias, estadoDemora: demora.estado };
     });
   }
 

@@ -23,6 +23,13 @@ async function main() {
     update: {},
     create: { name: 'CLIENTE' },
   });
+  // Rol de PREPARACIÓN de demo: ve lo del cliente + la próxima entrega (módulos EN_STAGE).
+  // Sirve para ensayar/mostrar la próxima demo en el mismo despliegue sin exponerla al cliente.
+  const stage = await prisma.role.upsert({
+    where: { name: 'STAGE' },
+    update: {},
+    create: { name: 'STAGE' },
+  });
 
   const passwordHash = await argon2.hash('admin123');
   await prisma.user.upsert({
@@ -38,7 +45,16 @@ async function main() {
     create: { username: 'cliente', passwordHash: clienteHash, roleId: cliente.id },
   });
 
-  console.log('Seed completo: roles ADMIN/OPERARIO/CLIENTE + usuarios admin (admin123) y cliente (botas2026)');
+  const stageHash = await argon2.hash('stage2026');
+  await prisma.user.upsert({
+    where: { username: 'stage' },
+    update: {},
+    create: { username: 'stage', passwordHash: stageHash, roleId: stage.id },
+  });
+
+  console.log(
+    'Seed completo: roles ADMIN/OPERARIO/CLIENTE/STAGE + usuarios admin (admin123), cliente (botas2026) y stage (stage2026)',
+  );
 }
 
 main()

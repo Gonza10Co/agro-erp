@@ -1,10 +1,12 @@
 import { Component, OnInit, inject, input, output, signal, DestroyRef } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
-import { OrdenCompra, OCLinea, EstadoOP } from '../../../core/api/models/pedidos.models';
+import { OrdenCompra, OCLinea, EstadoOP, ResumenCosteoOC } from '../../../core/api/models/pedidos.models';
+import { AuthService } from '../../../core/auth/auth.service';
+import { puedeVerNivel } from '../../../core/auth/modulos';
 import { badgeOC, badgeOP } from './estado-badge';
 
 interface LineaEdit {
@@ -18,7 +20,7 @@ interface LineaEdit {
 @Component({
   selector: 'app-oc-detalle',
   standalone: true,
-  imports: [DatePipe, RouterLink, FormsModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, FormsModule],
   template: `
     @if (cargando()) {
       <p class="cell-sub">Cargando orden…</p>
@@ -29,6 +31,7 @@ interface LineaEdit {
         <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ o.cliente?.nit }}</span></div>
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
+        <div class="kv"><span class="k">Entrega en</span><span class="v">{{ o.direccionDespacho || '—' }}</span></div>
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge {{ badge(o).clase }}"><span class="dot"></span>{{ badge(o).label }}</span></span></div>
         @if (o.ordenProduccion; as op) {
           <div class="kv"><span class="k">Orden de producción</span><span class="v">OP #{{ op.consecutivo }} <span class="badge {{ badgeOp(op.estado).clase }}"><span class="dot"></span>{{ badgeOp(op.estado).label }}</span></span></div>
@@ -59,11 +62,31 @@ interface LineaEdit {
         <div class="kv" style="font-weight:var(--fw-semibold);border-top:var(--bw) solid var(--border);padding-top:var(--sp-3)">
           <span>Total OC (sin IVA)</span><span class="cell-mono">{{ moneda(totalOC()) }}</span>
         </div>
+
+        @if (puedeVerCosteo && costeo(); as c) {
+          <div class="drawer-section-h">Costo y utilidad</div>
+          <div class="kv-list">
+            <div class="kv"><span class="k">Venta</span><span class="v cell-mono">{{ moneda(c.totalVenta) }}</span></div>
+            <div class="kv"><span class="k">Costo estimado (materiales)</span><span class="v cell-mono">{{ moneda(c.costoTotal) }}</span></div>
+            <div class="kv" style="font-weight:var(--fw-semibold)">
+              <span class="k">Utilidad</span>
+              <span class="v cell-mono" [style.color]="c.utilidad >= 0 ? 'var(--success)' : 'var(--error)'">{{ moneda(c.utilidad) }}</span>
+            </div>
+            <div class="kv"><span class="k">Margen</span><span class="v cell-mono">{{ c.margenPct | number:'1.0-1' }}%</span></div>
+            @if (c.materialesSinCosto > 0) {
+              <div class="kv"><span class="cell-sub">⚠️ {{ c.materialesSinCosto }} insumo(s) sin costo cargado — el costo es parcial.</span></div>
+            }
+          </div>
+        }
       } @else {
         <!-- Modo edición: ajustar cantidades y precios (solo en BORRADOR) -->
         <div class="field" style="margin-bottom:var(--sp-4)">
           <label class="label">Observaciones</label>
           <input class="input" [(ngModel)]="edObs" name="edObs" />
+        </div>
+        <div class="field" style="margin-bottom:var(--sp-4)">
+          <label class="label">Dirección de despacho</label>
+          <input class="input" [(ngModel)]="edDireccionDespacho" name="edDireccionDespacho" />
         </div>
         @for (le of edLineas(); track le.productoConfiguradoId) {
           <div style="margin-bottom:var(--sp-4)">
@@ -112,10 +135,14 @@ interface LineaEdit {
 export class OcDetalleComponent implements OnInit {
   private readonly api = inject(PedidosApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
   ocId = input.required<number>();
   changed = output<void>();
 
   oc = signal<OrdenCompra | null>(null);
+  costeo = signal<ResumenCosteoOC | null>(null);
+  // El bloque de costo/utilidad se oculta al cliente hasta liberar (gate de sección EN_STAGE).
+  readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
   cargando = signal(true);
   accion = signal(false);
   error = signal('');
@@ -124,6 +151,7 @@ export class OcDetalleComponent implements OnInit {
   editando = signal(false);
   edLineas = signal<LineaEdit[]>([]);
   edObs = '';
+  edDireccionDespacho = '';
 
   ngOnInit(): void { this.cargar(); }
 
@@ -131,6 +159,7 @@ export class OcDetalleComponent implements OnInit {
     const o = this.oc();
     if (!o) return;
     this.edObs = o.observaciones ?? '';
+    this.edDireccionDespacho = o.direccionDespacho ?? '';
     this.edLineas.set(
       (o.lineas ?? []).map((l) => ({
         productoConfiguradoId: l.productoConfiguradoId,
@@ -153,6 +182,7 @@ export class OcDetalleComponent implements OnInit {
     const dto = {
       clienteId: o.clienteId,
       observaciones: this.edObs.trim() || undefined,
+      direccionDespacho: this.edDireccionDespacho.trim() || undefined,
       lineas: this.edLineas().map((le) => ({
         productoConfiguradoId: le.productoConfiguradoId,
         precioUnitario: le.precioUnitario != null ? Number(le.precioUnitario) : undefined,
@@ -172,12 +202,18 @@ export class OcDetalleComponent implements OnInit {
   cargar(): void {
     this.cargando.set(true);
     this.oc.set(null);
+    this.costeo.set(null);
     this.api.obtenerOC(this.ocId())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (o) => { this.oc.set(o); this.cargando.set(false); },
         error: () => this.cargando.set(false),
       });
+    if (this.puedeVerCosteo) {
+      this.api.obtenerCosteoOC(this.ocId())
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({ next: (c) => this.costeo.set(c), error: () => this.costeo.set(null) });
+    }
   }
 
   confirmar(): void {

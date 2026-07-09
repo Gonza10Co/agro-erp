@@ -101,6 +101,8 @@ model Material {
   unidadMedida   UnidadMedida      @relation(fields: [unidadMedidaId], references: [id])
   origen         OrigenMaterial
   claseBom       ClaseBom
+  costoBase      Decimal?          @db.Decimal(14, 4) // costo de referencia (sembrado del maestro del cliente)
+  costoPromedio  Decimal?          @db.Decimal(14, 4) // costo promedio móvil; se actualiza con cada recepción valorizada
   activo         Boolean           @default(true)
   proveedorId    Int?
   proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
@@ -385,11 +387,14 @@ enum EstadoOP {
 }
 
 model Cliente {
-  id            Int           @id @default(autoincrement())
-  nit           String        @unique
-  nombre        String
-  ciudad        String?
-  tipoCredito   TipoCredito   @default(CONTADO)
+  id                Int           @id @default(autoincrement())
+  nit               String        @unique
+  nombre            String
+  ciudad            String?
+  telefono          String?
+  direccion         String? // domicilio / dirección fiscal
+  direccionDespacho String? // dónde se entrega por defecto; la OC puede sobreescribirla
+  tipoCredito       TipoCredito   @default(CONTADO)
   cupo          Decimal?      @db.Decimal(14, 2)
   estadoCartera EstadoCartera @default(AL_DIA)
   activo        Boolean       @default(true)
@@ -416,11 +421,13 @@ model OrdenCompra {
   id            Int      @id @default(autoincrement())
   consecutivo   Int      @unique
   ocCliente     String?
-  clienteId     Int
-  cliente       Cliente  @relation(fields: [clienteId], references: [id])
-  fecha         DateTime @default(now())
-  estado        EstadoOC @default(BORRADOR)
-  observaciones String?
+  clienteId         Int
+  cliente           Cliente   @relation(fields: [clienteId], references: [id])
+  fecha             DateTime  @default(now())
+  fechaConfirmacion DateTime? // se sella al confirmar; el reloj de demora corre desde acá
+  estado            EstadoOC  @default(BORRADOR)
+  observaciones     String?
+  direccionDespacho String? // dónde entregar este pedido; hereda la del cliente, editable
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -535,6 +542,7 @@ model Despacho {
   opId               Int             @unique
   op                 OrdenProduccion @relation(fields: [opId], references: [id])
   fecha              DateTime        @default(now())
+  direccionEntrega   String? // destino sellado en el remito (viene de la OC/cliente)
   autorizadoPorId    Int?
   autorizadoPor      User?           @relation(fields: [autorizadoPorId], references: [id])
   motivoAutorizacion String?
@@ -651,6 +659,7 @@ model OrdenCompraProveedorLinea {
   material     Material             @relation(fields: [materialId], references: [id])
   cantPedida   Decimal              @db.Decimal(14, 4)
   cantRecibida Decimal              @default(0) @db.Decimal(14, 4)
+  costoUnitario Decimal?            @db.Decimal(14, 4) // precio pactado con el proveedor (opcional)
 
   lineasRecepcion RecepcionCompraLinea[]
 
@@ -680,6 +689,7 @@ model RecepcionCompraLinea {
   ocpLineaId  Int
   ocpLinea    OrdenCompraProveedorLinea @relation(fields: [ocpLineaId], references: [id])
   cantidad    Decimal                   @db.Decimal(14, 4)
+  costoUnitario Decimal?                @db.Decimal(14, 4) // a cuánto se recibió; alimenta el costo promedio del material
 
   @@index([recepcionId])
 }
@@ -956,6 +966,7 @@ model MovimientoInventario {
   inventarioPTId Int?
   inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
   cantidad       Decimal          @db.Decimal(14, 4)
+  costoUnitario  Decimal?         @db.Decimal(14, 4) // valoriza el movimiento (kardex valorizado)
   referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?

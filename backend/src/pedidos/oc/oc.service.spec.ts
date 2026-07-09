@@ -12,6 +12,8 @@ describe('OcService', () => {
     },
     ordenCompraLinea: { deleteMany: jest.fn() },
     ordenCompraLineaTalla: { deleteMany: jest.fn() },
+    // crear() consulta la dirección de despacho del cliente para heredarla.
+    cliente: { findUnique: jest.fn() },
   } as any;
   // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
   prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
@@ -106,20 +108,51 @@ describe('OcService', () => {
       estado: 'CONFIRMADA',
     });
     const r = await service.confirmar(1);
-    expect(prisma.ordenCompra.update).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: { estado: 'CONFIRMADA' },
-    });
+    const arg = prisma.ordenCompra.update.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: 1 });
+    expect(arg.data.estado).toBe('CONFIRMADA');
+    // se sella la fecha de confirmación (arranca el reloj de demora)
+    expect(arg.data.fechaConfirmacion).toBeInstanceOf(Date);
     expect(r).toMatchObject({ estado: 'CONFIRMADA' });
   });
 
   it('listar devuelve las OCs ordenadas por consecutivo desc', async () => {
-    prisma.ordenCompra.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      { id: 2, estado: 'BORRADOR', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' } },
+      { id: 1, estado: 'BORRADOR', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' } },
+    ]);
     const r = await service.listar();
     expect(prisma.ordenCompra.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { consecutivo: 'desc' } }),
     );
     expect(r).toHaveLength(2);
+  });
+
+  it('listar adjunta el semáforo de demora: OC confirmada vieja → ROJO', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1,
+        estado: 'CONFIRMADA',
+        fechaConfirmacion: new Date('2000-01-01'),
+        cliente: { estadoCartera: 'AL_DIA' },
+      },
+    ]);
+    const r = await service.listar();
+    expect(r[0].estadoDemora).toBe('ROJO');
+    expect(typeof r[0].diasDemora).toBe('number');
+  });
+
+  it('listar marca "retenida por cartera" cuando el cliente está vencido', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1,
+        estado: 'CONFIRMADA',
+        fechaConfirmacion: new Date('2000-01-01'),
+        cliente: { estadoCartera: 'VENCIDO' },
+      },
+    ]);
+    const r = await service.listar();
+    expect(r[0].estadoDemora).toBe('RETENIDA_CARTERA');
   });
 
   it('obtener lanza NotFound si la OC no existe', async () => {

@@ -22,6 +22,19 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
         <input class="input" id="ciudad" name="ciudad" [(ngModel)]="ciudad" autocomplete="off" />
       </div>
       <div class="field">
+        <label class="label" for="telefono">Teléfono</label>
+        <input class="input" id="telefono" name="telefono" [(ngModel)]="telefono" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="label" for="direccion">Dirección</label>
+        <input class="input" id="direccion" name="direccion" [(ngModel)]="direccion" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="label" for="direccionDespacho">Dirección de despacho</label>
+        <input class="input" id="direccionDespacho" name="direccionDespacho" [(ngModel)]="direccionDespacho" autocomplete="off" />
+        <small style="color:var(--text-muted);font-size:var(--text-xs)">Dónde se entregan los pedidos por defecto (editable en cada orden)</small>
+      </div>
+      <div class="field">
         <label class="label" for="tipoCredito">Tipo de crédito</label>
         <select class="select" id="tipoCredito" name="tipoCredito" [(ngModel)]="tipoCredito">
           <option value="CONTADO">Contado</option>
@@ -50,6 +63,9 @@ export class ClienteFormComponent {
   nit = '';
   nombre = '';
   ciudad = '';
+  telefono = '';
+  direccion = '';
+  direccionDespacho = '';
   tipoCredito: TipoCredito = 'CONTADO';
   cupo?: number;
   loading = signal(false);
@@ -62,6 +78,9 @@ export class ClienteFormComponent {
         this.nit = c.nit;
         this.nombre = c.nombre;
         this.ciudad = c.ciudad ?? '';
+        this.telefono = c.telefono ?? '';
+        this.direccion = c.direccion ?? '';
+        this.direccionDespacho = c.direccionDespacho ?? '';
         this.tipoCredito = c.tipoCredito;
         this.cupo = c.cupo != null ? Number(c.cupo) : undefined;
       }
@@ -81,11 +100,22 @@ export class ClienteFormComponent {
       nit: this.nit.trim(),
       nombre: this.nombre.trim(),
       ciudad: this.ciudad.trim() || undefined,
+      telefono: this.telefono.trim() || undefined,
+      direccion: this.direccion.trim() || undefined,
+      direccionDespacho: this.direccionDespacho.trim() || undefined,
       tipoCredito: this.tipoCredito,
       cupo: this.cupo,
     };
     const op = editando
-      ? this.api.actualizar(editando.id, { nombre: dto.nombre, ciudad: dto.ciudad, tipoCredito: dto.tipoCredito, cupo: dto.cupo })
+      ? this.api.actualizar(editando.id, {
+          nombre: dto.nombre,
+          ciudad: dto.ciudad,
+          telefono: dto.telefono,
+          direccion: dto.direccion,
+          direccionDespacho: dto.direccionDespacho,
+          tipoCredito: dto.tipoCredito,
+          cupo: dto.cupo,
+        })
       : this.api.crear(dto);
     op.subscribe({
       next: (c) => { this.loading.set(false); this.created.emit(c); },

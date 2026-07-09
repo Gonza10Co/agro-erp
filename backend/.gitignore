@@ -11,3 +11,11 @@ node_modules
 # Las plantillas *.example.csv sí se versionan como documentación del formato.
 prisma/data/basarili/*.csv
 !prisma/data/basarili/*.example.csv
+
+# Costos unitarios reales del cliente (columna $UNITARIO de su Sheet) — SENSIBLE.
+prisma/data/material-costos.csv
+!prisma/data/material-costos.example.csv
+
+# Scratch de generación/revisión del BOM: no son parte del pipeline de seed.
+prisma/data/basarili/_*.mjs
+prisma/data/basarili/_*.md

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { OrdenCompra, OrdenProduccion, CrearOCDto } from './models/pedidos.models';
+import { OrdenCompra, OrdenProduccion, CrearOCDto, ResumenCosteoOC } from './models/pedidos.models';
 
 @Injectable({ providedIn: 'root' })
 export class PedidosApi {
@@ -12,6 +12,7 @@ export class PedidosApi {
   crearOC(dto: CrearOCDto) { return this.http.post<OrdenCompra>(this.oc, dto); }
   listarOC() { return this.http.get<OrdenCompra[]>(this.oc); }
   obtenerOC(id: number) { return this.http.get<OrdenCompra>(`${this.oc}/${id}`); }
+  obtenerCosteoOC(id: number) { return this.http.get<ResumenCosteoOC>(`${this.oc}/${id}/costeo`); }
   actualizarOC(id: number, dto: CrearOCDto) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}`, dto); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
 

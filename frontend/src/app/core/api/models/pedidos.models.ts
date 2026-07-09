@@ -1,4 +1,5 @@
 export type EstadoOC = 'BORRADOR' | 'CONFIRMADA' | 'EN_PRODUCCION' | 'CERRADA' | 'ANULADA';
+export type EstadoDemora = 'VERDE' | 'AMARILLO' | 'ROJO' | 'RETENIDA_CARTERA';
 export type EstadoOP = 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'DESPACHADA' | 'ANULADA';
 export type TipoCredito = 'CONTADO' | 'D30' | 'D60' | 'D90';
 export type EstadoCartera = 'AL_DIA' | 'VENCIDO' | 'BLOQUEADO';
@@ -9,6 +10,9 @@ export interface Cliente {
   nit: string;
   nombre: string;
   ciudad?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  direccionDespacho?: string | null;
   tipoCredito: TipoCredito;
   cupo?: string | null;
   estadoCartera: EstadoCartera;
@@ -40,10 +44,23 @@ export interface OrdenCompra {
   clienteId: number;
   cliente?: Cliente;
   fecha: string;
+  fechaConfirmacion?: string | null;
   estado: EstadoOC;
   observaciones?: string | null;
+  direccionDespacho?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
+  // Semáforo de demora calculado por el backend en el listado (no se persiste).
+  diasDemora?: number | null;
+  estadoDemora?: EstadoDemora | null;
+}
+
+export interface ResumenCosteoOC {
+  totalVenta: number;
+  costoTotal: number;
+  utilidad: number;
+  margenPct: number;
+  materialesSinCosto: number;
 }
 
 export interface ReservaInventarioPT {
@@ -77,16 +94,17 @@ export interface OrdenProduccion {
   lineas?: OPLinea[];
 }
 
-export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; tipoCredito?: TipoCredito; cupo?: number; }
+export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; direccionDespacho?: string; tipoCredito?: TipoCredito; cupo?: number; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
-export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; lineas: CrearOCLineaDto[]; }
+export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; direccionDespacho?: string; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
 export interface DespachoListItem {
   id: number;
   consecutivo: number;
   fecha: string;
+  direccionEntrega?: string | null;
   autorizadoPorId: number | null;
   factura: { id: number; consecutivo: number } | null;
   op: { consecutivo: number; oc: { cliente: { nombre: string } } };

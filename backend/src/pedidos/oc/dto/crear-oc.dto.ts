@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -29,6 +30,8 @@ export class CrearOCDto {
   @Type(() => Number) @IsInt() clienteId!: number;
   @IsOptional() @IsString() ocCliente?: string;
   @IsOptional() @IsString() observaciones?: string;
+  // Dirección de entrega del pedido; si se omite, hereda la del cliente.
+  @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

@@ -15,6 +15,10 @@ import { OcpDetalle, OcpLinea } from '../../core/api/models/compras.models';
       y se recibe en una próxima entrega.
     </p>
 
+    <p class="cell-sub" style="margin-bottom:var(--sp-3)">
+      El costo unitario es opcional; si lo capturas, actualiza el costo promedio del material.
+    </p>
+
     @for (l of pendientes(); track l.id) {
       <div class="linea">
         <div class="linea-info">
@@ -22,8 +26,12 @@ import { OcpDetalle, OcpLinea } from '../../core/api/models/compras.models';
           <span class="cell-sub">{{ l.materialNombre }}</span>
           <span class="cell-sub">Pendiente: {{ l.pendiente | number:'1.0-2' }} {{ l.unidad }}</span>
         </div>
-        <input class="input num" type="number" min="0" [max]="l.pendiente" step="any"
-          [ngModel]="cantidades()[l.id] ?? l.pendiente" (ngModelChange)="setCantidad(l.id, $event)" />
+        <div style="display:flex;gap:var(--sp-2);align-items:center">
+          <input class="input num" type="number" min="0" [max]="l.pendiente" step="any" title="Cantidad recibida"
+            [ngModel]="cantidades()[l.id] ?? l.pendiente" (ngModelChange)="setCantidad(l.id, $event)" />
+          <input class="input num" type="number" min="0" step="any" placeholder="$ costo" title="Costo unitario (opcional)"
+            [ngModel]="costos()[l.id] ?? null" (ngModelChange)="setCosto(l.id, $event)" />
+        </div>
       </div>
     }
 
@@ -53,6 +61,7 @@ export class RegistrarRecepcionComponent {
   done = output<void>();
 
   cantidades = signal<Record<number, number>>({});
+  costos = signal<Record<number, number | null>>({});
   observaciones = signal('');
   enviando = signal(false);
   error = signal('');
@@ -63,12 +72,23 @@ export class RegistrarRecepcionComponent {
     this.cantidades.update((c) => ({ ...c, [lineaId]: Number(valor) }));
   }
 
+  setCosto(lineaId: number, valor: number | null): void {
+    this.costos.update((c) => ({ ...c, [lineaId]: valor == null || valor === ('' as any) ? null : Number(valor) }));
+  }
+
   registrar(): void {
     if (this.enviando()) return;
     this.error.set('');
     // Sin tocar nada, el default es "llegó todo lo pendiente" (el caso común).
     const lineas = this.pendientes()
-      .map((l) => ({ ocpLineaId: l.id, cantidad: Number(this.cantidades()[l.id] ?? l.pendiente) }))
+      .map((l) => {
+        const costo = this.costos()[l.id];
+        return {
+          ocpLineaId: l.id,
+          cantidad: Number(this.cantidades()[l.id] ?? l.pendiente),
+          costoUnitario: costo != null && Number(costo) > 0 ? Number(costo) : undefined,
+        };
+      })
       .filter((l) => l.cantidad > 0);
     if (!lineas.length) {
       this.error.set('Ingresa al menos una cantidad recibida');

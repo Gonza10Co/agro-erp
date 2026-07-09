@@ -21,7 +21,8 @@
     "seed": "tsx prisma/seed.ts",
     "seed:catalogo": "tsx prisma/seed-catalogo.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
-    "seed:basarili": "tsx prisma/seed-basarili.ts"
+    "seed:basarili": "tsx prisma/seed-basarili.ts",
+    "seed:costos": "tsx prisma/seed-costos.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

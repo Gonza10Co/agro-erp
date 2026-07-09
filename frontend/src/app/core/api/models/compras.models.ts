@@ -100,7 +100,7 @@ export interface ResultadoGenerarOrdenes {
 }
 
 export interface RegistrarRecepcionDto {
-  lineas: { ocpLineaId: number; cantidad: number }[];
+  lineas: { ocpLineaId: number; cantidad: number; costoUnitario?: number }[];
   observaciones?: string;
 }
 
