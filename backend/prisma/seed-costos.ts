@@ -11,6 +11,10 @@ import { join } from 'path';
  * CSV esperado en `prisma/data/material-costos.csv` con header `codigo,costoBase`.
  * Solo ACTUALIZA materiales existentes (no crea): la llave es `Material.codigo`.
  *
+ * Los materiales que quedan en $0 son **muestras** y no se costean (el cliente lo confirmó
+ * el 2026-07-09): ARTECLEAN DS 102, cera de abejas, MB-11 marrón, pigmento blanco azulín y
+ * PU CS blanco. Las plantillas EVA (T34-46), que también venían en $0, valen $282 el par.
+ *
  * Correr (local): npm run seed:costos
  * Correr (prod):  ver método de carga quirúrgica en la memoria de inventarios.
  */
