@@ -8,6 +8,7 @@ import { OrdenCompra, OCLinea, EstadoOP, ResumenCosteoOC } from '../../../core/a
 import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerNivel } from '../../../core/auth/modulos';
 import { badgeOC, badgeOP } from './estado-badge';
+import { destinoAlEditar } from './oc-crear.util';
 
 interface LineaEdit {
   productoConfiguradoId: number;
@@ -179,10 +180,15 @@ export class OcDetalleComponent implements OnInit {
     const o = this.oc();
     if (!o || this.accion()) return;
     this.accion.set(true); this.error.set('');
+    const destino = destinoAlEditar({
+      sedeEntregaIdActual: o.sedeEntregaId,
+      direccionOriginal: o.direccionDespacho,
+      direccionEditada: this.edDireccionDespacho,
+    });
     const dto = {
       clienteId: o.clienteId,
       observaciones: this.edObs.trim() || undefined,
-      direccionDespacho: this.edDireccionDespacho.trim() || undefined,
+      ...destino,
       lineas: this.edLineas().map((le) => ({
         productoConfiguradoId: le.productoConfiguradoId,
         precioUnitario: le.precioUnitario != null ? Number(le.precioUnitario) : undefined,

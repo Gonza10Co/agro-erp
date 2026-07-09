@@ -12,13 +12,18 @@ describe('OcService', () => {
     },
     ordenCompraLinea: { deleteMany: jest.fn() },
     ordenCompraLineaTalla: { deleteMany: jest.fn() },
-    // crear() consulta la dirección de despacho del cliente para heredarla.
     cliente: { findUnique: jest.fn() },
+    // crear()/actualizar() consultan las sedes del cliente para resolver el destino.
+    sedeCliente: { findMany: jest.fn() },
   } as any;
   // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
   prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
   const service = new OcService(prisma);
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Por defecto, cliente sin sedes: la OC queda sin destino y no estorba a los tests viejos.
+    prisma.sedeCliente.findMany.mockResolvedValue([]);
+  });
 
   it('crear asigna el consecutivo de la secuencia y estado BORRADOR', async () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 3901n }]);
@@ -67,6 +72,51 @@ describe('OcService', () => {
         data: expect.objectContaining({ consecutivo: 1 }),
       }),
     );
+  });
+
+  it('crear hereda la sede principal del cliente y congela su dirección', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 4, ciudad: 'Cali', direccion: 'Bodega Sur', esPrincipal: false, activo: true },
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5 # 10-20', esPrincipal: true, activo: true },
+    ]);
+    await service.crear({
+      clienteId: 7,
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    const data = prisma.ordenCompra.create.mock.calls[0][0].data;
+    expect(data.sedeEntregaId).toBe(9);
+    expect(data.direccionDespacho).toBe('Cra 5 # 10-20, Ibagué');
+  });
+
+  it('crear rechaza una sede que no es del cliente', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5', esPrincipal: true, activo: true },
+    ]);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        sedeEntregaId: 123, // de otro cliente
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.ordenCompra.create).not.toHaveBeenCalled();
+  });
+
+  it('crear rechaza una sede inactiva del propio cliente', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5', esPrincipal: false, activo: false },
+    ]);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        sedeEntregaId: 9,
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('confirmar lanza BadRequest con los errores de validación', async () => {

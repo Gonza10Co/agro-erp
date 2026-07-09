@@ -387,14 +387,13 @@ enum EstadoOP {
 }
 
 model Cliente {
-  id                Int           @id @default(autoincrement())
-  nit               String        @unique
-  nombre            String
-  ciudad            String?
-  telefono          String?
-  direccion         String? // domicilio / dirección fiscal
-  direccionDespacho String? // dónde se entrega por defecto; la OC puede sobreescribirla
-  tipoCredito       TipoCredito   @default(CONTADO)
+  id          Int           @id @default(autoincrement())
+  nit         String        @unique
+  nombre      String
+  ciudad      String? // ciudad fiscal (la de la factura), NO la de entrega
+  telefono    String? // contacto principal
+  direccion   String? // domicilio / dirección fiscal
+  tipoCredito TipoCredito   @default(CONTADO)
   cupo          Decimal?      @db.Decimal(14, 2)
   estadoCartera EstadoCartera @default(AL_DIA)
   activo        Boolean       @default(true)
@@ -403,6 +402,30 @@ model Cliente {
 
   marcas        Marca[]
   ordenesCompra OrdenCompra[]
+  // A dónde se despacha. Un cliente puede tener sede en varias ciudades; la marcada
+  // como principal es el destino por defecto de sus pedidos.
+  sedes         SedeCliente[]
+}
+
+/// Sede/dirección de entrega de un cliente. Reemplaza al viejo `Cliente.direccionDespacho`:
+/// el default de despacho es la sede con `esPrincipal`. Un índice único parcial
+/// (ver migración) garantiza que solo haya una principal por cliente.
+model SedeCliente {
+  id          Int      @id @default(autoincrement())
+  clienteId   Int
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  nombre      String // etiqueta operativa: "Principal", "Bodega Norte", "Planta Cali"
+  ciudad      String
+  direccion   String
+  telefono    String?
+  esPrincipal Boolean  @default(false)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ordenesCompra OrdenCompra[]
+
+  @@index([clienteId])
 }
 
 model Bodega {
@@ -427,7 +450,12 @@ model OrdenCompra {
   fechaConfirmacion DateTime? // se sella al confirmar; el reloj de demora corre desde acá
   estado            EstadoOC  @default(BORRADOR)
   observaciones     String?
-  direccionDespacho String? // dónde entregar este pedido; hereda la del cliente, editable
+  // A qué sede va este pedido (trazabilidad y filtros). Si se omite, la sede principal.
+  sedeEntregaId     Int?
+  sedeEntrega       SedeCliente? @relation(fields: [sedeEntregaId], references: [id])
+  // Copia congelada de la dirección al momento de crear la OC: si mañana el cliente
+  // corrige la dirección de la sede, los remitos ya despachados NO deben cambiar.
+  direccionDespacho String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -435,6 +463,7 @@ model OrdenCompra {
   ordenProduccion OrdenProduccion?
 
   @@index([clienteId])
+  @@index([sedeEntregaId])
 }
 
 model OrdenCompraLinea {

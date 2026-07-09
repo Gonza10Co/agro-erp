@@ -110,8 +110,9 @@ export class DespachoService {
         data: {
           consecutivo,
           opId: op.id,
-          // Destino sellado en el momento del despacho: la de la OC o, si no, la del cliente.
-          direccionEntrega: op.oc.direccionDespacho ?? op.oc.cliente.direccionDespacho ?? null,
+          // Destino sellado en el remito. La OC ya congeló su dirección al crearse
+          // (de la sede elegida o de la principal), así que acá solo se copia.
+          direccionEntrega: op.oc.direccionDespacho ?? null,
           autorizadoPorId: bloqueada ? user.sub : null,
           motivoAutorizacion: bloqueada ? (dto.motivo ?? null) : null,
           lineas: { create: lineas },

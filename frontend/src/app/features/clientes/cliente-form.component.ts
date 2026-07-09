@@ -2,11 +2,12 @@ import { Component, effect, inject, input, output, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms';
 import { ClientesApi } from '../../core/api/clientes.api';
 import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/pedidos.models';
+import { SedesClienteComponent } from './sedes-cliente.component';
 
 @Component({
   selector: 'app-cliente-form',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, SedesClienteComponent],
   template: `
     <form (ngSubmit)="guardar()">
       <div class="field">
@@ -26,13 +27,9 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
         <input class="input" id="telefono" name="telefono" [(ngModel)]="telefono" autocomplete="off" />
       </div>
       <div class="field">
-        <label class="label" for="direccion">Dirección</label>
+        <label class="label" for="direccion">Dirección fiscal</label>
         <input class="input" id="direccion" name="direccion" [(ngModel)]="direccion" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label class="label" for="direccionDespacho">Dirección de despacho</label>
-        <input class="input" id="direccionDespacho" name="direccionDespacho" [(ngModel)]="direccionDespacho" autocomplete="off" />
-        <small style="color:var(--text-muted);font-size:var(--text-xs)">Dónde se entregan los pedidos por defecto (editable en cada orden)</small>
+        <small style="color:var(--text-muted);font-size:var(--text-xs)">La de la factura. A dónde se entrega se define abajo, en las sedes.</small>
       </div>
       <div class="field">
         <label class="label" for="tipoCredito">Tipo de crédito</label>
@@ -52,6 +49,15 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
         {{ editar() ? 'Guardar cambios' : 'Crear cliente' }}
       </button>
     </form>
+
+    <!-- Las sedes necesitan un cliente ya creado (cuelgan de su id). -->
+    @if (editar(); as c) {
+      <app-sedes-cliente [clienteId]="c.id" />
+    } @else {
+      <p style="color:var(--text-muted);font-size:var(--text-xs);margin-top:var(--sp-3)">
+        Crea el cliente y luego podrás agregarle sus sedes de entrega.
+      </p>
+    }
   `,
 })
 export class ClienteFormComponent {
@@ -65,7 +71,6 @@ export class ClienteFormComponent {
   ciudad = '';
   telefono = '';
   direccion = '';
-  direccionDespacho = '';
   tipoCredito: TipoCredito = 'CONTADO';
   cupo?: number;
   loading = signal(false);
@@ -80,7 +85,6 @@ export class ClienteFormComponent {
         this.ciudad = c.ciudad ?? '';
         this.telefono = c.telefono ?? '';
         this.direccion = c.direccion ?? '';
-        this.direccionDespacho = c.direccionDespacho ?? '';
         this.tipoCredito = c.tipoCredito;
         this.cupo = c.cupo != null ? Number(c.cupo) : undefined;
       }
@@ -102,7 +106,6 @@ export class ClienteFormComponent {
       ciudad: this.ciudad.trim() || undefined,
       telefono: this.telefono.trim() || undefined,
       direccion: this.direccion.trim() || undefined,
-      direccionDespacho: this.direccionDespacho.trim() || undefined,
       tipoCredito: this.tipoCredito,
       cupo: this.cupo,
     };
@@ -112,7 +115,6 @@ export class ClienteFormComponent {
           ciudad: dto.ciudad,
           telefono: dto.telefono,
           direccion: dto.direccion,
-          direccionDespacho: dto.direccionDespacho,
           tipoCredito: dto.tipoCredito,
           cupo: dto.cupo,
         })

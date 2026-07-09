@@ -1,10 +1,12 @@
 import { puedeVerModulo, puedeVerNivel, rutaInicial } from './modulos';
 
 describe('puedeVerModulo', () => {
-  it('CLIENTE solo ve clientes, pedidos y catálogo (demos 1-2)', () => {
+  it('CLIENTE ve clientes, pedidos, catálogo y sus datos maestros', () => {
     expect(puedeVerModulo('CLIENTE', 'clientes')).toBeTrue();
     expect(puedeVerModulo('CLIENTE', 'pedidos')).toBeTrue();
     expect(puedeVerModulo('CLIENTE', 'catalogo')).toBeTrue();
+    // Liberado el 2026-07-09: el cliente crea sus marcas, referencias y materiales.
+    expect(puedeVerModulo('CLIENTE', 'maestros')).toBeTrue();
   });
 
   it('CLIENTE NO ve los módulos de demos posteriores', () => {
@@ -37,6 +39,7 @@ describe('puedeVerModulo', () => {
       expect(puedeVerModulo('STAGE', 'clientes')).toBeTrue();
       expect(puedeVerModulo('STAGE', 'pedidos')).toBeTrue();
       expect(puedeVerModulo('STAGE', 'catalogo')).toBeTrue();
+      expect(puedeVerModulo('STAGE', 'maestros')).toBeTrue();
     });
 
     it('ve además los módulos EN_STAGE (Fase A: compras con costo)', () => {
@@ -47,7 +50,6 @@ describe('puedeVerModulo', () => {
       expect(puedeVerModulo('STAGE', 'inicio')).toBeFalse();
       expect(puedeVerModulo('STAGE', 'facturas')).toBeFalse();
       expect(puedeVerModulo('STAGE', 'reportes')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'maestros')).toBeFalse();
     });
   });
 });

@@ -9,13 +9,26 @@ export interface Cliente {
   id: number;
   nit: string;
   nombre: string;
-  ciudad?: string | null;
+  ciudad?: string | null; // ciudad fiscal, NO la de entrega
   telefono?: string | null;
-  direccion?: string | null;
-  direccionDespacho?: string | null;
+  direccion?: string | null; // domicilio / dirección fiscal
   tipoCredito: TipoCredito;
   cupo?: string | null;
   estadoCartera: EstadoCartera;
+  activo: boolean;
+  // Solo viene en el detalle (GET /clientes/:id). A dónde se le despacha.
+  sedes?: SedeCliente[];
+}
+
+/** Sede de entrega de un cliente. La marcada como principal es el destino por defecto. */
+export interface SedeCliente {
+  id: number;
+  clienteId: number;
+  nombre: string;
+  ciudad: string;
+  direccion: string;
+  telefono?: string | null;
+  esPrincipal: boolean;
   activo: boolean;
 }
 
@@ -47,6 +60,9 @@ export interface OrdenCompra {
   fechaConfirmacion?: string | null;
   estado: EstadoOC;
   observaciones?: string | null;
+  sedeEntregaId?: number | null;
+  sedeEntrega?: SedeCliente | null;
+  /** Snapshot congelado al crear la OC; no se relee de la sede. */
   direccionDespacho?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
@@ -94,10 +110,11 @@ export interface OrdenProduccion {
   lineas?: OPLinea[];
 }
 
-export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; direccionDespacho?: string; tipoCredito?: TipoCredito; cupo?: number; }
+export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; tipoCredito?: TipoCredito; cupo?: number; }
+export interface CrearSedeDto { nombre: string; ciudad: string; direccion: string; telefono?: string; esPrincipal?: boolean; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
-export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; direccionDespacho?: string; lineas: CrearOCLineaDto[]; }
+export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
 export interface DespachoListItem {

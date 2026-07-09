@@ -30,7 +30,9 @@ export class CrearOCDto {
   @Type(() => Number) @IsInt() clienteId!: number;
   @IsOptional() @IsString() ocCliente?: string;
   @IsOptional() @IsString() observaciones?: string;
-  // Dirección de entrega del pedido; si se omite, hereda la del cliente.
+  // Sede de entrega del cliente. Si se omite, se usa su sede principal.
+  @IsOptional() @Type(() => Number) @IsInt() sedeEntregaId?: number;
+  // Entrega puntual escrita a mano (una obra, un evento). Gana sobre la sede principal.
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   @IsArray()
   @ArrayMinSize(1)

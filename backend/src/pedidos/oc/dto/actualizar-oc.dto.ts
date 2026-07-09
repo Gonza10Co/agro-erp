@@ -8,6 +8,7 @@ export class ActualizarOCDto {
   @Type(() => Number) @IsInt() clienteId!: number;
   @IsOptional() @IsString() ocCliente?: string;
   @IsOptional() @IsString() observaciones?: string;
+  @IsOptional() @Type(() => Number) @IsInt() sedeEntregaId?: number;
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   @IsArray()
   @ArrayMinSize(1)

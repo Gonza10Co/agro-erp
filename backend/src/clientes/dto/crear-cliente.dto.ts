@@ -22,7 +22,6 @@ export class CrearClienteDto {
   @IsOptional() @IsString() @MaxLength(80) ciudad?: string;
   @IsOptional() @IsString() @MaxLength(40) telefono?: string;
   @IsOptional() @IsString() @MaxLength(240) direccion?: string;
-  @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   @IsOptional() @IsEnum(TipoCreditoDto) tipoCredito?: TipoCreditoDto;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) cupo?: number;
 }

@@ -5,7 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ClientesApi } from '../../../core/api/clientes.api';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
-import { Cliente, Talla } from '../../../core/api/models/pedidos.models';
+import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
 import { TallaGridComponent } from '../../../shared/ui/talla-grid/talla-grid.component';
@@ -46,9 +46,21 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             <div><label class="label">Observaciones (opcional)</label><input class="input" [ngModel]="observaciones()" (ngModelChange)="observaciones.set($event)" /></div>
           </div>
           <div style="margin-top:var(--sp-4)">
-            <label class="label">Dirección de despacho</label>
-            <input class="input" [ngModel]="direccionDespacho()" (ngModelChange)="direccionDespacho.set($event)" placeholder="Dónde se entrega este pedido" />
-            <p class="cell-sub" style="margin-top:var(--sp-2)">Se toma la del cliente; puedes cambiarla para este pedido.</p>
+            <label class="label">Entregar en</label>
+            @if (sedes().length > 0) {
+              <select class="input" [ngModel]="sedeEntregaId()" (ngModelChange)="onSedeSel($event)">
+                @for (s of sedes(); track s.id) {
+                  <option [ngValue]="s.id">{{ s.nombre }} — {{ s.direccion }}, {{ s.ciudad }}@if (s.esPrincipal) { (principal) }</option>
+                }
+                <option [ngValue]="null">Otra dirección…</option>
+              </select>
+            } @else if (clienteSel()) {
+              <p class="cell-sub" style="margin-bottom:var(--sp-2)">Este cliente no tiene sedes registradas. Escribe la dirección de entrega.</p>
+            }
+            @if (sedeEntregaId() === null) {
+              <input class="input" style="margin-top:var(--sp-2)" [ngModel]="direccionDespacho()" (ngModelChange)="direccionDespacho.set($event)" placeholder="Dónde se entrega este pedido" />
+              <p class="cell-sub" style="margin-top:var(--sp-2)">Entrega puntual: no queda amarrada a una sede del cliente.</p>
+            }
           </div>
         }
 
@@ -87,7 +99,7 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
         @if (paso() === 3) {
           <div class="panel-title">Revisar</div>
           <div class="kv"><span class="k">Cliente</span><span class="v">{{ clienteSel()?.nombre }}</span></div>
-          <div class="kv"><span class="k">Entrega en</span><span class="v">{{ direccionDespacho() || '—' }}</span></div>
+          <div class="kv"><span class="k">Entrega en</span><span class="v">{{ destinoResumen() }}</span></div>
           @for (l of lineas(); track l.producto.id) {
             <div class="kv" style="margin-top:var(--sp-3)">
               <span class="v"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares × {{ moneda(l.precio) }}</span>
@@ -144,6 +156,9 @@ export class OcCrearComponent implements OnInit {
   clienteSel = signal<Cliente | null>(null);
   ocCliente = signal('');
   observaciones = signal('');
+  sedes = signal<SedeCliente[]>([]);
+  // null = "Otra dirección…": el usuario escribe una entrega puntual a mano.
+  sedeEntregaId = signal<number | null>(null);
   direccionDespacho = signal('');
   lineas = signal<LineaWizard[]>([]);
   paso = signal<0 | 1 | 2 | 3>(0);
@@ -152,8 +167,29 @@ export class OcCrearComponent implements OnInit {
 
   onClienteSel(c: Cliente) {
     this.clienteSel.set(c);
-    // Prellena con la dirección de despacho del cliente (editable para este pedido).
-    this.direccionDespacho.set(c.direccionDespacho ?? '');
+    this.direccionDespacho.set('');
+    this.sedeEntregaId.set(null);
+    // El destino por defecto del pedido es la sede principal del cliente.
+    this.clientesApi
+      .listarSedes(c.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((sedes) => {
+        const activas = sedes.filter((s) => s.activo);
+        this.sedes.set(activas);
+        this.sedeEntregaId.set(activas.find((s) => s.esPrincipal)?.id ?? null);
+      });
+  }
+
+  onSedeSel(id: number | null) {
+    this.sedeEntregaId.set(id);
+    if (id !== null) this.direccionDespacho.set('');
+  }
+
+  /** Lo que se muestra en el paso de revisión. */
+  destinoResumen(): string {
+    const sede = this.sedes().find((s) => s.id === this.sedeEntregaId());
+    if (sede) return `${sede.direccion}, ${sede.ciudad}`;
+    return this.direccionDespacho() || '—';
   }
 
   nombreCliente = (c: Cliente) => c.nombre;
@@ -208,7 +244,7 @@ export class OcCrearComponent implements OnInit {
     const cl = this.clienteSel();
     if (!cl || this.enviando() || !this.pasoValido()) return;
     this.enviando.set(true); this.error.set('');
-    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), direccionDespacho: this.direccionDespacho(), lineas: this.lineas() });
+    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
       error: (e) => { this.enviando.set(false); this.error.set(this.msg(e)); },
