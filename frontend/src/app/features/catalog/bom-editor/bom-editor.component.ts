@@ -7,10 +7,14 @@ import {
   BomVersionData, CrearBomVersionPayload, MaterialItem, ReferenciaConfig,
 } from '../../../core/api/models/catalogo.models';
 import { Talla } from '../../../core/api/models/pedidos.models';
+import { PiezasApi, Pieza } from '../../../core/api/piezas.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { lineaDuplicada, mensajeDuplicado } from './bom-editor.util';
 
 interface LineaEdit {
   materialId: number | null;
+  /** Pieza del despiece; null = el material va a la bota completa. */
+  piezaId: number | null;
   claseConsumo: 'CURVA' | 'FIJO';
   consumoFijo: number | null;
   mermaPct: number | null;
@@ -18,7 +22,7 @@ interface LineaEdit {
 }
 
 const nuevaLinea = (): LineaEdit => ({
-  materialId: null, claseConsumo: 'FIJO', consumoFijo: null, mermaPct: null, tallas: {},
+  materialId: null, piezaId: null, claseConsumo: 'FIJO', consumoFijo: null, mermaPct: null, tallas: {},
 });
 
 @Component({
@@ -42,11 +46,12 @@ const nuevaLinea = (): LineaEdit => ({
             <p class="cell-sub">Sin líneas. Agrega la primera.</p>
           } @else {
             <table class="tbl">
-              <thead><tr><th>Material</th><th>Clase</th><th class="num">Consumo</th><th></th></tr></thead>
+              <thead><tr><th>Material</th><th>Pieza</th><th>Clase</th><th class="num">Consumo</th><th></th></tr></thead>
               <tbody>
                 @for (l of lineas(); track $index) {
                   <tr>
                     <td>{{ nombreMaterial(l.materialId) }}</td>
+                    <td class="cell-sub">{{ nombrePieza(l.piezaId) ?? 'Bota completa' }}</td>
                     <td><span class="badge">{{ l.claseConsumo }}</span></td>
                     <td class="num">{{ resumen(l) }}</td>
                     <td class="acc">
@@ -108,6 +113,16 @@ const nuevaLinea = (): LineaEdit => ({
         </select>
       </div>
       <div class="field">
+        <label class="label">Pieza</label>
+        <select class="input" [ngModel]="borrador().piezaId" (ngModelChange)="setBorrador('piezaId', $event)">
+          <option [ngValue]="null">Bota completa (sin despiezar)</option>
+          @for (p of piezas(); track p.id) {
+            <option [ngValue]="p.id">{{ p.nombre }}</option>
+          }
+        </select>
+        <small class="hint">El mismo material puede ir en varias piezas con consumos distintos.</small>
+      </div>
+      <div class="field">
         <label class="label">Clase de consumo</label>
         <select class="input" [ngModel]="borrador().claseConsumo" (ngModelChange)="setClase($event)">
           <option value="FIJO">Fijo (igual en todas las tallas)</option>
@@ -147,6 +162,7 @@ const nuevaLinea = (): LineaEdit => ({
     .ed{display:grid;grid-template-columns:1fr 340px;gap:var(--sp-5);align-items:start}
     .panel-title{font-size:var(--text-h3);font-weight:var(--fw-semibold);margin-bottom:var(--sp-4)}
     .label{display:block;font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--sp-2)}
+    .hint{display:block;color:var(--text-muted);font-size:var(--text-xs);margin-top:var(--sp-2)}
     .field{margin-bottom:var(--sp-4)}
     .input{width:100%;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
     .tbl{width:100%;border-collapse:collapse}
@@ -172,6 +188,7 @@ const nuevaLinea = (): LineaEdit => ({
 })
 export class BomEditorComponent implements OnInit {
   private readonly api = inject(CatalogoApi);
+  private readonly piezasApi = inject(PiezasApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -179,6 +196,7 @@ export class BomEditorComponent implements OnInit {
   ref = signal<ReferenciaConfig['referencia'] | null>(null);
   tallas = signal<Talla[]>([]);
   materiales = signal<MaterialItem[]>([]);
+  piezas = signal<Pieza[]>([]);
   lineas = signal<LineaEdit[]>([]);
   versionActiva = signal<number | null>(null);
 
@@ -205,12 +223,14 @@ export class BomEditorComponent implements OnInit {
       tallas: this.api.listarTallas(),
       materiales: this.api.listarMateriales(),
       versiones: this.api.versionesBom(this.referenciaId),
+      piezas: this.piezasApi.listar(),
     }).subscribe({
-      next: ({ config, tallas, materiales, versiones }) => {
+      next: ({ config, tallas, materiales, versiones, piezas }) => {
         this.ref.set(config.referencia);
         const min = config.referencia.tallaMin, max = config.referencia.tallaMax;
         this.tallas.set(tallas.filter((t) => t.valor >= min && t.valor <= max));
         this.materiales.set(materiales);
+        this.piezas.set(piezas);
         const activa = versiones.find((v) => v.activo);
         this.versionActiva.set(activa?.version ?? null);
         if (activa) this.lineas.set(activa.lineas.map(mapLinea));
@@ -222,6 +242,11 @@ export class BomEditorComponent implements OnInit {
   nombreMaterial(id: number | null): string {
     if (id == null) return '(sin material)';
     return this.matIndex().get(id)?.nombreCanonico ?? `#${id}`;
+  }
+
+  nombrePieza(id: number | null): string | null {
+    if (id == null) return null;
+    return this.piezas().find((p) => p.id === id)?.nombre ?? `#${id}`;
   }
 
   resumen(l: LineaEdit): string {
@@ -253,7 +278,7 @@ export class BomEditorComponent implements OnInit {
 
   cerrarDrawer(): void { this.drawerAbierto.set(false); }
 
-  setBorrador(campo: 'materialId' | 'consumoFijo' | 'mermaPct', valor: unknown): void {
+  setBorrador(campo: 'materialId' | 'piezaId' | 'consumoFijo' | 'mermaPct', valor: unknown): void {
     const v = valor === '' || valor == null ? null : Number(valor);
     this.borrador.update((b) => ({ ...b, [campo]: v }));
   }
@@ -277,8 +302,9 @@ export class BomEditorComponent implements OnInit {
       this.errorDrawer.set('Carga al menos una talla con consumo'); return;
     }
     const idx = this.editIdx();
-    if (this.lineas().some((l, i) => l.materialId === b.materialId && i !== idx)) {
-      this.errorDrawer.set('Ese material ya está en el BOM'); return;
+    // Se admite el mismo material en piezas distintas; lo que no se repite es (material, pieza).
+    if (lineaDuplicada(this.lineas(), b, idx)) {
+      this.errorDrawer.set(mensajeDuplicado(this.nombrePieza(b.piezaId))); return;
     }
     this.okMsg.set('');
     this.lineas.update((ls) => {
@@ -308,7 +334,12 @@ export class BomEditorComponent implements OnInit {
     const payload: CrearBomVersionPayload = {
       referenciaId: this.referenciaId,
       lineas: this.lineas().map((l) => {
-        const base = { materialId: l.materialId!, claseConsumo: l.claseConsumo, mermaPct: l.mermaPct ?? undefined };
+        const base = {
+          materialId: l.materialId!,
+          piezaId: l.piezaId ?? undefined,
+          claseConsumo: l.claseConsumo,
+          mermaPct: l.mermaPct ?? undefined,
+        };
         if (l.claseConsumo === 'FIJO') return { ...base, consumoFijo: l.consumoFijo ?? 0 };
         const tallas = Object.entries(l.tallas)
           .filter(([, c]) => c > 0)
@@ -330,6 +361,7 @@ function mapLinea(l: BomVersionData['lineas'][number]): LineaEdit {
   for (const t of l.lineasTalla) tallas[t.tallaId] = Number(t.consumo);
   return {
     materialId: l.materialId,
+    piezaId: l.piezaId ?? null,
     claseConsumo: l.claseConsumo,
     consumoFijo: l.consumoFijo == null ? null : Number(l.consumoFijo),
     mermaPct: l.mermaPct == null ? null : Number(l.mermaPct),

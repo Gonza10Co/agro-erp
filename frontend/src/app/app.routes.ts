@@ -23,6 +23,7 @@ export const routes: Routes = [
       { path: 'catalog/configurador', data: { modulo: 'catalogo' }, loadComponent: () => import('./features/catalog/configurador/configurador.component').then(m => m.ConfiguradorComponent) },
       { path: 'catalog/bom/:referenciaId/editar', data: { modulo: 'catalogo' }, loadComponent: () => import('./features/catalog/bom-editor/bom-editor.component').then(m => m.BomEditorComponent) },
       { path: 'catalog/marcas', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/marcas/marcas-list.component').then(m => m.MarcasListComponent) },
+      { path: 'catalog/piezas', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/piezas/piezas-list.component').then(m => m.PiezasListComponent) },
       { path: 'catalog/lineas', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/lineas/lineas-list.component').then(m => m.LineasListComponent) },
       { path: 'catalog/materiales', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/materiales/materiales-list.component').then(m => m.MaterialesListComponent) },
       { path: 'catalog/referencias', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/referencias/referencias-list.component').then(m => m.ReferenciasListComponent) },
