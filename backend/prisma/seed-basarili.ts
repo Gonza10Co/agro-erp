@@ -134,10 +134,14 @@ async function main() {
   }
   console.log(`  · referencias: ${referenciaPorCodigo.size}`);
 
-  // 7. BOMs por referencia: líneas FIJO + líneas CURVA (agrupadas por material).
+  // 7. BOMs por referencia: líneas FIJO + líneas CURVA (agrupadas por material Y PIEZA).
   // Idempotencia: se toma/crea el BOM activo y se recrean sus líneas.
   const fijos = leerCsv(ruta('bom-fijo.csv'));      // referencia, material, consumoFijo, mermaPct
-  const curvas = leerCsv(ruta('bom-curva.csv'));    // referencia, material, talla, consumo
+  const curvas = leerCsv(ruta('bom-curva.csv'));    // referencia, material, pieza, talla, consumo
+
+  // El despiece: un mismo material puede ir en varias piezas con consumos distintos.
+  const piezaPorCodigo = new Map<string, number>();
+  for (const p of await prisma.pieza.findMany()) piezaPorCodigo.set(p.codigo, p.id);
 
   const refsConBom = new Set<string>([...fijos, ...curvas].map((f) => f.referencia));
   let bomsCargados = 0;
@@ -159,18 +163,30 @@ async function main() {
       });
     }
 
-    // Curvas: agrupar por material → una línea CURVA con sus tallas.
-    const porMaterial = new Map<string, { talla: number; consumo: number }[]>();
+    // Curvas: agrupar por (material, pieza) → una línea CURVA por pieza, con sus tallas.
+    // Agrupar solo por material fundiría la micropiel de la capellada con la del talón.
+    const porMaterialPieza = new Map<string, { talla: number; consumo: number }[]>();
     for (const c of curvas.filter((x) => x.referencia === refCod)) {
-      const arr = porMaterial.get(c.material) ?? [];
+      const clave = `${c.material}|${c.pieza ?? ''}`;
+      const arr = porMaterialPieza.get(clave) ?? [];
       arr.push({ talla: Number(c.talla), consumo: num(c.consumo) ?? 0 });
-      porMaterial.set(c.material, arr);
+      porMaterialPieza.set(clave, arr);
     }
-    for (const [matCod, puntos] of porMaterial) {
+    for (const [clave, puntos] of porMaterialPieza) {
+      const [matCod, piezaCod] = clave.split('|');
       const materialId = materialPorCodigo.get(matCod);
       if (!materialId) { console.warn(`  · BOM ${refCod}: material ${matCod} desconocido`); continue; }
+      if (piezaCod && !piezaPorCodigo.has(piezaCod)) {
+        console.warn(`  · BOM ${refCod}: pieza ${piezaCod} desconocida (corre seed:piezas)`);
+        continue;
+      }
       const linea = await prisma.bomLinea.create({
-        data: { bomId: bom.id, materialId, claseConsumo: 'CURVA' },
+        data: {
+          bomId: bom.id,
+          materialId,
+          piezaId: piezaCod ? piezaPorCodigo.get(piezaCod)! : null,
+          claseConsumo: 'CURVA',
+        },
       });
       for (const p of puntos) {
         const tallaId = tallaPorValor.get(p.talla);

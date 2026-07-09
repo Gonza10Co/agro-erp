@@ -1,3 +1,7 @@
-referencia,material,talla,consumo
-101,PEJ1,38,0.104
-101,PEJ1,39,0.105
+referencia,material,pieza,talla,consumo
+101,PEJ1,CAPELLADA,38,0.104
+101,PEJ1,CAPELLADA,39,0.105
+101,PEJ1,TALON,38,0.031
+101,PEJ1,TALON,39,0.032
+101,PEJ2,,38,0.5
+101,PEJ2,,39,0.5

@@ -11,6 +11,8 @@ node_modules
 # Las plantillas *.example.csv sí se versionan como documentación del formato.
 prisma/data/basarili/*.csv
 !prisma/data/basarili/*.example.csv
+# Respaldos que deja el generador de despiece (bom-fijo.csv.pre-despiece, *.bak…)
+prisma/data/basarili/*.csv.*
 
 # Costos unitarios reales del cliente (columna $UNITARIO de su Sheet) — SENSIBLE.
 prisma/data/material-costos.csv
