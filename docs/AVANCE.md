@@ -4,7 +4,7 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-07-01** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-07-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 
 ---
@@ -13,12 +13,12 @@
 
 ```
    FUNCIONALIDAD (núcleo)        ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░  ~90%
-   ALCANCE DEL EXCEL DEL DUEÑO   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░  ~70%
+   ALCANCE DEL EXCEL DEL DUEÑO   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░  ~78%
    DEPLOY / PRODUCCIÓN           ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░  ~45%
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** ~338 backend + ~256 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
+**Tests:** 409 backend + 287 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -55,8 +55,8 @@ Paquete para que el cliente **opere con su catálogo real**. Todo en `develop`, 
 | 5 | **Carga de data real del Drive** — cargador `seed-basarili` + ETL del Drive: 110 marcas · 319 materiales · 5 referencias · 5 BOMs | ✅ |
 | 6 | **Editar OC en BORRADOR** — ajustar cantidades/precios antes de confirmar (inline en oc-detalle) | ✅ |
 
-> ⚠️ **Consumos de BOM:** el MRP del Drive no traía cantidades → los 5 BOMs se cargaron con
-> consumo placeholder (1). Los consumos reales se capturan en el **editor de BOM** (fase 1).
+> ~~⚠️ Consumos de BOM placeholder~~ **RESUELTO 2026-07-09:** consumos reales con curva por
+> talla y despiece por pieza, cargados de la hoja `CONSUMOSXREFERENCIA` (ver Entrega 2).
 
 ### 🧵 Bloque "Líneas de producción" (2026-07-01) — 4 líneas independientes
 
@@ -97,9 +97,34 @@ compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b
 
 ---
 
+### 📦 Entrega 2 — quincenal, fecha comprometida **viernes 2026-07-17** (2026-07-08/09)
+
+Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo en `develop`
+(commits `8a62428`…`15b3b33`), verificado **E2E con los 3 perfiles** en navegador local.
+
+| # | Entrega | Estado |
+|---|---------|--------|
+| 1 | **Semáforo de demoras en OC** — `fechaConfirmacion`, umbral único (amarillo 20d/rojo 30d), badge neutro `· cartera` para cliente VENCIDO (esos días no son demora nuestra), filtro "solo demoradas" | ✅ |
+| 2 | **Costo + utilidad de la OC** — explota el BOM real × costo del material (solo materiales); bloque gateado: CLIENTE no lo ve, STAGE/ADMIN sí. 296 materiales costeados (plantillas EVA $282/par; 5 muestras sin costo, JP 07-09) | ✅ |
+| 3 | **Compras con costo / kardex valorizado** — `costoUnitario` en OCP/recepción, promedio móvil en Material | ✅ |
+| 4 | **Sedes por cliente (1→N)** — `SedeCliente` + única principal (índice parcial), selector de sede en OC con snapshot congelado de dirección, remito la sella; **importador masivo** `seed:sedes` + plantilla xlsx/PDF para la comercial | ✅ |
+| 5 | **Despiece del BOM** — catálogo `Pieza` (15) + `BomLinea.piezaId`; el resolver identifica líneas por (material, pieza): micropiel en capellada/lateral/talón conviven con curvas propias; editor con columna Pieza + ABM en Maestros | ✅ |
+| 6 | **Datos reales del despiece** — `tools/generar-despiece.py` desde la hoja `CONSUMOSXREFERENCIA`: **celda GRIS = prueba industrial (se carga), BLANCA = cero** (regla de JP 07-09). Refs 101-106 (106=RESORTADA), 114 bloques validados, curva 13 tallas | ✅ |
+| 7 | **Perfil STAGE** — niveles ENTREGADO/EN_STAGE/INTERNO por módulo; **Maestros liberado al CLIENTE** (07-09, tras feedback de JP que no encontraba Marcas) | ✅ |
+
+> 🐛 **Bug cazado por el E2E (07-09):** el BOM traía hilo en METROS pero se costea por CONO
+> (5000/7500 m) y el cordón "1" era una GRUESA (144 uds) → costo $148M/40 pares, margen
+> −4.254%. Corregido (`FIJOS_CORREGIDOS` en el generador): $37.076/par, margen 56,4%.
+> **Regla nueva: cruzar SIEMPRE la unidad del consumo del BOM contra la unidad de compra.**
+
+---
+
 ## 🔨 EN CURSO
 
-- Nada activo. El bloque "Líneas de producción" (fases A1/0/A2/B1/A3-B2) cerró el 2026-07-01 (en `develop`).
+- **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — falta **deploy** (migraciones
+  aditivas, seguras en prod; correr `seed:costos`, `seed:piezas` y re-seed del BOM) y la demo.
+- **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · ¿la GRUESA de
+  cordón cuenta cordones o pares? · lista de materiales FIJOS de la 106 (hilos/marquilla/caja).
 
 ---
 
@@ -113,6 +138,9 @@ compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b
 - [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada. Caso real: Feroz = servicio de inyección a la capellada de Bogotá (maquila).
 - [ ] **Líneas de insumo (Marquillas/Punteras/Plantillas)** — producción **por lote** (no par/QR): transformación MP→PT con rendimiento/merma (plantillas: lámina→preforma→troquel por talla, hoy NO se registra ese eslabón), venta a terceros (catálogo de clientes externos ya visto en los Excel) y doble rol como `Material` de las líneas de bota.
 - [ ] **Metas por célula** — el Reporte usa metas mensuales por tipo; falta el desglose por célula.
+- [ ] **Variantes ECONOMICA y S/P (sin puntera)** ⚠️ NUEVO 07-09 — JP confirmó: variantes de la misma referencia elegidas AL PEDIR (ECONOMICA: micropiel lateral/botella → microfibra; S/P: contrafuerte preformado en vez de puntera). Requiere **overrides por (material, pieza)** — hoy apuntan solo a material. Los datos ya están identificados en la hoja del cliente. → **candidata a Entrega 3**.
+- [ ] **Amarre por CÉLULA (corte/guarnición/PT)** ⚠️ pedido de JP 07-09 — hoy la OP amarra solo PT por bodega geográfica; falta WIP reservable por etapa (es el comportamiento real de la fábrica). Va de la mano con el **amarre de INSUMOS** (Fase B original). Ojo: juntas desbordan una quincena.
+- [ ] **Materiales FIJOS de la 106 (RESORTADA)** — solo tiene las 19 líneas del despiece; su lista de hilos/marquilla/cordón/caja no existe en ningún histórico. Pedirla a JP o derivarla de una referencia hermana.
 
 > ⚠️ Segundas, servicios y metas-por-célula hay que **definirlos con el cliente** antes de modelar.
 
@@ -120,7 +148,7 @@ compartidos → sin multi-tenancy). Todo en `develop`, TDD, 4 commits desde `05b
 - [x] **Conectar el servicio `backend` de Railway a GitHub (branch `master`)** ✅ 2026-06-16 — backend auto-despliega desde `master` e igual que Vercel; el primer deploy aplicó las 13 migraciones pendientes (DB al día).
 - [ ] **Re-desplegar el frontend (Vercel)** — quedó atrás del backend (commit setup inicial). Redeploy en Vercel o push a `master`.
 - [x] **Datos de prod definidos** ✅ 2026-06-17 — catálogo real del cliente cargado en local vía `seed:basarili` (CSVs del Drive). En prod se corre el seed **una vez** contra Railway.
-- [ ] **Capturar consumos de BOM** — los 5 BOMs reales están con placeholder; el cliente carga los consumos por talla en el editor de BOM.
+- [x] **Capturar consumos de BOM** ✅ 2026-07-09 — cargados los consumos REALES con curva por talla y despiece (refs 101-106) desde `CONSUMOSXREFERENCIA`; los 16 bloques sin prueba industrial (celda blanca) quedaron en cero a la espera del cliente.
 - [ ] **ABM de usuarios** (diferido) — hoy operan con usuarios sembrados; falta pantalla para que el cliente cree sus operarios/gerentes.
 
 ### 3) Git — `develop` muy adelantado vs `master`
