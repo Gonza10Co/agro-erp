@@ -16,7 +16,8 @@ const SIDEBAR_KEY = 'agro-sidebar';
     <aside class="app-sidebar">
       <div class="sidebar-head">
         <a class="brand" routerLink="/pedidos/oc">
-          <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v9a4 4 0 0 0 4 4h10a2 2 0 0 0 2-2 4 4 0 0 0-3-3.9L11 10V5z"/></svg></span>
+          <!-- Monograma BÁ del cliente (vectorizado de su logo) -->
+          <span class="brand-mark"><svg viewBox="0 0 499 355" fill="currentColor"><path fill-rule="evenodd" d="M375 55L305 162L352 229L418 139L418 276L357 279L306 353L496 355L499 59ZM2 54L0 353L48 354L80 306L81 138L181 135L114 198L112 245L202 247L221 274L137 277L85 354L268 354L332 260L268 163L302 107L273 59ZM396 23L398 25L493 25L499 21L499 2L496 0L413 0L405 8Z"/></svg></span>
           <span class="brand-text"><b>BOTAS</b><small>AGROINDUSTRIAL</small></span>
         </a>
         <div class="sidebar-actions">

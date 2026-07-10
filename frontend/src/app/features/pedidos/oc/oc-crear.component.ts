@@ -71,7 +71,8 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             placeholder="Buscar producto…" (seleccionar)="agregarProducto($event)" />
           <div style="margin-top:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2)">
             @for (l of lineas(); track l.producto.id) {
-              <div class="kv"><span class="v"><b>{{ l.producto.nombreComercial }}</b> <span class="cell-sub cell-mono">{{ l.producto.codigo }}</span></span>
+              <!-- &ngsp;: Angular elimina los text nodes de solo-espacio; sin esto el código queda pegado al nombre -->
+              <div class="kv"><span class="v"><b>{{ l.producto.nombreComercial }}</b>&ngsp;<span class="cell-sub cell-mono">{{ l.producto.codigo }}</span></span>
                 <button class="btn btn-ghost btn-sm" type="button" (click)="quitarProducto(l.producto.id)">Quitar</button></div>
             }
             @if (!lineas().length) { <p class="cell-sub">Agrega al menos un producto.</p> }

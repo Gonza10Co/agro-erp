@@ -114,29 +114,11 @@ interface LineaEdit {
       @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
 
       @if (o.estado === 'BORRADOR' && editando()) {
-        <div class="drawer-foot" style="gap:var(--sp-2)">
+        <div class="drawer-foot" style="gap:var(--sp-2);align-items:center">
           <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="guardarEdicion()">Guardar cambios</button>
           <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="cancelarEdicion()">Cancelar</button>
-        </div>
-      } @else if (o.estado === 'BORRADOR') {
-        <div class="drawer-foot" style="gap:var(--sp-2)">
-          <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="confirmar()">Confirmar OC</button>
-          <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="entrarEdicion()">Editar</button>
-        </div>
-        @if (puedeVerProforma) {
-          <!-- Un borrador es una cotización: se imprime como proforma o se elimina si el negocio no se da. -->
-          <div class="drawer-foot" style="gap:var(--sp-2);align-items:center;flex-wrap:wrap">
-            @if (emisores().length > 1) {
-              <select class="input" style="width:auto" [(ngModel)]="emisorId" name="emisorProforma">
-                @for (e of emisores(); track e.id) {
-                  <option [ngValue]="e.id">{{ e.nombre }}</option>
-                }
-              </select>
-            }
-            <button class="btn btn-accent" type="button" [class.is-loading]="generandoPdf()" [disabled]="generandoPdf() || !emisores().length" (click)="descargarProforma()">Cotización PDF</button>
-            @if (!emisores().length) {
-              <span class="cell-sub">Ninguna línea tiene datos de emisor configurados.</span>
-            }
+          <!-- Eliminar vive en el modo edición: es la otra forma de "deshacer" la cotización. -->
+          @if (puedeVerProforma) {
             @if (!confirmandoEliminar()) {
               <button class="btn btn-ghost" type="button" style="color:var(--error);margin-left:auto" [disabled]="accion()" (click)="confirmandoEliminar.set(true)">Eliminar</button>
             } @else {
@@ -144,8 +126,23 @@ interface LineaEdit {
               <button class="btn btn-ghost" type="button" style="color:var(--error)" [class.is-loading]="accion()" [disabled]="accion()" (click)="eliminar()">Sí, eliminar</button>
               <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="confirmandoEliminar.set(false)">No</button>
             }
-          </div>
-        }
+          }
+        </div>
+      } @else if (o.estado === 'BORRADOR') {
+        <div class="drawer-foot" style="gap:var(--sp-2);align-items:center;flex-wrap:wrap">
+          @if (puedeVerProforma) {
+            @if (emisores().length > 1) {
+              <select class="input" style="width:auto" [(ngModel)]="emisorId" name="emisorProforma">
+                @for (e of emisores(); track e.id) {
+                  <option [ngValue]="e.id">{{ e.nombre }}</option>
+                }
+              </select>
+            }
+            <button class="btn btn-accent" type="button" [title]="emisores().length ? '' : 'Ninguna línea tiene datos de emisor configurados'" [class.is-loading]="generandoPdf()" [disabled]="generandoPdf() || !emisores().length" (click)="descargarProforma()">Cotización PDF</button>
+          }
+          <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="confirmar()">Confirmar OC</button>
+          <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="entrarEdicion()">Editar</button>
+        </div>
       } @else if (o.estado === 'CONFIRMADA') {
         <div class="drawer-foot">
           <button class="btn btn-accent" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="generarOP()">Generar OP</button>
@@ -255,10 +252,11 @@ export class OcDetalleComponent implements OnInit {
       })),
     );
     this.error.set('');
+    this.confirmandoEliminar.set(false);
     this.editando.set(true);
   }
 
-  cancelarEdicion(): void { this.editando.set(false); }
+  cancelarEdicion(): void { this.editando.set(false); this.confirmandoEliminar.set(false); }
 
   guardarEdicion(): void {
     const o = this.oc();
