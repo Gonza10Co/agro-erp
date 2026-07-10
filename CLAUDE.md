@@ -28,3 +28,18 @@ OC (pedido del cliente) → OP (producción, amarra stock PT) → OF (corrida de
 - `develop` = construcción adelantada; `master` = lo mostrado al cliente (merge `--no-ff` + tag `demo-N`).
 - TDD: test primero, implementación mínima, commit frecuente. Mensajes de commit y comentarios en español.
 - Specs/planes históricos en `docs/superpowers/`.
+
+## Niveles de liberación: la próxima demo nace en EN_STAGE
+
+`frontend/src/app/core/auth/modulos.ts` define `ENTREGADO < EN_STAGE < INTERNO`; cada rol ve
+hasta su alcance (`CLIENTE→ENTREGADO`, `STAGE→EN_STAGE`, internos→`INTERNO`). **"Mergear stage a
+cliente" no es mergear ramas: es subir el nivel de `EN_STAGE` a `ENTREGADO`.**
+
+Todo lo de la **próxima** demo se construye en `EN_STAGE` y solo sube a `ENTREGADO` **el día que
+se muestra** (así los deploys intermedios a `master` no espoilean al cliente). Excepción: si algo
+**rompe** al cliente (cambio de modelo, fix de un bug que él ya sufre) va a `ENTREGADO` de una.
+
+> ⚠️ El nivel de MÓDULO no alcanza. Lo nuevo que aterriza dentro de un módulo que el cliente ya
+> tiene (`pedidos`, `clientes`, `catalogo`, `maestros`) queda visible apenas se despliega. Gatear
+> por **sección** con `puedeVerNivel(rol, 'EN_STAGE')` — como el bloque costo/utilidad de la OC.
+> El gating es solo de interfaz: el backend no bloquea esos endpoints.
