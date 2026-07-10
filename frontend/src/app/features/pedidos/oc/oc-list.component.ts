@@ -78,7 +78,7 @@ import { badgeOC } from './estado-badge';
 
     <app-drawer [open]="!!seleccionada()" [title]="tituloDrawer()" (closed)="cerrar()">
       @if (seleccionada(); as oc) {
-        <app-oc-detalle [ocId]="oc.id" (changed)="onCambio()" />
+        <app-oc-detalle [ocId]="oc.id" (changed)="onCambio()" (eliminado)="onEliminada()" />
       }
     </app-drawer>
   `,
@@ -129,6 +129,8 @@ export class OcListComponent {
   abrir(oc: OrdenCompra): void { this.seleccionada.set(oc); }
   cerrar(): void { this.seleccionada.set(null); }
   onCambio(): void { this.cargar(); }
+  // La OC ya no existe: cerrar el drawer antes de recargar (evita re-pedir un 404).
+  onEliminada(): void { this.cerrar(); this.cargar(); }
 
   badge(oc: OrdenCompra) { return badgeOC(oc.estado); }
 

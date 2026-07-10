@@ -10,6 +10,10 @@ export interface Linea {
   nombre: string;
   celulaInicial: Celula;
   activo: boolean;
+  // Datos de emisor de cotización/proforma (null = la línea no emite).
+  razonSocial?: string | null;
+  nit?: string | null;
+  datosPago?: string | null;
 }
 export interface CrearLineaDto { codigo: string; nombre: string; celulaInicial?: Celula; }
 export interface ActualizarLineaDto { nombre?: string; celulaInicial?: Celula; }

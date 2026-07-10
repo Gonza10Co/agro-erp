@@ -9,6 +9,7 @@ describe('OcService', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     ordenCompraLinea: { deleteMany: jest.fn() },
     ordenCompraLineaTalla: { deleteMany: jest.fn() },
@@ -246,5 +247,27 @@ describe('OcService', () => {
     await expect(
       service.actualizar(99, { clienteId: 7, lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 1 }] }] }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('eliminar borra tallas, líneas y la OC cuando está en BORRADOR', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'BORRADOR' });
+    prisma.ordenCompra.delete.mockResolvedValue({ id: 1 });
+    await service.eliminar(1);
+    // el orden importa: primero las hojas, después el tronco
+    expect(prisma.ordenCompraLineaTalla.deleteMany).toHaveBeenCalledWith({ where: { ocLinea: { ocId: 1 } } });
+    expect(prisma.ordenCompraLinea.deleteMany).toHaveBeenCalledWith({ where: { ocId: 1 } });
+    expect(prisma.ordenCompra.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+  });
+
+  it('eliminar rechaza una OC que no está en BORRADOR', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'CONFIRMADA' });
+    await expect(service.eliminar(1)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.ordenCompra.delete).not.toHaveBeenCalled();
+    expect(prisma.ordenCompraLinea.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('eliminar lanza NotFound si la OC no existe', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue(null);
+    await expect(service.eliminar(99)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
