@@ -84,6 +84,23 @@ MATERIALES = {
 }
 
 
+# Consumos del bom-fijo histórico que estaban en la unidad FÍSICA (metros, unidades)
+# cuando el material se compra y costea por EMPAQUE (cono, gruesa). Sin esta conversión
+# el costeo multiplica metros × precio-del-cono y el costo del par sale en millones.
+#   - Hilos ref 101: venían en metros; las refs 102-105 ya estaban en conos.
+#     0.0086 = 43.02 m ÷ 5000 m/cono · 0.0036 = 27.16 m ÷ 7500 m/cono.
+#   - Cordón: "1" por par era una GRUESA entera (144 cordones). 2 cordones/par → 2/144.
+#     ⚠ Pendiente confirmar con el cliente si la gruesa cuenta cordones o pares.
+FIJOS_CORREGIDOS: dict[tuple[str, str], float] = {
+    ("101", "PHIL111"): 0.0086,
+    ("101", "PHIL112"): 0.0036,
+    ("101", "PCOR52"): 0.0139,
+    ("102", "PCOR52"): 0.0139,
+    ("103", "PCOR52"): 0.0139,
+    ("104", "PCOR52"): 0.0139,
+}
+
+
 def es_gris(celda) -> bool:
     f = celda.fill
     if f is None or f.patternType is None:
@@ -206,13 +223,23 @@ def main() -> int:
             shutil.copy(fijo, respaldo)
         crudo = respaldo.read_text(encoding="utf-8").strip().splitlines()
         header, cuerpo = crudo[0], crudo[1:]
-        conservadas = [
-            l for l in cuerpo
-            if (p := l.split(",")) and p[1] not in despiezados.get(p[0], set())
-        ]
+        conservadas = []
+        corregidas = 0
+        for l in cuerpo:
+            p = l.split(",")
+            if p[1] in despiezados.get(p[0], set()):
+                continue
+            nuevo = FIJOS_CORREGIDOS.get((p[0], p[1]))
+            if nuevo is not None and float(p[2]) != nuevo:
+                l = f"{p[0]},{p[1]},{nuevo},{p[3] if len(p) > 3 else ''}"
+                corregidas += 1
+            conservadas.append(l)
         fijo.write_text("\n".join([header, *conservadas]) + "\n", encoding="utf-8")
         quitadas = len(cuerpo) - len(conservadas)
-        print(f"bom-fijo.csv: {len(cuerpo)} líneas originales -> {len(conservadas)} conservadas")
+        print(
+            f"bom-fijo.csv: {len(cuerpo)} líneas originales -> {len(conservadas)} conservadas"
+            f" · {corregidas} consumos convertidos a unidad de empaque"
+        )
     else:
         quitadas = 0
 
