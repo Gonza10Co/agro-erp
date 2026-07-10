@@ -36,6 +36,13 @@ describe('PedidosApi', () => {
     req.flush({ id: 5 });
   });
 
+  it('eliminarOC hace DELETE /pedidos/oc/:id', () => {
+    api.eliminarOC(5).subscribe();
+    const req = http.expectOne('http://localhost:3001/pedidos/oc/5');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
   it('generarOP hace POST /pedidos/op/desde-oc/:ocId', () => {
     api.generarOP(5).subscribe();
     const req = http.expectOne('http://localhost:3001/pedidos/op/desde-oc/5');

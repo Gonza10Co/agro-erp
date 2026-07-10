@@ -4,11 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
+import { LineasApi, Linea } from '../../../core/api/lineas.api';
 import { OrdenCompra, OCLinea, EstadoOP, ResumenCosteoOC } from '../../../core/api/models/pedidos.models';
 import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerNivel } from '../../../core/auth/modulos';
+import { ToastService } from '../../../core/notificaciones/toast.service';
 import { badgeOC, badgeOP } from './estado-badge';
 import { destinoAlEditar } from './oc-crear.util';
+import { armarProforma } from './oc-proforma.util';
+import { descargarProformaPdf } from './oc-proforma-pdf';
 
 interface LineaEdit {
   productoConfiguradoId: number;
@@ -119,6 +123,29 @@ interface LineaEdit {
           <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="confirmar()">Confirmar OC</button>
           <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="entrarEdicion()">Editar</button>
         </div>
+        @if (puedeVerProforma) {
+          <!-- Un borrador es una cotización: se imprime como proforma o se elimina si el negocio no se da. -->
+          <div class="drawer-foot" style="gap:var(--sp-2);align-items:center;flex-wrap:wrap">
+            @if (emisores().length > 1) {
+              <select class="input" style="width:auto" [(ngModel)]="emisorId" name="emisorProforma">
+                @for (e of emisores(); track e.id) {
+                  <option [ngValue]="e.id">{{ e.nombre }}</option>
+                }
+              </select>
+            }
+            <button class="btn btn-accent" type="button" [class.is-loading]="generandoPdf()" [disabled]="generandoPdf() || !emisores().length" (click)="descargarProforma()">Cotización PDF</button>
+            @if (!emisores().length) {
+              <span class="cell-sub">Ninguna línea tiene datos de emisor configurados.</span>
+            }
+            @if (!confirmandoEliminar()) {
+              <button class="btn btn-ghost" type="button" style="color:var(--error);margin-left:auto" [disabled]="accion()" (click)="confirmandoEliminar.set(true)">Eliminar</button>
+            } @else {
+              <span class="cell-sub" style="margin-left:auto">¿Eliminar del todo?</span>
+              <button class="btn btn-ghost" type="button" style="color:var(--error)" [class.is-loading]="accion()" [disabled]="accion()" (click)="eliminar()">Sí, eliminar</button>
+              <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="confirmandoEliminar.set(false)">No</button>
+            }
+          </div>
+        }
       } @else if (o.estado === 'CONFIRMADA') {
         <div class="drawer-foot">
           <button class="btn btn-accent" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="generarOP()">Generar OP</button>
@@ -135,18 +162,29 @@ interface LineaEdit {
 })
 export class OcDetalleComponent implements OnInit {
   private readonly api = inject(PedidosApi);
+  private readonly lineasApi = inject(LineasApi);
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   ocId = input.required<number>();
   changed = output<void>();
+  eliminado = output<void>();
 
   oc = signal<OrdenCompra | null>(null);
   costeo = signal<ResumenCosteoOC | null>(null);
   // El bloque de costo/utilidad se oculta al cliente hasta liberar (gate de sección EN_STAGE).
   readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Cotización/proforma y eliminar borrador: nuevos de esta entrega, mismos gates.
+  readonly puedeVerProforma = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
   cargando = signal(true);
   accion = signal(false);
   error = signal('');
+
+  // Líneas con datos de emisor (razón social/NIT/pago): candidatas a emitir la proforma.
+  emisores = signal<Linea[]>([]);
+  emisorId: number | null = null;
+  generandoPdf = signal(false);
+  confirmandoEliminar = signal(false);
 
   // Edición inline (cantidades/precios) de una OC en BORRADOR.
   editando = signal(false);
@@ -154,7 +192,53 @@ export class OcDetalleComponent implements OnInit {
   edObs = '';
   edDireccionDespacho = '';
 
-  ngOnInit(): void { this.cargar(); }
+  ngOnInit(): void {
+    this.cargar();
+    if (this.puedeVerProforma) {
+      this.lineasApi.listar()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (ls) => {
+            const emisores = ls.filter((l) => l.razonSocial && l.nit && l.datosPago);
+            this.emisores.set(emisores);
+            this.emisorId = emisores[0]?.id ?? null;
+          },
+          error: () => this.emisores.set([]),
+        });
+    }
+  }
+
+  async descargarProforma(): Promise<void> {
+    const o = this.oc();
+    const e = this.emisores().find((l) => l.id === this.emisorId);
+    if (!o || !e || this.generandoPdf()) return;
+    this.generandoPdf.set(true);
+    this.error.set('');
+    try {
+      const proforma = armarProforma(
+        o,
+        { nombre: e.nombre, razonSocial: e.razonSocial!, nit: e.nit!, datosPago: e.datosPago! },
+        new Date(),
+      );
+      await descargarProformaPdf(proforma);
+    } catch {
+      this.error.set('No se pudo generar la cotización');
+    } finally {
+      this.generandoPdf.set(false);
+    }
+  }
+
+  eliminar(): void {
+    if (this.accion()) return;
+    this.accion.set(true);
+    this.error.set('');
+    this.api.eliminarOC(this.ocId())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => { this.accion.set(false); this.toast.exito('Cotización eliminada'); this.eliminado.emit(); },
+        error: (e) => { this.accion.set(false); this.confirmandoEliminar.set(false); this.error.set(this.msg(e)); },
+      });
+  }
 
   entrarEdicion(): void {
     const o = this.oc();

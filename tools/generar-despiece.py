@@ -89,15 +89,15 @@ MATERIALES = {
 # el costeo multiplica metros × precio-del-cono y el costo del par sale en millones.
 #   - Hilos ref 101: venían en metros; las refs 102-105 ya estaban en conos.
 #     0.0086 = 43.02 m ÷ 5000 m/cono · 0.0036 = 27.16 m ÷ 7500 m/cono.
-#   - Cordón: "1" por par era una GRUESA entera (144 cordones). 2 cordones/par → 2/144.
-#     ⚠ Pendiente confirmar con el cliente si la gruesa cuenta cordones o pares.
+#   - Cordón: la GRUESA trae 144 PARES de cordones (confirmado por Juan Pablo,
+#     2026-07-10). Un par de botas consume un par de cordones → 1/144 = 0.0069.
 FIJOS_CORREGIDOS: dict[tuple[str, str], float] = {
     ("101", "PHIL111"): 0.0086,
     ("101", "PHIL112"): 0.0036,
-    ("101", "PCOR52"): 0.0139,
-    ("102", "PCOR52"): 0.0139,
-    ("103", "PCOR52"): 0.0139,
-    ("104", "PCOR52"): 0.0139,
+    ("101", "PCOR52"): 0.0069,
+    ("102", "PCOR52"): 0.0069,
+    ("103", "PCOR52"): 0.0069,
+    ("104", "PCOR52"): 0.0069,
 }
 
 

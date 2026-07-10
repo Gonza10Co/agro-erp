@@ -121,10 +121,20 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 
 ## 🔨 EN CURSO
 
-- **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — falta **deploy** (migraciones
-  aditivas, seguras en prod; correr `seed:costos`, `seed:piezas` y re-seed del BOM) y la demo.
-- **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · ¿la GRUESA de
-  cordón cuenta cordones o pares? · lista de materiales FIJOS de la 106 (hilos/marquilla/caja).
+- **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — **desplegada a prod
+  2026-07-09** (tag `entrega-2`): migraciones aplicadas, seeds corridos (rol STAGE, 15 piezas,
+  BOM ×6 con despiece, 296 costos, 3 sedes) y `fechaConfirmacion` retro-sellada en 8 OCs
+  (semáforo verificado vivo: 2 ROJO/1 AMARILLO). Falta solo la **demo** al cliente.
+- **Cotización/proforma PDF + eliminar borradores** (pedido de Juan José vía JP, 07-10) ✅
+  construida y E2E local: OC BORRADOR = cotización → botón "Cotización PDF" (jsPDF, número
+  `COT-fecha-hora`, IVA 19%, emisor por línea — hoy solo Feroz tiene datos) y eliminar del
+  todo con confirmación. Gateada EN_STAGE. **Pendiente: re-deploy + seed de emisores en prod**
+  (y el re-seed del BOM lleva el fix de la gruesa).
+- **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · lista de
+  materiales FIJOS de la 106 (hilos/marquilla/caja) · **datos de emisor de Basarili/Agro/Alta**
+  (razón social, NIT, cuenta) para que sus proformas salgan con membrete propio.
+  ~~¿La GRUESA cuenta cordones o pares?~~ **Respondido 07-10: 144 PARES por gruesa**
+  (consumo corregido a 1/144 = 0.0069; muestras en $0 confirmadas sin costear).
 
 ---
 

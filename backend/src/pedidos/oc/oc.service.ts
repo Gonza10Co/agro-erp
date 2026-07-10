@@ -96,6 +96,23 @@ export class OcService {
     });
   }
 
+  // Un borrador es una cotización: si el negocio no se cierra, se elimina del todo.
+  // Solo BORRADOR — nada cuelga de él todavía (la OP nace al confirmar).
+  async eliminar(id: number) {
+    const oc = await this.prisma.ordenCompra.findUnique({ where: { id } });
+    if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+    if (oc.estado !== 'BORRADOR') {
+      throw new BadRequestException(
+        'Solo se puede eliminar una OC en estado BORRADOR',
+      );
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ordenCompraLineaTalla.deleteMany({ where: { ocLinea: { ocId: id } } });
+      await tx.ordenCompraLinea.deleteMany({ where: { ocId: id } });
+      await tx.ordenCompra.delete({ where: { id } });
+    });
+  }
+
   /**
    * Destino del pedido. Una sede elegida a mano tiene que ser del propio cliente y estar
    * activa; si no, el pedido terminaría despachándose a la bodega de otro.

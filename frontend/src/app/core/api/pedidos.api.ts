@@ -15,6 +15,7 @@ export class PedidosApi {
   obtenerCosteoOC(id: number) { return this.http.get<ResumenCosteoOC>(`${this.oc}/${id}/costeo`); }
   actualizarOC(id: number, dto: CrearOCDto) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}`, dto); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
+  eliminarOC(id: number) { return this.http.delete<void>(`${this.oc}/${id}`); }
 
   generarOP(ocId: number) { return this.http.post<OrdenProduccion>(`${this.op}/desde-oc/${ocId}`, {}); }
   listarOP() { return this.http.get<OrdenProduccion[]>(this.op); }

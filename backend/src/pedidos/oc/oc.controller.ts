@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -42,5 +43,8 @@ export class OcController {
   }
   @Post(':id/confirmar') confirmar(@Param('id', ParseIntPipe) id: number) {
     return this.oc.confirmar(id);
+  }
+  @Delete(':id') eliminar(@Param('id', ParseIntPipe) id: number) {
+    return this.oc.eliminar(id);
   }
 }

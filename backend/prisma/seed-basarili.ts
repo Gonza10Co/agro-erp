@@ -73,6 +73,20 @@ async function main() {
   await prisma.linea.updateMany({ where: { codigo: 'EXTERNA' }, data: { activo: false } });
   console.log(`  · líneas: ${lineas.length} (+EXTERNA desactivada si existía)`);
 
+  // 3c. Datos de emisor de proforma por línea (razón social, NIT, bloque de pago).
+  // Vienen en emisores.csv (SENSIBLE, gitignored): una línea sin emisor no puede
+  // emitir cotización. Hoy solo tenemos los de Feroz; los demás se piden al cliente.
+  let emisores = 0;
+  for (const f of leerCsv(ruta('emisores.csv'))) {
+    const r = await prisma.linea.updateMany({
+      where: { codigo: f.linea },
+      data: { razonSocial: f.razonSocial, nit: f.nit, datosPago: f.datosPago },
+    });
+    if (r.count > 0) emisores++;
+    else console.warn(`  · emisor ${f.linea}: línea inexistente, omitido`);
+  }
+  console.log(`  · emisores de proforma: ${emisores}`);
+
   // 4. Marcas (codigo, nombre, tipo)
   let marcas = 0;
   for (const f of leerCsv(ruta('marcas.csv'))) {

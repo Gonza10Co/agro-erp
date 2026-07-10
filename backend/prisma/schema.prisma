@@ -261,6 +261,11 @@ model Linea {
   nombre        String
   celulaInicial Celula  @default(CORTE)
   activo        Boolean @default(true)
+  // Datos de la empresa que emite cotizaciones/proformas a nombre de esta línea.
+  // Nullable: una línea sin estos datos no puede emitir proforma (no aparece en el selector).
+  razonSocial   String?
+  nit           String?
+  datosPago     String? // bloque de consignación tal cual se imprime (banco · cuenta · titular)
 
   marcas Marca[]
   pares  Par[]
