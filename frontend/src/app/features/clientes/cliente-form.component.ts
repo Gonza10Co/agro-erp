@@ -29,7 +29,7 @@ import { SedesClienteComponent } from './sedes-cliente.component';
       <div class="field">
         <label class="label" for="direccion">Dirección fiscal</label>
         <input class="input" id="direccion" name="direccion" [(ngModel)]="direccion" autocomplete="off" />
-        <small style="color:var(--text-muted);font-size:var(--text-xs)">La de la factura. A dónde se entrega se define abajo, en las sedes.</small>
+        <small class="hint">La de la factura. A dónde se entrega se define abajo, en las sedes.</small>
       </div>
       <div class="field">
         <label class="label" for="tipoCredito">Tipo de crédito</label>
