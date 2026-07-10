@@ -126,10 +126,10 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
   BOM ×6 con despiece, 296 costos, 3 sedes) y `fechaConfirmacion` retro-sellada en 8 OCs
   (semáforo verificado vivo: 2 ROJO/1 AMARILLO). Falta solo la **demo** al cliente.
 - **Cotización/proforma PDF + eliminar borradores** (pedido de Juan José vía JP, 07-10) ✅
-  construida y E2E local: OC BORRADOR = cotización → botón "Cotización PDF" (jsPDF, número
-  `COT-fecha-hora`, IVA 19%, emisor por línea — hoy solo Feroz tiene datos) y eliminar del
-  todo con confirmación. Gateada EN_STAGE. **Pendiente: re-deploy + seed de emisores en prod**
-  (y el re-seed del BOM lleva el fix de la gruesa).
+  construida, E2E local y **desplegada a prod 07-10**: OC BORRADOR = cotización → botón
+  "Cotización PDF" (jsPDF, número `COT-fecha-hora`, IVA 19%, emisor por línea — hoy solo
+  Feroz tiene datos) y eliminar del todo con confirmación. Gateada EN_STAGE. Seed corrido en
+  prod (emisor Feroz + BOM con la gruesa corregida: margen OC-8 pasó de 21.77% a 22.18%).
 - **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · lista de
   materiales FIJOS de la 106 (hilos/marquilla/caja) · **datos de emisor de Basarili/Agro/Alta**
   (razón social, NIT, cuenta) para que sus proformas salgan con membrete propio.
