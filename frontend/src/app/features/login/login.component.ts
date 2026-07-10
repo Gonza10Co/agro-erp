@@ -50,7 +50,7 @@ import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.
     <div class="brand-panel">
       <div class="bp-grid"></div>
       <div class="bp-content bp-logo">
-        <span class="bp-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v9a4 4 0 0 0 4 4h10a2 2 0 0 0 2-2 4 4 0 0 0-3-3.9L11 10V5z"/></svg></span>
+        <span class="bp-mark"><svg viewBox="0 0 499 355" fill="currentColor"><path fill-rule="evenodd" d="M375 55L305 162L352 229L418 139L418 276L357 279L306 353L496 355L499 59ZM2 54L0 353L48 354L80 306L81 138L181 135L114 198L112 245L202 247L221 274L137 277L85 354L268 354L332 260L268 163L302 107L273 59ZM396 23L398 25L493 25L499 21L499 2L496 0L413 0L405 8Z"/></svg></span>
         <span><b>BOTAS AGROINDUSTRIAL</b><small>ERP · MES · IBAGUÉ</small></span>
       </div>
       <div class="bp-headline">
