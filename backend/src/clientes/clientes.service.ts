@@ -18,6 +18,8 @@ export class ClientesService {
         nit: dto.nit,
         nombre: dto.nombre,
         ciudad: dto.ciudad,
+        telefono: dto.telefono,
+        direccion: dto.direccion,
         tipoCredito: dto.tipoCredito,
         cupo: dto.cupo,
       },
@@ -28,8 +30,17 @@ export class ClientesService {
     return this.prisma.cliente.findMany({ orderBy: { nombre: 'asc' } });
   }
 
+  // El detalle trae las sedes: son el destino de despacho del cliente.
   obtener(id: number) {
-    return this.prisma.cliente.findUnique({ where: { id } });
+    return this.prisma.cliente.findUnique({
+      where: { id },
+      include: {
+        sedes: {
+          where: { activo: true },
+          orderBy: [{ esPrincipal: 'desc' }, { nombre: 'asc' }],
+        },
+      },
+    });
   }
 
   async actualizar(id: number, dto: ActualizarClienteDto) {
@@ -39,6 +50,8 @@ export class ClientesService {
       data: {
         nombre: dto.nombre,
         ciudad: dto.ciudad,
+        telefono: dto.telefono,
+        direccion: dto.direccion,
         tipoCredito: dto.tipoCredito,
         cupo: dto.cupo,
       },

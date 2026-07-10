@@ -144,6 +144,10 @@ const SIDEBAR_KEY = 'agro-sidebar';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
             <span class="nav-label">Marcas</span>
           </a>
+          <a class="nav-item" routerLink="/catalog/piezas" routerLinkActive="is-active" title="Piezas de la bota (despiece)">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9a4 4 0 0 1 4-4h1l1 4 4 2 5 3v3z"/><path d="M9 5v4"/></svg></span>
+            <span class="nav-label">Piezas</span>
+          </a>
           <a class="nav-item" routerLink="/catalog/lineas" routerLinkActive="is-active" title="Líneas de producción">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
             <span class="nav-label">Líneas</span>
@@ -187,7 +191,7 @@ export class ShellComponent {
   readonly usuario = this.auth.usuario();
   readonly iniciales = (this.usuario?.username ?? '?').slice(0, 2).toUpperCase();
   readonly rolLabel =
-    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente' } as Record<string, string>)[
+    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage' } as Record<string, string>)[
       this.usuario?.role ?? ''
     ] ?? (this.usuario?.role ?? '');
 

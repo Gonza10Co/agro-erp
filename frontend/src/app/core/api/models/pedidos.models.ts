@@ -1,4 +1,5 @@
 export type EstadoOC = 'BORRADOR' | 'CONFIRMADA' | 'EN_PRODUCCION' | 'CERRADA' | 'ANULADA';
+export type EstadoDemora = 'VERDE' | 'AMARILLO' | 'ROJO' | 'RETENIDA_CARTERA';
 export type EstadoOP = 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'DESPACHADA' | 'ANULADA';
 export type TipoCredito = 'CONTADO' | 'D30' | 'D60' | 'D90';
 export type EstadoCartera = 'AL_DIA' | 'VENCIDO' | 'BLOQUEADO';
@@ -8,10 +9,26 @@ export interface Cliente {
   id: number;
   nit: string;
   nombre: string;
-  ciudad?: string | null;
+  ciudad?: string | null; // ciudad fiscal, NO la de entrega
+  telefono?: string | null;
+  direccion?: string | null; // domicilio / dirección fiscal
   tipoCredito: TipoCredito;
   cupo?: string | null;
   estadoCartera: EstadoCartera;
+  activo: boolean;
+  // Solo viene en el detalle (GET /clientes/:id). A dónde se le despacha.
+  sedes?: SedeCliente[];
+}
+
+/** Sede de entrega de un cliente. La marcada como principal es el destino por defecto. */
+export interface SedeCliente {
+  id: number;
+  clienteId: number;
+  nombre: string;
+  ciudad: string;
+  direccion: string;
+  telefono?: string | null;
+  esPrincipal: boolean;
   activo: boolean;
 }
 
@@ -40,10 +57,26 @@ export interface OrdenCompra {
   clienteId: number;
   cliente?: Cliente;
   fecha: string;
+  fechaConfirmacion?: string | null;
   estado: EstadoOC;
   observaciones?: string | null;
+  sedeEntregaId?: number | null;
+  sedeEntrega?: SedeCliente | null;
+  /** Snapshot congelado al crear la OC; no se relee de la sede. */
+  direccionDespacho?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
+  // Semáforo de demora calculado por el backend en el listado (no se persiste).
+  diasDemora?: number | null;
+  estadoDemora?: EstadoDemora | null;
+}
+
+export interface ResumenCosteoOC {
+  totalVenta: number;
+  costoTotal: number;
+  utilidad: number;
+  margenPct: number;
+  materialesSinCosto: number;
 }
 
 export interface ReservaInventarioPT {
@@ -77,16 +110,18 @@ export interface OrdenProduccion {
   lineas?: OPLinea[];
 }
 
-export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; tipoCredito?: TipoCredito; cupo?: number; }
+export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; tipoCredito?: TipoCredito; cupo?: number; }
+export interface CrearSedeDto { nombre: string; ciudad: string; direccion: string; telefono?: string; esPrincipal?: boolean; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
-export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; lineas: CrearOCLineaDto[]; }
+export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
 export interface DespachoListItem {
   id: number;
   consecutivo: number;
   fecha: string;
+  direccionEntrega?: string | null;
   autorizadoPorId: number | null;
   factura: { id: number; consecutivo: number } | null;
   op: { consecutivo: number; oc: { cliente: { nombre: string } } };

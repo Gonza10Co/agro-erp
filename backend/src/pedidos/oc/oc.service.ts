@@ -8,6 +8,9 @@ import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { ActualizarOCDto } from './dto/actualizar-oc.dto';
 import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
+import { estadoDemora } from './oc-demora';
+import { resolverDestinoOC } from './oc-destino';
+import { elegirSedePorDefecto } from '../../clientes/sedes-core';
 
 @Injectable()
 export class OcService {
@@ -17,12 +20,19 @@ export class OcService {
     // nextval + create en la misma tx: si el create falla no queda hueco evitable.
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'oc');
+      const { sedeEntregaId, direccionDespacho } = await this.resolverDestino(
+        tx,
+        dto.clienteId,
+        dto,
+      );
       return tx.ordenCompra.create({
         data: {
           consecutivo,
           clienteId: dto.clienteId,
           ocCliente: dto.ocCliente,
           observaciones: dto.observaciones,
+          sedeEntregaId,
+          direccionDespacho,
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -55,12 +65,19 @@ export class OcService {
     return this.prisma.$transaction(async (tx) => {
       await tx.ordenCompraLineaTalla.deleteMany({ where: { ocLinea: { ocId: id } } });
       await tx.ordenCompraLinea.deleteMany({ where: { ocId: id } });
+      const { sedeEntregaId, direccionDespacho } = await this.resolverDestino(
+        tx,
+        dto.clienteId,
+        dto,
+      );
       return tx.ordenCompra.update({
         where: { id },
         data: {
           clienteId: dto.clienteId,
           ocCliente: dto.ocCliente,
           observaciones: dto.observaciones,
+          sedeEntregaId,
+          direccionDespacho,
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
@@ -76,6 +93,33 @@ export class OcService {
         },
         include: { lineas: { include: { tallas: true } } },
       });
+    });
+  }
+
+  /**
+   * Destino del pedido. Una sede elegida a mano tiene que ser del propio cliente y estar
+   * activa; si no, el pedido terminaría despachándose a la bodega de otro.
+   */
+  private async resolverDestino(
+    tx: Pick<PrismaService, 'sedeCliente'>,
+    clienteId: number,
+    dto: { sedeEntregaId?: number; direccionDespacho?: string },
+  ) {
+    const sedes = await tx.sedeCliente.findMany({ where: { clienteId } });
+
+    let sedeElegida: (typeof sedes)[number] | null = null;
+    if (dto.sedeEntregaId != null) {
+      sedeElegida = sedes.find((s) => s.id === dto.sedeEntregaId && s.activo) ?? null;
+      if (!sedeElegida)
+        throw new BadRequestException(
+          `La sede ${dto.sedeEntregaId} no pertenece al cliente ${clienteId} o está inactiva`,
+        );
+    }
+
+    return resolverDestinoOC({
+      sedeElegida,
+      sedePrincipal: elegirSedePorDefecto(sedes),
+      direccionManual: dto.direccionDespacho,
     });
   }
 
@@ -116,19 +160,27 @@ export class OcService {
 
     return this.prisma.ordenCompra.update({
       where: { id },
-      data: { estado: 'CONFIRMADA' },
+      // Se sella la fecha de confirmación: desde acá corre el reloj de demora.
+      data: { estado: 'CONFIRMADA', fechaConfirmacion: new Date() },
     });
   }
 
-  listar() {
-    return this.prisma.ordenCompra.findMany({
+  async listar() {
+    const ocs = await this.prisma.ordenCompra.findMany({
       orderBy: { consecutivo: 'desc' },
       include: {
-        cliente: { select: { id: true, nit: true, nombre: true } },
+        cliente: { select: { id: true, nit: true, nombre: true, estadoCartera: true } },
         ordenProduccion: {
           select: { id: true, consecutivo: true, estado: true },
         },
       },
+    });
+    // El semáforo de demora se calcula al vuelo (no se persiste): días desde la
+    // confirmación cruzados con la cartera del cliente.
+    const ahora = new Date();
+    return ocs.map((oc) => {
+      const demora = estadoDemora(oc.fechaConfirmacion, ahora, oc.cliente.estadoCartera, oc.estado);
+      return { ...oc, diasDemora: demora.dias, estadoDemora: demora.estado };
     });
   }
 

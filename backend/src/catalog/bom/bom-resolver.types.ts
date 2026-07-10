@@ -8,6 +8,12 @@ export type AccionOverride = 'ADD' | 'REPLACE' | 'REMOVE' | 'SET_CONSUMO';
 /** Una línea de BOM, independiente de la talla. consumoPorTalla mapea valor de talla → consumo. */
 export interface LineaBase {
   materialId: number;
+  /**
+   * Pieza del despiece a la que va este material (capellada, lateral, talón…).
+   * null = bota completa, sin despiezar. Un mismo material puede aparecer en varias
+   * piezas con consumos distintos, así que la identidad de la línea es (material, pieza).
+   */
+  piezaId: number | null;
   claseConsumo: ClaseConsumo;
   consumoFijo: number | null;
   consumoPorTalla: Record<number, number>; // {} si claseConsumo === 'FIJO'

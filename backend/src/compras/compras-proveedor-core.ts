@@ -51,6 +51,22 @@ export function validarRecepcion(
   return null;
 }
 
+/**
+ * Costo promedio móvil (weighted average) tras una entrada valorizada de inventario.
+ *   nuevoPromedio = (stockPrevio·costoPrevio + cantEntra·costoEntra) / (stockPrevio + cantEntra)
+ * Si no había stock, el promedio es simplemente el costo de la entrada.
+ */
+export function costoPromedioMovil(
+  stockPrevio: number,
+  costoPrevio: number,
+  cantEntra: number,
+  costoEntra: number,
+): number {
+  const stockNuevo = stockPrevio + cantEntra;
+  if (stockNuevo <= 0) return costoEntra;
+  return (stockPrevio * costoPrevio + cantEntra * costoEntra) / stockNuevo;
+}
+
 export function validarDevolucion(
   causa: string,
   lineas: LineaDevolucionDto[],

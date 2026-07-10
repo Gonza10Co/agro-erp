@@ -49,7 +49,7 @@ describe('RegistrarRecepcionComponent', () => {
     const done = spyOn(fixture.componentInstance.done, 'emit');
     fixture.componentInstance.registrar();
     expect(api.registrarRecepcion).toHaveBeenCalledWith(10, {
-      lineas: [{ ocpLineaId: 1, cantidad: 10 }],
+      lineas: [{ ocpLineaId: 1, cantidad: 10, costoUnitario: undefined }],
       observaciones: undefined,
     });
     expect(done).toHaveBeenCalled();

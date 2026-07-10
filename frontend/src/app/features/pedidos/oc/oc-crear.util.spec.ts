@@ -1,4 +1,4 @@
-import { tallasDeProducto, construirDto, LineaWizard } from './oc-crear.util';
+import { tallasDeProducto, construirDto, destinoAlEditar, LineaWizard } from './oc-crear.util';
 import { Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 
@@ -24,6 +24,7 @@ describe('oc-crear.util', () => {
       clienteId: 3,
       ocCliente: 'PO-1',
       observaciones: undefined,
+      direccionDespacho: undefined,
       lineas: [{ productoConfiguradoId: 7, precioUnitario: 85000, tallas: [{ tallaId: 2, cantidad: 10 }, { tallaId: 99, cantidad: 5 }] }],
     });
   });
@@ -32,5 +33,43 @@ describe('oc-crear.util', () => {
     const lineas: LineaWizard[] = [{ producto: PROD, precio: 0, valores: { 2: 4 } }];
     const dto = construirDto({ clienteId: 3, lineas });
     expect(dto.lineas[0].precioUnitario).toBeUndefined();
+  });
+});
+
+describe('destinoAlEditar', () => {
+  it('conserva la sede si nadie tocó la dirección', () => {
+    expect(
+      destinoAlEditar({
+        sedeEntregaIdActual: 9,
+        direccionOriginal: 'Cra 5 # 10-20, Ibagué',
+        direccionEditada: 'Cra 5 # 10-20, Ibagué',
+      }),
+    ).toEqual({ sedeEntregaId: 9, direccionDespacho: undefined });
+  });
+
+  it('suelta la sede si reescribieron la dirección', () => {
+    expect(
+      destinoAlEditar({
+        sedeEntregaIdActual: 9,
+        direccionOriginal: 'Cra 5 # 10-20, Ibagué',
+        direccionEditada: 'Obra Calle 80, Bogotá',
+      }),
+    ).toEqual({ sedeEntregaId: undefined, direccionDespacho: 'Obra Calle 80, Bogotá' });
+  });
+
+  it('una entrega puntual intacta no se muda a la sede principal', () => {
+    expect(
+      destinoAlEditar({
+        sedeEntregaIdActual: null,
+        direccionOriginal: 'Obra Calle 80',
+        direccionEditada: 'Obra Calle 80',
+      }),
+    ).toEqual({ sedeEntregaId: undefined, direccionDespacho: 'Obra Calle 80' });
+  });
+
+  it('borrar la dirección deja la OC sin destino explícito', () => {
+    expect(
+      destinoAlEditar({ sedeEntregaIdActual: 9, direccionOriginal: 'Cra 5', direccionEditada: '  ' }),
+    ).toEqual({ sedeEntregaId: undefined, direccionDespacho: undefined });
   });
 });

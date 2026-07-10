@@ -33,10 +33,11 @@ const RANGO_ACCION: Record<Override['accion'], number> = {
 };
 
 /** Construye una LineaBase a partir de un override (para ADD o REPLACE sin heredar). */
-function lineaDesdeOverride(ov: Override): LineaBase {
+function lineaDesdeOverride(ov: Override, piezaId: number | null = null): LineaBase {
   const tieneCurva = Object.keys(ov.consumoPorTalla).length > 0;
   return {
     materialId: ov.materialNuevoId as number,
+    piezaId,
     claseConsumo: tieneCurva ? 'CURVA' : 'FIJO',
     consumoFijo: tieneCurva ? null : (ov.consumoFijo ?? 0),
     consumoPorTalla: tieneCurva ? { ...ov.consumoPorTalla } : {},
@@ -44,14 +45,36 @@ function lineaDesdeOverride(ov: Override): LineaBase {
   };
 }
 
+/**
+ * Identidad de una línea dentro de una receta. NO es el material a secas: la misma
+ * micropiel puede ir en la capellada y en el talón con consumos distintos.
+ */
+function clave(materialId: number, piezaId: number | null): string {
+  return `${materialId}|${piezaId ?? ''}`;
+}
+
+/**
+ * Los overrides apuntan a un material (`materialObjetivoId`), no a una pieza. Un override
+ * sobre la micropiel alcanza a TODAS las piezas hechas de micropiel.
+ */
+function entradasDeMaterial(
+  mapa: Map<string, LineaBase>,
+  materialId: number,
+): [string, LineaBase][] {
+  return [...mapa.entries()].filter(([, l]) => l.materialId === materialId);
+}
+
 /** Aplica las reglas de override al BOM base y devuelve el conjunto efectivo de líneas. */
 export function aplicarOverrides(
   base: LineaBase[],
   overrides: Override[],
 ): LineaBase[] {
-  const mapa = new Map<number, LineaBase>();
+  const mapa = new Map<string, LineaBase>();
   for (const l of base)
-    mapa.set(l.materialId, { ...l, consumoPorTalla: { ...l.consumoPorTalla } });
+    mapa.set(clave(l.materialId, l.piezaId), {
+      ...l,
+      consumoPorTalla: { ...l.consumoPorTalla },
+    });
 
   const ordenados = [...overrides].sort(
     (a, b) =>
@@ -61,42 +84,47 @@ export function aplicarOverrides(
   for (const ov of ordenados) {
     switch (ov.accion) {
       case 'REMOVE':
-        if (ov.materialObjetivoId != null) mapa.delete(ov.materialObjetivoId);
+        if (ov.materialObjetivoId != null)
+          for (const [k] of entradasDeMaterial(mapa, ov.materialObjetivoId))
+            mapa.delete(k);
         break;
       case 'REPLACE': {
         if (ov.materialObjetivoId == null || ov.materialNuevoId == null) break;
-        const objetivo = mapa.get(ov.materialObjetivoId);
-        if (!objetivo) break;
-        const nueva: LineaBase = ov.heredaCurva
-          ? {
-              ...objetivo,
-              materialId: ov.materialNuevoId,
-              consumoPorTalla: { ...objetivo.consumoPorTalla },
-            }
-          : lineaDesdeOverride(ov);
-        mapa.delete(ov.materialObjetivoId);
-        mapa.set(ov.materialNuevoId, nueva);
+        // El material nuevo entra en cada pieza donde estaba el viejo.
+        for (const [k, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId)) {
+          const nueva: LineaBase = ov.heredaCurva
+            ? {
+                ...objetivo,
+                materialId: ov.materialNuevoId,
+                consumoPorTalla: { ...objetivo.consumoPorTalla },
+              }
+            : lineaDesdeOverride(ov, objetivo.piezaId);
+          mapa.delete(k);
+          mapa.set(clave(ov.materialNuevoId, nueva.piezaId), nueva);
+        }
         break;
       }
       case 'SET_CONSUMO': {
         if (ov.materialObjetivoId == null) break;
-        const objetivo = mapa.get(ov.materialObjetivoId);
-        if (!objetivo) break;
         const tieneCurva = Object.keys(ov.consumoPorTalla).length > 0;
-        if (tieneCurva) {
-          objetivo.claseConsumo = 'CURVA';
-          objetivo.consumoPorTalla = { ...ov.consumoPorTalla };
-          objetivo.consumoFijo = null;
-        } else {
-          objetivo.claseConsumo = 'FIJO';
-          objetivo.consumoFijo = ov.consumoFijo ?? 0;
-          objetivo.consumoPorTalla = {};
+        for (const [, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId)) {
+          if (tieneCurva) {
+            objetivo.claseConsumo = 'CURVA';
+            objetivo.consumoPorTalla = { ...ov.consumoPorTalla };
+            objetivo.consumoFijo = null;
+          } else {
+            objetivo.claseConsumo = 'FIJO';
+            objetivo.consumoFijo = ov.consumoFijo ?? 0;
+            objetivo.consumoPorTalla = {};
+          }
         }
         break;
       }
       case 'ADD':
-        if (ov.materialNuevoId != null)
-          mapa.set(ov.materialNuevoId, lineaDesdeOverride(ov));
+        if (ov.materialNuevoId != null) {
+          const nueva = lineaDesdeOverride(ov);
+          mapa.set(clave(nueva.materialId, nueva.piezaId), nueva);
+        }
         break;
     }
   }

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { CrearOCLineaDto } from './crear-oc.dto';
 
 // Edición completa de una OC en BORRADOR: reemplaza cabecera y líneas.
@@ -8,6 +8,8 @@ export class ActualizarOCDto {
   @Type(() => Number) @IsInt() clienteId!: number;
   @IsOptional() @IsString() ocCliente?: string;
   @IsOptional() @IsString() observaciones?: string;
+  @IsOptional() @Type(() => Number) @IsInt() sedeEntregaId?: number;
+  @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

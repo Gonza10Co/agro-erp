@@ -30,6 +30,10 @@ function cargar(http: HttpTestingController) {
       ],
     },
   ]);
+  http.expectOne(`${BASE}/piezas`).flush([
+    { id: 50, codigo: 'CAPELLADA', nombre: 'Capellada', orden: 10, activo: true },
+    { id: 51, codigo: 'TALON', nombre: 'Talón', orden: 50, activo: true },
+  ]);
 }
 
 describe('BomEditorComponent', () => {
@@ -69,7 +73,7 @@ describe('BomEditorComponent', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
       referenciaId: 1,
-      lineas: [{ materialId: 30, claseConsumo: 'FIJO', mermaPct: undefined, consumoFijo: 1 }],
+      lineas: [{ materialId: 30, piezaId: undefined, claseConsumo: 'FIJO', mermaPct: undefined, consumoFijo: 1 }],
     });
     req.flush({ id: 10, version: 3, activo: true, vigenteDesde: '', lineas: [] });
     expect(cmp.versionActiva()).toBe(3);
@@ -126,5 +130,48 @@ describe('BomEditorComponent', () => {
     cmp.aplicarLinea();
     expect(cmp.errorDrawer()).toContain('ya está');
     expect(cmp.lineas().length).toBe(1);
+  });
+
+  // El pedido del cliente: la capellada en micropiel y el talón en micropiel también,
+  // cada uno con su consumo. Antes el editor lo bloqueaba.
+  it('permite el mismo material en otra pieza del despiece', () => {
+    const fixture = crear();
+    cargar(http);
+    const cmp = fixture.componentInstance;
+    cmp.abrirNueva();
+    cmp.setBorrador('materialId', 30); // el mismo de la línea original (que va sin pieza)
+    cmp.setBorrador('piezaId', 51); // Talón
+    cmp.setClase('FIJO');
+    cmp.setBorrador('consumoFijo', 2);
+    cmp.aplicarLinea();
+    expect(cmp.errorDrawer()).toBe('');
+    expect(cmp.lineas().length).toBe(2);
+    expect(cmp.lineas()[1].piezaId).toBe(51);
+  });
+
+  it('la pieza viaja en el payload al guardar', () => {
+    const fixture = crear();
+    cargar(http);
+    const cmp = fixture.componentInstance;
+    cmp.abrirNueva();
+    cmp.setBorrador('materialId', 31);
+    cmp.setBorrador('piezaId', 50); // Capellada
+    cmp.setClase('FIJO');
+    cmp.setBorrador('consumoFijo', 0.6);
+    cmp.aplicarLinea();
+    cmp.guardar();
+    const req = http.expectOne(`${BASE}/bom/version`);
+    expect(req.request.body.lineas[1]).toEqual(
+      jasmine.objectContaining({ materialId: 31, piezaId: 50, consumoFijo: 0.6 }),
+    );
+    req.flush({ id: 11, version: 3, activo: true, vigenteDesde: '', lineas: [] });
+  });
+
+  it('muestra "Bota completa" cuando la línea no tiene pieza', () => {
+    const fixture = crear();
+    cargar(http);
+    const cmp = fixture.componentInstance;
+    expect(cmp.nombrePieza(null)).toBeNull();
+    expect(cmp.nombrePieza(50)).toBe('Capellada');
   });
 });

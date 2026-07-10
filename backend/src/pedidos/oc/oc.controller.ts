@@ -10,13 +10,17 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OcService } from './oc.service';
+import { OcCosteoService } from './oc-costeo.service';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { ActualizarOCDto } from './dto/actualizar-oc.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pedidos/oc')
 export class OcController {
-  constructor(private readonly oc: OcService) {}
+  constructor(
+    private readonly oc: OcService,
+    private readonly costeo: OcCosteoService,
+  ) {}
 
   @Post() crear(@Body() dto: CrearOCDto) {
     return this.oc.crear(dto);
@@ -26,6 +30,9 @@ export class OcController {
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.oc.obtener(id);
+  }
+  @Get(':id/costeo') costear(@Param('id', ParseIntPipe) id: number) {
+    return this.costeo.costear(id);
   }
   @Patch(':id') actualizar(
     @Param('id', ParseIntPipe) id: number,

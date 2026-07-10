@@ -21,7 +21,8 @@ function prismaMock() {
     recepcionCompra: { create: jest.fn() },
     devolucionProveedor: { create: jest.fn() },
     inventarioMaterial: { upsert: jest.fn(), updateMany: jest.fn() },
-    movimientoInventario: { createMany: jest.fn() },
+    movimientoInventario: { create: jest.fn(), createMany: jest.fn() },
+    material: { findUnique: jest.fn(), update: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   return prisma;
@@ -159,8 +160,8 @@ describe('ComprasProveedorService.registrarRecepcion', () => {
       create: { materialId: 7, cantDisponible: 100 },
       update: { cantDisponible: { increment: 100 } },
     });
-    const movs = prisma.movimientoInventario.createMany.mock.calls[0][0].data;
-    expect(movs).toEqual([
+    const mov = prisma.movimientoInventario.create.mock.calls[0][0].data;
+    expect(mov).toEqual(
       expect.objectContaining({
         tipo: 'ENTRADA',
         motivo: 'COMPRA',
@@ -169,12 +170,49 @@ describe('ComprasProveedorService.registrarRecepcion', () => {
         referencia: 'OCP-3',
         usuarioId: 1,
       }),
-    ]);
+    );
     expect(prisma.ordenCompraProveedor.update).toHaveBeenCalledWith({
       where: { id: 10 },
       data: { estado: 'PARCIAL' },
     });
     expect(res.estado).toBe('PARCIAL');
+  });
+
+  it('recepción con costo actualiza el costo promedio móvil del material', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue(ocp());
+    // El material ya tenía 100 uds a $200 (promedio previo).
+    prisma.material.findUnique.mockResolvedValue({
+      costoPromedio: 200,
+      costoBase: null,
+      inventario: { cantDisponible: 100 },
+    });
+
+    await service.registrarRecepcion(
+      10,
+      { lineas: [{ ocpLineaId: 1, cantidad: 100, costoUnitario: 300 }] },
+      user,
+    );
+
+    // 100@200 + 100@300 → promedio 250
+    expect(prisma.material.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { costoPromedio: 250 },
+    });
+    // el kardex queda valorizado
+    expect(prisma.movimientoInventario.create.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({ costoUnitario: 300 }),
+    );
+  });
+
+  it('recepción sin costo NO toca el costo promedio', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue(ocp());
+    await service.registrarRecepcion(
+      10,
+      { lineas: [{ ocpLineaId: 1, cantidad: 100 }] },
+      user,
+    );
+    expect(prisma.material.findUnique).not.toHaveBeenCalled();
+    expect(prisma.material.update).not.toHaveBeenCalled();
   });
 
   it('recepción que completa todas las líneas deja la OCP COMPLETA', async () => {

@@ -4,9 +4,14 @@ import { LineaBase } from './bom-resolver.types';
 import { aplicarOverrides } from './bom-resolver';
 import { Override } from './bom-resolver.types';
 
-function lineaFija(materialId: number, consumo: number): LineaBase {
+function lineaFija(
+  materialId: number,
+  consumo: number,
+  piezaId: number | null = null,
+): LineaBase {
   return {
     materialId,
+    piezaId,
     claseConsumo: 'FIJO',
     consumoFijo: consumo,
     consumoPorTalla: {},
@@ -429,5 +434,79 @@ describe('explotarMultinivel — detección de ciclos', () => {
     };
     const lineas: LineaBase[] = [lineaFija(300, 1), lineaFija(301, 1)];
     expect(() => explotarMultinivel(lineas, materiales, 42)).not.toThrow();
+  });
+});
+
+/**
+ * Despiece: un mismo material puede ir en varias piezas de la bota con consumos
+ * distintos (micropiel en capellada, laterales y talón). La identidad de la línea es
+ * (material, pieza), no el material a secas.
+ */
+describe('aplicarOverrides con despiece por pieza', () => {
+  const CAPELLADA = 1;
+  const LATERAL = 2;
+  const TALON = 3;
+  const MICROPIEL = 10;
+  const SINTETICO = 20;
+
+  it('NO colapsa el mismo material usado en piezas distintas', () => {
+    const base = [
+      lineaFija(MICROPIEL, 0.6, CAPELLADA),
+      lineaFija(MICROPIEL, 0.4, LATERAL),
+      lineaFija(MICROPIEL, 0.2, TALON),
+    ];
+    const r = aplicarOverrides(base, []);
+    expect(r).toHaveLength(3);
+    expect(r.map((l) => l.consumoFijo).sort()).toEqual([0.2, 0.4, 0.6]);
+  });
+
+  it('distingue la línea sin pieza de la que sí la tiene', () => {
+    const r = aplicarOverrides([lineaFija(MICROPIEL, 1), lineaFija(MICROPIEL, 0.6, CAPELLADA)], []);
+    expect(r).toHaveLength(2);
+  });
+
+  it('REMOVE de un material lo saca de todas sus piezas', () => {
+    const base = [
+      lineaFija(MICROPIEL, 0.6, CAPELLADA),
+      lineaFija(MICROPIEL, 0.4, LATERAL),
+      lineaFija(SINTETICO, 0.3, TALON),
+    ];
+    const ov: Override[] = [
+      { accion: 'REMOVE', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: null, consumoFijo: null, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r).toHaveLength(1);
+    expect(r[0].materialId).toBe(SINTETICO);
+  });
+
+  it('REPLACE cambia el material en cada pieza y conserva la pieza', () => {
+    const base = [lineaFija(MICROPIEL, 0.6, CAPELLADA), lineaFija(MICROPIEL, 0.4, LATERAL)];
+    const ov: Override[] = [
+      { accion: 'REPLACE', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: SINTETICO, consumoFijo: null, heredaCurva: true, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r).toHaveLength(2);
+    expect(r.every((l) => l.materialId === SINTETICO)).toBe(true);
+    expect(r.map((l) => l.piezaId).sort()).toEqual([CAPELLADA, LATERAL]);
+    expect(r.find((l) => l.piezaId === CAPELLADA)?.consumoFijo).toBe(0.6);
+    expect(r.find((l) => l.piezaId === LATERAL)?.consumoFijo).toBe(0.4);
+  });
+
+  it('SET_CONSUMO alcanza todas las piezas de ese material', () => {
+    const base = [lineaFija(MICROPIEL, 0.6, CAPELLADA), lineaFija(MICROPIEL, 0.4, LATERAL)];
+    const ov: Override[] = [
+      { accion: 'SET_CONSUMO', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: null, consumoFijo: 1.5, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r.every((l) => l.consumoFijo === 1.5)).toBe(true);
+    expect(r.map((l) => l.piezaId).sort()).toEqual([CAPELLADA, LATERAL]);
+  });
+
+  it('el caso del cliente: capellada en micropiel, lateral en sintético', () => {
+    const base = [lineaFija(MICROPIEL, 0.6, CAPELLADA), lineaFija(SINTETICO, 0.4, LATERAL)];
+    const r = aplicarOverrides(base, []);
+    expect(r).toHaveLength(2);
+    expect(r.find((l) => l.piezaId === CAPELLADA)?.materialId).toBe(MICROPIEL);
+    expect(r.find((l) => l.piezaId === LATERAL)?.materialId).toBe(SINTETICO);
   });
 });

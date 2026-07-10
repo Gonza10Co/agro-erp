@@ -2,11 +2,12 @@ import { Component, effect, inject, input, output, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms';
 import { ClientesApi } from '../../core/api/clientes.api';
 import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/pedidos.models';
+import { SedesClienteComponent } from './sedes-cliente.component';
 
 @Component({
   selector: 'app-cliente-form',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, SedesClienteComponent],
   template: `
     <form (ngSubmit)="guardar()">
       <div class="field">
@@ -20,6 +21,15 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
       <div class="field">
         <label class="label" for="ciudad">Ciudad</label>
         <input class="input" id="ciudad" name="ciudad" [(ngModel)]="ciudad" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="label" for="telefono">Teléfono</label>
+        <input class="input" id="telefono" name="telefono" [(ngModel)]="telefono" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label class="label" for="direccion">Dirección fiscal</label>
+        <input class="input" id="direccion" name="direccion" [(ngModel)]="direccion" autocomplete="off" />
+        <small class="hint">La de la factura. A dónde se entrega se define abajo, en las sedes.</small>
       </div>
       <div class="field">
         <label class="label" for="tipoCredito">Tipo de crédito</label>
@@ -39,6 +49,15 @@ import { Cliente, CrearClienteDto, TipoCredito } from '../../core/api/models/ped
         {{ editar() ? 'Guardar cambios' : 'Crear cliente' }}
       </button>
     </form>
+
+    <!-- Las sedes necesitan un cliente ya creado (cuelgan de su id). -->
+    @if (editar(); as c) {
+      <app-sedes-cliente [clienteId]="c.id" />
+    } @else {
+      <p style="color:var(--text-muted);font-size:var(--text-xs);margin-top:var(--sp-3)">
+        Crea el cliente y luego podrás agregarle sus sedes de entrega.
+      </p>
+    }
   `,
 })
 export class ClienteFormComponent {
@@ -50,6 +69,8 @@ export class ClienteFormComponent {
   nit = '';
   nombre = '';
   ciudad = '';
+  telefono = '';
+  direccion = '';
   tipoCredito: TipoCredito = 'CONTADO';
   cupo?: number;
   loading = signal(false);
@@ -62,6 +83,8 @@ export class ClienteFormComponent {
         this.nit = c.nit;
         this.nombre = c.nombre;
         this.ciudad = c.ciudad ?? '';
+        this.telefono = c.telefono ?? '';
+        this.direccion = c.direccion ?? '';
         this.tipoCredito = c.tipoCredito;
         this.cupo = c.cupo != null ? Number(c.cupo) : undefined;
       }
@@ -81,11 +104,20 @@ export class ClienteFormComponent {
       nit: this.nit.trim(),
       nombre: this.nombre.trim(),
       ciudad: this.ciudad.trim() || undefined,
+      telefono: this.telefono.trim() || undefined,
+      direccion: this.direccion.trim() || undefined,
       tipoCredito: this.tipoCredito,
       cupo: this.cupo,
     };
     const op = editando
-      ? this.api.actualizar(editando.id, { nombre: dto.nombre, ciudad: dto.ciudad, tipoCredito: dto.tipoCredito, cupo: dto.cupo })
+      ? this.api.actualizar(editando.id, {
+          nombre: dto.nombre,
+          ciudad: dto.ciudad,
+          telefono: dto.telefono,
+          direccion: dto.direccion,
+          tipoCredito: dto.tipoCredito,
+          cupo: dto.cupo,
+        })
       : this.api.crear(dto);
     op.subscribe({
       next: (c) => { this.loading.set(false); this.created.emit(c); },

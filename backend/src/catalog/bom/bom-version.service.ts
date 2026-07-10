@@ -57,6 +57,7 @@ export class BomVersionService {
           data: {
             bomId: bom.id,
             materialId: l.materialId,
+            piezaId: l.piezaId ?? null,
             claseConsumo: l.claseConsumo,
             consumoFijo: l.claseConsumo === 'FIJO' ? l.consumoFijo : null,
             mermaPct: l.mermaPct ?? null,

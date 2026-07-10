@@ -12,11 +12,18 @@ describe('OcService', () => {
     },
     ordenCompraLinea: { deleteMany: jest.fn() },
     ordenCompraLineaTalla: { deleteMany: jest.fn() },
+    cliente: { findUnique: jest.fn() },
+    // crear()/actualizar() consultan las sedes del cliente para resolver el destino.
+    sedeCliente: { findMany: jest.fn() },
   } as any;
   // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
   prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
   const service = new OcService(prisma);
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Por defecto, cliente sin sedes: la OC queda sin destino y no estorba a los tests viejos.
+    prisma.sedeCliente.findMany.mockResolvedValue([]);
+  });
 
   it('crear asigna el consecutivo de la secuencia y estado BORRADOR', async () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 3901n }]);
@@ -67,6 +74,51 @@ describe('OcService', () => {
     );
   });
 
+  it('crear hereda la sede principal del cliente y congela su dirección', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 4, ciudad: 'Cali', direccion: 'Bodega Sur', esPrincipal: false, activo: true },
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5 # 10-20', esPrincipal: true, activo: true },
+    ]);
+    await service.crear({
+      clienteId: 7,
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    const data = prisma.ordenCompra.create.mock.calls[0][0].data;
+    expect(data.sedeEntregaId).toBe(9);
+    expect(data.direccionDespacho).toBe('Cra 5 # 10-20, Ibagué');
+  });
+
+  it('crear rechaza una sede que no es del cliente', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5', esPrincipal: true, activo: true },
+    ]);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        sedeEntregaId: 123, // de otro cliente
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.ordenCompra.create).not.toHaveBeenCalled();
+  });
+
+  it('crear rechaza una sede inactiva del propio cliente', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.sedeCliente.findMany.mockResolvedValue([
+      { id: 9, ciudad: 'Ibagué', direccion: 'Cra 5', esPrincipal: false, activo: false },
+    ]);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        sedeEntregaId: 9,
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('confirmar lanza BadRequest con los errores de validación', async () => {
     prisma.ordenCompra.findUnique.mockResolvedValue({
       id: 1,
@@ -106,20 +158,51 @@ describe('OcService', () => {
       estado: 'CONFIRMADA',
     });
     const r = await service.confirmar(1);
-    expect(prisma.ordenCompra.update).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: { estado: 'CONFIRMADA' },
-    });
+    const arg = prisma.ordenCompra.update.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: 1 });
+    expect(arg.data.estado).toBe('CONFIRMADA');
+    // se sella la fecha de confirmación (arranca el reloj de demora)
+    expect(arg.data.fechaConfirmacion).toBeInstanceOf(Date);
     expect(r).toMatchObject({ estado: 'CONFIRMADA' });
   });
 
   it('listar devuelve las OCs ordenadas por consecutivo desc', async () => {
-    prisma.ordenCompra.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      { id: 2, estado: 'BORRADOR', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' } },
+      { id: 1, estado: 'BORRADOR', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' } },
+    ]);
     const r = await service.listar();
     expect(prisma.ordenCompra.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { consecutivo: 'desc' } }),
     );
     expect(r).toHaveLength(2);
+  });
+
+  it('listar adjunta el semáforo de demora: OC confirmada vieja → ROJO', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1,
+        estado: 'CONFIRMADA',
+        fechaConfirmacion: new Date('2000-01-01'),
+        cliente: { estadoCartera: 'AL_DIA' },
+      },
+    ]);
+    const r = await service.listar();
+    expect(r[0].estadoDemora).toBe('ROJO');
+    expect(typeof r[0].diasDemora).toBe('number');
+  });
+
+  it('listar marca "retenida por cartera" cuando el cliente está vencido', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1,
+        estado: 'CONFIRMADA',
+        fechaConfirmacion: new Date('2000-01-01'),
+        cliente: { estadoCartera: 'VENCIDO' },
+      },
+    ]);
+    const r = await service.listar();
+    expect(r[0].estadoDemora).toBe('RETENIDA_CARTERA');
   });
 
   it('obtener lanza NotFound si la OC no existe', async () => {

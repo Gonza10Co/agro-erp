@@ -83,6 +83,9 @@ button{font-family:inherit}
 
 /* ════════════════════════════ INPUTS ════════════════════════════ */
 .field{display:flex;flex-direction:column;gap:6px}
+/* Ritmo vertical en formularios de drawer: aire entre campos y antes del botón de
+   guardar. Solo en drawers: en las páginas los grids ya separan con su propio gap. */
+.drawer-body .field:not(:last-child){margin-bottom:var(--sp-4)}
 .label{font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--text-muted)}
 .label .req{color:var(--error)}
 .hint{font-size:var(--text-micro);color:var(--text-subtle)}

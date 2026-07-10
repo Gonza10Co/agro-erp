@@ -37,6 +37,8 @@ export interface MaterialItem {
 export interface BomLineaTallaData { tallaId: number; consumo: number | string; }
 export interface BomLineaData {
   id: number; materialId: number; claseConsumo: 'CURVA' | 'FIJO';
+  /** Pieza del despiece; null = el material va a la bota completa. */
+  piezaId?: number | null;
   consumoFijo: number | string | null; mermaPct: number | string | null;
   lineasTalla: BomLineaTallaData[];
 }
@@ -45,6 +47,7 @@ export interface BomVersionData {
 }
 export interface BomLineaInput {
   materialId: number; claseConsumo: 'CURVA' | 'FIJO';
+  piezaId?: number;
   consumoFijo?: number; mermaPct?: number;
   tallas?: { tallaId: number; consumo: number }[];
 }

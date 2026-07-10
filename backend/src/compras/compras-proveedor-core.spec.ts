@@ -1,4 +1,5 @@
 import {
+  costoPromedioMovil,
   estadoOcp,
   validarRecepcion,
   validarDevolucion,
@@ -91,6 +92,26 @@ describe('validarRecepcion', () => {
     expect(validarRecepcion(lineasOcp, [{ ocpLineaId: 2, cantidad: 1 }])).toMatch(
       /pendiente/i,
     );
+  });
+});
+
+describe('costoPromedioMovil', () => {
+  it('sin stock previo, el promedio es el costo de la entrada', () => {
+    expect(costoPromedioMovil(0, 0, 100, 250)).toBe(250);
+  });
+
+  it('pondera el costo previo con el de la entrada', () => {
+    // 100 uds a $200 + 100 uds a $300 → $250
+    expect(costoPromedioMovil(100, 200, 100, 300)).toBe(250);
+  });
+
+  it('el peso es proporcional a las cantidades', () => {
+    // 300 uds a $100 + 100 uds a $500 → (30000 + 50000)/400 = $200
+    expect(costoPromedioMovil(300, 100, 100, 500)).toBe(200);
+  });
+
+  it('si el stock resultante es 0, cae al costo de la entrada (borde)', () => {
+    expect(costoPromedioMovil(-100, 100, 100, 400)).toBe(400);
   });
 });
 

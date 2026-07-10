@@ -110,6 +110,9 @@ export class DespachoService {
         data: {
           consecutivo,
           opId: op.id,
+          // Destino sellado en el remito. La OC ya congeló su dirección al crearse
+          // (de la sede elegida o de la principal), así que acá solo se copia.
+          direccionEntrega: op.oc.direccionDespacho ?? null,
           autorizadoPorId: bloqueada ? user.sub : null,
           motivoAutorizacion: bloqueada ? (dto.motivo ?? null) : null,
           lineas: { create: lineas },
@@ -135,6 +138,7 @@ export class DespachoService {
         id: true,
         consecutivo: true,
         fecha: true,
+        direccionEntrega: true,
         autorizadoPorId: true,
         factura: { select: { id: true, consecutivo: true } },
         op: {

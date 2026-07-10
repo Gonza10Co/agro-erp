@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { OcDetalleComponent } from './oc-detalle.component';
 import { PedidosApi } from '../../../core/api/pedidos.api';
@@ -15,16 +17,17 @@ const OC_BORRADOR = {
 };
 
 describe('OcDetalleComponent', () => {
-  let apiMock: { obtenerOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy };
+  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy };
   function setup(ocId = 7) {
     apiMock = {
       obtenerOC: jasmine.createSpy('obtenerOC').and.returnValue(of(OC_BORRADOR)),
+      obtenerCosteoOC: jasmine.createSpy('obtenerCosteoOC').and.returnValue(of(null)),
       confirmarOC: jasmine.createSpy('confirmarOC').and.returnValue(of({ id: 7, estado: 'CONFIRMADA' })),
       generarOP: jasmine.createSpy('generarOP').and.returnValue(of({ id: 50, consecutivo: 1 })),
     };
     TestBed.configureTestingModule({
       imports: [OcDetalleComponent],
-      providers: [{ provide: PedidosApi, useValue: apiMock }, provideRouter([])],
+      providers: [{ provide: PedidosApi, useValue: apiMock }, provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(OcDetalleComponent);
     fixture.componentRef.setInput('ocId', ocId);

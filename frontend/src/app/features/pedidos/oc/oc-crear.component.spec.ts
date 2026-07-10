@@ -39,7 +39,7 @@ describe('OcCrearComponent', () => {
     c.crear();
     const req = http.expectOne('http://localhost:3001/pedidos/oc');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ clienteId: 3, ocCliente: undefined, observaciones: undefined, lineas: [{ productoConfiguradoId: 7, precioUnitario: 85000, tallas: [{ tallaId: 1, cantidad: 12 }] }] });
+    expect(req.request.body).toEqual({ clienteId: 3, ocCliente: undefined, observaciones: undefined, direccionDespacho: undefined, lineas: [{ productoConfiguradoId: 7, precioUnitario: 85000, tallas: [{ tallaId: 1, cantidad: 12 }] }] });
     req.flush({ id: 1, consecutivo: 1, estado: 'BORRADOR' });
     http.verify();
   });

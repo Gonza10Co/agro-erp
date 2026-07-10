@@ -99,6 +99,27 @@ describe('ShellComponent', () => {
     expect(text).toContain('Reporte diario');
   });
 
+  it('un rol STAGE ve lo del cliente + la próxima entrega (Compras), pero no los módulos internos', () => {
+    const payload = btoa(JSON.stringify({ sub: 7, username: 'stage', role: 'STAGE' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    TestBed.configureTestingModule({
+      imports: [ShellComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(ShellComponent);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    // lo del cliente + la próxima entrega
+    expect(text).toContain('Órdenes de Compra');
+    expect(text).toContain('Clientes');
+    expect(text).toContain('Compras');
+    expect(text).toContain('Stage');
+    // internos ocultos
+    expect(text).not.toContain('Inicio');
+    expect(text).not.toContain('Facturas');
+    expect(text).not.toContain('Reporte diario');
+  });
+
   it('arranca colapsada si la preferencia guardada es "colapsada"', () => {
     localStorage.setItem('agro-sidebar', 'colapsada');
     TestBed.configureTestingModule({
