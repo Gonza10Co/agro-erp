@@ -121,8 +121,10 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 
 ## 🔨 EN CURSO
 
-- **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — falta **deploy** (migraciones
-  aditivas, seguras en prod; correr `seed:costos`, `seed:piezas` y re-seed del BOM) y la demo.
+- **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — **desplegada a prod
+  2026-07-09** (tag `entrega-2`): migraciones aplicadas, seeds corridos (rol STAGE, 15 piezas,
+  BOM ×6 con despiece, 296 costos, 3 sedes) y `fechaConfirmacion` retro-sellada en 8 OCs
+  (semáforo verificado vivo: 2 ROJO/1 AMARILLO). Falta solo la **demo** al cliente.
 - **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · ¿la GRUESA de
   cordón cuenta cordones o pares? · lista de materiales FIJOS de la 106 (hilos/marquilla/caja).
 
