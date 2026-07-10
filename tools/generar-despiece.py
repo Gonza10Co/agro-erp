@@ -33,8 +33,10 @@ FILA_TALLAS = 3
 COL_INI = 3  # columna C
 GRISES = {"FFCCCCCC", "FFB7B7B7"}
 
-# Referencias y variantes que el cliente todavía no confirma (2026-07-09).
-REFS_EXCLUIDAS = {"106"}
+# Variantes que el cliente todavía no confirma cómo modelar (ECONOMICA y S/P van como
+# variantes elegidas al pedir → overrides por (material, pieza), entrega siguiente).
+# La 106 = RESORTADA quedó confirmada el 2026-07-09.
+REFS_EXCLUIDAS: set[str] = set()
 PREFIJOS_EXCLUIDOS = ("ECONOMICA",)
 
 # Sufijo del nombre -> código de la pieza en el catálogo `Pieza`.
