@@ -5,7 +5,9 @@ module.exports = {
   testMatch: ['<rootDir>/src/**/*.spec.ts'],
   transform: {
     '^.+\\.(t|j)s$': [
-      'ts-jest',
+      // require.resolve: el resolver de jest en el runner de CI (Linux) no
+      // encontraba el paquete hoisted en la raíz del monorepo; Node sí.
+      require.resolve('ts-jest'),
       {
         tsconfig: {
           module: 'commonjs',

@@ -14,7 +14,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: el postinstall del esbuild anidado (vite, 0.25.x) valida
+      # contra el binario hoisted (0.28.x) y revienta npm ci en Linux. Nada de acá
+      # depende de postinstalls: prisma generate va explícito, argon2 trae prebuilds
+      # y esbuild resuelve su binario vía @esbuild/* (optionalDependencies).
+      - run: npm ci --ignore-scripts
       - run: npx prisma generate
         working-directory: backend
       - run: npm run build --workspace backend
@@ -30,6 +34,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # Mismo --ignore-scripts que el job backend (ver comentario arriba).
+      - run: npm ci --ignore-scripts
       - run: npm run build --workspace frontend
       - run: npm test --workspace frontend -- --watch=false --browsers=ChromeHeadless
