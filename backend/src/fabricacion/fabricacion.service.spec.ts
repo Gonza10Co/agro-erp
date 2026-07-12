@@ -147,6 +147,25 @@ describe('FabricacionService.generarOF', () => {
   });
 });
 
+describe('FabricacionService.obtenerOF', () => {
+  it('trae por par el producto y la línea (datos de la etiqueta física)', async () => {
+    const { prisma } = makePrisma({
+      root: { ordenFabricacion: { findUnique: jest.fn().mockResolvedValue({ id: 1, pares: [] }) } },
+    });
+    await new FabricacionService(prisma).obtenerOF(1);
+    const select = prisma.ordenFabricacion.findUnique.mock.calls[0][0].include.pares.select;
+    expect(select.productoConfigurado).toEqual({ select: { codigo: true, nombreComercial: true } });
+    expect(select.linea).toEqual({ select: { codigo: true, nombre: true } });
+  });
+
+  it('404 si la OF no existe', async () => {
+    const { prisma } = makePrisma({
+      root: { ordenFabricacion: { findUnique: jest.fn().mockResolvedValue(null) } },
+    });
+    await expect(new FabricacionService(prisma).obtenerOF(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
 describe('FabricacionService.avanzar', () => {
   const dto = { operarioId: 3, maquinaId: 4 };
 

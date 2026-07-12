@@ -21,6 +21,25 @@ export interface OFListItem {
   _count: { pares: number };
 }
 
+export interface OFDetallePar {
+  id: number;
+  codigo: string;
+  celulaActual: Celula;
+  estado: EstadoPar;
+  talla: { valor: string };
+  productoConfigurado: { codigo: string; nombreComercial: string } | null;
+  linea: { codigo: string; nombre: string } | null;
+}
+
+export interface OFDetalle {
+  id: number;
+  consecutivo: number;
+  estado: EstadoOF;
+  fecha: string;
+  op: { consecutivo: number };
+  pares: OFDetallePar[];
+}
+
 export interface ParTablero {
   id: number;
   codigo: string;

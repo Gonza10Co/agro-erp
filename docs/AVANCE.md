@@ -137,6 +137,14 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
   nativo de jest 30) → jest no resolvía ningún módulo en el runner; entrada agregada a mano al
   lock. ⚠️ Si se regenera el lock en Windows, npm borra esa entrada — re-agregarla (ver commit
   `766d318`). Ambos jobs verdes; fix mergeado a `master`.
+- **Etiquetas de código de barras por OF** ✅ 2026-07-12 (módulo fabricación = INTERNO; **sin
+  entrega asignada aún**) — botón «Etiquetas» en el listado de OF: PDF hoja carta adhesiva 3×8
+  (etiquetas de 66×32 mm) con Code128 + código legible + producto · talla · línea por cada par
+  activo (excluye bajas/cancelados). jsPDF + jsbarcode con import dinámico (patrón proforma);
+  `obtenerOF` ahora trae producto y línea por par. Verificado E2E en navegador (PDF real
+  revisado: 3 pares Feroz OK). El lector físico opera en modo teclado contra la pantalla de
+  operario existente (input con autofocus) — falta solo comprar lectores y decidir con el
+  cliente dónde vive la etiqueta (canastilla/lote) y el código máster por caja (empaque).
 - **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · lista de
   materiales FIJOS de la 106 (hilos/marquilla/caja) · **datos de emisor de Basarili/Agro/Alta**
   (razón social, NIT, cuenta) para que sus proformas salgan con membrete propio.

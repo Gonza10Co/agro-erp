@@ -223,6 +223,9 @@ export class FabricacionService {
             celulaActual: true,
             estado: true,
             talla: { select: { valor: true } },
+            // Para las etiquetas físicas: qué es el par y por qué línea se fabrica.
+            productoConfigurado: { select: { codigo: true, nombreComercial: true } },
+            linea: { select: { codigo: true, nombre: true } },
           },
         },
       },

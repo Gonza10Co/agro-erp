@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import { OFListItem } from '../../core/api/models/fabricacion.models';
+import { descargarEtiquetasPdf } from './of-etiquetas-pdf';
 
 @Component({
   selector: 'app-of-list',
@@ -26,7 +27,12 @@ import { OFListItem } from '../../core/api/models/fabricacion.models';
                   <td>{{ o._count.pares }}</td>
                   <td><span class="badge" [class.badge-accent]="o.estado === 'TERMINADA'">{{ o.estado }}</span></td>
                   <td>{{ o.fecha | date:'dd MMM y' }}</td>
-                  <td><a class="btn btn-sm" [routerLink]="['/fabricacion/tablero']" [queryParams]="{ ofId: o.id }">Ver tablero</a></td>
+                  <td style="display:flex;gap:var(--sp-2)">
+                    <a class="btn btn-sm" [routerLink]="['/fabricacion/tablero']" [queryParams]="{ ofId: o.id }">Ver tablero</a>
+                    <button class="btn btn-sm" type="button" [disabled]="descargando() === o.id" (click)="imprimirEtiquetas(o)">
+                      {{ descargando() === o.id ? 'Generando…' : 'Etiquetas' }}
+                    </button>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -49,11 +55,25 @@ export class OfListComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   ofs = signal<OFListItem[]>([]);
   error = signal<string | null>(null);
+  // id de la OF cuyas etiquetas se están generando (deshabilita solo ese botón).
+  descargando = signal<number | null>(null);
 
   ngOnInit(): void {
     this.api.listarOF().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (o) => this.ofs.set(o),
       error: () => this.error.set('No se pudo cargar las órdenes de fabricación. Intentá de nuevo.'),
+    });
+  }
+
+  /** PDF de etiquetas adhesivas (Code128 por par) para pegar en la canastilla/lote. */
+  imprimirEtiquetas(o: OFListItem): void {
+    if (this.descargando() !== null) return;
+    this.descargando.set(o.id);
+    this.api.obtenerOF(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (of) => {
+        void descargarEtiquetasPdf(of).finally(() => this.descargando.set(null));
+      },
+      error: () => this.descargando.set(null), // el toast global ya avisa del HTTP
     });
   }
 }
