@@ -161,9 +161,9 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 - [x] **Capturar consumos de BOM** ✅ 2026-07-09 — cargados los consumos REALES con curva por talla y despiece (refs 101-106) desde `CONSUMOSXREFERENCIA`; los 16 bloques sin prueba industrial (celda blanca) quedaron en cero a la espera del cliente.
 - [ ] **ABM de usuarios** (diferido) — hoy operan con usuarios sembrados; falta pantalla para que el cliente cree sus operarios/gerentes.
 
-### 3) Git — `develop` muy adelantado vs `master`
-- [ ] Tags presentes: **solo `demo-1` y `demo-13`**. Faltan/verificar: `demo-9`, `demo-10`, `demo-11`, `demo-12`, `demo-14`.
-- [ ] Varias demos sin merge `--no-ff` confirmado a `master`. Poner al día merges + tags.
+### 3) Git — higiene de tags y merges
+- [x] **Tags al día** ✅ 2026-07-12 — creados `demo-9` (ed05bb2), `demo-10` (f7af48d), `demo-11` (40a4ab6), `demo-12` (9ff9fad) sobre el commit de cierre de cada demo en `develop` (entraron a `master` en bloque con la 13, sin merge propio) y `demo-14` (a97b4b9, el merge que la llevó a `master`, mismo patrón que `demo-13`). Ya existían: `demo-1`, `demo-13`, `nucleo-real`, `entrega-1`, `entrega-1.1`, `entrega-2`.
+- [x] **Merges verificados** ✅ 2026-07-12 — `master` contiene todo `develop` (las demos 2-12 entraron en los merges en bloque; no hay nada sin mergear). Regla vigente: cada entrega/demo nueva sí lleva su merge `--no-ff` + tag.
 
 ### 4) Deudas técnicas menores (anotadas, no bloquean)
 - [ ] `op-detalle` muestra flash de skeleton al recargar tras Anular.
