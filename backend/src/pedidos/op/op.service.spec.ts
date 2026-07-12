@@ -41,6 +41,24 @@ describe('OpService.generarDesdeOC', () => {
     );
   });
 
+  it('la OP hereda la línea de producción de la OC (línea por pedido)', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({
+      id: 1,
+      estado: 'CONFIRMADA',
+      lineaId: 4,
+      lineas: [],
+    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'AMARRADA' });
+
+    await new OpService(prisma).generarDesdeOC(1);
+
+    expect(tx.ordenProduccion.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ lineaId: 4 }) }),
+    );
+  });
+
   it('amarra stock disponible y reserva; calcula a producir', async () => {
     prisma.ordenCompra.findUnique.mockResolvedValue({
       id: 1,

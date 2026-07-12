@@ -37,6 +37,9 @@ interface LineaEdit {
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Entrega en</span><span class="v">{{ o.direccionDespacho || '—' }}</span></div>
+        @if (puedeVerLinea) {
+          <div class="kv"><span class="k">Línea de producción</span><span class="v">{{ o.linea?.nombre || '—' }}</span></div>
+        }
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge {{ badge(o).clase }}"><span class="dot"></span>{{ badge(o).label }}</span></span></div>
         @if (o.ordenProduccion; as op) {
           <div class="kv"><span class="k">Orden de producción</span><span class="v">OP #{{ op.consecutivo }} <span class="badge {{ badgeOp(op.estado).clase }}"><span class="dot"></span>{{ badgeOp(op.estado).label }}</span></span></div>
@@ -173,6 +176,8 @@ export class OcDetalleComponent implements OnInit {
   readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
   // Cotización/proforma y eliminar borrador: nuevos de esta entrega, mismos gates.
   readonly puedeVerProforma = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Línea por pedido: sección EN_STAGE hasta liberarla al cliente.
+  readonly puedeVerLinea = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
   cargando = signal(true);
   accion = signal(false);
   error = signal('');

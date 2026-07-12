@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, ParseIntPipe, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ReportesService } from './reportes.service';
 import { GuardarMetasDto } from './dto/guardar-metas.dto';
@@ -17,20 +17,33 @@ export class ReportesController {
   constructor(private readonly service: ReportesService) {}
 
   @Get('diario')
-  diario(@Query('anio') anio?: string, @Query('mes') mes?: string) {
+  diario(
+    @Query('anio') anio?: string,
+    @Query('mes') mes?: string,
+    @Query('lineaId', new ParseIntPipe({ optional: true })) lineaId?: number,
+  ) {
     const p = periodo(anio, mes);
-    return this.service.diario(p.anio, p.mes);
+    return this.service.diario(p.anio, p.mes, lineaId);
   }
 
   @Get('metas')
-  metas(@Query('anio') anio?: string, @Query('mes') mes?: string) {
+  metas(
+    @Query('anio') anio?: string,
+    @Query('mes') mes?: string,
+    @Query('lineaId', new ParseIntPipe({ optional: true })) lineaId?: number,
+  ) {
     const p = periodo(anio, mes);
-    return this.service.listarMetas(p.anio, p.mes);
+    return this.service.listarMetas(p.anio, p.mes, lineaId);
   }
 
   @Put('metas')
-  guardarMetas(@Body() dto: GuardarMetasDto, @Query('anio') anio?: string, @Query('mes') mes?: string) {
+  guardarMetas(
+    @Body() dto: GuardarMetasDto,
+    @Query('anio') anio?: string,
+    @Query('mes') mes?: string,
+    @Query('lineaId', new ParseIntPipe({ optional: true })) lineaId?: number,
+  ) {
     const p = periodo(anio, mes);
-    return this.service.guardarMetas(p.anio, p.mes, dto.items);
+    return this.service.guardarMetas(p.anio, p.mes, dto.items, lineaId);
   }
 }

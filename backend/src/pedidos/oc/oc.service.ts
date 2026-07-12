@@ -25,6 +25,7 @@ export class OcService {
         dto.clienteId,
         dto,
       );
+      const lineaId = await this.resolverLinea(tx, dto.lineaId);
       return tx.ordenCompra.create({
         data: {
           consecutivo,
@@ -33,6 +34,7 @@ export class OcService {
           observaciones: dto.observaciones,
           sedeEntregaId,
           direccionDespacho,
+          lineaId,
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -70,6 +72,8 @@ export class OcService {
         dto.clienteId,
         dto,
       );
+      // undefined no toca la línea: la edición actual del drawer no la reenvía.
+      const lineaId = await this.resolverLinea(tx, dto.lineaId);
       return tx.ordenCompra.update({
         where: { id },
         data: {
@@ -78,6 +82,7 @@ export class OcService {
           observaciones: dto.observaciones,
           sedeEntregaId,
           direccionDespacho,
+          lineaId,
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
@@ -111,6 +116,21 @@ export class OcService {
       await tx.ordenCompraLinea.deleteMany({ where: { ocId: id } });
       await tx.ordenCompra.delete({ where: { id } });
     });
+  }
+
+  /**
+   * Línea de producción del pedido (línea por pedido: el mapeo marca→línea no es
+   * fijo). Una línea elegida a mano tiene que existir y estar activa.
+   */
+  private async resolverLinea(
+    tx: Pick<PrismaService, 'linea'>,
+    lineaId?: number,
+  ): Promise<number | undefined> {
+    if (lineaId == null) return undefined;
+    const linea = await tx.linea.findFirst({ where: { id: lineaId, activo: true } });
+    if (!linea)
+      throw new BadRequestException(`La línea ${lineaId} no existe o está inactiva`);
+    return lineaId;
   }
 
   /**
@@ -187,6 +207,7 @@ export class OcService {
       orderBy: { consecutivo: 'desc' },
       include: {
         cliente: { select: { id: true, nit: true, nombre: true, estadoCartera: true } },
+        linea: { select: { id: true, codigo: true, nombre: true } },
         ordenProduccion: {
           select: { id: true, consecutivo: true, estado: true },
         },
@@ -206,6 +227,7 @@ export class OcService {
       where: { id },
       include: {
         cliente: true,
+        linea: { select: { id: true, codigo: true, nombre: true } },
         ordenProduccion: {
           select: { id: true, consecutivo: true, estado: true },
         },

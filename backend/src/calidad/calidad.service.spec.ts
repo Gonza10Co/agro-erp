@@ -196,6 +196,24 @@ describe('CalidadService.reportar — BAJA', () => {
     );
   });
 
+  it('la reposición hereda la línea del propio par (línea por pedido) sobre la de la marca', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      ...parEnProceso,
+      lineaId: 4,
+      linea: { celulaInicial: 'INYECCION' },
+      // La marca apunta a otra línea: debe perder contra la denormalizada en el par.
+      productoConfigurado: { marca: { lineaId: 1, linea: { celulaInicial: 'CORTE' } } },
+    });
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null, lineaId: 4 }),
+      }),
+    );
+  });
+
   it('la reposición de un par de línea Feroz re-arranca en INYECCION, no en CORTE', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({

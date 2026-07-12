@@ -64,6 +64,9 @@ export interface OrdenCompra {
   sedeEntrega?: SedeCliente | null;
   /** Snapshot congelado al crear la OC; no se relee de la sede. */
   direccionDespacho?: string | null;
+  /** Línea de producción del pedido (se decide por pedido, no por marca). */
+  lineaId?: number | null;
+  linea?: { id: number; codigo: string; nombre: string } | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
   // Semáforo de demora calculado por el backend en el listado (no se persiste).
@@ -114,7 +117,7 @@ export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string;
 export interface CrearSedeDto { nombre: string; ciudad: string; direccion: string; telefono?: string; esPrincipal?: boolean; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
-export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineas: CrearOCLineaDto[]; }
+export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineaId?: number; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
 export interface DespachoListItem {

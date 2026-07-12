@@ -34,6 +34,18 @@ describe('oc-crear.util', () => {
     const dto = construirDto({ clienteId: 3, lineas });
     expect(dto.lineas[0].precioUnitario).toBeUndefined();
   });
+
+  it('construirDto incluye la línea de producción elegida (línea por pedido)', () => {
+    const lineas: LineaWizard[] = [{ producto: PROD, precio: 85000, valores: { 2: 10 } }];
+    const dto = construirDto({ clienteId: 3, lineaId: 4, lineas });
+    expect(dto.lineaId).toBe(4);
+  });
+
+  it('construirDto sin línea elegida no manda la clave lineaId', () => {
+    const lineas: LineaWizard[] = [{ producto: PROD, precio: 85000, valores: { 2: 10 } }];
+    const dto = construirDto({ clienteId: 3, lineaId: null, lineas });
+    expect('lineaId' in dto).toBe(false);
+  });
 });
 
 describe('destinoAlEditar', () => {

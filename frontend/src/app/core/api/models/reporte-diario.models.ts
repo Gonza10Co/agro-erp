@@ -45,6 +45,8 @@ export interface ReporteDiario {
   metas: BloqueMetas;
   kardexPT: FilaKardexPT[];
   pendientes: string[];
+  /** Línea filtrada (null = toda la fábrica). Con línea, el kardex PT va vacío. */
+  lineaId?: number | null;
 }
 
 export type TipoMeta = 'GUARNICION' | 'INYECCION' | 'FACTURACION_PARES' | 'FACTURACION_VALOR';

@@ -5,7 +5,7 @@ describe('ReportesService', () => {
     eventoTrazabilidad: { findMany: jest.fn() },
     factura: { findMany: jest.fn() },
     movimientoInventario: { findMany: jest.fn(), groupBy: jest.fn() },
-    meta: { findMany: jest.fn(), upsert: jest.fn() },
+    meta: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
   };
   const service = new ReportesService(prisma);
   beforeEach(() => jest.clearAllMocks());
@@ -61,21 +61,62 @@ describe('ReportesService', () => {
       expect(rep.acumulado.troquelado).toBe(0);
       expect(rep.kardexPT[0].saldoInicial).toBe(0);
       expect(rep.metas.guarnicion.pct).toBe(0);
+      // Sin filtro: metas globales (lineaId NULL) y sin marca de línea en el response.
+      expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBeNull();
+      expect(rep.lineaId).toBeNull();
+    });
+
+    it('filtrado por línea: eventos por par, facturas por OP y kardex PT honesto (vacío)', async () => {
+      prisma.eventoTrazabilidad.findMany.mockResolvedValue([]);
+      prisma.factura.findMany.mockResolvedValue([]);
+      prisma.meta.findMany.mockResolvedValue([]);
+
+      const rep = await service.diario(2026, 6, 4);
+
+      // La línea baja al where de cada consulta segmentable.
+      expect(prisma.eventoTrazabilidad.findMany.mock.calls[0][0].where.par).toEqual({ lineaId: 4 });
+      expect(prisma.factura.findMany.mock.calls[0][0].where.despacho).toEqual({ op: { lineaId: 4 } });
+      expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBe(4);
+      // El stock de bodega PT no conoce la línea: no se consulta ni se inventa.
+      expect(prisma.movimientoInventario.findMany).not.toHaveBeenCalled();
+      expect(prisma.movimientoInventario.groupBy).not.toHaveBeenCalled();
+      expect(rep.kardexPT[0].saldoInicial).toBe(0);
+      expect(rep.lineaId).toBe(4);
     });
   });
 
   describe('guardarMetas', () => {
-    it('hace upsert por cada meta recibida', async () => {
-      prisma.meta.upsert.mockResolvedValue({});
+    it('crea la meta si no existe y actualiza si existe (upsert a mano)', async () => {
+      prisma.meta.findFirst
+        .mockResolvedValueOnce(null) // GUARNICION: no existe → create
+        .mockResolvedValueOnce({ id: 77 }); // INYECCION: existe → update
       prisma.meta.findMany.mockResolvedValue([]);
       await service.guardarMetas(2026, 6, [
         { tipo: 'GUARNICION', valor: 20160 },
         { tipo: 'INYECCION', valor: 20160 },
       ]);
-      expect(prisma.meta.upsert).toHaveBeenCalledTimes(2);
-      const arg = prisma.meta.upsert.mock.calls[0][0];
-      expect(arg.where.anio_mes_tipo).toEqual({ anio: 2026, mes: 6, tipo: 'GUARNICION' });
-      expect(arg.create.valor).toBe(20160);
+      expect(prisma.meta.create).toHaveBeenCalledWith({
+        data: { anio: 2026, mes: 6, tipo: 'GUARNICION', valor: 20160, lineaId: null },
+      });
+      expect(prisma.meta.update).toHaveBeenCalledWith({
+        where: { id: 77 },
+        data: { valor: 20160 },
+      });
+    });
+
+    it('con línea guarda la meta de esa línea, no la global', async () => {
+      prisma.meta.findFirst.mockResolvedValue(null);
+      prisma.meta.findMany.mockResolvedValue([]);
+      await service.guardarMetas(2026, 6, [{ tipo: 'INYECCION', valor: 5000 }], 4);
+      expect(prisma.meta.findFirst).toHaveBeenCalledWith({
+        where: { anio: 2026, mes: 6, tipo: 'INYECCION', lineaId: 4 },
+      });
+      expect(prisma.meta.create).toHaveBeenCalledWith({
+        data: { anio: 2026, mes: 6, tipo: 'INYECCION', valor: 5000, lineaId: 4 },
+      });
+      expect(prisma.meta.findMany).toHaveBeenCalledWith({
+        where: { anio: 2026, mes: 6, lineaId: 4 },
+      });
     });
   });
 });

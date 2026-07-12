@@ -5,6 +5,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ClientesApi } from '../../../core/api/clientes.api';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
+import { LineasApi, Linea } from '../../../core/api/lineas.api';
+import { AuthService } from '../../../core/auth/auth.service';
+import { puedeVerNivel } from '../../../core/auth/modulos';
 import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
@@ -62,6 +65,19 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
               <p class="cell-sub" style="margin-top:var(--sp-2)">Entrega puntual: no queda amarrada a una sede del cliente.</p>
             }
           </div>
+          <!-- Línea por pedido (EN_STAGE): el mapeo marca→línea no es fijo, se decide acá. -->
+          @if (puedeElegirLinea) {
+            <div style="margin-top:var(--sp-4)">
+              <label class="label">Línea de producción <span style="color:var(--accent)">*</span></label>
+              <select class="input" [ngModel]="lineaProdId()" (ngModelChange)="lineaProdId.set($event)">
+                <option [ngValue]="null">— Elegir línea —</option>
+                @for (l of lineasProduccion(); track l.id) {
+                  <option [ngValue]="l.id">{{ l.nombre }}</option>
+                }
+              </select>
+              <p class="cell-sub" style="margin-top:var(--sp-2)">Por qué línea se fabrica este pedido; la producción y los reportes se segmentan por acá.</p>
+            </div>
+          }
         }
 
         <!-- PASO 1: PRODUCTOS -->
@@ -101,6 +117,9 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
           <div class="panel-title">Revisar</div>
           <div class="kv"><span class="k">Cliente</span><span class="v">{{ clienteSel()?.nombre }}</span></div>
           <div class="kv"><span class="k">Entrega en</span><span class="v">{{ destinoResumen() }}</span></div>
+          @if (puedeElegirLinea) {
+            <div class="kv"><span class="k">Línea de producción</span><span class="v">{{ lineaResumen() }}</span></div>
+          }
           @for (l of lineas(); track l.producto.id) {
             <div class="kv" style="margin-top:var(--sp-3)">
               <span class="v"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares × {{ moneda(l.precio) }}</span>
@@ -145,8 +164,13 @@ export class OcCrearComponent implements OnInit {
   private readonly clientesApi = inject(ClientesApi);
   private readonly pedidosApi = inject(PedidosApi);
   private readonly catalogoApi = inject(CatalogoApi);
+  private readonly lineasApi = inject(LineasApi);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  // Línea por pedido: sección EN_STAGE — el cliente no la ve hasta liberarla.
+  readonly puedeElegirLinea = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
 
   pasosLabels = ['Cliente', 'Productos', 'Curva de tallas', 'Revisar'];
 
@@ -161,6 +185,8 @@ export class OcCrearComponent implements OnInit {
   // null = "Otra dirección…": el usuario escribe una entrega puntual a mano.
   sedeEntregaId = signal<number | null>(null);
   direccionDespacho = signal('');
+  lineasProduccion = signal<Linea[]>([]);
+  lineaProdId = signal<number | null>(null);
   lineas = signal<LineaWizard[]>([]);
   paso = signal<0 | 1 | 2 | 3>(0);
   enviando = signal(false);
@@ -210,6 +236,14 @@ export class OcCrearComponent implements OnInit {
     this.clientesApi.listar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((c) => this.clientes.set(c));
     this.catalogoApi.listarProductos().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => this.productos.set(p));
     this.catalogoApi.listarTallas().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((t) => this.tallas.set(t));
+    if (this.puedeElegirLinea) {
+      this.lineasApi.listar().pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((ls) => this.lineasProduccion.set(ls.filter((l) => l.activo)));
+    }
+  }
+
+  lineaResumen(): string {
+    return this.lineasProduccion().find((l) => l.id === this.lineaProdId())?.nombre ?? '—';
   }
 
   tallasDe(p: ProductoConfiguradoFull): Talla[] { return tallasDeProducto(p, this.tallas()); }
@@ -231,7 +265,8 @@ export class OcCrearComponent implements OnInit {
 
   pasoValido(): boolean {
     switch (this.paso()) {
-      case 0: return this.clienteSel() !== null;
+      // Quien ve el selector de línea debe elegirla: el reporte por línea depende de esto.
+      case 0: return this.clienteSel() !== null && (!this.puedeElegirLinea || this.lineaProdId() !== null);
       case 1: return this.lineas().length >= 1;
       case 2: return this.lineas().every((l) => totalCurva(l.valores) > 0 && l.precio > 0);
       default: return this.lineas().length >= 1 && this.clienteSel() !== null;
@@ -245,7 +280,7 @@ export class OcCrearComponent implements OnInit {
     const cl = this.clienteSel();
     if (!cl || this.enviando() || !this.pasoValido()) return;
     this.enviando.set(true); this.error.set('');
-    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineas: this.lineas() });
+    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
       error: (e) => { this.enviando.set(false); this.error.set(this.msg(e)); },
