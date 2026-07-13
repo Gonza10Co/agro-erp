@@ -137,6 +137,15 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
   nativo de jest 30) → jest no resolvía ningún módulo en el runner; entrada agregada a mano al
   lock. ⚠️ Si se regenera el lock en Windows, npm borra esa entrada — re-agregarla (ver commit
   `766d318`). Ambos jobs verdes; fix mergeado a `master`.
+- **Entrega 3 DESPLEGADA A PROD** ✅ 2026-07-13 (merge `af3066b`, CI verde, sin tag — deploy
+  intermedio): Railway aplicó `linea_por_pedido` + `metas_por_linea` y Vercel quedó Ready.
+  `seed:demo` corrido contra la DB pública: producción del mes repartida en 4 líneas
+  (⚠️ en prod FEROZ=id 4, en local=12 — siempre resolver por `codigo`) y metas por línea.
+  **Verificado vivo en prod** (`/reportes/diario?lineaId`): global 88.9%/98.8%/84.3%,
+  Basarili facturación 59.5% (bajo meta), Alta 148.8% (sobre meta), Feroz solo inyección
+  98.8% y facturación 0 (servicio aparte, sin modelar). Cero spoilers: selector de línea
+  gateado EN_STAGE y `reportes`/`fabricacion` no visibles para CLIENTE. Falta: liberar el
+  gate el día de la demo que lo muestre.
 - **Etiquetas de código de barras por OF** ✅ 2026-07-12 (módulo fabricación = INTERNO; **sin
   entrega asignada aún**) — botón «Etiquetas» en el listado de OF: PDF hoja carta adhesiva 3×8
   (etiquetas de 66×32 mm) con Code128 + código legible + producto · talla · línea por cada par
