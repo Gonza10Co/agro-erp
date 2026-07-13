@@ -117,6 +117,25 @@ describe('FabricacionService.generarOF', () => {
     expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.subPasoActual === null && p.lineaId === 4)).toBe(true);
   });
 
+  it('la línea de la OP (línea por pedido) manda sobre la de la marca', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineaId: 4, linea: { celulaInicial: 'INYECCION' },
+      lineas: [
+        {
+          productoConfiguradoId: 10,
+          // La marca apunta a otra línea: debe perder contra la del pedido.
+          productoConfigurado: { marca: { lineaId: 1, linea: { celulaInicial: 'CORTE' } } },
+          tallas: [{ tallaId: 1, cantAProducir: 2 }],
+        },
+      ],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    const data = tx.par.createMany.mock.calls[0][0].data;
+    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.lineaId === 4)).toBe(true);
+  });
+
   it('sin línea asignada los pares siguen arrancando en CORTE (cero regresión)', async () => {
     const { prisma, tx } = makePrisma();
     prisma.ordenProduccion.findUnique.mockResolvedValue({
@@ -125,6 +144,25 @@ describe('FabricacionService.generarOF', () => {
     });
     await new FabricacionService(prisma).generarOF(100);
     expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ celulaActual: 'CORTE', subPasoActual: null });
+  });
+});
+
+describe('FabricacionService.obtenerOF', () => {
+  it('trae por par el producto y la línea (datos de la etiqueta física)', async () => {
+    const { prisma } = makePrisma({
+      root: { ordenFabricacion: { findUnique: jest.fn().mockResolvedValue({ id: 1, pares: [] }) } },
+    });
+    await new FabricacionService(prisma).obtenerOF(1);
+    const select = prisma.ordenFabricacion.findUnique.mock.calls[0][0].include.pares.select;
+    expect(select.productoConfigurado).toEqual({ select: { codigo: true, nombreComercial: true } });
+    expect(select.linea).toEqual({ select: { codigo: true, nombre: true } });
+  });
+
+  it('404 si la OF no existe', async () => {
+    const { prisma } = makePrisma({
+      root: { ordenFabricacion: { findUnique: jest.fn().mockResolvedValue(null) } },
+    });
+    await expect(new FabricacionService(prisma).obtenerOF(99)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 

@@ -40,6 +40,7 @@ export function construirDto(args: {
   observaciones?: string;
   sedeEntregaId?: number | null;
   direccionDespacho?: string;
+  lineaId?: number | null;
   lineas: LineaWizard[];
 }): CrearOCDto {
   return {
@@ -49,6 +50,8 @@ export function construirDto(args: {
     // Sin sede no se manda la clave: el backend caerá en la sede principal del cliente.
     ...(args.sedeEntregaId != null ? { sedeEntregaId: args.sedeEntregaId } : {}),
     direccionDespacho: args.direccionDespacho ? args.direccionDespacho : undefined,
+    // Línea de producción del pedido; sin elegir no se manda la clave.
+    ...(args.lineaId != null ? { lineaId: args.lineaId } : {}),
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
       precioUnitario: l.precio > 0 ? l.precio : undefined,

@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReportesApi } from '../../core/api/reportes.api';
+import { LineasApi, Linea } from '../../core/api/lineas.api';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/reporte-diario.models';
 
@@ -14,6 +15,12 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
       <div class="page-header">
         <div class="ph-title">Reporte diario gerencial</div>
         <div class="ph-actions">
+          <select class="mes-input" [ngModel]="lineaSel()" (ngModelChange)="cambiarLinea($event)">
+            <option [ngValue]="null">Todas las líneas</option>
+            @for (l of lineasProd(); track l.id) {
+              <option [ngValue]="l.id">{{ l.nombre }}</option>
+            }
+          </select>
           <input class="mes-input" type="month" [value]="mesValor()" (change)="cambiarMes($event)" />
           <button class="btn" type="button" (click)="abrirMetas()">Editar metas</button>
         </div>
@@ -89,7 +96,10 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
         <!-- Kardex de Producto Terminado -->
         <div class="card"><div class="card-body table-wrap">
           <div class="sec-h">Kardex de Producto Terminado <span class="cell-sub">· saldo de bodega día a día</span></div>
-          @if (kardexConMov().length === 0) {
+          @if (lineaSel() !== null) {
+            <!-- Honesto: el stock de bodega PT aún no distingue de qué línea salió cada par. -->
+            <p class="cell-sub">El kardex de bodega aún no se segmenta por línea; quita el filtro para verlo completo.</p>
+          } @else if (kardexConMov().length === 0) {
             <p class="cell-sub">Sin movimientos de bodega este mes.</p>
           } @else {
             <table class="tbl">
@@ -116,8 +126,8 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
       }
     </div>
 
-    <!-- Drawer: editar metas del mes -->
-    <app-drawer [open]="drawer()" [title]="'Metas de ' + nombreMes()" (closed)="drawer.set(false)">
+    <!-- Drawer: editar metas del mes (globales o de la línea filtrada) -->
+    <app-drawer [open]="drawer()" [title]="'Metas de ' + nombreMes() + ' · ' + nombreLinea()" (closed)="drawer.set(false)">
       <div class="form">
         <label class="fld"><span>Meta de Guarnición (pares)</span><input type="number" min="0" [(ngModel)]="fGuarn" /></label>
         <label class="fld"><span>Meta de Inyección (pares)</span><input type="number" min="0" [(ngModel)]="fIny" /></label>
@@ -167,12 +177,16 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
 })
 export class ReporteDiarioComponent implements OnInit {
   private readonly api = inject(ReportesApi);
+  private readonly lineasApi = inject(LineasApi);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly hoy = new Date();
   anio = signal(this.hoy.getUTCFullYear());
   mes = signal(this.hoy.getUTCMonth() + 1);
   r = signal<ReporteDiario | null>(null);
+  // null = toda la fábrica; con id, el reporte (y sus metas) son de esa línea.
+  lineasProd = signal<Linea[]>([]);
+  lineaSel = signal<number | null>(null);
   drawer = signal(false);
   guardando = signal(false);
 
@@ -198,14 +212,26 @@ export class ReporteDiarioComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.lineasApi.listar().pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((ls) => this.lineasProd.set(ls.filter((l) => l.activo)));
     this.cargar();
   }
 
   private cargar(): void {
     this.api
-      .diario(this.anio(), this.mes())
+      .diario(this.anio(), this.mes(), this.lineaSel() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((d) => this.r.set(d));
+  }
+
+  cambiarLinea(id: number | null): void {
+    this.lineaSel.set(id);
+    this.r.set(null);
+    this.cargar();
+  }
+
+  nombreLinea(): string {
+    return this.lineasProd().find((l) => l.id === this.lineaSel())?.nombre ?? 'toda la fábrica';
   }
 
   cambiarMes(ev: Event): void {
@@ -236,7 +262,7 @@ export class ReporteDiarioComponent implements OnInit {
     ];
     this.guardando.set(true);
     this.api
-      .guardarMetas(this.anio(), this.mes(), items)
+      .guardarMetas(this.anio(), this.mes(), items, this.lineaSel() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

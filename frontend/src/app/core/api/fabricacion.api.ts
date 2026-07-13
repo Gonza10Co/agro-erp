@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
-  OFGenerada, OFListItem, ParTablero, ParDetalle, Operario, Maquina,
+  OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -15,6 +15,9 @@ export class FabricacionApi {
   }
   listarOF() {
     return this.http.get<OFListItem[]>(`${this.base}/fabricacion/of`);
+  }
+  obtenerOF(id: number) {
+    return this.http.get<OFDetalle>(`${this.base}/fabricacion/of/${id}`);
   }
   avanzar(codigo: string, operarioId: number, maquinaId: number) {
     return this.http.post<unknown>(

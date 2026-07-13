@@ -20,36 +20,58 @@ function rangoMes(anio: number, mes: number) {
 export class ReportesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async diario(anio: number, mes: number): Promise<ReporteDiario> {
+  async diario(
+    anio: number,
+    mes: number,
+    lineaId?: number,
+  ): Promise<ReporteDiario & { lineaId: number | null }> {
     const { desde, hasta } = rangoMes(anio, mes);
+    const porLinea = lineaId != null;
 
     const [eventos, facturas, movimientosPT, saldoPrevio, metas] = await Promise.all([
       this.prisma.eventoTrazabilidad.findMany({
-        where: { timestamp: { gte: desde, lt: hasta } },
+        // La línea vive denormalizada en el Par (línea por pedido).
+        where: {
+          timestamp: { gte: desde, lt: hasta },
+          ...(porLinea ? { par: { lineaId } } : {}),
+        },
         select: { celula: true, subPaso: true, timestamp: true },
       }),
       this.prisma.factura.findMany({
-        where: { fecha: { gte: desde, lt: hasta }, estado: 'EMITIDA' },
+        // Factura → despacho → OP: la OP hereda la línea de la OC.
+        where: {
+          fecha: { gte: desde, lt: hasta },
+          estado: 'EMITIDA',
+          ...(porLinea ? { despacho: { op: { lineaId } } } : {}),
+        },
         select: { fecha: true, subtotal: true, lineas: { select: { cantidad: true } } },
       }),
-      this.prisma.movimientoInventario.findMany({
-        where: { inventarioPTId: { not: null }, createdAt: { gte: desde, lt: hasta } },
-        select: { tipo: true, motivo: true, cantidad: true, createdAt: true },
-      }),
+      // El kardex de bodega PT aún NO es segmentable por línea (el stock PT no
+      // conoce la línea): con filtro activo va vacío y el front lo dice honesto.
+      porLinea
+        ? Promise.resolve([])
+        : this.prisma.movimientoInventario.findMany({
+            where: { inventarioPTId: { not: null }, createdAt: { gte: desde, lt: hasta } },
+            select: { tipo: true, motivo: true, cantidad: true, createdAt: true },
+          }),
       // Saldo de PT al inicio del mes = entradas − salidas de movimientos previos.
-      this.prisma.movimientoInventario.groupBy({
-        by: ['tipo'],
-        where: { inventarioPTId: { not: null }, createdAt: { lt: desde } },
-        _sum: { cantidad: true },
-      }),
-      this.prisma.meta.findMany({ where: { anio, mes } }),
+      porLinea
+        ? Promise.resolve([])
+        : this.prisma.movimientoInventario.groupBy({
+            by: ['tipo'],
+            where: { inventarioPTId: { not: null }, createdAt: { lt: desde } },
+            _sum: { cantidad: true },
+          }),
+      // Sin filtro se compara contra la meta global (lineaId NULL); con filtro,
+      // contra la meta propia de esa línea.
+      this.prisma.meta.findMany({ where: { anio, mes, lineaId: lineaId ?? null } }),
     ]);
 
     const sumPrevio = (tipo: string) =>
       Number((saldoPrevio as any[]).find((g) => g.tipo === tipo)?._sum.cantidad ?? 0);
     const saldoInicialPT = sumPrevio('ENTRADA') - sumPrevio('SALIDA');
 
-    return construirReporte({
+    const reporte = construirReporte({
       anio,
       mes,
       eventos: eventos.map((e) => ({
@@ -71,21 +93,40 @@ export class ReportesService {
         createdAt: m.createdAt,
       })),
     });
+    return { ...reporte, lineaId: lineaId ?? null };
   }
 
-  async listarMetas(anio: number, mes: number): Promise<MetaMin[]> {
-    const metas = await this.prisma.meta.findMany({ where: { anio, mes } });
+  async listarMetas(anio: number, mes: number, lineaId?: number): Promise<MetaMin[]> {
+    const metas = await this.prisma.meta.findMany({
+      where: { anio, mes, lineaId: lineaId ?? null },
+    });
     return metas.map((m) => ({ tipo: m.tipo as TipoMeta, valor: Number(m.valor) }));
   }
 
-  async guardarMetas(anio: number, mes: number, items: { tipo: TipoMeta; valor: number }[]) {
+  async guardarMetas(
+    anio: number,
+    mes: number,
+    items: { tipo: TipoMeta; valor: number }[],
+    lineaId?: number,
+  ) {
+    const linea = lineaId ?? null;
     for (const item of items) {
-      await this.prisma.meta.upsert({
-        where: { anio_mes_tipo: { anio, mes, tipo: item.tipo } },
-        create: { anio, mes, tipo: item.tipo, valor: item.valor },
-        update: { valor: item.valor },
+      // Upsert a mano: el unique compuesto no cubre lineaId NULL (en PG los NULL
+      // son distintos entre sí), así que la clave global se resuelve por código.
+      const existente = await this.prisma.meta.findFirst({
+        where: { anio, mes, tipo: item.tipo, lineaId: linea },
       });
+      if (existente) {
+        await this.prisma.meta.update({
+          where: { id: existente.id },
+          data: { valor: item.valor },
+        });
+      } else {
+        await this.prisma.meta.create({
+          data: { anio, mes, tipo: item.tipo, valor: item.valor, lineaId: linea },
+        });
+      }
     }
-    return this.listarMetas(anio, mes);
+    return this.listarMetas(anio, mes, lineaId);
   }
 }

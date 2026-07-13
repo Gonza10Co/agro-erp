@@ -26,7 +26,8 @@ export class OpService {
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
-        data: { consecutivo, ocId, estado: 'CREADA' },
+        // La línea del pedido baja de la OC: fabricación la lee de la OP.
+        data: { consecutivo, ocId, estado: 'CREADA', lineaId: oc.lineaId ?? null },
       });
 
       for (const linea of oc.lineas) {

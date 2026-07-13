@@ -35,6 +35,11 @@ describe('ReporteDiarioComponent', () => {
     const fixture = TestBed.createComponent(ReporteDiarioComponent);
     http = TestBed.inject(HttpTestingController);
     fixture.detectChanges(); // ngOnInit → GET
+    // Selector de línea del header (solo llegan las activas).
+    http.expectOne('http://localhost:3001/catalog/lineas').flush([
+      { id: 1, codigo: 'BASARILI', nombre: 'Basarili', celulaInicial: 'CORTE', activo: true },
+      { id: 4, codigo: 'FEROZ', nombre: 'Feroz', celulaInicial: 'INYECCION', activo: true },
+    ]);
     return fixture;
   }
   afterEach(() => http.verify());
@@ -76,6 +81,34 @@ describe('ReporteDiarioComponent', () => {
     expect(c.anio()).toBe(2026);
     expect(c.mes()).toBe(5);
     http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario' && r.params.get('mes') === '5').flush(REPORTE);
+  });
+
+  it('filtrar por línea recarga con ?lineaId y esconde el kardex (aún no segmentable)', () => {
+    const fixture = setup();
+    flush();
+    const c = fixture.componentInstance;
+    c.cambiarLinea(4);
+    http
+      .expectOne((r) => r.url === 'http://localhost:3001/reportes/diario' && r.params.get('lineaId') === '4')
+      .flush({ ...REPORTE, kardexPT: [], lineaId: 4 });
+    fixture.detectChanges();
+    expect(c.lineaSel()).toBe(4);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('aún no se segmenta por línea');
+  });
+
+  it('con línea filtrada las metas se guardan para esa línea', () => {
+    const fixture = setup();
+    flush();
+    const c = fixture.componentInstance;
+    c.cambiarLinea(4);
+    http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario').flush({ ...REPORTE, lineaId: 4 });
+    c.abrirMetas();
+    c.guardar();
+    const put = http.expectOne(
+      (r) => r.url === 'http://localhost:3001/reportes/metas' && r.params.get('lineaId') === '4',
+    );
+    put.flush([]);
+    http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario').flush({ ...REPORTE, lineaId: 4 }); // recarga
   });
 
   it('guardar metas hace PUT y recarga', () => {

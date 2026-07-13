@@ -130,6 +130,21 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
   "Cotización PDF" (jsPDF, número `COT-fecha-hora`, IVA 19%, emisor por línea — hoy solo
   Feroz tiene datos) y eliminar del todo con confirmación. Gateada EN_STAGE. Seed corrido en
   prod (emisor Feroz + BOM con la gruesa corregida: margen OC-8 pasó de 21.77% a 22.18%).
+- **CI de GitHub Actions reparado** ✅ 2026-07-12 — llevaba roto desde antes del 06-jul (todos
+  los push mandaban correo de fallo). Dos causas: (1) el postinstall del esbuild anidado de vite
+  validaba contra el binario hoisted → `npm ci --ignore-scripts` en ambos jobs; (2) el
+  package-lock generado en Windows no traía el binding Linux de `unrs-resolver` (el resolver
+  nativo de jest 30) → jest no resolvía ningún módulo en el runner; entrada agregada a mano al
+  lock. ⚠️ Si se regenera el lock en Windows, npm borra esa entrada — re-agregarla (ver commit
+  `766d318`). Ambos jobs verdes; fix mergeado a `master`.
+- **Etiquetas de código de barras por OF** ✅ 2026-07-12 (módulo fabricación = INTERNO; **sin
+  entrega asignada aún**) — botón «Etiquetas» en el listado de OF: PDF hoja carta adhesiva 3×8
+  (etiquetas de 66×32 mm) con Code128 + código legible + producto · talla · línea por cada par
+  activo (excluye bajas/cancelados). jsPDF + jsbarcode con import dinámico (patrón proforma);
+  `obtenerOF` ahora trae producto y línea por par. Verificado E2E en navegador (PDF real
+  revisado: 3 pares Feroz OK). El lector físico opera en modo teclado contra la pantalla de
+  operario existente (input con autofocus) — falta solo comprar lectores y decidir con el
+  cliente dónde vive la etiqueta (canastilla/lote) y el código máster por caja (empaque).
 - **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · lista de
   materiales FIJOS de la 106 (hilos/marquilla/caja) · **datos de emisor de Basarili/Agro/Alta**
   (razón social, NIT, cuenta) para que sus proformas salgan con membrete propio.
@@ -142,8 +157,8 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 
 ### 1) Modelado de negocio — conceptos del Excel aún sin modelar
 - [x] **EXTERNO / tercerización** ✅ 2026-07-01 — modelado como línea con `celulaInicial=INYECCION`; desde 2026-07-06 esa línea es **Feroz** (la Externa original quedó desactivada; JP confirmó que esos cortes no vuelven).
-- [ ] **Línea por pedido** ⚠️ NUEVO 2026-07-06 — la línea se decide en la OC/OP, no por marca (JP: una misma marca la puede fabricar Agro/Alta/Basarili según el pedido). Capturar `lineaId` al crear el pedido, heredarla al par; `Marca.lineaId` queda solo como default sugerido.
-- [ ] **Reporte Diario Gerencial POR LÍNEA** — la Demo 14 ya existe pero agrega todo junto; falta segmentar producción/metas por las 4 líneas (el `Par.lineaId` ya está listo para ello).
+- [x] **Línea por pedido** ✅ 2026-07-12 (EN_STAGE) — `OrdenCompra.lineaId` (+`OrdenProduccion.lineaId`, migración `linea_por_pedido`): el wizard de OC pide la línea (selector gateado EN_STAGE, obligatorio para quien lo ve), la OP la hereda al generarse y cada Par nace con la línea del pedido (célula inicial incluida — Feroz arranca en INYECCIÓN); la reposición de calidad hereda la línea del par dado de baja. `Marca.lineaId` queda solo como fallback histórico. Verificado E2E local por API (OC Feroz → OP → OF → 3 pares en INYECCIÓN con `lineaId`). Backend valida línea activa; OCs viejas sin línea siguen funcionando igual.
+- [x] **Reporte Diario Gerencial POR LÍNEA** ✅ 2026-07-12 (EN_STAGE) — `GET /reportes/diario?lineaId` filtra producción vía `par.lineaId` y facturación vía `despacho.op.lineaId`; selector "Todas las líneas / …" en la pantalla. **Metas por línea**: `Meta.lineaId` (NULL = meta global, migración `metas_por_linea`); el drawer de metas edita las de la línea filtrada. Honesto: el **kardex de bodega PT no se segmenta** (el stock PT no conoce la línea) — con filtro activo la sección lo dice y va vacía. Verificado E2E local (evento Feroz cuenta solo en Feroz; global agrega todo). ⚠️ Depende de que los pedidos nuevos traigan línea; los históricos (lineaId NULL) solo aparecen en "Todas las líneas". **Seed demo por línea ✅ 2026-07-13**: `seed-demo` asigna línea a todas sus OCs (resueltas por `codigo`, nunca por id) y reparte la producción D14 en 4 cadenas — 9014 Basarili 45% · 9018 Agro 30% · 9019 Alta 15% · 9020 Feroz 10% (Feroz solo eventos INYECCIÓN→PT) — con metas por línea (Feroz sin guarnición ni facturación: el servicio de inyección se factura aparte, sin modelar). De paso: el upsert de metas estaba roto (el unique `anio_mes_tipo` murió con la migración `metas_por_linea` → upsert manual) y el reset de máquinas/operarios ya no borra global (upsert idempotente: había eventos de OPs no-demo que los referencian por FK).
 - [ ] **SEGUNDAS** — categoría de calidad vendible; no existe en el modelo. Dato real: Feroz ya maneja "SEGUNDAS FEROZ" como inventario aparte (336 segundas vs 263 primeras al 03-jul-2026).
 - [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada. Caso real: Feroz = servicio de inyección a la capellada de Bogotá (maquila).
 - [ ] **Líneas de insumo (Marquillas/Punteras/Plantillas)** — producción **por lote** (no par/QR): transformación MP→PT con rendimiento/merma (plantillas: lámina→preforma→troquel por talla, hoy NO se registra ese eslabón), venta a terceros (catálogo de clientes externos ya visto en los Excel) y doble rol como `Material` de las líneas de bota.
@@ -210,13 +225,13 @@ docker start agro-erp-pg
 # Backend (:3001) — NUNCA :3000
 cd agro-erp/backend
 npm run start:dev
-# seeds (si la DB está limpia):
+# seeds (si la DB está limpia — en ESTE orden: seed:demo necesita las líneas):
 #   npm run seed          # usuario admin / admin123
 #   npm run seed:catalogo
-#   npm run seed:demo
 #   npm run seed:basarili # catálogo real del Drive + las 4 líneas de producción
 #                         # (Basarili/Agro/Alta/Feroz; Feroz arranca en INYECCIÓN,
 #                         #  EXTERNA queda desactivada si existía)
+#   npm run seed:demo     # OCs demo con línea asignada + metas por línea (07-13)
 
 # Frontend (:4200)
 cd agro-erp/frontend

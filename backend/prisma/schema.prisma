@@ -267,8 +267,11 @@ model Linea {
   nit           String?
   datosPago     String? // bloque de consignación tal cual se imprime (banco · cuenta · titular)
 
-  marcas Marca[]
-  pares  Par[]
+  marcas          Marca[]
+  pares           Par[]
+  ordenesCompra   OrdenCompra[]
+  ordenesProduccion OrdenProduccion[]
+  metas           Meta[]
 }
 
 model Marca {
@@ -478,6 +481,10 @@ model OrdenCompra {
   // Copia congelada de la dirección al momento de crear la OC: si mañana el cliente
   // corrige la dirección de la sede, los remitos ya despachados NO deben cambiar.
   direccionDespacho String?
+  // La línea de producción se decide POR PEDIDO (cliente 2026-07-06: el mapeo
+  // marca→línea NO es fijo). De acá se hereda a la OP y a cada Par.
+  lineaId       Int?
+  linea         Linea?   @relation(fields: [lineaId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -486,6 +493,7 @@ model OrdenCompra {
 
   @@index([clienteId])
   @@index([sedeEntregaId])
+  @@index([lineaId])
 }
 
 model OrdenCompraLinea {
@@ -537,6 +545,10 @@ model OrdenProduccion {
   oc          OrdenCompra @relation(fields: [ocId], references: [id])
   fecha       DateTime    @default(now())
   estado      EstadoOP    @default(CREADA)
+  // Copia de OrdenCompra.lineaId al generar la OP: fabricación lee de acá la
+  // célula de arranque y el lineaId que se denormaliza en cada Par.
+  lineaId     Int?
+  linea       Linea?      @relation(fields: [lineaId], references: [id])
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -544,6 +556,8 @@ model OrdenProduccion {
   despacho           Despacho?
   requerimientos     RequerimientoCompra[]
   ordenesFabricacion OrdenFabricacion[]
+
+  @@index([lineaId])
 }
 
 model OrdenProduccionLinea {
@@ -1039,14 +1053,19 @@ enum TipoMeta {
 }
 
 // Meta mensual configurable por tipo. Alimenta el % de cumplimiento del reporte diario.
+// lineaId NULL = meta global de la fábrica; con línea = meta de esa línea (reporte
+// por línea). OJO: el unique compuesto no ataja duplicados con lineaId NULL (en PG
+// los NULL son distintos entre sí) — el service resuelve el upsert a mano.
 model Meta {
   id        Int      @id @default(autoincrement())
   anio      Int
   mes       Int // 1..12
   tipo      TipoMeta
   valor     Decimal  @db.Decimal(14, 2)
+  lineaId   Int?
+  linea     Linea?   @relation(fields: [lineaId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([anio, mes, tipo])
+  @@unique([anio, mes, tipo, lineaId])
 }

@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { OfListComponent } from './of-list.component';
 
 describe('OfListComponent', () => {
-  it('lista las OF con su OP, conteo de pares y badge de estado', () => {
+  function setup() {
     TestBed.configureTestingModule({
       imports: [OfListComponent],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -17,11 +17,28 @@ describe('OfListComponent', () => {
       { id: 1, consecutivo: 5, estado: 'TERMINADA', fecha: '2026-06-07', op: { consecutivo: 9005 }, _count: { pares: 12 } },
     ]);
     fixture.detectChanges();
+    return { fixture, http };
+  }
+
+  it('lista las OF con su OP, conteo de pares y badge de estado', () => {
+    const { fixture, http } = setup();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('OF-5');
     expect(el.textContent).toContain('OP-9005');
     expect(el.textContent).toContain('12');
     expect(el.querySelector('.badge-accent')).toBeTruthy(); // TERMINADA resalta
+    http.verify();
+  });
+
+  it('el botón Etiquetas pide el detalle de la OF y libera el botón al terminar', () => {
+    const { fixture, http } = setup();
+    const c = fixture.componentInstance;
+    c.imprimirEtiquetas(c.ofs()[0]);
+    expect(c.descargando()).toBe(1);
+    // OF sin pares activos → el generador sale sin producir PDF (nada que imprimir).
+    http.expectOne('http://localhost:3001/fabricacion/of/1').flush({
+      id: 1, consecutivo: 5, estado: 'TERMINADA', fecha: '2026-06-07', op: { consecutivo: 9005 }, pares: [],
+    });
     http.verify();
   });
 });

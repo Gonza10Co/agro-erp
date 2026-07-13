@@ -16,6 +16,8 @@ describe('OcService', () => {
     cliente: { findUnique: jest.fn() },
     // crear()/actualizar() consultan las sedes del cliente para resolver el destino.
     sedeCliente: { findMany: jest.fn() },
+    // La línea elegida a mano se valida contra el catálogo (existe y activa).
+    linea: { findFirst: jest.fn() },
   } as any;
   // crear() corre dentro de $transaction; el tx reusa el mismo mock raíz.
   prisma.$transaction = jest.fn(async (cb: any) => cb(prisma));
@@ -44,6 +46,42 @@ describe('OcService', () => {
         }),
       }),
     );
+  });
+
+  it('crear persiste la línea de producción elegida (línea por pedido)', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.linea.findFirst.mockResolvedValue({ id: 3, activo: true });
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    await service.crear({
+      clienteId: 7,
+      lineaId: 3,
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    expect(prisma.linea.findFirst).toHaveBeenCalledWith({ where: { id: 3, activo: true } });
+    expect(prisma.ordenCompra.create.mock.calls[0][0].data.lineaId).toBe(3);
+  });
+
+  it('crear rechaza una línea de producción inexistente o inactiva', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.linea.findFirst.mockResolvedValue(null);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        lineaId: 99,
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('sin lineaId la OC queda sin línea y no se consulta el catálogo', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    await service.crear({
+      clienteId: 7,
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    expect(prisma.linea.findFirst).not.toHaveBeenCalled();
+    expect(prisma.ordenCompra.create.mock.calls[0][0].data.lineaId).toBeUndefined();
   });
 
   it('crear persiste el precioUnitario pactado de cada línea', async () => {

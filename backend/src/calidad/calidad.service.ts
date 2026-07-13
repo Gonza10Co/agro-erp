@@ -37,7 +37,11 @@ export class CalidadService {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       // La línea del par define dónde re-arranca la reposición (Feroz → INYECCION).
-      include: { productoConfigurado: { include: { marca: { include: { linea: true } } } } },
+      // La denormalizada en el par (línea por pedido) manda; marca = fallback.
+      include: {
+        linea: true,
+        productoConfigurado: { include: { marca: { include: { linea: true } } } },
+      },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
     const tipo = await this.prisma.tipoDano.findUnique({ where: { id: dto.tipoDanoId } });
@@ -70,8 +74,9 @@ export class CalidadService {
         return { incidencia, parReposicion: null };
       }
       const marca = (par as any).productoConfigurado?.marca;
-      const celulaInicial = marca?.linea?.celulaInicial ?? 'CORTE';
-      const lineaId = marca?.lineaId ?? null;
+      const celulaInicial =
+        (par as any).linea?.celulaInicial ?? marca?.linea?.celulaInicial ?? 'CORTE';
+      const lineaId = par.lineaId ?? marca?.lineaId ?? null;
       return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial, lineaId);
     } catch (e: unknown) {
       // FK inválida del reporte: solo el operario (input del usuario) → 400.

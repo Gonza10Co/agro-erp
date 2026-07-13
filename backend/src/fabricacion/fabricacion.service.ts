@@ -18,7 +18,9 @@ export class FabricacionService {
     const op = await this.prisma.ordenProduccion.findUnique({
       where: { id: opId },
       include: {
-        // La línea del producto define el punto de arranque del par (célula inicial).
+        // La línea del PEDIDO (heredada de la OC) define el punto de arranque del
+        // par; la de la marca queda solo como fallback histórico.
+        linea: true,
         lineas: {
           include: {
             tallas: true,
@@ -39,9 +41,12 @@ export class FabricacionService {
           productoConfiguradoId: l.productoConfiguradoId,
           tallaId: t.tallaId,
           cantAProducir: t.cantAProducir,
-          // Sin línea asignada → CORTE (comportamiento histórico, cero regresión).
-          celulaInicial: l.productoConfigurado?.marca?.linea?.celulaInicial ?? 'CORTE',
-          lineaId: l.productoConfigurado?.marca?.lineaId ?? null,
+          // Línea por pedido: la de la OP manda; marca = fallback; sin línea → CORTE.
+          celulaInicial:
+            op.linea?.celulaInicial ??
+            l.productoConfigurado?.marca?.linea?.celulaInicial ??
+            'CORTE',
+          lineaId: op.lineaId ?? l.productoConfigurado?.marca?.lineaId ?? null,
         })),
     );
     if (lineas.length === 0)
@@ -218,6 +223,9 @@ export class FabricacionService {
             celulaActual: true,
             estado: true,
             talla: { select: { valor: true } },
+            // Para las etiquetas físicas: qué es el par y por qué línea se fabrica.
+            productoConfigurado: { select: { codigo: true, nombreComercial: true } },
+            linea: { select: { codigo: true, nombre: true } },
           },
         },
       },

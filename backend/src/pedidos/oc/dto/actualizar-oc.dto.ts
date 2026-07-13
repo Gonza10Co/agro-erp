@@ -10,6 +10,8 @@ export class ActualizarOCDto {
   @IsOptional() @IsString() observaciones?: string;
   @IsOptional() @Type(() => Number) @IsInt() sedeEntregaId?: number;
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
+  // Si no viene, la OC conserva la línea que ya tenía (undefined no toca el campo).
+  @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

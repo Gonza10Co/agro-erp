@@ -34,6 +34,8 @@ export class CrearOCDto {
   @IsOptional() @Type(() => Number) @IsInt() sedeEntregaId?: number;
   // Entrega puntual escrita a mano (una obra, un evento). Gana sobre la sede principal.
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
+  // Línea de producción del pedido (el mapeo marca→línea no es fijo: se decide acá).
+  @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

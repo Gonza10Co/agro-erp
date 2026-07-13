@@ -8,6 +8,7 @@
     "frontend"
   ],
   "scripts": {
+    "postinstall": "node tools/fix-lock-bindings.mjs",
     "dev:back": "npm run start:dev --workspace backend",
     "dev:front": "npm run start --workspace frontend",
     "build": "npm run build --workspace backend && npm run build --workspace frontend",
