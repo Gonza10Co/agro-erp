@@ -158,7 +158,7 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 ### 1) Modelado de negocio — conceptos del Excel aún sin modelar
 - [x] **EXTERNO / tercerización** ✅ 2026-07-01 — modelado como línea con `celulaInicial=INYECCION`; desde 2026-07-06 esa línea es **Feroz** (la Externa original quedó desactivada; JP confirmó que esos cortes no vuelven).
 - [x] **Línea por pedido** ✅ 2026-07-12 (EN_STAGE) — `OrdenCompra.lineaId` (+`OrdenProduccion.lineaId`, migración `linea_por_pedido`): el wizard de OC pide la línea (selector gateado EN_STAGE, obligatorio para quien lo ve), la OP la hereda al generarse y cada Par nace con la línea del pedido (célula inicial incluida — Feroz arranca en INYECCIÓN); la reposición de calidad hereda la línea del par dado de baja. `Marca.lineaId` queda solo como fallback histórico. Verificado E2E local por API (OC Feroz → OP → OF → 3 pares en INYECCIÓN con `lineaId`). Backend valida línea activa; OCs viejas sin línea siguen funcionando igual.
-- [x] **Reporte Diario Gerencial POR LÍNEA** ✅ 2026-07-12 (EN_STAGE) — `GET /reportes/diario?lineaId` filtra producción vía `par.lineaId` y facturación vía `despacho.op.lineaId`; selector "Todas las líneas / …" en la pantalla. **Metas por línea**: `Meta.lineaId` (NULL = meta global, migración `metas_por_linea`); el drawer de metas edita las de la línea filtrada. Honesto: el **kardex de bodega PT no se segmenta** (el stock PT no conoce la línea) — con filtro activo la sección lo dice y va vacía. Verificado E2E local (evento Feroz cuenta solo en Feroz; global agrega todo). ⚠️ Depende de que los pedidos nuevos traigan línea; los históricos (lineaId NULL) solo aparecen en "Todas las líneas".
+- [x] **Reporte Diario Gerencial POR LÍNEA** ✅ 2026-07-12 (EN_STAGE) — `GET /reportes/diario?lineaId` filtra producción vía `par.lineaId` y facturación vía `despacho.op.lineaId`; selector "Todas las líneas / …" en la pantalla. **Metas por línea**: `Meta.lineaId` (NULL = meta global, migración `metas_por_linea`); el drawer de metas edita las de la línea filtrada. Honesto: el **kardex de bodega PT no se segmenta** (el stock PT no conoce la línea) — con filtro activo la sección lo dice y va vacía. Verificado E2E local (evento Feroz cuenta solo en Feroz; global agrega todo). ⚠️ Depende de que los pedidos nuevos traigan línea; los históricos (lineaId NULL) solo aparecen en "Todas las líneas". **Seed demo por línea ✅ 2026-07-13**: `seed-demo` asigna línea a todas sus OCs (resueltas por `codigo`, nunca por id) y reparte la producción D14 en 4 cadenas — 9014 Basarili 45% · 9018 Agro 30% · 9019 Alta 15% · 9020 Feroz 10% (Feroz solo eventos INYECCIÓN→PT) — con metas por línea (Feroz sin guarnición ni facturación: el servicio de inyección se factura aparte, sin modelar). De paso: el upsert de metas estaba roto (el unique `anio_mes_tipo` murió con la migración `metas_por_linea` → upsert manual) y el reset de máquinas/operarios ya no borra global (upsert idempotente: había eventos de OPs no-demo que los referencian por FK).
 - [ ] **SEGUNDAS** — categoría de calidad vendible; no existe en el modelo. Dato real: Feroz ya maneja "SEGUNDAS FEROZ" como inventario aparte (336 segundas vs 263 primeras al 03-jul-2026).
 - [ ] **SERVICIOS / MANTENIMIENTO** — línea de ingreso aparte, no modelada. Caso real: Feroz = servicio de inyección a la capellada de Bogotá (maquila).
 - [ ] **Líneas de insumo (Marquillas/Punteras/Plantillas)** — producción **por lote** (no par/QR): transformación MP→PT con rendimiento/merma (plantillas: lámina→preforma→troquel por talla, hoy NO se registra ese eslabón), venta a terceros (catálogo de clientes externos ya visto en los Excel) y doble rol como `Material` de las líneas de bota.
@@ -225,13 +225,13 @@ docker start agro-erp-pg
 # Backend (:3001) — NUNCA :3000
 cd agro-erp/backend
 npm run start:dev
-# seeds (si la DB está limpia):
+# seeds (si la DB está limpia — en ESTE orden: seed:demo necesita las líneas):
 #   npm run seed          # usuario admin / admin123
 #   npm run seed:catalogo
-#   npm run seed:demo
 #   npm run seed:basarili # catálogo real del Drive + las 4 líneas de producción
 #                         # (Basarili/Agro/Alta/Feroz; Feroz arranca en INYECCIÓN,
 #                         #  EXTERNA queda desactivada si existía)
+#   npm run seed:demo     # OCs demo con línea asignada + metas por línea (07-13)
 
 # Frontend (:4200)
 cd agro-erp/frontend
