@@ -7,6 +7,8 @@ describe('puedeVerModulo', () => {
     expect(puedeVerModulo('CLIENTE', 'catalogo')).toBeTrue();
     // Liberado el 2026-07-09: el cliente crea sus marcas, referencias y materiales.
     expect(puedeVerModulo('CLIENTE', 'maestros')).toBeTrue();
+    // Liberado el 2026-07-17 (demo Entrega 2): compras de insumos con costo.
+    expect(puedeVerModulo('CLIENTE', 'compras')).toBeTrue();
   });
 
   it('CLIENTE NO ve los módulos de demos posteriores', () => {
@@ -14,7 +16,6 @@ describe('puedeVerModulo', () => {
     expect(puedeVerModulo('CLIENTE', 'despachos')).toBeFalse();
     expect(puedeVerModulo('CLIENTE', 'facturas')).toBeFalse();
     expect(puedeVerModulo('CLIENTE', 'cartera')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'compras')).toBeFalse();
     expect(puedeVerModulo('CLIENTE', 'inventario')).toBeFalse();
     expect(puedeVerModulo('CLIENTE', 'fabricacion')).toBeFalse();
     expect(puedeVerModulo('CLIENTE', 'calidad')).toBeFalse();
@@ -42,8 +43,16 @@ describe('puedeVerModulo', () => {
       expect(puedeVerModulo('STAGE', 'maestros')).toBeTrue();
     });
 
-    it('ve además los módulos EN_STAGE (Fase A: compras con costo)', () => {
+    it('ve compras, ya liberada al cliente en la Entrega 2', () => {
       expect(puedeVerModulo('STAGE', 'compras')).toBeTrue();
+    });
+
+    // Tras el "merge a cliente" de la Entrega 2 (2026-07-17) no queda ningún MÓDULO
+    // en EN_STAGE: lo adelantado de la Entrega 3 (línea por pedido) vive dentro de
+    // "pedidos", que el cliente ya tiene, y se gatea por SECCIÓN con puedeVerNivel.
+    it('lo que STAGE ve de más hoy es de sección, no de módulo', () => {
+      expect(puedeVerNivel('STAGE', 'EN_STAGE')).toBeTrue();
+      expect(puedeVerNivel('CLIENTE', 'EN_STAGE')).toBeFalse();
     });
 
     it('NO ve los módulos INTERNOS (adelantados, solo roles internos)', () => {
