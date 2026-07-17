@@ -47,9 +47,9 @@ const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // El cliente empieza a cargar sus datos maestros (referencias, materiales, marcas,
   // líneas, grupos de opción). Ninguna de esas pantallas muestra costos.
   maestros: 'ENTREGADO',
-  // EN_STAGE — próxima entrega (Fase A): compras de insumos con costo. Se muestra
-  // al perfil STAGE en la demo; el cliente aún no lo ve.
-  compras: 'EN_STAGE',
+  // Entregado en la demo de la Entrega 2 (2026-07-17): compras de insumos con
+  // costo, recepciones parciales y devoluciones a proveedor.
+  compras: 'ENTREGADO',
   // INTERNO — adelantado, solo roles internos.
   inicio: 'INTERNO',
   proveedores: 'INTERNO',

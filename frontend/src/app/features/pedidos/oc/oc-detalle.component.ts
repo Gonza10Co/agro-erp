@@ -172,10 +172,10 @@ export class OcDetalleComponent implements OnInit {
 
   oc = signal<OrdenCompra | null>(null);
   costeo = signal<ResumenCosteoOC | null>(null);
-  // El bloque de costo/utilidad se oculta al cliente hasta liberar (gate de sección EN_STAGE).
-  readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
-  // Cotización/proforma y eliminar borrador: nuevos de esta entrega, mismos gates.
-  readonly puedeVerProforma = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Costo/utilidad: entregado en la demo de la Entrega 2 (2026-07-17).
+  readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'ENTREGADO');
+  // Cotización/proforma y eliminar borrador: entregados en la misma demo.
+  readonly puedeVerProforma = puedeVerNivel(this.auth.rol(), 'ENTREGADO');
   // Línea por pedido: sección EN_STAGE hasta liberarla al cliente.
   readonly puedeVerLinea = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
   cargando = signal(true);
