@@ -9,6 +9,8 @@ ERP + MES para fábrica de botas de seguridad (make-to-order). Monorepo npm work
 - Tests: `npm test` (raíz) · solo back: `npm run test:back` · solo front: `npm run test:front`
 - DB local: Docker `agro-erp-pg` en :5433 (`docker start agro-erp-pg`); el `.env` del backend apunta a local, NO a Railway.
 - Migraciones: desde `backend/`, `npx prisma migrate dev`. SIEMPRE migraciones, nunca `db push`.
+  ⚠️ `migrate dev` NO regenera el cliente: correr `npx prisma generate` después, o el
+  `dev:back` en watch queda compilando contra tipos viejos (los tests jest no lo detectan).
 
 ## Arquitectura
 
@@ -19,7 +21,7 @@ ERP + MES para fábrica de botas de seguridad (make-to-order). Monorepo npm work
 
 ## Dominio (lo mínimo)
 
-OC (pedido del cliente) → OP (producción, amarra stock PT) → OF (corrida de fabricación) → pares con código `OF{n}-{seq}` escaneados por célula (CORTE→GUARNICION→ALMACEN→INYECCION→PT) → InventarioPT → Despacho (regla de cartera: cliente vencido bloquea, autoriza solo GERENTE/ADMIN).
+OC (pedido del cliente) → OP (producción, amarra stock PT **y dispara el requerimiento de insumos automático**: amarra MP disponible vía `InventarioMaterial.cantReservada` y calcula qué comprar; la reserva se libera al anular/despachar la OP o al recalcular) → OF (corrida de fabricación) → pares con código `OF{n}-{seq}` escaneados por célula (CORTE→GUARNICION→ALMACEN→INYECCION→PT) → InventarioPT → Despacho (regla de cartera: cliente vencido bloquea, autoriza solo GERENTE/ADMIN).
 
 **Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea **Feroz** (capellada de Bogotá; hoy solo servicio de inyección) arranca en INYECCIÓN, no en CORTE. La línea EXTERNA del kickoff quedó **desactivada** (cliente 2026-07-06: esos cortes no vuelven; Feroz la reemplaza). `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). **El mapeo marca→línea NO es fijo** (cliente 2026-07-06): la línea se decide **por pedido** — implementado 2026-07-12: la OC captura `lineaId` (selector EN_STAGE en el wizard), la OP lo hereda y cada par nace con la línea del pedido; `Marca.lineaId` es solo fallback histórico. El reporte diario acepta `?lineaId` y las metas se segmentan con `Meta.lineaId` (NULL = global). El kardex de bodega PT también se corta por línea: cada movimiento PT sella `MovimientoInventario.lineaId` al escribirse (producción/despacho); los históricos con NULL suman solo en "Todas las líneas".
 

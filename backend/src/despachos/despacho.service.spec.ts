@@ -25,6 +25,8 @@ describe('DespachoService', () => {
     reservaInventarioPT: { delete: jest.fn() },
     ordenCompra: { update: jest.fn() },
     movimientoInventario: { createMany: jest.fn() },
+    requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+    inventarioMaterial: { update: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   const service = new DespachoService(prisma);
@@ -111,6 +113,27 @@ describe('DespachoService', () => {
           lineaId: 3, // la línea de la OP se sella en el kardex (reporte por línea)
         },
       ],
+    });
+  });
+
+  it('al despachar libera el amarre de insumos de la OP (la producción terminó)', async () => {
+    prisma.ordenProduccion.findUnique.mockResolvedValue(opBase());
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+    prisma.despacho.create.mockResolvedValue({ id: 1, consecutivo: 5 });
+    prisma.requerimientoCompra.findMany.mockResolvedValue([
+      { id: 7, lineas: [{ materialId: 3, cantReservada: 40 }] },
+    ]);
+    await service.despachar({ opId: 1 }, operario);
+    expect(prisma.requerimientoCompra.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { opId: 1, reservaActiva: true } }),
+    );
+    expect(prisma.inventarioMaterial.update).toHaveBeenCalledWith({
+      where: { materialId: 3 },
+      data: { cantReservada: { decrement: 40 } },
+    });
+    expect(prisma.requerimientoCompra.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { reservaActiva: false },
     });
   });
 

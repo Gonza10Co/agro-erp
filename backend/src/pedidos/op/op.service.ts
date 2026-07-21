@@ -5,11 +5,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
+import { ComprasService } from '../../compras/compras.service';
+import { liberarReservasDeOp } from '../../compras/reserva-insumos';
 import { amarrarTalla, DisponibilidadBodega } from './amarre';
 
 @Injectable()
 export class OpService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly compras: ComprasService,
+  ) {}
 
   async generarDesdeOC(ocId: number) {
     const oc = await this.prisma.ordenCompra.findUnique({
@@ -23,7 +28,7 @@ export class OpService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const creada = await this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
         // La línea del pedido baja de la OC: fabricación la lee de la OP.
@@ -104,6 +109,24 @@ export class OpService {
         include: { lineas: { include: { tallas: true } } },
       });
     });
+
+    // La promesa de la Entrega 4: apenas se confirma el pedido, el sistema
+    // amarra los insumos que ya hay en bodega y dice exactamente qué comprar.
+    // Solo aplica si algo quedó A PRODUCIR (lo amarrado de PT no consume insumos).
+    let requerimientoId: number | null = null;
+    const aProducir = ((creada as any)?.lineas ?? []).some((l: any) =>
+      (l.tallas ?? []).some((t: any) => t.cantAProducir > 0),
+    );
+    if (aProducir) {
+      try {
+        const req = await this.compras.calcularRequerimiento((creada as any).id);
+        requerimientoId = req.id;
+      } catch {
+        // BOM incompleto u otro tropiezo: la OP queda creada igual y el
+        // requerimiento se puede calcular a mano desde el detalle de la OP.
+      }
+    }
+    return { ...(creada as any), requerimientoId };
   }
 
   async anular(opId: number) {
@@ -142,6 +165,9 @@ export class OpService {
         where: { opId, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
         data: { estado: 'ANULADA' },
       });
+      // El amarre de insumos también se suelta: esos materiales quedan libres
+      // para otros pedidos.
+      await liberarReservasDeOp(tx, opId);
       await tx.ordenProduccion.update({
         where: { id: opId },
         data: { estado: 'ANULADA' },

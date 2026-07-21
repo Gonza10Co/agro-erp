@@ -7,6 +7,7 @@ import {
   RegistrarDevolucionDto,
   RegistrarRecepcionDto,
   Requerimiento,
+  RequerimientoResumen,
   ResultadoGenerarOrdenes,
 } from './models/compras.models';
 
@@ -20,6 +21,11 @@ export class ComprasApi {
   }
   obtener(id: number) {
     return this.http.get<Requerimiento>(`${this.base}/requerimientos/${id}`);
+  }
+  listarPorOp(opId: number) {
+    return this.http.get<RequerimientoResumen[]>(`${this.base}/requerimientos`, {
+      params: { opId },
+    });
   }
 
   // ── Demo 13: OCP a proveedor ──

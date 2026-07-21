@@ -7,13 +7,13 @@ import { ComprasApi } from '../../core/api/compras.api';
 import { Requerimiento } from '../../core/api/models/compras.models';
 
 const datos: Requerimiento = {
-  id: 1, consecutivo: 1, opId: 7, fecha: '2026-06-05', estado: 'CALCULADO',
+  id: 1, consecutivo: 1, opId: 7, fecha: '2026-06-05', estado: 'CALCULADO', reservaActiva: true,
   grupos: [
     { proveedor: { id: 7, nombre: 'Curtiembre Andina' }, lineas: [
-      { materialId: 1, materialCodigo: 'CUERO-NEGRO', materialNombre: 'Cuero negro', proveedorId: 7, proveedorNombre: 'Curtiembre Andina', cantNecesaria: 100, cantDisponible: 30, cantAComprar: 70 },
+      { materialId: 1, materialCodigo: 'CUERO-NEGRO', materialNombre: 'Cuero negro', proveedorId: 7, proveedorNombre: 'Curtiembre Andina', cantNecesaria: 100, cantDisponible: 30, cantReservada: 30, cantAComprar: 70 },
     ] },
     { proveedor: null, lineas: [
-      { materialId: 9, materialCodigo: 'PEGANTE', materialNombre: 'Pegante', proveedorId: null, proveedorNombre: null, cantNecesaria: 5, cantDisponible: 0, cantAComprar: 5 },
+      { materialId: 9, materialCodigo: 'PEGANTE', materialNombre: 'Pegante', proveedorId: null, proveedorNombre: null, cantNecesaria: 5, cantDisponible: 0, cantReservada: 0, cantAComprar: 5 },
     ] },
   ],
 };
@@ -45,6 +45,18 @@ describe('RequerimientoComponent', () => {
   it('muestra estado vacío cuando no hay grupos', () => {
     const el: HTMLElement = setup({ ...datos, grupos: [] }).nativeElement;
     expect(el.textContent).toContain('Nada que comprar');
+  });
+
+  it('muestra la columna Amarrado y la nota de insumos amarrados', () => {
+    const el: HTMLElement = setup(datos).nativeElement;
+    expect(el.textContent).toContain('Amarrado');
+    expect(el.textContent).toContain('insumos de bodega amarrados a este pedido');
+  });
+
+  it('con la reserva liberada muestra la marca "amarre liberado"', () => {
+    const el: HTMLElement = setup({ ...datos, reservaActiva: false }).nativeElement;
+    expect(el.textContent).toContain('amarre liberado');
+    expect(el.textContent).not.toContain('insumos de bodega amarrados');
   });
 
   it('muestra "Generar órdenes de compra" cuando está CALCULADO y hay líneas con proveedor', () => {

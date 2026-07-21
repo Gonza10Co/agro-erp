@@ -6,6 +6,8 @@ export interface LineaRequerimiento {
   proveedorNombre: string | null;
   cantNecesaria: number;
   cantDisponible: number;
+  /** Amarre de insumos: lo que este pedido reservó de bodega al calcularse. */
+  cantReservada: number;
   cantAComprar: number;
 }
 
@@ -20,7 +22,17 @@ export interface Requerimiento {
   opId: number;
   fecha: string;
   estado?: 'CALCULADO' | 'CON_ORDEN';
+  /** false = el amarre ya se liberó (OP anulada/despachada o recálculo posterior). */
+  reservaActiva?: boolean;
   grupos: GrupoRequerimiento[];
+}
+
+/** Fila del listado de requerimientos de una OP (GET /requerimientos?opId). */
+export interface RequerimientoResumen {
+  id: number;
+  consecutivo: number;
+  fecha: string;
+  reservaActiva: boolean;
 }
 
 // ── Demo 13: OCP a proveedor ──

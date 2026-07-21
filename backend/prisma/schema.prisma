@@ -654,6 +654,9 @@ model InventarioMaterial {
   materialId     Int      @unique
   material       Material @relation(fields: [materialId], references: [id])
   cantDisponible Decimal  @default(0) @db.Decimal(14, 4)
+  // Amarre de insumos: lo reservado por pedidos en curso. El neto reservable de
+  // un pedido nuevo es cantDisponible − cantReservada (nunca negativo).
+  cantReservada  Decimal  @default(0) @db.Decimal(14, 4)
   updatedAt      DateTime @updatedAt
 }
 
@@ -664,6 +667,9 @@ model RequerimientoCompra {
   op          OrdenProduccion     @relation(fields: [opId], references: [id])
   fecha       DateTime            @default(now())
   estado      EstadoRequerimiento @default(CALCULADO)
+  // La reserva de bodega sigue viva. Se apaga al anular/despachar la OP o al
+  // recalcular el requerimiento (el nuevo re-amarra; este queda como histórico).
+  reservaActiva Boolean           @default(true)
   createdAt   DateTime            @default(now())
 
   lineas        RequerimientoCompraLinea[]
@@ -682,6 +688,9 @@ model RequerimientoCompraLinea {
   proveedor       Proveedor?          @relation(fields: [proveedorId], references: [id])
   cantNecesaria   Decimal             @db.Decimal(14, 4)
   cantDisponible  Decimal             @db.Decimal(14, 4)
+  // Amarre de insumos: lo que este pedido reservó de bodega al calcularse.
+  // cantAComprar = cantNecesaria − cantReservada (lo no amarrado se compra).
+  cantReservada   Decimal             @default(0) @db.Decimal(14, 4)
   cantAComprar    Decimal             @db.Decimal(14, 4)
 
   @@index([requerimientoId])
