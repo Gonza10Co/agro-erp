@@ -46,22 +46,27 @@ export class ReportesService {
         },
         select: { fecha: true, subtotal: true, lineas: { select: { cantidad: true } } },
       }),
-      // El kardex de bodega PT aún NO es segmentable por línea (el stock PT no
-      // conoce la línea): con filtro activo va vacío y el front lo dice honesto.
-      porLinea
-        ? Promise.resolve([])
-        : this.prisma.movimientoInventario.findMany({
-            where: { inventarioPTId: { not: null }, createdAt: { gte: desde, lt: hasta } },
-            select: { tipo: true, motivo: true, cantidad: true, createdAt: true },
-          }),
+      // Kardex PT: cada movimiento sella la línea del pedido que lo originó
+      // (par.lineaId / op.lineaId). Los históricos previos a la columna quedaron
+      // con NULL: solo suman en "Todas las líneas".
+      this.prisma.movimientoInventario.findMany({
+        where: {
+          inventarioPTId: { not: null },
+          createdAt: { gte: desde, lt: hasta },
+          ...(porLinea ? { lineaId } : {}),
+        },
+        select: { tipo: true, motivo: true, cantidad: true, createdAt: true },
+      }),
       // Saldo de PT al inicio del mes = entradas − salidas de movimientos previos.
-      porLinea
-        ? Promise.resolve([])
-        : this.prisma.movimientoInventario.groupBy({
-            by: ['tipo'],
-            where: { inventarioPTId: { not: null }, createdAt: { lt: desde } },
-            _sum: { cantidad: true },
-          }),
+      this.prisma.movimientoInventario.groupBy({
+        by: ['tipo'],
+        where: {
+          inventarioPTId: { not: null },
+          createdAt: { lt: desde },
+          ...(porLinea ? { lineaId } : {}),
+        },
+        _sum: { cantidad: true },
+      }),
       // Sin filtro se compara contra la meta global (lineaId NULL); con filtro,
       // contra la meta propia de esa línea.
       this.prisma.meta.findMany({ where: { anio, mes, lineaId: lineaId ?? null } }),

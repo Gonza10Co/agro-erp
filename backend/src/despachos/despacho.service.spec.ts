@@ -3,7 +3,7 @@ import { DespachoService } from './despacho.service';
 
 function opBase(over: any = {}) {
   return {
-    id: 1, ocId: 9, estado: 'AMARRADA', despacho: null,
+    id: 1, ocId: 9, estado: 'AMARRADA', despacho: null, lineaId: 3,
     oc: { cliente: { estadoCartera: 'AL_DIA' } },
     lineas: [
       { productoConfiguradoId: 7, tallas: [
@@ -108,6 +108,7 @@ describe('DespachoService', () => {
           cantidad: 5,
           referencia: 'DSP-5',
           usuarioId: 4,
+          lineaId: 3, // la línea de la OP se sella en el kardex (reporte por línea)
         },
       ],
     });

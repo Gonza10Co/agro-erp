@@ -1004,28 +1004,42 @@ async function main() {
     );
   }
 
-  // 3) Entrada de producción al kardex de PT: una agregada por día (no una por par).
-  const movProdD14 = PRODUCCION_DIA.map(({ d, cant }) => ({
-    tipo: 'ENTRADA' as const,
-    motivo: 'PRODUCCION' as const,
-    inventarioPTId: invPT.id,
-    cantidad: cant,
-    referencia: 'D14-PROD',
-    createdAt: diaUTC(d, 14),
-  }));
+  // 3) Entrada de producción al kardex de PT: una por día y por línea (no una por par).
+  // La línea queda sellada en el movimiento (kardex PT por línea); el total diario
+  // no cambia porque el reparto ya cuadra el residuo del redondeo en Basarili.
+  const movProdD14 = repartoDia.flatMap(({ d, porCons }) =>
+    PROD_LINEAS.map((cadena) => ({
+      tipo: 'ENTRADA' as const,
+      motivo: 'PRODUCCION' as const,
+      inventarioPTId: invPT.id,
+      cantidad: porCons[cadena.cons],
+      referencia: 'D14-PROD',
+      lineaId: cadena.linea?.id ?? null,
+      createdAt: diaUTC(d, 14),
+    })),
+  );
   await prisma.movimientoInventario.createMany({ data: movProdD14 });
 
   // Saldo inicial de bodega al arrancar el mes (último día del mes previo), para soportar
   // ventas que salen de stock acumulado (como en el Excel: la bodega ronda ~25.000 pares).
-  await prisma.movimientoInventario.create({
-    data: {
-      tipo: 'ENTRADA',
-      motivo: 'PRODUCCION',
+  // Repartido por línea (40/30/20/10) para que el kardex filtrado nunca quede negativo:
+  // Alta vende sobre su meta (7.500) y necesita colchón mayor que su 15% de producción.
+  const SALDO_INI_LINEAS = [
+    { linea: linBasarili, cant: 12000 },
+    { linea: linAgro, cant: 9000 },
+    { linea: linAlta, cant: 6000 },
+    { linea: linFeroz, cant: 3000 },
+  ];
+  await prisma.movimientoInventario.createMany({
+    data: SALDO_INI_LINEAS.map(({ linea, cant }) => ({
+      tipo: 'ENTRADA' as const,
+      motivo: 'PRODUCCION' as const,
       inventarioPTId: invPT.id,
-      cantidad: 30000,
+      cantidad: cant,
       referencia: 'D14-SALDOINI',
+      lineaId: linea?.id ?? null,
       createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)),
-    },
+    })),
   });
 
   // Ventas del mes: 3 cadenas OC→OP→Despacho→Factura (Despacho tiene opId único,
@@ -1094,6 +1108,7 @@ async function main() {
         inventarioPTId: invPT.id,
         cantidad: v.cant,
         referencia: 'D14-DESP',
+        lineaId: v.linea?.id ?? null,
         createdAt: diaUTC(v.d, 15),
       },
     });

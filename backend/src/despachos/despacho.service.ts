@@ -95,6 +95,7 @@ export class DespachoService {
       }
 
       // Kardex: una SALIDA por reserva despachada, trazable al despacho.
+      // La línea de la OP se sella en el movimiento (kardex PT por línea).
       await tx.movimientoInventario.createMany({
         data: reservas.map((r) => ({
           tipo: 'SALIDA' as const,
@@ -103,6 +104,7 @@ export class DespachoService {
           cantidad: r.cantidad,
           referencia: `DSP-${consecutivo}`,
           usuarioId: user.sub,
+          lineaId: op.lineaId ?? null,
         })),
       });
 

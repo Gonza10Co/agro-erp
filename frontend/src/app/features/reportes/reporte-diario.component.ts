@@ -96,9 +96,9 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
         <!-- Kardex de Producto Terminado -->
         <div class="card"><div class="card-body table-wrap">
           <div class="sec-h">Kardex de Producto Terminado <span class="cell-sub">· saldo de bodega día a día</span></div>
-          @if (lineaSel() !== null) {
-            <!-- Honesto: el stock de bodega PT aún no distingue de qué línea salió cada par. -->
-            <p class="cell-sub">El kardex de bodega aún no se segmenta por línea; quita el filtro para verlo completo.</p>
+          @if (lineaSel() !== null && kardexConMov().length === 0) {
+            <!-- Los movimientos previos al kardex por línea no tienen línea sellada. -->
+            <p class="cell-sub">Sin movimientos de bodega de esta línea este mes (los históricos sin línea suman solo en «Todas las líneas»).</p>
           } @else if (kardexConMov().length === 0) {
             <p class="cell-sub">Sin movimientos de bodega este mes.</p>
           } @else {

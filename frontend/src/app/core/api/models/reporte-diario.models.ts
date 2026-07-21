@@ -45,7 +45,8 @@ export interface ReporteDiario {
   metas: BloqueMetas;
   kardexPT: FilaKardexPT[];
   pendientes: string[];
-  /** Línea filtrada (null = toda la fábrica). Con línea, el kardex PT va vacío. */
+  /** Línea filtrada (null = toda la fábrica). El kardex PT se corta por la línea
+   *  sellada en cada movimiento; los históricos sin línea suman solo en el global. */
   lineaId?: number | null;
 }
 

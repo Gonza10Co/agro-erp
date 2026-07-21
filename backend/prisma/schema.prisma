@@ -272,6 +272,7 @@ model Linea {
   ordenesCompra   OrdenCompra[]
   ordenesProduccion OrdenProduccion[]
   metas           Meta[]
+  movimientosInventario MovimientoInventario[]
 }
 
 model Marca {
@@ -1032,6 +1033,10 @@ model MovimientoInventario {
   inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
   cantidad       Decimal          @db.Decimal(14, 4)
   costoUnitario  Decimal?         @db.Decimal(14, 4) // valoriza el movimiento (kardex valorizado)
+  // Línea de producción del pedido que originó el movimiento PT (par.lineaId / op.lineaId).
+  // NULL en movimientos de MP y en históricos previos a la columna: solo suman en "Todas las líneas".
+  lineaId        Int?
+  linea          Linea?           @relation(fields: [lineaId], references: [id])
   referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?
@@ -1040,6 +1045,7 @@ model MovimientoInventario {
 
   @@index([materialId, createdAt])
   @@index([inventarioPTId, createdAt])
+  @@index([lineaId, createdAt])
   @@index([createdAt])
 }
 
