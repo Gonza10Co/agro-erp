@@ -2,8 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
+  CrearOcpManualDto,
   OcpDetalle,
   OcpResumen,
+  ProveedorItem,
   RegistrarDevolucionDto,
   RegistrarRecepcionDto,
   Requerimiento,
@@ -52,5 +54,21 @@ export class ComprasApi {
       `${this.base}/compras/ordenes/${ocpId}/devoluciones`,
       dto,
     );
+  }
+  // OCP manual: compra directa sin requerimiento.
+  crearOrden(dto: CrearOcpManualDto) {
+    return this.http.post<{ id: number; consecutivo: number; estado: string }>(
+      `${this.base}/compras/ordenes`,
+      dto,
+    );
+  }
+  anularOrden(ocpId: number) {
+    return this.http.post<{ id: number; consecutivo: number; estado: string; requerimientoReabierto: boolean }>(
+      `${this.base}/compras/ordenes/${ocpId}/anular`,
+      {},
+    );
+  }
+  listarProveedores() {
+    return this.http.get<ProveedorItem[]>(`${this.base}/proveedores`);
   }
 }

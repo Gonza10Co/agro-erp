@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 import { OcpListComponent } from './ocp-list.component';
 import { ComprasApi } from '../../core/api/compras.api';
@@ -13,6 +15,7 @@ const datos: OcpResumen[] = [
     requerimiento: { id: 1, consecutivo: 9 },
     fecha: '2026-06-12',
     estado: 'PARCIAL',
+    valorEstimado: null,
     totalPedido: 30,
     totalRecibido: 20,
   },
@@ -23,6 +26,7 @@ const datos: OcpResumen[] = [
     requerimiento: null,
     fecha: '2026-06-12',
     estado: 'PENDIENTE',
+    valorEstimado: null,
     totalPedido: 8,
     totalRecibido: 0,
   },
@@ -34,6 +38,8 @@ describe('OcpListComponent', () => {
       imports: [OcpListComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ComprasApi, useValue: { listarOrdenes: () => of(items) } },
       ],
     });

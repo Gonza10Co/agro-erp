@@ -9,6 +9,7 @@ const OCP: Record<EstadoOcp, OcpBadge> = {
   PENDIENTE: { clase: 'badge-neutral', label: 'Pendiente' },
   PARCIAL:   { clase: 'badge-accent',  label: 'Parcial' },
   COMPLETA:  { clase: 'badge-success', label: 'Completa' },
+  ANULADA:   { clase: 'badge-neutral', label: 'Anulada' },
 };
 
 export const badgeOcp = (estado: EstadoOcp): OcpBadge => OCP[estado];

@@ -1,7 +1,7 @@
 // Núcleo puro de la Demo 13 — compras lado proveedor.
 // Sin Prisma ni NestJS: todo testeable en memoria.
 
-export type EstadoOcp = 'PENDIENTE' | 'PARCIAL' | 'COMPLETA';
+export type EstadoOcp = 'PENDIENTE' | 'PARCIAL' | 'COMPLETA' | 'ANULADA';
 
 export interface LineaOcpCantidades {
   cantPedida: number;
@@ -65,6 +65,41 @@ export function costoPromedioMovil(
   const stockNuevo = stockPrevio + cantEntra;
   if (stockNuevo <= 0) return costoEntra;
   return (stockPrevio * costoPrevio + cantEntra * costoEntra) / stockNuevo;
+}
+
+export interface LineaOcpManual {
+  materialId: number;
+  cantPedida: number;
+  costoUnitario?: number | null;
+}
+
+// Validación de la OCP manual (compra directa, sin requerimiento: reposición de
+// stock, insumos no ligados a una OP).
+export function validarOcpManual(lineas: LineaOcpManual[]): string | null {
+  if (!lineas.length) return 'La orden debe tener al menos una línea';
+  const vistos = new Set<number>();
+  for (const l of lineas) {
+    if (vistos.has(l.materialId)) return `Material ${l.materialId} repetido en la orden`;
+    vistos.add(l.materialId);
+    if (l.cantPedida <= 0) return 'Cada cantidad pedida debe ser mayor a 0';
+    if (l.costoUnitario != null && l.costoUnitario <= 0)
+      return 'El costo unitario, si se captura, debe ser mayor a 0';
+  }
+  return null;
+}
+
+// Guarda de anulación: solo una OCP sin mercancía movida puede anularse.
+export function validarAnulacionOcp(ocp: {
+  estado: EstadoOcp;
+  recepciones: number;
+  devoluciones: number;
+}): string | null {
+  if (ocp.estado === 'ANULADA') return 'La orden ya está anulada';
+  if (ocp.recepciones > 0)
+    return 'La orden tiene recepciones registradas; ya no se puede anular';
+  if (ocp.devoluciones > 0)
+    return 'La orden tiene devoluciones registradas; ya no se puede anular';
+  return null;
 }
 
 export function validarDevolucion(
