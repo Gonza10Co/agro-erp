@@ -12,8 +12,16 @@ Uso:
     python tools/generar-despiece.py <ruta-al-xlsx>
 
 Escribe (dentro de backend/prisma/data/basarili/, que está fuera de control de versiones):
-    bom-curva.csv   referencia,material,pieza,talla,consumo
-    bom-fijo.csv    referencia,material,consumoFijo,mermaPct   (sin los materiales despiezados)
+    bom-curva.csv      referencia,material,pieza,talla,consumo
+    bom-fijo.csv       referencia,material,consumoFijo,mermaPct   (sin los materiales despiezados)
+    bom-variantes.csv  variante,referencia,accion,materialObjetivo,pieza,materialNuevo,talla,consumo
+                       Reglas de override para las variantes elegidas al pedir:
+                       - ECONOMICA: diff contra el despiece base de su referencia
+                         (SET_CONSUMO si cambia la curva, ADD si la línea es nueva,
+                         REMOVE si la línea base desaparece en la variante).
+                       - SP (sin puntera): ADD del contrafuerte preformado con su curva
+                         (hoy en CERO: bloques blancos, sin prueba industrial). El REMOVE
+                         de la puntera es estructural y lo pone el seed.
 
 Requiere: pip install openpyxl
 """
@@ -33,11 +41,9 @@ FILA_TALLAS = 3
 COL_INI = 3  # columna C
 GRISES = {"FFCCCCCC", "FFB7B7B7"}
 
-# Variantes que el cliente todavía no confirma cómo modelar (ECONOMICA y S/P van como
-# variantes elegidas al pedir → overrides por (material, pieza), entrega siguiente).
-# La 106 = RESORTADA quedó confirmada el 2026-07-09.
+# La 106 = RESORTADA quedó confirmada el 2026-07-09. Las variantes ECONOMICA y S/P
+# (elegidas al pedir) ya NO se descartan: salen como reglas en bom-variantes.csv.
 REFS_EXCLUIDAS: set[str] = set()
-PREFIJOS_EXCLUIDOS = ("ECONOMICA",)
 
 # Sufijo del nombre -> código de la pieza en el catálogo `Pieza`.
 # El orden importa: "SOPORTE LATERAL" debe probarse antes que "LATERAL".
@@ -73,7 +79,9 @@ MATERIALES = {
     "STROBEL": "PSTR263",  # STROBEL 300 GRMS
     "VAMPLING FORRO": "PVAM265",  # VAMPLING LININF
     "CONTRAFUERTE COUNTER DOUBLE SID": "PCON44",
-    "CONTRAFUERTE COUNTER DOUBLE SID S/P": "PCON44",
+    # El preformado S/P es un material distinto (reemplaza puntera + contrafuerte en la
+    # variante "sin puntera"); antes colisionaba con PCON44 y se descartaba.
+    "CONTRAFUERTE COUNTER DOUBLE SID S/P": "PCON44SP",
     "LAMBRILLA 2,5": "PLAM126",
     "LAMBRILLA EVA 2,5 BULLON": "PLAM126",  # cliente: BULLON EVA = LAMBRILLA 2,5
     "LAMBRILLLA EVA 2,5 BULLON": "PLAM126",  # sic: triple L, typo del Excel en la ref 106
@@ -137,9 +145,12 @@ def main() -> int:
 
     # clave (ref, material, pieza) -> (validado, {talla: consumo}, nombre en la hoja)
     lineas: dict[tuple[str, str, str], tuple[bool, dict[int, float], str]] = {}
+    # clave (variante, ref, material, pieza) -> (validado, {talla: consumo}, nombre)
+    var_lineas: dict[tuple[str, str, str, str], tuple[bool, dict[int, float], str]] = {}
     despiezados: dict[str, set[str]] = defaultdict(set)
     sin_mapeo: set[str] = set()
     colisiones: list[str] = []
+    combos_omitidos: set[str] = set()
     validados = sin_validar = 0
 
     for r in range(1, ws.max_row + 1):
@@ -152,32 +163,50 @@ def main() -> int:
         if not m:
             continue
         ref, nombre = m.group(1), m.group(2).strip().upper()
-        if ref in REFS_EXCLUIDAS or nombre.startswith(PREFIJOS_EXCLUIDOS):
+        if ref in REFS_EXCLUIDAS:
             continue
 
-        base, pieza = partir_pieza(nombre)
+        variante: str | None = None
+        nombre_bom = nombre
+        if nombre.startswith("ECONOMICA"):
+            variante = "ECONOMICA"
+            nombre_bom = nombre[len("ECONOMICA"):].strip()
+
+        base, pieza = partir_pieza(nombre_bom)
         codigo = MATERIALES.get(base)
         if not codigo:
             sin_mapeo.add(f"{ref}: {base}")
             continue
+        if codigo == "PCON44SP":
+            if variante == "ECONOMICA":
+                # Combo ECONOMICA+S/P: se compone solo (reglas de ambas opciones); no
+                # necesita fila propia mientras el bloque siga en blanco.
+                combos_omitidos.add(f"{ref}: {nombre}")
+                continue
+            variante = "SP"
 
         # El color manda: un bloque sin gris no tiene prueba industrial.
         bloque_validado = any(es_gris(ws.cell(r, c)) for c in range(COL_INI, COL_INI + len(tallas)))
-        if bloque_validado:
-            validados += 1
-        else:
-            sin_validar += 1
+        if variante is None:
+            if bloque_validado:
+                validados += 1
+            else:
+                sin_validar += 1
 
-        despiezados[ref].add(codigo)
         curva = {}
         for i, talla in enumerate(tallas):
             celda = ws.cell(r, COL_INI + i)
             valor = celda.value if isinstance(celda.value, (int, float)) else 0
             curva[talla] = round(float(valor), 6) if (bloque_validado and es_gris(celda)) else 0
 
-        # Dos nombres de la hoja pueden caer en el mismo (material, pieza) — p. ej. el
-        # contrafuerte normal y el "S/P" comparten código. Gana el que tenga prueba
-        # industrial; si chocaran dos validados, hay que desambiguar el catálogo.
+        if variante is not None:
+            var_lineas[(variante, ref, codigo, pieza or "")] = (bloque_validado, curva, nombre)
+            continue
+
+        despiezados[ref].add(codigo)
+
+        # Dos nombres de la hoja pueden caer en el mismo (material, pieza). Gana el que
+        # tenga prueba industrial; si chocaran dos validados, hay que desambiguar el catálogo.
         clave = (ref, codigo, pieza or "")
         previo = lineas.get(clave)
         if previo:
@@ -243,13 +272,65 @@ def main() -> int:
     else:
         quitadas = 0
 
+    # --- bom-variantes.csv: reglas de override por (material, pieza) para las variantes.
+    # (variante, ref, accion, materialObjetivo, pieza, materialNuevo, curva|None)
+    reglas: list[tuple[str, str, str, str, str, str, dict[int, float] | None]] = []
+
+    # ECONOMICA: diff contra el despiece base de su misma referencia.
+    refs_econ = sorted({ref for (v, ref, _c, _p) in var_lineas if v == "ECONOMICA"})
+    for ref in refs_econ:
+        base_ref = {
+            (cod, pz): crv for (r, cod, pz), (_v, crv, _n) in lineas.items() if r == ref
+        }
+        econ_ref = {
+            (cod, pz): crv
+            for (v, r, cod, pz), (_va, crv, _n) in var_lineas.items()
+            if v == "ECONOMICA" and r == ref
+        }
+        for (cod, pz), crv in sorted(econ_ref.items()):
+            if (cod, pz) in base_ref:
+                if base_ref[(cod, pz)] != crv:
+                    reglas.append(("ECONOMICA", ref, "SET_CONSUMO", cod, pz, "", crv))
+            else:
+                reglas.append(("ECONOMICA", ref, "ADD", "", pz, cod, crv))
+        for (cod, pz) in sorted(base_ref):
+            if (cod, pz) not in econ_ref:
+                reglas.append(("ECONOMICA", ref, "REMOVE", cod, pz, "", None))
+
+    # S/P: ADD del contrafuerte preformado con su curva (hoy en cero, bloques blancos).
+    # El REMOVE de la puntera es estructural: lo resuelve el seed contra el BOM de la ref.
+    for (v, ref, cod, pz), (_va, crv, _n) in sorted(var_lineas.items()):
+        if v == "SP":
+            reglas.append(("SP", ref, "ADD", "", pz, cod, crv))
+
+    var_csv = DATA / "bom-variantes.csv"
+    with var_csv.open("w", encoding="utf-8", newline="") as f:
+        f.write("variante,referencia,accion,materialObjetivo,pieza,materialNuevo,talla,consumo\n")
+        for v, ref, acc, obj, pz, nuevo, crv in reglas:
+            if crv is None:
+                f.write(f"{v},{ref},{acc},{obj},{pz},{nuevo},,\n")
+            else:
+                for talla, cons in sorted(crv.items()):
+                    f.write(f"{v},{ref},{acc},{obj},{pz},{nuevo},{talla},{cons}\n")
+
+    if combos_omitidos:
+        print("COMBOS variante omitidos (se componen solos):")
+        for c in sorted(combos_omitidos):
+            print(f"  - {c}")
+
     refs = sorted(despiezados)
+    resumen_var = defaultdict(lambda: defaultdict(int))
+    for v, ref, acc, *_ in reglas:
+        resumen_var[v][acc] += 1
     print(
         f"Despiece: {validados} bloques validados (gris) · {sin_validar} en cero (blanco) · "
         f"{len(filas)} filas de curva · refs {', '.join(refs)}"
     )
+    for v, accs in sorted(resumen_var.items()):
+        detalle = " · ".join(f"{a}×{n}" for a, n in sorted(accs.items()))
+        print(f"Variante {v}: {detalle}")
     print(f"bom-fijo.csv: {quitadas} líneas retiradas (esos materiales ahora van por pieza)")
-    print(f"Escrito: {curva.name} y {fijo.name} (respaldo en bom-fijo.csv.pre-despiece)")
+    print(f"Escrito: {curva.name}, {fijo.name} y {var_csv.name} (respaldo en bom-fijo.csv.pre-despiece)")
     return 0
 
 

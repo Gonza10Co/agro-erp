@@ -192,7 +192,8 @@ model Pieza {
   orden  Int     @default(100) // orden natural del despiece, para listar
   activo Boolean @default(true)
 
-  lineasBom BomLinea[]
+  lineasBom      BomLinea[]
+  reglasOverride ReglaOverride[]
 }
 
 model BomLinea {
@@ -306,6 +307,11 @@ model ReglaOverride {
   materialObjetivo   Material?      @relation("MaterialObjetivo", fields: [materialObjetivoId], references: [id])
   materialNuevoId    Int?
   materialNuevo      Material?      @relation("MaterialNuevo", fields: [materialNuevoId], references: [id])
+  // Variantes por pieza (ECONOMICA/S-P): con piezaId la regla afecta SOLO la línea
+  // (materialObjetivo, pieza); NULL = todas las piezas del material (comportamiento clásico).
+  // En ADD, piezaId es la pieza donde entra la línea nueva.
+  piezaId            Int?
+  pieza              Pieza?         @relation(fields: [piezaId], references: [id])
   consumoFijo        Decimal?
   heredaCurva        Boolean        @default(false)
 

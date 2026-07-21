@@ -27,6 +27,12 @@ export interface Override {
   orden: number;
   materialObjetivoId: number | null;
   materialNuevoId: number | null;
+  /**
+   * Variantes por pieza (ECONOMICA/S-P): con pieza, la regla afecta SOLO la línea
+   * (materialObjetivo, pieza); null/ausente = todas las piezas del material.
+   * En ADD es la pieza donde entra la línea nueva.
+   */
+  piezaObjetivoId?: number | null;
   consumoFijo: number | null;
   heredaCurva: boolean;
   consumoPorTalla: Record<number, number>;
