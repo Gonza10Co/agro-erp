@@ -65,6 +65,9 @@ export class DespachoService {
             productoConfiguradoId: l.productoConfiguradoId,
             tallaId: t.tallaId,
             bodegaId: r.inventarioPT.bodegaId,
+            // El grado sale del saldo del que se reservó, no de la línea: es lo
+            // que físicamente sale de bodega.
+            calidad: r.inventarioPT.calidad ?? 'PRIMERA',
             cantidad: r.cantidad,
             inventarioPTId: r.inventarioPTId,
             reservaId: r.id,

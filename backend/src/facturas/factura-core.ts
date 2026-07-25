@@ -1,18 +1,27 @@
 // Núcleo puro de facturación: valoriza lo despachado y calcula totales.
 // Sin Prisma ni Nest — testeable en aislamiento. Redondeo a 2 decimales (centavos).
 
+export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
+
 export interface LineaDespachoParaFacturar {
   productoConfiguradoId: number;
   tallaId: number;
+  calidad?: CalidadPT;
   cantidad: number;
 }
 
 export interface LineaFacturaData {
   productoConfiguradoId: number;
   tallaId: number;
+  calidad: CalidadPT;
   cantidad: number;
   precioUnitario: number;
   subtotal: number;
+}
+
+/** Clave del precio pactado: el mismo producto vale distinto según su grado. */
+export function clavePrecio(productoConfiguradoId: number, calidad: CalidadPT): string {
+  return `${productoConfiguradoId}|${calidad}`;
 }
 
 export interface Totales {
@@ -28,21 +37,24 @@ function redondear(n: number): number {
 
 /**
  * Construye las líneas de factura valorizando cada línea de despacho con el precio
- * pactado del producto. Lanza si algún producto despachado no tiene precio pactado.
+ * pactado para su producto Y SU GRADO: una segunda se vende más barata, así que el
+ * precio se busca por (producto, calidad). Lanza si no hay precio pactado.
  */
 export function lineasDeFactura(
   lineasDespacho: LineaDespachoParaFacturar[],
-  precioPorProducto: Map<number, number>,
+  precioPorProducto: Map<string, number>,
 ): LineaFacturaData[] {
   return lineasDespacho.map((l) => {
-    const precio = precioPorProducto.get(l.productoConfiguradoId);
+    const calidad = l.calidad ?? 'PRIMERA';
+    const precio = precioPorProducto.get(clavePrecio(l.productoConfiguradoId, calidad));
     if (precio == null)
       throw new Error(
-        `Producto ${l.productoConfiguradoId} sin precio pactado en la OC`,
+        `Producto ${l.productoConfiguradoId} (${calidad}) sin precio pactado en la OC`,
       );
     return {
       productoConfiguradoId: l.productoConfiguradoId,
       tallaId: l.tallaId,
+      calidad,
       cantidad: l.cantidad,
       precioUnitario: precio,
       subtotal: redondear(l.cantidad * precio),

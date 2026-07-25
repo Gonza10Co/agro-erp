@@ -47,6 +47,8 @@ export interface OCLinea {
   id: number;
   productoConfiguradoId: number;
   productoConfigurado?: ProductoConfigurado;
+  /** Grado pedido: una segunda se vende a otro precio y sale de otro saldo. */
+  calidad?: 'PRIMERA' | 'SEGUNDA';
   precioUnitario?: string | null; // Decimal serializado como string
   tallas: OCLineaTalla[];
 }
@@ -101,6 +103,8 @@ export interface OPLinea {
   id: number;
   productoConfiguradoId: number;
   productoConfigurado?: ProductoConfigurado;
+  /** Heredado de la OC: define de qué saldo descarga el despacho. */
+  calidad?: 'PRIMERA' | 'SEGUNDA';
   tallas: OPLineaTalla[];
 }
 export interface OrdenProduccion {
@@ -116,7 +120,8 @@ export interface OrdenProduccion {
 export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; tipoCredito?: TipoCredito; cupo?: number; }
 export interface CrearSedeDto { nombre: string; ciudad: string; direccion: string; telefono?: string; esPrincipal?: boolean; }
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
-export interface CrearOCLineaDto { productoConfiguradoId: number; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
+export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
+export interface CrearOCLineaDto { productoConfiguradoId: number; calidad?: CalidadPT; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
 export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineaId?: number; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }

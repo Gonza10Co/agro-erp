@@ -13,7 +13,8 @@ function despachoBase(over: any = {}) {
       oc: {
         clienteId: 7,
         cliente: { id: 7, tipoCredito: 'D30', estadoCartera: 'AL_DIA' },
-        lineas: [{ productoConfiguradoId: 10, precioUnitario: 85000 }],
+        // El precio se pacta por (producto, grado): la línea de primeras.
+        lineas: [{ productoConfiguradoId: 10, calidad: 'PRIMERA', precioUnitario: 85000 }],
       },
     },
     ...over,
@@ -177,8 +178,8 @@ describe('FacturaService', () => {
     expect(Number(arg.data.iva)).toBe(80750);
     expect(Number(arg.data.total)).toBe(505750);
     expect(arg.data.lineas.create).toEqual([
-      { productoConfiguradoId: 10, tallaId: 38, cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
-      { productoConfiguradoId: 10, tallaId: 40, cantidad: 2, precioUnitario: 85000, subtotal: 170000 },
+      { productoConfiguradoId: 10, tallaId: 38, calidad: 'PRIMERA', cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
+      { productoConfiguradoId: 10, tallaId: 40, calidad: 'PRIMERA', cantidad: 2, precioUnitario: 85000, subtotal: 170000 },
     ]);
   });
 

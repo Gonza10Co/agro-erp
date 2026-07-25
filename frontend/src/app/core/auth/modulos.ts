@@ -81,8 +81,9 @@ export type Seccion =
   | 'ocp-manual'
   | 'ocp-anular'
   | 'costo-ocp'
-  // Entrega 5 — facturación de servicios (maquila Feroz).
-  | 'factura-servicio';
+  // Entrega 5 — facturación de servicios (maquila Feroz) y venta de segundas.
+  | 'factura-servicio'
+  | 'venta-segundas';
 
 /**
  * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
@@ -109,6 +110,9 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // Entrega 5, pendiente de su demo. El módulo `facturas` hoy es INTERNO, así que
   // este gate es el que manda el día que se libere facturación al cliente.
   'factura-servicio': 'EN_STAGE',
+  // Vender segundas sí cae dentro de `pedidos`, que el cliente ya tiene: sin este
+  // gate el selector de calidad aparecería en su wizard apenas se despliegue.
+  'venta-segundas': 'EN_STAGE',
 };
 
 /**

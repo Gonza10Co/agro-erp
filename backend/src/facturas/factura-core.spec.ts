@@ -1,4 +1,4 @@
-import { lineasDeFactura, lineasDeServicio, totales } from './factura-core';
+import { clavePrecio, lineasDeFactura, lineasDeServicio, totales } from './factura-core';
 
 describe('factura-core', () => {
   describe('lineasDeServicio (maquila / mantenimiento)', () => {
@@ -52,9 +52,9 @@ describe('factura-core', () => {
 
   describe('lineasDeFactura', () => {
     it('valoriza cada línea de despacho con el precio pactado del producto', () => {
-      const precios = new Map<number, number>([
-        [10, 85000],
-        [20, 92000],
+      const precios = new Map<string, number>([
+        [clavePrecio(10, 'PRIMERA'), 85000],
+        [clavePrecio(20, 'PRIMERA'), 92000],
       ]);
       const lineas = lineasDeFactura(
         [
@@ -65,13 +65,38 @@ describe('factura-core', () => {
       );
 
       expect(lineas).toEqual([
-        { productoConfiguradoId: 10, tallaId: 38, cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
-        { productoConfiguradoId: 20, tallaId: 40, cantidad: 2, precioUnitario: 92000, subtotal: 184000 },
+        { productoConfiguradoId: 10, tallaId: 38, calidad: 'PRIMERA', cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
+        { productoConfiguradoId: 20, tallaId: 40, calidad: 'PRIMERA', cantidad: 2, precioUnitario: 92000, subtotal: 184000 },
       ]);
     });
 
+    it('la SEGUNDA se valoriza a su propio precio, no al de la primera', () => {
+      const precios = new Map<string, number>([
+        [clavePrecio(10, 'PRIMERA'), 85000],
+        [clavePrecio(10, 'SEGUNDA'), 55000], // mismo producto, grado distinto
+      ]);
+      const lineas = lineasDeFactura(
+        [
+          { productoConfiguradoId: 10, tallaId: 38, calidad: 'PRIMERA', cantidad: 3 },
+          { productoConfiguradoId: 10, tallaId: 38, calidad: 'SEGUNDA', cantidad: 2 },
+        ],
+        precios,
+      );
+      expect(lineas[0]).toMatchObject({ calidad: 'PRIMERA', precioUnitario: 85000, subtotal: 255000 });
+      expect(lineas[1]).toMatchObject({ calidad: 'SEGUNDA', precioUnitario: 55000, subtotal: 110000 });
+    });
+
+    it('lanza si se despacharon segundas sin precio pactado para ese grado', () => {
+      // Tener precio de primera NO habilita facturar segundas: si el pedido no
+      // pactó tarifa de segunda, la factura saldría al precio equivocado.
+      const precios = new Map<string, number>([[clavePrecio(10, 'PRIMERA'), 85000]]);
+      expect(() =>
+        lineasDeFactura([{ productoConfiguradoId: 10, tallaId: 38, calidad: 'SEGUNDA', cantidad: 1 }], precios),
+      ).toThrow(/SEGUNDA.*sin precio pactado/);
+    });
+
     it('redondea el subtotal a 2 decimales (sin float drift)', () => {
-      const precios = new Map<number, number>([[10, 99.99]]);
+      const precios = new Map<string, number>([[clavePrecio(10, 'PRIMERA'), 99.99]]);
       const [linea] = lineasDeFactura(
         [{ productoConfiguradoId: 10, tallaId: 38, cantidad: 3 }],
         precios,

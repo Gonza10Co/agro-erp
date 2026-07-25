@@ -80,7 +80,10 @@ describe('DespachoService', () => {
     expect(createArg.data.consecutivo).toBe(5);
     expect(createArg.data.opId).toBe(1);
     expect(createArg.data.autorizadoPorId).toBeNull();
-    expect(createArg.data.lineas.create).toEqual([{ productoConfiguradoId: 7, tallaId: 10, bodegaId: 2, cantidad: 5 }]);
+    // El grado viaja al remito: sin él, una segunda saldría rotulada como primera.
+    expect(createArg.data.lineas.create).toEqual([
+      { productoConfiguradoId: 7, tallaId: 10, bodegaId: 2, calidad: 'PRIMERA', cantidad: 5 },
+    ]);
     expect(prisma.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { estado: 'DESPACHADA' } });
     expect(prisma.ordenCompra.update).toHaveBeenCalledWith({ where: { id: 9 }, data: { estado: 'CERRADA' } });
   });

@@ -39,6 +39,8 @@ export class OcService {
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
+              // Grado pedido: define de qué saldo amarra la OP y a qué precio se factura.
+              calidad: l.calidad ?? 'PRIMERA',
               precioUnitario: l.precioUnitario,
               tallas: {
                 create: l.tallas.map((t) => ({
@@ -86,6 +88,8 @@ export class OcService {
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
+              // Grado pedido: define de qué saldo amarra la OP y a qué precio se factura.
+              calidad: l.calidad ?? 'PRIMERA',
               precioUnitario: l.precioUnitario,
               tallas: {
                 create: l.tallas.map((t) => ({

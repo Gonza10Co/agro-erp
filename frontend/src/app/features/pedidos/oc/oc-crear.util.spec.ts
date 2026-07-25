@@ -29,6 +29,23 @@ describe('oc-crear.util', () => {
     });
   });
 
+  it('construirDto manda la calidad SEGUNDA con su propio precio', () => {
+    const lineas: LineaWizard[] = [
+      { producto: PROD, precio: 55000, calidad: 'SEGUNDA', valores: { 2: 10 } },
+    ];
+    const dto = construirDto({ clienteId: 3, lineas });
+    expect(dto.lineas[0].calidad).toBe('SEGUNDA');
+    expect(dto.lineas[0].precioUnitario).toBe(55000);
+  });
+
+  it('construirDto NO manda la clave calidad en un pedido normal', () => {
+    // PRIMERA es el default del backend: los pedidos de siempre no cambian de forma.
+    const lineas: LineaWizard[] = [{ producto: PROD, precio: 85000, valores: { 2: 10 } }];
+    expect(construirDto({ clienteId: 3, lineas }).lineas[0].calidad).toBeUndefined();
+    const explicita: LineaWizard[] = [{ producto: PROD, precio: 85000, calidad: 'PRIMERA', valores: { 2: 10 } }];
+    expect(construirDto({ clienteId: 3, lineas: explicita }).lineas[0].calidad).toBeUndefined();
+  });
+
   it('construirDto omite precioUnitario cuando no hay precio', () => {
     const lineas: LineaWizard[] = [{ producto: PROD, precio: 0, valores: { 2: 4 } }];
     const dto = construirDto({ clienteId: 3, lineas });

@@ -511,6 +511,9 @@ model OrdenCompraLinea {
   oc                    OrdenCompra         @relation(fields: [ocId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  // Grado pedido: el cliente puede comprar segundas a otro precio. El precio se
+  // pacta POR LÍNEA, así que una segunda va en su propia línea con su tarifa.
+  calidad               CalidadPT           @default(PRIMERA)
   precioUnitario        Decimal?            @db.Decimal(14, 2) // precio pactado por par (igual todas las tallas)
 
   tallas OrdenCompraLineaTalla[]
@@ -578,6 +581,8 @@ model OrdenProduccionLinea {
   op                    OrdenProduccion     @relation(fields: [opId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  // Hereda el grado pedido en la OC: el despacho descarga de ese saldo.
+  calidad               CalidadPT           @default(PRIMERA)
 
   tallas OrdenProduccionLineaTalla[]
 
@@ -639,6 +644,9 @@ model DespachoLinea {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   bodegaId              Int
   bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  // Entra en la identidad de la línea: sin esto una primera y una segunda del
+  // mismo producto+talla+bodega colapsarían en un solo renglón del remito.
+  calidad               CalidadPT           @default(PRIMERA)
   cantidad              Int
 
   @@index([despachoId])
@@ -1068,6 +1076,8 @@ model FacturaLinea {
   servicioId            Int?
   servicio              ServicioCatalogo?    @relation(fields: [servicioId], references: [id])
   descripcion           String? // texto libre del servicio, como en la hoja del cliente
+  // Grado facturado: sin esto una segunda saldría al precio de la primera.
+  calidad               CalidadPT            @default(PRIMERA)
   cantidad              Int
   precioUnitario        Decimal              @db.Decimal(14, 2)
   subtotal              Decimal              @db.Decimal(14, 2)

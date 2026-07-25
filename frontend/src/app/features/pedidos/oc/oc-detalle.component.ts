@@ -53,7 +53,8 @@ interface LineaEdit {
           <div style="margin-bottom:var(--sp-4)">
             <div style="display:flex;justify-content:space-between;align-items:baseline;font-weight:var(--fw-medium);margin-bottom:var(--sp-2)">
               <span>{{ l.productoConfigurado?.nombreComercial }}
-                <span class="cell-sub cell-mono">{{ l.productoConfigurado?.codigo }}</span></span>
+                <span class="cell-sub cell-mono">{{ l.productoConfigurado?.codigo }}</span>
+                @if (l.calidad === 'SEGUNDA') { <span class="badge-seg">Segunda</span> }</span>
               <span class="cell-sub cell-mono">{{ l.precioUnitario ? (moneda(precio(l)) + ' /par') : 'sin precio' }}</span>
             </div>
             <table class="data">
@@ -159,6 +160,10 @@ interface LineaEdit {
       }
     }
   `,
+  styles: [`
+    /* El grado tiene que verse en el pedido: una segunda va a otro precio. */
+    .badge-seg{display:inline-block;margin-left:var(--sp-2);padding:1px 8px;border-radius:99px;font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--warn,#d97706);border:var(--bw) solid currentColor}
+  `],
 })
 export class OcDetalleComponent implements OnInit {
   private readonly api = inject(PedidosApi);

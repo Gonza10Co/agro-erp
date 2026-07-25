@@ -4,6 +4,8 @@ import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.model
 export interface LineaWizard {
   producto: ProductoConfiguradoFull;
   precio: number;
+  /** Grado pedido. Una segunda se vende más barata, así que va en su propia línea. */
+  calidad?: 'PRIMERA' | 'SEGUNDA';
   valores: Record<number, number>;
 }
 
@@ -54,6 +56,9 @@ export function construirDto(args: {
     ...(args.lineaId != null ? { lineaId: args.lineaId } : {}),
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
+      // PRIMERA es el default del backend: solo se manda la clave si se pidió otro
+      // grado, así los pedidos normales no cambian de forma.
+      ...(l.calidad === 'SEGUNDA' ? { calidad: 'SEGUNDA' as const } : {}),
       precioUnitario: l.precio > 0 ? l.precio : undefined,
       tallas: Object.entries(l.valores)
         .map(([tallaId, cantidad]) => ({ tallaId: Number(tallaId), cantidad }))

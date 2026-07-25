@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { FacturarDto } from './dto/facturar.dto';
 import { FacturarServicioDto } from './dto/facturar-servicio.dto';
-import { lineasDeFactura, lineasDeServicio, totales } from './factura-core';
+import { clavePrecio, lineasDeFactura, lineasDeServicio, totales } from './factura-core';
 import { diasCredito } from '../cartera/cartera-core';
 import { recalcularEstadoCartera } from '../cartera/recalcular-cartera';
 
@@ -30,15 +30,16 @@ export class FacturaService {
     if (despacho.factura)
       throw new BadRequestException('El despacho ya fue facturado');
 
-    // Precio pactado por producto desde las líneas de la OC (Decimal → number).
-    const precioPorProducto = new Map<number, number>();
+    // Precio pactado por (producto, GRADO) desde las líneas de la OC: la segunda
+    // se vendió a otro precio y tiene su propia línea en el pedido.
+    const precioPorProducto = new Map<string, number>();
     for (const l of despacho.op.oc.lineas) {
       if (l.precioUnitario != null)
-        precioPorProducto.set(l.productoConfiguradoId, Number(l.precioUnitario));
+        precioPorProducto.set(clavePrecio(l.productoConfiguradoId, l.calidad), Number(l.precioUnitario));
     }
     const sinPrecio = despacho.lineas
-      .filter((l: any) => !precioPorProducto.has(l.productoConfiguradoId))
-      .map((l: any) => l.productoConfiguradoId);
+      .filter((l: any) => !precioPorProducto.has(clavePrecio(l.productoConfiguradoId, l.calidad ?? 'PRIMERA')))
+      .map((l: any) => `${l.productoConfiguradoId} (${l.calidad ?? 'PRIMERA'})`);
     if (sinPrecio.length > 0)
       throw new BadRequestException(
         `Productos despachados sin precio pactado en la OC: ${[...new Set(sinPrecio)].join(', ')}`,
@@ -74,6 +75,7 @@ export class FacturaService {
             create: lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
               tallaId: l.tallaId,
+              calidad: l.calidad,
               cantidad: l.cantidad,
               precioUnitario: l.precioUnitario,
               subtotal: l.subtotal,

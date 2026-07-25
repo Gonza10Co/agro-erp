@@ -136,6 +136,71 @@ describe('OpService.generarDesdeOC', () => {
     });
   });
 
+  describe('venta de SEGUNDAS', () => {
+    function ocDeSegundas(cantidad = 100) {
+      return {
+        id: 1,
+        estado: 'CONFIRMADA',
+        lineas: [
+          {
+            id: 11,
+            productoConfiguradoId: 2,
+            calidad: 'SEGUNDA',
+            tallas: [{ tallaId: 5, cantidad }],
+          },
+        ],
+      };
+    }
+
+    it('amarra del saldo de SEGUNDA, no del de primeras', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue(ocDeSegundas());
+      tx.$queryRawUnsafe.mockResolvedValue([{ v: 802n }]);
+      tx.ordenProduccion.create.mockResolvedValue({ id: 51 });
+      tx.ordenProduccionLinea.create.mockResolvedValue({ id: 61 });
+      tx.inventarioPT.findMany.mockResolvedValue([]);
+      tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 81 });
+      tx.ordenProduccion.findUnique.mockResolvedValue({ id: 51, estado: 'AMARRADA' });
+
+      await new OpService(prisma, compras).generarDesdeOC(1);
+
+      // La consulta de stock se acota al grado pedido.
+      expect(tx.inventarioPT.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ calidad: 'SEGUNDA' }),
+        }),
+      );
+      // Y la OP hereda el grado, para que el despacho descargue de ese saldo.
+      expect(tx.ordenProduccionLinea.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ calidad: 'SEGUNDA' }) }),
+      );
+    });
+
+    it('NO manda a producir lo que falte: las segundas no se fabrican a pedido', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue(ocDeSegundas(100));
+      tx.$queryRawUnsafe.mockResolvedValue([{ v: 803n }]);
+      tx.ordenProduccion.create.mockResolvedValue({ id: 52 });
+      tx.ordenProduccionLinea.create.mockResolvedValue({ id: 62 });
+      // Solo hay 30 segundas en bodega para un pedido de 100.
+      tx.inventarioPT.findMany.mockResolvedValue([
+        { id: 71, bodegaId: 1, cantDisponible: 30, cantReservada: 0, bodega: { prioridad: 100 } },
+      ]);
+      tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 82 });
+      tx.ordenProduccion.findUnique.mockResolvedValue({ id: 52, estado: 'AMARRADA' });
+
+      await new OpService(prisma, compras).generarDesdeOC(1);
+
+      expect(tx.ordenProduccionLineaTalla.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            cantPedida: 100,
+            cantAmarrada: 30,
+            cantAProducir: 0, // ← lo que falta NO se fabrica
+          }),
+        }),
+      );
+    });
+  });
+
   it('bloquea las filas de InventarioPT (FOR UPDATE) antes de leer disponibilidad', async () => {
     prisma.ordenCompra.findUnique.mockResolvedValue({
       id: 1,
