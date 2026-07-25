@@ -7,6 +7,13 @@
 > Última actualización: **2026-07-25** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
+> **Entrega 5 desplegada a prod el 2026-07-25** (merge `--no-ff` `3c4111b`, CI verde 481+339).
+> Las 5 migraciones aplicadas por `migrate deploy`, verificadas contra la base real: el reporte
+> trae las 5 células, las 21 filas de PT exponen su grado y **el backfill de `Factura.clienteId`
+> dejó 0 facturas sin cliente** (era el riesgo del bloque de servicios). Cartera sigue viva tras
+> el refactor. Sin tag todavía. `venta-segundas` y `factura-servicio` quedan `EN_STAGE`; el
+> catálogo de servicios va vacío en prod hasta correr `seed:demo`/cargarlo a mano.
+>
 > **Entrega 4 desplegada a prod el 2026-07-25** (merge `--no-ff` develop→master `61eeb06`, CI verde,
 > las 4 migraciones aditivas aplicadas solas por `migrate deploy`) y **liberada al cliente el mismo
 > día**: el amarre de insumos ya le corría al generar la OP (le reservaba stock de su bodega), así
