@@ -535,13 +535,16 @@ model InventarioPT {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   bodegaId              Int
   bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  // El grado entra en la llave: primeras y segundas del mismo producto+talla+bodega
+  // son saldos distintos. Todo lo existente queda PRIMERA (default).
+  calidad               CalidadPT           @default(PRIMERA)
   cantDisponible        Int                 @default(0)
   cantReservada         Int                 @default(0)
 
   reservas    ReservaInventarioPT[]
   movimientos MovimientoInventario[]
 
-  @@unique([productoConfiguradoId, tallaId, bodegaId])
+  @@unique([productoConfiguradoId, tallaId, bodegaId, calidad])
   @@index([productoConfiguradoId, tallaId])
 }
 
@@ -844,6 +847,15 @@ enum EstadoPar {
 enum ClaseDano {
   BAJA // daño total: acta + reposición automática
   REPROCESO // recuperable: solo registro
+  SEGUNDA // el par sigue vivo pero baja de grado: se vende como segunda
+}
+
+// Grado de calidad del producto terminado. El cliente las lleva como "referencia
+// paralela" (SEGUNDAS FEROZ), pero acá se modela como ATRIBUTO del par y del stock:
+// duplicar SKUs implicaría ×2 sobre las marcas y crear catálogo desde el piso.
+enum CalidadPT {
+  PRIMERA
+  SEGUNDA
 }
 
 model OrdenFabricacion {
@@ -872,6 +884,9 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
+  // Grado con el que el par va a entrar a bodega. Se sella cuando calidad reporta
+  // una incidencia de clase SEGUNDA; el par sigue su curso normal por las células.
+  calidad               CalidadPT           @default(PRIMERA)
   subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
   lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
   linea                 Linea?              @relation(fields: [lineaId], references: [id])

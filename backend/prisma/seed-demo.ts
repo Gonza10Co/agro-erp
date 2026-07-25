@@ -62,12 +62,14 @@ async function crearOPAmarrada(opts: {
   });
 
   for (const t of opts.tallas) {
+    // Solo PRIMERA: el amarre de un pedido nunca toma segundas (igual que op.service).
     const inv = await prisma.inventarioPT.findUnique({
       where: {
-        productoConfiguradoId_tallaId_bodegaId: {
+        productoConfiguradoId_tallaId_bodegaId_calidad: {
           productoConfiguradoId: opts.productoConfiguradoId,
           tallaId: t.tallaId,
           bodegaId: opts.bodegaId,
+          calidad: 'PRIMERA',
         },
       },
     });
@@ -176,16 +178,18 @@ async function main() {
         const t = enRango[i];
         await prisma.inventarioPT.upsert({
           where: {
-            productoConfiguradoId_tallaId_bodegaId: {
+            productoConfiguradoId_tallaId_bodegaId_calidad: {
               productoConfiguradoId: p.id,
               tallaId: t.id,
               bodegaId: ibg.id,
+              calidad: 'PRIMERA',
             },
           },
           create: {
             productoConfiguradoId: p.id,
             tallaId: t.id,
             bodegaId: ibg.id,
+            calidad: 'PRIMERA',
             cantDisponible: 100,
             cantReservada: 0,
           },
@@ -268,6 +272,8 @@ async function main() {
   await prisma.despachoLinea.deleteMany({ where: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } });
   await prisma.despacho.deleteMany({ where: { op: { consecutivo: { in: CONS_D14 } } } });
   await prisma.eventoTrazabilidad.deleteMany({ where: { par: { of: { op: { consecutivo: { in: CONS_D14 } } } } } });
+  // Antes que los pares: las incidencias de las segundas los referencian por FK.
+  await prisma.incidenciaCalidad.deleteMany({ where: { par: { of: { op: { consecutivo: { in: CONS_D14 } } } } } });
   await prisma.par.deleteMany({ where: { of: { op: { consecutivo: { in: CONS_D14 } } } } });
   await prisma.ordenFabricacion.deleteMany({ where: { op: { consecutivo: { in: CONS_D14 } } } });
   await prisma.ordenProduccion.deleteMany({ where: { consecutivo: { in: CONS_D14 } } });
@@ -476,6 +482,10 @@ async function main() {
     { codigo: 'STROBEL-TORCIDO',     nombre: 'Strobel torcido',            celulaCausante: Celula.GUARNICION, clase: ClaseDano.REPROCESO },
     { codigo: 'ECONOMIZADOR-RASGADO',nombre: 'Economizador rasgado',       celulaCausante: Celula.INYECCION,  clase: ClaseDano.REPROCESO },
     { codigo: 'DANO-ROBOT',          nombre: 'Daño de robot en capellada', celulaCausante: Celula.INYECCION,  clase: ClaseDano.BAJA      },
+    // SEGUNDA: el par no se pierde ni se reprocesa — se vende como segunda.
+    { codigo: 'MANCHA-CUERO',        nombre: 'Mancha en el cuero',         celulaCausante: Celula.CORTE,      clase: ClaseDano.SEGUNDA   },
+    { codigo: 'TONO-DISPAREJO',      nombre: 'Tono disparejo entre piezas',celulaCausante: Celula.GUARNICION, clase: ClaseDano.SEGUNDA   },
+    { codigo: 'REBABA-SUELA',        nombre: 'Rebaba en la suela',         celulaCausante: Celula.INYECCION,  clase: ClaseDano.SEGUNDA   },
   ];
   for (const t of tiposDano) {
     await prisma.tipoDano.upsert({
@@ -897,10 +907,11 @@ async function main() {
   // inventarioPT destino (talla A del producto DIEL en Ibagué — tiene stock por el seed).
   const invPT = await prisma.inventarioPT.findUniqueOrThrow({
     where: {
-      productoConfiguradoId_tallaId_bodegaId: {
+      productoConfiguradoId_tallaId_bodegaId_calidad: {
         productoConfiguradoId: prodDiel.id,
         tallaId: tallaA.id,
         bodegaId: ibg.id,
+        calidad: 'PRIMERA',
       },
     },
   });
@@ -950,7 +961,22 @@ async function main() {
     { cel: Celula.PT, sub: null, h: 14 },
   ];
 
+  // Segundas de la demo: 1 de cada 60 pares (≈1,7%), repartidas entre los 3 motivos
+  // del catálogo. La célula de detección es la que causa el defecto.
+  const TASA_SEGUNDAS = 60;
+  const TIPOS_SEGUNDA: { codigo: string; deteccion: Celula; descripcion: string }[] = [
+    { codigo: 'MANCHA-CUERO', deteccion: Celula.CORTE, descripcion: 'Mancha visible en la pieza de caña' },
+    { codigo: 'TONO-DISPAREJO', deteccion: Celula.GUARNICION, descripcion: 'Diferencia de tono entre lateral y talón' },
+    { codigo: 'REBABA-SUELA', deteccion: Celula.INYECCION, descripcion: 'Rebaba de PU en el borde de la suela' },
+  ];
+  const tiposSegundaBD = await prisma.tipoDano.findMany({
+    where: { codigo: { in: TIPOS_SEGUNDA.map((t) => t.codigo) } },
+    select: { id: true, codigo: true },
+  });
+  const idsTipoSegunda = Object.fromEntries(tiposSegundaBD.map((t) => [t.codigo, t.id]));
+
   let totalParesD14 = 0;
+  let totalSegundasD14 = 0;
   for (const cadena of PROD_LINEAS) {
     const totalCadena = repartoDia.reduce((a, r) => a + r.porCons[cadena.cons], 0);
     const ocProd = await prisma.ordenCompra.create({
@@ -990,14 +1016,39 @@ async function main() {
           tallaId: tallaA.id,
           estado: 'TERMINADO' as const,
           celulaActual: Celula.PT,
+          // 1 de cada 60 sale de segunda (≈1,7%): determinista para que el seed
+          // sea reproducible, y en el orden de magnitud del dato real de Feroz.
+          calidad: seq % TASA_SEGUNDAS === 0 ? 'SEGUNDA' as const : 'PRIMERA' as const,
           lineaId: cadena.linea?.id ?? null,
           createdAt: diaUTC(r.d, 5),
         });
       }
     }
     await enLotes(paresData, 2000, (lote) => prisma.par.createMany({ data: lote }));
-    const pares = await prisma.par.findMany({ where: { ofId: ofProd.id }, select: { id: true, createdAt: true } });
+    const pares = await prisma.par.findMany({
+      where: { ofId: ofProd.id },
+      select: { id: true, createdAt: true, calidad: true },
+    });
     totalParesD14 += pares.length;
+
+    // Cada segunda lleva su incidencia: sin motivo registrado, el % de segundas
+    // por centro de costo saldría en cero y la columna quedaría sin explicación.
+    const segundasCadena = pares.filter((p) => p.calidad === 'SEGUNDA');
+    const incidenciasSegunda = segundasCadena.map((p, i) => {
+      const tipo = TIPOS_SEGUNDA[i % TIPOS_SEGUNDA.length];
+      return {
+        parId: p.id,
+        tipoDanoId: idsTipoSegunda[tipo.codigo],
+        celulaDeteccion: tipo.deteccion,
+        operarioId: ids[tipo.deteccion].op,
+        descripcion: tipo.descripcion,
+        timestamp: new Date(new Date(p.createdAt).getTime() + 6 * 3600_000),
+      };
+    });
+    await enLotes(incidenciasSegunda, 2000, (lote) =>
+      prisma.incidenciaCalidad.createMany({ data: lote }),
+    );
+    totalSegundasD14 += segundasCadena.length;
 
     const etapas =
       cadena.linea?.celulaInicial === 'INYECCION'
@@ -1019,7 +1070,7 @@ async function main() {
     }
     await enLotes(eventosCadena, 5000, (lote) => prisma.eventoTrazabilidad.createMany({ data: lote }));
     console.log(
-      `  Demo 14: OP-${cadena.cons} → ${cadena.linea?.codigo ?? 'SIN LÍNEA'}: ${pares.length} pares (${etapas.length} etapas/par)`,
+      `  Demo 14: OP-${cadena.cons} → ${cadena.linea?.codigo ?? 'SIN LÍNEA'}: ${pares.length} pares (${etapas.length} etapas/par, ${segundasCadena.length} de segunda)`,
     );
   }
 
@@ -1059,6 +1110,38 @@ async function main() {
       lineaId: linea?.id ?? null,
       createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)),
     })),
+  });
+
+  // Saldo de SEGUNDAS en bodega: mismo producto/talla/bodega, otro grado. Se ve en
+  // el inventario como una fila aparte con su badge, nunca mezclado con las primeras
+  // (y el amarre de pedidos jamás lo toca).
+  const invPTSegunda = await prisma.inventarioPT.upsert({
+    where: {
+      productoConfiguradoId_tallaId_bodegaId_calidad: {
+        productoConfiguradoId: prodDiel.id,
+        tallaId: tallaA.id,
+        bodegaId: ibg.id,
+        calidad: 'SEGUNDA',
+      },
+    },
+    update: { cantDisponible: totalSegundasD14 },
+    create: {
+      productoConfiguradoId: prodDiel.id,
+      tallaId: tallaA.id,
+      bodegaId: ibg.id,
+      calidad: 'SEGUNDA',
+      cantDisponible: totalSegundasD14,
+    },
+  });
+  await prisma.movimientoInventario.create({
+    data: {
+      tipo: 'ENTRADA',
+      motivo: 'PRODUCCION',
+      inventarioPTId: invPTSegunda.id,
+      cantidad: totalSegundasD14,
+      referencia: 'D14-SEGUNDAS',
+      createdAt: new Date(Date.UTC(anioRep, mesRep - 1, 0, 12)),
+    },
   });
 
   // Ventas del mes: 3 cadenas OC→OP→Despacho→Factura (Despacho tiene opId único,
@@ -1134,7 +1217,7 @@ async function main() {
   }
   const totalVendidos = VENTAS_D14.reduce((a, v) => a + v.cant, 0);
   console.log(
-    `  Demo 14 (reporte diario): metas Excel del mes ${mesRep}/${anioRep} (globales + por línea) + ${totalParesD14} pares producidos en ${PRODUCCION_DIA.length} días repartidos en ${PROD_LINEAS.length} líneas, ${VENTAS_D14.length} facturas (${totalVendidos} pares vendidos)`,
+    `  Demo 14 (reporte diario): metas Excel del mes ${mesRep}/${anioRep} (globales + por célula + por línea) + ${totalParesD14} pares producidos en ${PRODUCCION_DIA.length} días repartidos en ${PROD_LINEAS.length} líneas (${totalSegundasD14} de segunda, con su incidencia), ${VENTAS_D14.length} facturas (${totalVendidos} pares vendidos)`,
   );
 
   console.log('Seed demo OK:', {

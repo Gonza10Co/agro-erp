@@ -129,13 +129,20 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
             <h4>Producto terminado</h4>
             @if (d.pt.length) {
               <table class="tabla">
-                <thead><tr><th>Producto</th><th class="num">Talla</th><th>Bodega</th><th class="num">Disponible</th><th class="num">Reservado</th></tr></thead>
+                <thead><tr><th>Producto</th><th class="num">Talla</th><th>Bodega</th><th>Calidad</th><th class="num">Disponible</th><th class="num">Reservado</th></tr></thead>
                 <tbody>
-                  @for (p of d.pt; track p.codigo + '-' + p.talla + '-' + p.bodega) {
+                  @for (p of d.pt; track p.codigo + '-' + p.talla + '-' + p.bodega + '-' + p.calidad) {
                     <tr>
                       <td>{{ p.producto }} <span class="cell-sub cell-mono">{{ p.codigo }}</span></td>
                       <td class="num">{{ p.talla }}</td>
                       <td>{{ p.bodega }}</td>
+                      <td>
+                        @if (p.calidad === 'SEGUNDA') {
+                          <span class="badge-seg">Segunda</span>
+                        } @else {
+                          <span class="cell-sub">Primera</span>
+                        }
+                      </td>
                       <td class="num cell-mono">{{ p.cantDisponible }}</td>
                       <td class="num cell-mono" [class.reservado]="p.cantReservada > 0">{{ p.cantReservada }}</td>
                     </tr>
@@ -185,6 +192,8 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
     .tabla th,.tabla td{text-align:left;padding:var(--sp-2);border-bottom:var(--bw) solid var(--border)}
     .num{text-align:right}
     .reservado{color:var(--warning, #b8860b);font-weight:var(--fw-medium)}
+    /* El grado se ve de un vistazo: una segunda no se despacha como primera. */
+    .badge-seg{display:inline-block;padding:1px 8px;border-radius:99px;font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--warn,#d97706);border:var(--bw) solid currentColor}
     .wip-strip{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
     .wip-celula{display:flex;flex-direction:column;align-items:center;min-width:96px;padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface)}
     .wip-celula.has-pares{border-color:var(--accent)}

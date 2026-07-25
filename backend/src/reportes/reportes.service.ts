@@ -35,7 +35,13 @@ export class ReportesService {
           timestamp: { gte: desde, lt: hasta },
           ...(porLinea ? { par: { lineaId } } : {}),
         },
-        select: { celula: true, subPaso: true, timestamp: true },
+        // El grado del par separa la columna Bodega (primeras) de Segundas.
+        select: {
+          celula: true,
+          subPaso: true,
+          timestamp: true,
+          par: { select: { calidad: true } },
+        },
       }),
       this.prisma.factura.findMany({
         // Factura → despacho → OP: la OP hereda la línea de la OC.
@@ -83,6 +89,7 @@ export class ReportesService {
         celula: e.celula as Celula,
         subPaso: e.subPaso ?? null,
         timestamp: e.timestamp,
+        esSegunda: e.par?.calidad === 'SEGUNDA',
       })),
       ventas: facturas.map((f) => ({
         fecha: f.fecha,

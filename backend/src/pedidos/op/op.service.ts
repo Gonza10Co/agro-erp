@@ -49,12 +49,15 @@ export class OpService {
           // un orden canónico de adquisición (evita deadlocks entre tx cruzadas).
           // Limitación conocida: con 0 filas no bloquea inserts nuevos de fabricación
           // simultánea — el amarre puede no ver ese stock (subóptimo, nunca negativo).
-          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} ORDER BY id FOR UPDATE`;
+          // Solo PRIMERA: un pedido normal jamás se llena con segundas — esas se
+          // venden aparte, a su precio. El lock también se acota al mismo grado.
+          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} AND "calidad" = 'PRIMERA'::"CalidadPT" ORDER BY id FOR UPDATE`;
 
           const stock = await tx.inventarioPT.findMany({
             where: {
               productoConfiguradoId: linea.productoConfiguradoId,
               tallaId: t.tallaId,
+              calidad: 'PRIMERA',
             },
             include: { bodega: true },
           });

@@ -47,6 +47,8 @@ describe('reporte-diario-core', () => {
         { celula: 'GUARNICION', subPaso: 'AMARRE', timestamp: new Date('2026-06-01T10:00:00Z') },
         { celula: 'INYECCION', timestamp: new Date('2026-06-02T10:00:00Z') },
         { celula: 'PT', timestamp: new Date('2026-06-02T11:00:00Z') },
+        // Un par que se marcó de segunda: llega a PT igual, pero no suma a Bodega.
+        { celula: 'PT', timestamp: new Date('2026-06-02T11:30:00Z'), esSegunda: true },
       ],
       ventas: [
         { fecha: new Date('2026-06-02T12:00:00Z'), pares: 50, valor: 4250000 },
@@ -90,12 +92,47 @@ describe('reporte-diario-core', () => {
       expect(d2.valor).toBe(5100000);
     });
 
-    it('deja en 0 las columnas pendientes de captura', () => {
-      for (const f of rep.filas) {
-        expect(f.externo).toBe(0);
-        expect(f.segundas).toBe(0);
-      }
+    it('deja en 0 las columnas que aún no se capturan (ya no incluye segundas)', () => {
+      for (const f of rep.filas) expect(f.externo).toBe(0);
       expect(rep.pendientes).toEqual(COLUMNAS_PENDIENTES);
+      expect(rep.pendientes).not.toContain('SEGUNDAS');
+    });
+
+    describe('SEGUNDAS', () => {
+      it('cuenta los pares de segunda que llegan a PT en su propia columna', () => {
+        const d2 = rep.filas.find((f) => f.fecha === '2026-06-02')!;
+        expect(d2.segundas).toBe(1);
+      });
+
+      it('no las suma a Bodega: son saldos distintos, no producto bueno', () => {
+        const d2 = rep.filas.find((f) => f.fecha === '2026-06-02')!;
+        expect(d2.bodega).toBe(1); // el par de primera, no los dos
+        expect(rep.acumulado.bodega).toBe(1);
+        expect(rep.acumulado.segundas).toBe(1);
+      });
+
+      it('una segunda detectada antes de PT igual cuenta en las células que recorrió', () => {
+        const conSegundaEnCorte = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'CORTE', timestamp: new Date('2026-06-05T08:00:00Z'), esSegunda: true },
+            { celula: 'PT', timestamp: new Date('2026-06-05T18:00:00Z'), esSegunda: true },
+          ],
+        });
+        const d5 = conSegundaEnCorte.filas.find((f) => f.fecha === '2026-06-05')!;
+        expect(d5.troquelado).toBe(1); // el corte se hizo: cuenta como producción
+        expect(d5.bodega).toBe(0);
+        expect(d5.segundas).toBe(1);
+      });
+
+      it('la meta de PT se mide contra producto de primera, no contra segundas', () => {
+        const conMetaPT = construirReporte({
+          ...input,
+          metas: [...input.metas, { tipo: 'PT', valor: 10 }],
+        });
+        const pt = conMetaPT.metas.celulas.find((c) => c.celula === 'PT')!;
+        expect(pt.real).toBe(1); // solo la primera
+      });
     });
 
     it('acumula cada columna del mes', () => {

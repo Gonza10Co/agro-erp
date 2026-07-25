@@ -46,10 +46,12 @@ import {
         </div>
 
         <!-- Nota honesta sobre columnas no capturadas aún -->
-        <p class="nota">
-          <b>Nota:</b> las columnas <em>Externo</em> y <em>Segundas</em> aún no se capturan en el sistema
-          (van en 0). Pendiente de definir con el cliente · {{ d.pendientes.join(' · ') }}.
-        </p>
+        @if (d.pendientes.length) {
+          <p class="nota">
+            <b>Nota:</b> la columna <em>Externo</em> aún no se captura en el sistema
+            (va en 0). Pendiente de definir con el cliente · {{ d.pendientes.join(' · ') }}.
+          </p>
+        }
 
         <!-- Tabla diaria estilo Excel -->
         <div class="card"><div class="card-body table-wrap">
@@ -63,7 +65,7 @@ import {
                 <th class="pend" title="Pendiente de captura">Externo</th>
                 <th>Inyección</th>
                 <th>Bodega</th>
-                <th class="pend" title="Pendiente de captura">Segundas</th>
+                <th class="seg" title="Pares que salieron de segunda (no entran al saldo de primeras)">Segundas</th>
                 <th>Pares vendidos</th>
                 <th>Valor</th>
               </tr>
@@ -77,7 +79,7 @@ import {
                   <td class="pend">{{ num(f.externo) }}</td>
                   <td>{{ num(f.inyeccion) }}</td>
                   <td>{{ num(f.bodega) }}</td>
-                  <td class="pend">{{ num(f.segundas) }}</td>
+                  <td class="seg" [class.cero]="!f.segundas">{{ num(f.segundas) }}</td>
                   <td>{{ num(f.paresVendidos) }}</td>
                   <td>{{ f.valor ? moneda(f.valor) : '—' }}</td>
                 </tr>
@@ -91,7 +93,7 @@ import {
                 <td class="pend">{{ num(d.acumulado.externo) }}</td>
                 <td>{{ num(d.acumulado.inyeccion) }}</td>
                 <td>{{ num(d.acumulado.bodega) }}</td>
-                <td class="pend">{{ num(d.acumulado.segundas) }}</td>
+                <td class="seg">{{ num(d.acumulado.segundas) }}</td>
                 <td>{{ num(d.acumulado.paresVendidos) }}</td>
                 <td>{{ moneda(d.acumulado.valor) }}</td>
               </tr>
@@ -172,6 +174,9 @@ import {
     .tbl th.l,.tbl td.l{text-align:left;font-family:var(--font-sans,inherit)}
     .tbl thead th{font-size:var(--text-caption);color:var(--text-subtle);text-transform:uppercase;letter-spacing:.03em;font-weight:var(--fw-semibold)}
     .tbl th.pend,.tbl td.pend{color:var(--text-subtle);font-style:italic}
+    /* Segundas: producto vendible pero de menor grado — se marca, no se esconde. */
+    .tbl td.seg{color:var(--warn,#d97706);font-weight:var(--fw-semibold)}
+    .tbl td.seg.cero{color:var(--text-subtle);font-weight:400}
     .tbl tr.vacia td{color:var(--text-subtle);opacity:.55}
     .tbl tfoot .acum td{background:var(--warn-bg,#fef9c3);color:#000;font-weight:var(--fw-semibold);border-top:2px solid var(--border)}
     .tbl td.pos{color:var(--ok,#16a34a)} .tbl td.neg{color:var(--warn,#d97706)}

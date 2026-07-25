@@ -7,10 +7,10 @@ const REPORTE = {
   anio: 2026,
   mes: 6,
   filas: [
-    { fecha: '2026-06-01', troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 4, segundas: 0, paresVendidos: 0, valor: 0 },
+    { fecha: '2026-06-01', troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 0, valor: 0 },
     { fecha: '2026-06-02', troquelado: 0, guarnicion: 0, almacen: 0, externo: 0, inyeccion: 0, bodega: 0, segundas: 0, paresVendidos: 8, valor: 809200 },
   ],
-  acumulado: { troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 4, segundas: 0, paresVendidos: 8, valor: 809200 },
+  acumulado: { troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 8, valor: 809200 },
   metas: {
     celulas: [
       { celula: 'CORTE', meta: 70, real: 48, pct: 68.6 },
@@ -27,7 +27,7 @@ const REPORTE = {
     { fecha: '2026-06-02', saldoInicial: 504, ingreso: 0, venta: 8, devolucion: 0, saldoFinal: 496 },
     { fecha: '2026-06-03', saldoInicial: 496, ingreso: 0, venta: 0, devolucion: 0, saldoFinal: 496 },
   ],
-  pendientes: ['EXTERNO', 'SEGUNDAS', 'SERVICIOS_MANTENIMIENTO'],
+  pendientes: ['EXTERNO', 'SERVICIOS_MANTENIMIENTO'],
 };
 
 describe('ReporteDiarioComponent', () => {
@@ -68,6 +68,21 @@ describe('ReporteDiarioComponent', () => {
     expect(c.metasCards()[0].pct).toBe(68.6);
     // La de valor formatea en pesos; las de pares, con separador de miles.
     expect(c.metasCards()[6].fmt(2400000)).toBe('$2.400.000');
+  });
+
+  it('las segundas ya no se anuncian como pendientes de captura', () => {
+    const fixture = setup();
+    flush();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    // La nota honesta sigue, pero solo por Externo: Segundas ya se capturan.
+    expect(el.textContent).toContain('Externo');
+    expect(el.textContent).not.toContain('<em>Segundas</em> aún no se capturan');
+    // La columna deja de estar en gris/itálica de "pendiente".
+    const encabezados = Array.from(el.querySelectorAll('thead th'));
+    const thSegundas = encabezados.find((th) => th.textContent?.trim() === 'Segundas')!;
+    expect(thSegundas.classList.contains('pend')).toBeFalse();
+    expect(thSegundas.classList.contains('seg')).toBeTrue();
   });
 
   it('pinta las 7 tarjetas en la pantalla', () => {

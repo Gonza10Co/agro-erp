@@ -24,7 +24,7 @@ export const TIPOS_META: readonly TipoMeta[] = [
 export type ColumnaProduccion = 'troquelado' | 'guarnicion' | 'almacen' | 'inyeccion' | 'bodega';
 
 /** Conceptos que el Excel muestra pero que aún NO se capturan en el backend. */
-export const COLUMNAS_PENDIENTES = ['EXTERNO', 'SEGUNDAS', 'SERVICIOS_MANTENIMIENTO'] as const;
+export const COLUMNAS_PENDIENTES = ['EXTERNO', 'SERVICIOS_MANTENIMIENTO'] as const;
 
 const CELULA_A_COLUMNA: Record<Celula, ColumnaProduccion> = {
   CORTE: 'troquelado',
@@ -38,6 +38,7 @@ export interface EventoMin {
   celula: Celula;
   subPaso?: string | null; // poblado solo en eventos de Guarnición
   timestamp: Date;
+  esSegunda?: boolean; // el par viene marcado con grado SEGUNDA
 }
 export interface VentaMin {
   fecha: Date;
@@ -72,8 +73,8 @@ export interface FilaDia {
   almacen: number;
   externo: number; // pendiente de captura → 0
   inyeccion: number;
-  bodega: number;
-  segundas: number; // pendiente de captura → 0
+  bodega: number; // pares de PRIMERA que entraron a bodega
+  segundas: number; // pares de SEGUNDA que entraron a bodega (excluyentes con bodega)
   paresVendidos: number;
   valor: number;
 }
@@ -167,6 +168,13 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     if (ev.celula === 'GUARNICION' && ev.subPaso !== 'AMARRE') continue;
     const fila = porDia.get(claveDia(ev.timestamp));
     if (!fila) continue;
+    // Al llegar a PT el grado separa las columnas: Bodega es producto de primera
+    // y Segundas va aparte (no se suman entre sí, así el total no se duplica).
+    // En las células previas el trabajo se hizo igual, marcado o no: cuenta normal.
+    if (ev.celula === 'PT' && ev.esSegunda) {
+      fila.segundas += 1;
+      continue;
+    }
     fila[columnaDeCelula(ev.celula)] += 1;
   }
 
@@ -198,6 +206,7 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     acumulado.almacen += f.almacen;
     acumulado.inyeccion += f.inyeccion;
     acumulado.bodega += f.bodega;
+    acumulado.segundas += f.segundas;
     acumulado.paresVendidos += f.paresVendidos;
     acumulado.valor += f.valor;
   }

@@ -35,6 +35,17 @@ describe('validarReporte', () => {
   it('BAJA con ambas violaciones prioriza ROL_INSUFICIENTE (403 antes que 400)', () => {
     expect(validarReporte('BAJA', undefined, 'VENTAS')).toBe('ROL_INSUFICIENTE');
   });
+
+  describe('SEGUNDA', () => {
+    // Bajar un par de grado no destruye producto (a diferencia de BAJA), así que no
+    // exige gerente: lo marca quien revisa en planta. Pero sí exige decir por qué,
+    // que es lo que después explica el % de segundas por célula.
+    it('exige descripción pero no rol de gerente', () => {
+      expect(validarReporte('SEGUNDA', 'mancha en la caña', 'OPERARIO')).toBeNull();
+      expect(validarReporte('SEGUNDA', undefined, 'GERENTE')).toBe('SIN_DESCRIPCION');
+      expect(validarReporte('SEGUNDA', '  ', 'ADMIN')).toBe('SIN_DESCRIPCION');
+    });
+  });
 });
 
 describe('agruparIndicadores', () => {
@@ -50,9 +61,24 @@ describe('agruparIndicadores', () => {
     ];
     const { centros } = agruparIndicadores(incidencias, { GUARNICION: 10, INYECCION: 4 });
     const guar = centros.find((c) => c.celula === 'GUARNICION')!;
-    expect(guar).toMatchObject({ total: 2, bajas: 0, reprocesos: 2, paresProcesados: 10, pctDano: 0.2 });
+    expect(guar).toMatchObject({ total: 2, bajas: 0, reprocesos: 2, segundas: 0, paresProcesados: 10, pctDano: 0.2 });
     const iny = centros.find((c) => c.celula === 'INYECCION')!;
-    expect(iny).toMatchObject({ total: 1, bajas: 1, reprocesos: 0, pctDano: 0.25 });
+    expect(iny).toMatchObject({ total: 1, bajas: 1, reprocesos: 0, segundas: 0, pctDano: 0.25 });
+  });
+
+  it('cuenta las SEGUNDAS aparte, sin inflar reprocesos', () => {
+    const incidencias = [
+      inc('MANCHA-CANA', 'Mancha en la caña', 'GUARNICION', 'SEGUNDA'),
+      inc('MANCHA-CANA', 'Mancha en la caña', 'GUARNICION', 'SEGUNDA'),
+      inc('STROBEL-RASGADO', 'Strobel rasgado', 'GUARNICION', 'REPROCESO'),
+      inc('DANO-ROBOT', 'Daño de robot', 'INYECCION', 'BAJA'),
+    ];
+    const { centros } = agruparIndicadores(incidencias, { GUARNICION: 20, INYECCION: 10 });
+    const guar = centros.find((c) => c.celula === 'GUARNICION')!;
+    // 3 incidencias: 2 segundas + 1 reproceso, 0 bajas. Antes las 2 segundas
+    // habrían caído en "reprocesos" por ser el complemento de las bajas.
+    expect(guar).toMatchObject({ total: 3, bajas: 0, reprocesos: 1, segundas: 2 });
+    expect(guar.bajas + guar.reprocesos + guar.segundas).toBe(guar.total);
   });
 
   it('siempre devuelve los 4 centros de costo, con pctDano null si no hubo pares procesados', () => {

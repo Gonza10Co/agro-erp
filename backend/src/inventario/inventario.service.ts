@@ -33,18 +33,21 @@ export class InventarioService {
 
   registrarStock(dto: RegistrarStockDto) {
     const { productoConfiguradoId, tallaId, bodegaId, cantidad } = dto;
+    const calidad = dto.calidad ?? 'PRIMERA';
     return this.prisma.inventarioPT.upsert({
       where: {
-        productoConfiguradoId_tallaId_bodegaId: {
+        productoConfiguradoId_tallaId_bodegaId_calidad: {
           productoConfiguradoId,
           tallaId,
           bodegaId,
+          calidad,
         },
       },
       create: {
         productoConfiguradoId,
         tallaId,
         bodegaId,
+        calidad,
         cantDisponible: cantidad,
       },
       update: { cantDisponible: { increment: cantidad } },
@@ -76,7 +79,12 @@ export class InventarioService {
           talla: { select: { valor: true } },
           bodega: { select: { codigo: true, nombre: true } },
         },
-        orderBy: [{ productoConfigurado: { codigo: 'asc' } }, { talla: { valor: 'asc' } }],
+        // Primeras antes que segundas dentro del mismo producto/talla.
+        orderBy: [
+          { productoConfigurado: { codigo: 'asc' } },
+          { talla: { valor: 'asc' } },
+          { calidad: 'asc' },
+        ],
       }),
     ]);
 
@@ -100,6 +108,7 @@ export class InventarioService {
         codigo: i.productoConfigurado.codigo,
         talla: i.talla.valor,
         bodega: i.bodega.nombre,
+        calidad: i.calidad,
         cantDisponible: i.cantDisponible,
         cantReservada: i.cantReservada,
       })),
