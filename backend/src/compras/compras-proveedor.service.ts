@@ -9,11 +9,14 @@ import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
   costoPromedioMovil,
   estadoOcp,
+  validarAnulacionOcp,
   validarDevolucion,
+  validarOcpManual,
   validarRecepcion,
 } from './compras-proveedor-core';
 import { RegistrarRecepcionDto } from './dto/registrar-recepcion.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
+import { CrearOcpManualDto } from './dto/crear-ocp-manual.dto';
 
 interface Usuario {
   sub: number;
@@ -23,6 +26,23 @@ interface Usuario {
 type DecimalLike = { toNumber(): number } | number | null;
 const num = (d: DecimalLike): number =>
   d == null ? 0 : typeof d === 'number' ? d : d.toNumber();
+
+// Costo de referencia del material para prellenar la línea de la OCP:
+// el promedio móvil si existe; si no, el costo base; si no hay dato, null.
+const costoRef = (m: { costoPromedio?: DecimalLike; costoBase?: DecimalLike } | null | undefined): number | null => {
+  const v = num(m?.costoPromedio ?? null) || num(m?.costoBase ?? null);
+  return v > 0 ? v : null;
+};
+
+// Valor estimado de la orden: Σ cantPedida × costoUnitario de las líneas con costo.
+// null si ninguna línea tiene costo (no hay estimado honesto que mostrar).
+const valorEstimado = (
+  lineas: { cantPedida: DecimalLike; costoUnitario: DecimalLike }[],
+): number | null => {
+  const conCosto = lineas.filter((l) => l.costoUnitario != null);
+  if (!conCosto.length) return null;
+  return conCosto.reduce((s, l) => s + num(l.cantPedida) * num(l.costoUnitario), 0);
+};
 
 @Injectable()
 export class ComprasProveedorService {
@@ -35,7 +55,11 @@ export class ComprasProveedorService {
       where: { id: reqId },
       include: {
         lineas: {
-          include: { material: { select: { codigo: true, nombreCanonico: true } } },
+          include: {
+            material: {
+              select: { codigo: true, nombreCanonico: true, costoPromedio: true, costoBase: true },
+            },
+          },
         },
       },
     });
@@ -80,6 +104,9 @@ export class ComprasProveedorService {
               create: lineas.map((l) => ({
                 materialId: l.materialId,
                 cantPedida: num(l.cantAComprar),
+                // Precio en línea: se prellena con el costo de referencia del
+                // material (promedio móvil o base); la recepción puede corregirlo.
+                costoUnitario: costoRef(l.material),
               })),
             },
           },
@@ -102,13 +129,95 @@ export class ComprasProveedorService {
     return { ordenes, sinProveedor };
   }
 
+  // OCP manual: compra directa sin requerimiento (reposición, insumos sin OP).
+  async crearManual(dto: CrearOcpManualDto) {
+    const error = validarOcpManual(dto.lineas);
+    if (error) throw new BadRequestException(error);
+
+    const proveedor = await this.prisma.proveedor.findUnique({
+      where: { id: dto.proveedorId },
+    });
+    if (!proveedor) throw new NotFoundException(`Proveedor ${dto.proveedorId} no existe`);
+
+    const ids = dto.lineas.map((l) => l.materialId);
+    const materiales = await this.prisma.material.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    if (materiales.length !== ids.length) {
+      const existentes = new Set((materiales as any[]).map((m) => m.id));
+      const faltantes = ids.filter((id) => !existentes.has(id));
+      throw new BadRequestException(`Materiales inexistentes: ${faltantes.join(', ')}`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const consecutivo = await siguienteConsecutivo(tx, 'ocp');
+      const ocp = await tx.ordenCompraProveedor.create({
+        data: {
+          consecutivo,
+          proveedorId: dto.proveedorId,
+          observaciones: dto.observaciones,
+          lineas: {
+            create: dto.lineas.map((l) => ({
+              materialId: l.materialId,
+              cantPedida: l.cantPedida,
+              costoUnitario: l.costoUnitario ?? null,
+            })),
+          },
+        },
+      });
+      return { id: ocp.id, consecutivo: ocp.consecutivo, estado: ocp.estado };
+    });
+  }
+
+  // Anulación: solo una OCP sin mercancía movida. Si era la última viva de su
+  // requerimiento, el requerimiento vuelve a CALCULADO (se puede regenerar).
+  async anular(ocpId: number) {
+    const ocp = await this.prisma.ordenCompraProveedor.findUnique({
+      where: { id: ocpId },
+      include: { _count: { select: { recepciones: true, devoluciones: true } } },
+    });
+    if (!ocp) throw new NotFoundException(`Orden de compra ${ocpId} no existe`);
+    const error = validarAnulacionOcp({
+      estado: ocp.estado as any,
+      recepciones: (ocp as any)._count.recepciones,
+      devoluciones: (ocp as any)._count.devoluciones,
+    });
+    if (error) throw new ConflictException(error);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.ordenCompraProveedor.update({
+        where: { id: ocp.id },
+        data: { estado: 'ANULADA' },
+      });
+      let requerimientoReabierto = false;
+      if (ocp.requerimientoId != null) {
+        const vivas = await tx.ordenCompraProveedor.count({
+          where: {
+            requerimientoId: ocp.requerimientoId,
+            id: { not: ocp.id },
+            estado: { not: 'ANULADA' },
+          },
+        });
+        if (vivas === 0) {
+          await tx.requerimientoCompra.update({
+            where: { id: ocp.requerimientoId },
+            data: { estado: 'CALCULADO' },
+          });
+          requerimientoReabierto = true;
+        }
+      }
+      return { id: ocp.id, consecutivo: ocp.consecutivo, estado: 'ANULADA', requerimientoReabierto };
+    });
+  }
+
   async listar() {
     const ocps = await this.prisma.ordenCompraProveedor.findMany({
       orderBy: { consecutivo: 'desc' },
       include: {
         proveedor: { select: { id: true, nombre: true } },
         requerimiento: { select: { id: true, consecutivo: true } },
-        lineas: { select: { cantPedida: true, cantRecibida: true } },
+        lineas: { select: { cantPedida: true, cantRecibida: true, costoUnitario: true } },
       },
     });
     return (ocps as any[]).map((o) => ({
@@ -120,6 +229,7 @@ export class ComprasProveedorService {
       estado: o.estado,
       totalPedido: o.lineas.reduce((s: number, l: any) => s + num(l.cantPedida), 0),
       totalRecibido: o.lineas.reduce((s: number, l: any) => s + num(l.cantRecibida), 0),
+      valorEstimado: valorEstimado(o.lineas),
     }));
   }
 
@@ -167,6 +277,7 @@ export class ComprasProveedorService {
       fecha: o.fecha,
       estado: o.estado,
       observaciones: o.observaciones,
+      valorEstimado: valorEstimado(o.lineas as any[]),
       lineas: (o.lineas as any[]).map((l) => ({
         id: l.id,
         materialId: l.materialId,
@@ -176,6 +287,7 @@ export class ComprasProveedorService {
         cantPedida: num(l.cantPedida),
         cantRecibida: num(l.cantRecibida),
         pendiente: num(l.cantPedida) - num(l.cantRecibida),
+        costoUnitario: l.costoUnitario != null ? num(l.costoUnitario) : null,
       })),
       recepciones: (o.recepciones as any[]).map((r) => ({
         id: r.id,
@@ -211,6 +323,8 @@ export class ComprasProveedorService {
       include: { lineas: true },
     });
     if (!ocp) throw new NotFoundException(`Orden de compra ${ocpId} no existe`);
+    if (ocp.estado === 'ANULADA')
+      throw new ConflictException(`La OCP-${ocp.consecutivo} está anulada`);
     if (ocp.estado === 'COMPLETA')
       throw new ConflictException(`La OCP-${ocp.consecutivo} ya está completa`);
 
@@ -326,6 +440,8 @@ export class ComprasProveedorService {
       include: { lineas: true },
     });
     if (!ocp) throw new NotFoundException(`Orden de compra ${ocpId} no existe`);
+    if (ocp.estado === 'ANULADA')
+      throw new ConflictException(`La OCP-${ocp.consecutivo} está anulada`);
 
     const error = validarDevolucion(dto.causa, dto.lineas);
     if (error) throw new BadRequestException(error);

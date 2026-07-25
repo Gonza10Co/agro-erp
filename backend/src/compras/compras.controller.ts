@@ -14,6 +14,7 @@ import { ComprasService } from './compras.service';
 import { ComprasProveedorService } from './compras-proveedor.service';
 import { RegistrarRecepcionDto } from './dto/registrar-recepcion.dto';
 import { RegistrarDevolucionDto } from './dto/registrar-devolucion.dto';
+import { CrearOcpManualDto } from './dto/crear-ocp-manual.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -58,6 +59,17 @@ export class ComprasController {
   @Get('compras/ordenes')
   listarOrdenes() {
     return this.proveedorService.listar();
+  }
+
+  // OCP manual: compra directa sin requerimiento.
+  @Post('compras/ordenes')
+  crearOrden(@Body() dto: CrearOcpManualDto) {
+    return this.proveedorService.crearManual(dto);
+  }
+
+  @Post('compras/ordenes/:id/anular')
+  anularOrden(@Param('id', ParseIntPipe) id: number) {
+    return this.proveedorService.anular(id);
   }
 
   @Get('compras/ordenes/:id')

@@ -11,10 +11,11 @@ const ocp: OcpDetalle = {
   requerimiento: null,
   fecha: '2026-06-12',
   estado: 'PARCIAL',
+  valorEstimado: null,
   observaciones: null,
   lineas: [
-    { id: 1, materialId: 7, materialCodigo: 'MICRO-NEG', materialNombre: 'Microfibra negra', unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10 },
-    { id: 2, materialId: 8, materialCodigo: 'POLIOL', materialNombre: 'Poliol', unidad: 'kg', cantPedida: 8, cantRecibida: 8, pendiente: 0 },
+    { id: 1, materialId: 7, materialCodigo: 'MICRO-NEG', materialNombre: 'Microfibra negra', unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10, costoUnitario: null },
+    { id: 2, materialId: 8, materialCodigo: 'POLIOL', materialNombre: 'Poliol', unidad: 'kg', cantPedida: 8, cantRecibida: 8, pendiente: 0, costoUnitario: null },
   ],
   recepciones: [],
   devoluciones: [],
@@ -71,5 +72,22 @@ describe('RegistrarRecepcionComponent', () => {
     } as any);
     fixture.componentInstance.registrar();
     expect(fixture.componentInstance.error()).toContain('supera lo pendiente');
+  });
+});
+
+describe('RegistrarRecepcionComponent — precio en línea (Entrega 4)', () => {
+  it('prellena el costo con el precio pactado de la línea y lo envía', () => {
+    const conCosto = { ...ocp, lineas: [{ ...ocp.lineas[0], costoUnitario: 950 }] };
+    const api = { registrarRecepcion: jasmine.createSpy().and.returnValue(of({ id: 1, consecutivo: 2, estado: 'COMPLETA' })) };
+    TestBed.configureTestingModule({
+      imports: [RegistrarRecepcionComponent],
+      providers: [{ provide: ComprasApi, useValue: api }],
+    });
+    const fixture = TestBed.createComponent(RegistrarRecepcionComponent);
+    fixture.componentRef.setInput('ocp', conCosto);
+    fixture.detectChanges();
+    fixture.componentInstance.registrar();
+    const dto = api.registrarRecepcion.calls.mostRecent().args[1];
+    expect(dto.lineas[0].costoUnitario).toBe(950);
   });
 });

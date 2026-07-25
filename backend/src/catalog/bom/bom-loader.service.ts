@@ -95,6 +95,7 @@ export class BomLoaderService {
         orden,
         materialObjetivoId: r.materialObjetivoId ?? null,
         materialNuevoId: r.materialNuevoId ?? null,
+        piezaObjetivoId: r.piezaId ?? null,
         consumoFijo: num(r.consumoFijo),
         heredaCurva: r.heredaCurva,
         consumoPorTalla,

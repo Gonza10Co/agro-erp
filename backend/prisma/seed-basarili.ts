@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -211,6 +212,139 @@ async function main() {
     bomsCargados++;
   }
   console.log(`  · BOMs: ${bomsCargados}`);
+
+  // 7b. Variantes elegidas al pedir (ECONOMICA / S-P): ejes del configurador +
+  // reglas de override por (material, pieza). Fuente: bom-variantes.csv, generado
+  // por tools/generar-despiece.py como diff contra el despiece base. El S/P además
+  // QUITA la puntera de la referencia (REMOVE estructural contra su BOM activo).
+  const rutaVariantes = ruta('bom-variantes.csv');
+  if (existsSync(rutaVariantes)) {
+    const variantes = leerCsv(rutaVariantes); // variante, referencia, accion, materialObjetivo, pieza, materialNuevo, talla, consumo
+
+    // Ejes con opción "estándar" explícita (sin reglas) para que elegir sea obvio.
+    const grupoVersion = await prisma.grupoOpcion.upsert({
+      where: { codigo: 'VERSION' },
+      update: { nombre: 'Versión' },
+      create: { codigo: 'VERSION', nombre: 'Versión', obligatorio: false, orden: 50 },
+    });
+    const grupoPuntera = await prisma.grupoOpcion.upsert({
+      where: { codigo: 'PUNTERA' },
+      update: { nombre: 'Puntera' },
+      create: { codigo: 'PUNTERA', nombre: 'Puntera', obligatorio: false, orden: 51 },
+    });
+    const opcion = async (grupoOpcionId: number, codigo: string, nombre: string) =>
+      prisma.opcion.upsert({
+        where: { grupoOpcionId_codigo: { grupoOpcionId, codigo } },
+        update: { nombre, activo: true },
+        create: { grupoOpcionId, codigo, nombre },
+      });
+    await opcion(grupoVersion.id, 'ESTANDAR', 'Estándar');
+    const opEconomica = await opcion(grupoVersion.id, 'ECONOMICA', 'Económica');
+    await opcion(grupoPuntera.id, 'CON_PUNTERA', 'Con puntera');
+    const opSinPuntera = await opcion(grupoPuntera.id, 'SP', 'Sin puntera (S/P)');
+
+    // Qué referencias tienen cada variante (según las reglas generadas).
+    const refsPorVariante = new Map<string, Set<string>>();
+    for (const v of variantes) {
+      const s = refsPorVariante.get(v.variante) ?? new Set<string>();
+      s.add(v.referencia);
+      refsPorVariante.set(v.variante, s);
+    }
+    const ejeEnRefs = async (grupoOpcionId: number, refs: Set<string>) => {
+      for (const refCod of refs) {
+        const referenciaId = referenciaPorCodigo.get(refCod);
+        if (!referenciaId) continue;
+        await prisma.referenciaEje.upsert({
+          where: { referenciaId_grupoOpcionId: { referenciaId, grupoOpcionId } },
+          update: {},
+          create: { referenciaId, grupoOpcionId, obligatorio: false },
+        });
+      }
+    };
+    await ejeEnRefs(grupoVersion.id, refsPorVariante.get('ECONOMICA') ?? new Set());
+    await ejeEnRefs(grupoPuntera.id, refsPorVariante.get('SP') ?? new Set());
+
+    // Idempotencia: las reglas de estas opciones se recrean completas.
+    const opcionIds = [opEconomica.id, opSinPuntera.id];
+    await prisma.reglaOverrideTalla.deleteMany({
+      where: { reglaOverride: { opcionId: { in: opcionIds } } },
+    });
+    await prisma.reglaOverride.deleteMany({ where: { opcionId: { in: opcionIds } } });
+
+    const opcionPorVariante = new Map<string, number>([
+      ['ECONOMICA', opEconomica.id],
+      ['SP', opSinPuntera.id],
+    ]);
+    type ReglaAcc = { variante: string; referencia: string; accion: string; materialObjetivo: string; pieza: string; materialNuevo: string; curva: { talla: number; consumo: number }[] };
+    const reglasAgrupadas = new Map<string, ReglaAcc>();
+    for (const v of variantes) {
+      const k = [v.variante, v.referencia, v.accion, v.materialObjetivo, v.pieza, v.materialNuevo].join('|');
+      const r = reglasAgrupadas.get(k) ?? {
+        variante: v.variante, referencia: v.referencia, accion: v.accion,
+        materialObjetivo: v.materialObjetivo, pieza: v.pieza, materialNuevo: v.materialNuevo, curva: [],
+      };
+      if (v.talla) r.curva.push({ talla: Number(v.talla), consumo: num(v.consumo) ?? 0 });
+      reglasAgrupadas.set(k, r);
+    }
+    let reglasCreadas = 0;
+    for (const r of reglasAgrupadas.values()) {
+      const referenciaId = referenciaPorCodigo.get(r.referencia);
+      const opcionId = opcionPorVariante.get(r.variante);
+      if (!referenciaId || !opcionId) continue;
+      const piezaId = r.pieza ? (piezaPorCodigo.get(r.pieza) ?? null) : null;
+      if (r.pieza && piezaId == null) {
+        console.warn(`  · variante ${r.variante}/${r.referencia}: pieza ${r.pieza} desconocida, regla omitida`);
+        continue;
+      }
+      const materialObjetivoId = r.materialObjetivo ? (materialPorCodigo.get(r.materialObjetivo) ?? null) : null;
+      const materialNuevoId = r.materialNuevo ? (materialPorCodigo.get(r.materialNuevo) ?? null) : null;
+      const regla = await prisma.reglaOverride.create({
+        data: {
+          referenciaId, opcionId,
+          accion: r.accion as 'ADD' | 'REPLACE' | 'REMOVE' | 'SET_CONSUMO',
+          materialObjetivoId, materialNuevoId, piezaId,
+          heredaCurva: false,
+          consumoFijo: r.curva.length || r.accion === 'REMOVE' ? null : 0,
+        },
+      });
+      for (const p of r.curva) {
+        const tallaId = tallaPorValor.get(p.talla);
+        if (!tallaId) continue;
+        await prisma.reglaOverrideTalla.create({
+          data: { reglaOverrideId: regla.id, tallaId, consumo: p.consumo },
+        });
+      }
+      reglasCreadas++;
+    }
+
+    // S/P estructural: la variante quita la puntera del BOM de cada referencia.
+    let removesPuntera = 0;
+    for (const refCod of refsPorVariante.get('SP') ?? new Set<string>()) {
+      const referenciaId = referenciaPorCodigo.get(refCod);
+      if (!referenciaId) continue;
+      const bomSp = await prisma.bom.findFirst({
+        where: { referenciaId, activo: true },
+        include: { lineas: { include: { material: { select: { id: true, codigo: true } } } } },
+      });
+      const punteras = new Set(
+        (bomSp?.lineas ?? [])
+          .filter((l) => l.material.codigo.startsWith('PPUN'))
+          .map((l) => l.materialId),
+      );
+      for (const materialId of punteras) {
+        await prisma.reglaOverride.create({
+          data: { referenciaId, opcionId: opSinPuntera.id, accion: 'REMOVE', materialObjetivoId: materialId },
+        });
+        removesPuntera++;
+      }
+    }
+    console.log(
+      `  · variantes: ${reglasCreadas} reglas de ${reglasAgrupadas.size} (+${removesPuntera} REMOVE de puntera S/P) · ` +
+      `ejes VERSION en ${refsPorVariante.get('ECONOMICA')?.size ?? 0} refs, PUNTERA en ${refsPorVariante.get('SP')?.size ?? 0}`,
+    );
+  } else {
+    console.log('  · variantes: bom-variantes.csv no existe, omitido (corre tools/generar-despiece.py)');
+  }
 
   // 8. Inventario de materia prima (stock actual). codigo, cantDisponible.
   // Fuente: pestaña INVENTARIO del "CONTROL MATERIA PRIMA E INSUMOS" del cliente.

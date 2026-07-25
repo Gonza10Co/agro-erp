@@ -29,8 +29,9 @@ import { OcpDetalle, OcpLinea } from '../../core/api/models/compras.models';
         <div style="display:flex;gap:var(--sp-2);align-items:center">
           <input class="input num" type="number" min="0" [max]="l.pendiente" step="any" title="Cantidad recibida"
             [ngModel]="cantidades()[l.id] ?? l.pendiente" (ngModelChange)="setCantidad(l.id, $event)" />
+          <!-- Prellenado con el precio pactado en la línea de la orden, si existe. -->
           <input class="input num" type="number" min="0" step="any" placeholder="$ costo" title="Costo unitario (opcional)"
-            [ngModel]="costos()[l.id] ?? null" (ngModelChange)="setCosto(l.id, $event)" />
+            [ngModel]="costoDefault(l)" (ngModelChange)="setCosto(l.id, $event)" />
         </div>
       </div>
     }
@@ -76,13 +77,19 @@ export class RegistrarRecepcionComponent {
     this.costos.update((c) => ({ ...c, [lineaId]: valor == null || valor === ('' as any) ? null : Number(valor) }));
   }
 
+  // Default del costo: lo que el usuario tecleó, o el precio pactado en la orden.
+  costoDefault(l: OcpLinea): number | null {
+    const c = this.costos();
+    return l.id in c ? c[l.id] : l.costoUnitario;
+  }
+
   registrar(): void {
     if (this.enviando()) return;
     this.error.set('');
     // Sin tocar nada, el default es "llegó todo lo pendiente" (el caso común).
     const lineas = this.pendientes()
       .map((l) => {
-        const costo = this.costos()[l.id];
+        const costo = this.costoDefault(l);
         return {
           ocpLineaId: l.id,
           cantidad: Number(this.cantidades()[l.id] ?? l.pendiente),

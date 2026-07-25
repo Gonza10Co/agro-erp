@@ -8,5 +8,7 @@ import { ComprasProveedorService } from './compras-proveedor.service';
   imports: [CatalogModule],
   controllers: [ComprasController],
   providers: [ComprasService, ComprasProveedorService],
+  // OpModule dispara el requerimiento automático al generar la OP.
+  exports: [ComprasService],
 })
 export class ComprasModule {}

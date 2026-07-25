@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
+import { liberarReservasDeOp } from '../compras/reserva-insumos';
 import { DespacharDto } from './dto/despachar.dto';
 import { construirLineasDespacho, ReservaPlana } from './despacho-lineas';
 
@@ -95,6 +96,7 @@ export class DespachoService {
       }
 
       // Kardex: una SALIDA por reserva despachada, trazable al despacho.
+      // La línea de la OP se sella en el movimiento (kardex PT por línea).
       await tx.movimientoInventario.createMany({
         data: reservas.map((r) => ({
           tipo: 'SALIDA' as const,
@@ -103,6 +105,7 @@ export class DespachoService {
           cantidad: r.cantidad,
           referencia: `DSP-${consecutivo}`,
           usuarioId: user.sub,
+          lineaId: op.lineaId ?? null,
         })),
       });
 
@@ -123,6 +126,9 @@ export class DespachoService {
         where: { id: op.id },
         data: { estado: 'DESPACHADA' },
       });
+      // La producción terminó: el amarre de insumos de esta OP ya cumplió y se
+      // libera (el consumo real por OF es de Fase B).
+      await liberarReservasDeOp(tx, op.id);
       await tx.ordenCompra.update({
         where: { id: op.ocId },
         data: { estado: 'CERRADA' },

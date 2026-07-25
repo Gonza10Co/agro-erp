@@ -83,7 +83,22 @@ describe('ReporteDiarioComponent', () => {
     http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario' && r.params.get('mes') === '5').flush(REPORTE);
   });
 
-  it('filtrar por línea recarga con ?lineaId y esconde el kardex (aún no segmentable)', () => {
+  it('filtrar por línea recarga con ?lineaId y muestra el kardex de esa línea', () => {
+    const fixture = setup();
+    flush();
+    const c = fixture.componentInstance;
+    c.cambiarLinea(4);
+    http
+      .expectOne((r) => r.url === 'http://localhost:3001/reportes/diario' && r.params.get('lineaId') === '4')
+      .flush({ ...REPORTE, lineaId: 4 });
+    fixture.detectChanges();
+    expect(c.lineaSel()).toBe(4);
+    // El kardex ya se segmenta por línea: la tabla se muestra igual que sin filtro.
+    expect(c.kardexConMov().length).toBe(2);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('históricos sin línea');
+  });
+
+  it('con línea filtrada y sin movimientos avisa que los históricos suman solo en Todas', () => {
     const fixture = setup();
     flush();
     const c = fixture.componentInstance;
@@ -92,8 +107,7 @@ describe('ReporteDiarioComponent', () => {
       .expectOne((r) => r.url === 'http://localhost:3001/reportes/diario' && r.params.get('lineaId') === '4')
       .flush({ ...REPORTE, kardexPT: [], lineaId: 4 });
     fixture.detectChanges();
-    expect(c.lineaSel()).toBe(4);
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('aún no se segmenta por línea');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('históricos sin línea');
   });
 
   it('con línea filtrada las metas se guardan para esa línea', () => {

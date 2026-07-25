@@ -247,11 +247,11 @@ describe('FabricacionService.avanzar', () => {
     );
   });
 
-  it('al terminar en PT registra movimiento ENTRADA/PRODUCCION en el kardex', async () => {
+  it('al terminar en PT registra movimiento ENTRADA/PRODUCCION en el kardex con la línea del par', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
       id: 50, codigo: 'OF1-0001', ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO',
-      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+      productoConfiguradoId: 10, tallaId: 1, lineaId: 12, of: { estado: 'EN_PROCESO' },
     });
     await new FabricacionService(prisma).avanzar('OF1-0001', dto);
 
@@ -262,6 +262,7 @@ describe('FabricacionService.avanzar', () => {
         inventarioPTId: 33, // el id que devuelve el upsert de InventarioPT
         cantidad: 1,
         referencia: 'OF1-0001',
+        lineaId: 12, // la línea viaja del par al kardex (reporte por línea)
       },
     });
   });

@@ -11,10 +11,11 @@ const ocp: OcpDetalle = {
   requerimiento: null,
   fecha: '2026-06-12',
   estado: 'PARCIAL',
+  valorEstimado: null,
   observaciones: null,
   lineas: [
-    { id: 1, materialId: 7, materialCodigo: 'MICRO-NEG', materialNombre: 'Microfibra negra', unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10 },
-    { id: 2, materialId: 8, materialCodigo: 'POLIOL', materialNombre: 'Poliol', unidad: 'kg', cantPedida: 8, cantRecibida: 0, pendiente: 8 },
+    { id: 1, materialId: 7, materialCodigo: 'MICRO-NEG', materialNombre: 'Microfibra negra', unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10, costoUnitario: null },
+    { id: 2, materialId: 8, materialCodigo: 'POLIOL', materialNombre: 'Poliol', unidad: 'kg', cantPedida: 8, cantRecibida: 0, pendiente: 8, costoUnitario: null },
   ],
   recepciones: [],
   devoluciones: [],

@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { OcpDetalleComponent } from './ocp-detalle.component';
 import { ComprasApi } from '../../core/api/compras.api';
@@ -12,11 +14,12 @@ const detalle: OcpDetalle = {
   requerimiento: { id: 1, consecutivo: 9 },
   fecha: '2026-06-12',
   estado: 'PARCIAL',
+  valorEstimado: null,
   observaciones: null,
   lineas: [
     {
       id: 1, materialId: 7, materialCodigo: 'MICRO-NEG', materialNombre: 'Microfibra negra',
-      unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10,
+      unidad: 'm', cantPedida: 30, cantRecibida: 20, pendiente: 10, costoUnitario: null,
     },
   ],
   recepciones: [
@@ -35,6 +38,8 @@ function setup(d: OcpDetalle | null) {
     imports: [OcpDetalleComponent],
     providers: [
       provideRouter([]),
+      provideHttpClient(),
+      provideHttpClientTesting(),
       { provide: ComprasApi, useValue: api },
       { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '10' })) } },
     ],
@@ -75,5 +80,35 @@ describe('OcpDetalleComponent', () => {
   it('muestra error si la OCP no existe', () => {
     const el: HTMLElement = setup(null).nativeElement;
     expect(el.textContent).toContain('No se encontró la orden de compra');
+  });
+});
+
+describe('OcpDetalleComponent — anulación (Entrega 4)', () => {
+  it('muestra "Anular orden" solo cuando no hay mercancía movida', () => {
+    const sinMovimientos: OcpDetalle = { ...detalle, recepciones: [], devoluciones: [],
+      lineas: [{ ...detalle.lineas[0], cantRecibida: 0, pendiente: 30 }] };
+    const el: HTMLElement = setup(sinMovimientos).nativeElement;
+    expect(el.textContent).toContain('Anular orden');
+  });
+
+  it('con recepciones NO ofrece anular; ANULADA esconde recepción/devolución', () => {
+    const el: HTMLElement = setup(detalle).nativeElement; // tiene recepciones
+    expect(el.textContent).not.toContain('Anular orden');
+
+    TestBed.resetTestingModule();
+    const anulada: OcpDetalle = { ...detalle, estado: 'ANULADA', recepciones: [], devoluciones: [],
+      lineas: [{ ...detalle.lineas[0], cantRecibida: 0, pendiente: 30 }] };
+    const el2: HTMLElement = setup(anulada).nativeElement;
+    expect(el2.textContent).toContain('Anulada');
+    expect(el2.textContent).not.toContain('Registrar recepción');
+  });
+
+  it('muestra el costo unitario de la línea y el total estimado', () => {
+    const conCosto: OcpDetalle = { ...detalle, valorEstimado: 36000,
+      lineas: [{ ...detalle.lineas[0], costoUnitario: 1200 }] };
+    const el: HTMLElement = setup(conCosto).nativeElement;
+    expect(el.textContent).toContain('total estimado');
+    expect(el.textContent).toContain('$36,000');
+    expect(el.textContent).toContain('$1,200');
   });
 });

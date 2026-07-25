@@ -43,6 +43,10 @@ describe('ReportesService', () => {
 
       expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60 });
 
+      // Sin filtro NO se restringe por línea: los históricos con lineaId NULL cuentan.
+      expect(prisma.movimientoInventario.findMany.mock.calls[0][0].where.lineaId).toBeUndefined();
+      expect(prisma.movimientoInventario.groupBy.mock.calls[0][0].where.lineaId).toBeUndefined();
+
       // Saldo inicial PT = entradas previas - salidas previas = 800.
       expect(rep.kardexPT[0].saldoInicial).toBe(800);
       const k2 = rep.kardexPT.find((f) => f.fecha === '2026-06-02')!;
@@ -66,10 +70,17 @@ describe('ReportesService', () => {
       expect(rep.lineaId).toBeNull();
     });
 
-    it('filtrado por línea: eventos por par, facturas por OP y kardex PT honesto (vacío)', async () => {
+    it('filtrado por línea: eventos por par, facturas por OP y kardex PT por la línea del movimiento', async () => {
       prisma.eventoTrazabilidad.findMany.mockResolvedValue([]);
       prisma.factura.findMany.mockResolvedValue([]);
       prisma.meta.findMany.mockResolvedValue([]);
+      prisma.movimientoInventario.findMany.mockResolvedValue([
+        { tipo: 'ENTRADA', motivo: 'PRODUCCION', cantidad: 10, createdAt: new Date('2026-06-02T08:00:00Z') },
+      ]);
+      prisma.movimientoInventario.groupBy.mockResolvedValue([
+        { tipo: 'ENTRADA', _sum: { cantidad: 100 } },
+        { tipo: 'SALIDA', _sum: { cantidad: 40 } },
+      ]);
 
       const rep = await service.diario(2026, 6, 4);
 
@@ -77,10 +88,12 @@ describe('ReportesService', () => {
       expect(prisma.eventoTrazabilidad.findMany.mock.calls[0][0].where.par).toEqual({ lineaId: 4 });
       expect(prisma.factura.findMany.mock.calls[0][0].where.despacho).toEqual({ op: { lineaId: 4 } });
       expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBe(4);
-      // El stock de bodega PT no conoce la línea: no se consulta ni se inventa.
-      expect(prisma.movimientoInventario.findMany).not.toHaveBeenCalled();
-      expect(prisma.movimientoInventario.groupBy).not.toHaveBeenCalled();
-      expect(rep.kardexPT[0].saldoInicial).toBe(0);
+      // El kardex PT se corta por la línea sellada en cada movimiento.
+      expect(prisma.movimientoInventario.findMany.mock.calls[0][0].where.lineaId).toBe(4);
+      expect(prisma.movimientoInventario.groupBy.mock.calls[0][0].where.lineaId).toBe(4);
+      expect(rep.kardexPT[0].saldoInicial).toBe(60);
+      const k2 = rep.kardexPT.find((f) => f.fecha === '2026-06-02')!;
+      expect(k2.ingreso).toBe(10);
       expect(rep.lineaId).toBe(4);
     });
   });

@@ -54,14 +54,20 @@ function clave(materialId: number, piezaId: number | null): string {
 }
 
 /**
- * Los overrides apuntan a un material (`materialObjetivoId`), no a una pieza. Un override
- * sobre la micropiel alcanza a TODAS las piezas hechas de micropiel.
+ * Líneas alcanzadas por un override. Sin pieza objetivo, el override sobre la
+ * micropiel alcanza a TODAS las piezas hechas de micropiel; con pieza objetivo
+ * (variantes ECONOMICA/S-P) solo la línea (material, pieza).
  */
 function entradasDeMaterial(
   mapa: Map<string, LineaBase>,
   materialId: number,
+  piezaObjetivoId?: number | null,
 ): [string, LineaBase][] {
-  return [...mapa.entries()].filter(([, l]) => l.materialId === materialId);
+  return [...mapa.entries()].filter(
+    ([, l]) =>
+      l.materialId === materialId &&
+      (piezaObjetivoId == null || l.piezaId === piezaObjetivoId),
+  );
 }
 
 /** Aplica las reglas de override al BOM base y devuelve el conjunto efectivo de líneas. */
@@ -85,13 +91,13 @@ export function aplicarOverrides(
     switch (ov.accion) {
       case 'REMOVE':
         if (ov.materialObjetivoId != null)
-          for (const [k] of entradasDeMaterial(mapa, ov.materialObjetivoId))
+          for (const [k] of entradasDeMaterial(mapa, ov.materialObjetivoId, ov.piezaObjetivoId))
             mapa.delete(k);
         break;
       case 'REPLACE': {
         if (ov.materialObjetivoId == null || ov.materialNuevoId == null) break;
         // El material nuevo entra en cada pieza donde estaba el viejo.
-        for (const [k, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId)) {
+        for (const [k, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId, ov.piezaObjetivoId)) {
           const nueva: LineaBase = ov.heredaCurva
             ? {
                 ...objetivo,
@@ -107,7 +113,7 @@ export function aplicarOverrides(
       case 'SET_CONSUMO': {
         if (ov.materialObjetivoId == null) break;
         const tieneCurva = Object.keys(ov.consumoPorTalla).length > 0;
-        for (const [, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId)) {
+        for (const [, objetivo] of entradasDeMaterial(mapa, ov.materialObjetivoId, ov.piezaObjetivoId)) {
           if (tieneCurva) {
             objetivo.claseConsumo = 'CURVA';
             objetivo.consumoPorTalla = { ...ov.consumoPorTalla };
@@ -122,7 +128,8 @@ export function aplicarOverrides(
       }
       case 'ADD':
         if (ov.materialNuevoId != null) {
-          const nueva = lineaDesdeOverride(ov);
+          // Con pieza objetivo, la línea nueva entra en esa pieza (no en "bota completa").
+          const nueva = lineaDesdeOverride(ov, ov.piezaObjetivoId ?? null);
           mapa.set(clave(nueva.materialId, nueva.piezaId), nueva);
         }
         break;

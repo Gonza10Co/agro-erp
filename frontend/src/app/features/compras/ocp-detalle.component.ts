@@ -4,6 +4,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ComprasApi } from '../../core/api/compras.api';
 import { OcpDetalle } from '../../core/api/models/compras.models';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeVerNivel } from '../../core/auth/modulos';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import { RegistrarRecepcionComponent } from './registrar-recepcion.component';
 import { RegistrarDevolucionComponent } from './registrar-devolucion.component';
@@ -30,29 +32,45 @@ import { badgeOcp } from './ocp-badge';
               {{ o.proveedor.nombre }} · {{ o.fecha | date:'dd MMM y' }}
               @if (o.requerimiento) {
                 · origen <a class="link-req" [routerLink]="['/compras/requerimiento', o.requerimiento.id]">REQ-{{ o.requerimiento.consecutivo }}</a>
+              } @else {
+                · orden manual
+              }
+              @if (o.valorEstimado != null) {
+                · total estimado <b>{{ '$' + (o.valorEstimado | number:'1.0-0') }}</b>
               }
             </div>
           </div>
           <div class="ph-actions">
-            @if (o.estado !== 'COMPLETA') {
+            @if (o.estado !== 'COMPLETA' && o.estado !== 'ANULADA') {
               <button class="btn btn-primary" type="button" (click)="drawer.set('recepcion')">Registrar recepción</button>
             }
-            @if (hayRecibido()) {
+            @if (hayRecibido() && o.estado !== 'ANULADA') {
               <button class="btn btn-ghost" type="button" (click)="drawer.set('devolucion')">Devolución a proveedor</button>
+            }
+            @if (puedeAnularOcp && anulable()) {
+              <button class="btn btn-secondary" type="button" [class.is-loading]="anulando()"
+                [disabled]="anulando()" (click)="anular()">Anular orden</button>
             }
           </div>
         </div>
 
+        @if (errorAccion()) {
+          <div class="card" style="margin-bottom:var(--sp-4)"><div class="card-body">
+            <p style="color:var(--error);font-size:var(--text-sm)">{{ errorAccion() }}</p>
+          </div></div>
+        }
+
         <div class="card" style="margin-bottom:var(--sp-4)">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Insumo</th><th>Unidad</th><th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Pendiente</th></tr></thead>
+              <thead><tr><th>Insumo</th><th>Unidad</th><th class="num">Pedido</th><th class="num">$ unit.</th><th class="num">Recibido</th><th class="num">Pendiente</th></tr></thead>
               <tbody>
                 @for (l of o.lineas; track l.id) {
                   <tr>
                     <td><span class="cell-mono">{{ l.materialCodigo }}</span> · {{ l.materialNombre }}</td>
                     <td class="cell-sub">{{ l.unidad }}</td>
                     <td class="num cell-mono">{{ l.cantPedida | number:'1.0-2' }}</td>
+                    <td class="num cell-mono cell-sub">{{ l.costoUnitario != null ? '$' + (l.costoUnitario | number:'1.0-0') : '—' }}</td>
                     <td class="num cell-mono">{{ l.cantRecibida | number:'1.0-2' }}</td>
                     <td class="num cell-mono" [class.pend]="l.pendiente > 0">{{ l.pendiente | number:'1.0-2' }}</td>
                   </tr>
@@ -130,14 +148,24 @@ import { badgeOcp } from './ocp-badge';
 })
 export class OcpDetalleComponent implements OnInit {
   private readonly api = inject(ComprasApi);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   ocp = signal<OcpDetalle | null>(null);
   estado = signal<'cargando' | 'ok' | 'error'>('cargando');
   drawer = signal<'recepcion' | 'devolucion' | null>(null);
+  anulando = signal(false);
+  errorAccion = signal('');
+  // Anular OCP: sección EN_STAGE hasta liberarla al cliente el día de la demo.
+  readonly puedeAnularOcp = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
 
   hayRecibido = computed(() => (this.ocp()?.lineas ?? []).some((l) => l.cantRecibida > 0));
+  // Solo se anula una orden sin mercancía movida (mismo criterio del backend).
+  anulable = computed(() => {
+    const o = this.ocp();
+    return !!o && o.estado !== 'ANULADA' && !this.hayRecibido() && o.devoluciones.length === 0;
+  });
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
@@ -156,6 +184,21 @@ export class OcpDetalleComponent implements OnInit {
     this.drawer.set(null);
     const o = this.ocp();
     if (o) this.cargar(o.id);
+  }
+
+  anular(): void {
+    const o = this.ocp();
+    if (!o || this.anulando()) return;
+    this.anulando.set(true);
+    this.errorAccion.set('');
+    this.api.anularOrden(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.anulando.set(false); this.cargar(o.id); },
+      error: (e) => {
+        this.anulando.set(false);
+        const m = e?.error?.message;
+        this.errorAccion.set(Array.isArray(m) ? m.join(' ') : (m ?? 'No se pudo anular la orden'));
+      },
+    });
   }
 
   badge(o: OcpDetalle) { return badgeOcp(o.estado); }

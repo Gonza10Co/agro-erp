@@ -146,6 +146,7 @@ export class FabricacionService {
             update: { cantDisponible: { increment: 1 } },
           });
           // Kardex: cada par terminado es una ENTRADA de PT trazable al par.
+          // La línea del par se sella en el movimiento (kardex PT por línea).
           await tx.movimientoInventario.create({
             data: {
               tipo: 'ENTRADA',
@@ -153,6 +154,7 @@ export class FabricacionService {
               inventarioPTId: inv.id,
               cantidad: 1,
               referencia: par.codigo,
+              lineaId: par.lineaId ?? null,
             },
           });
           // El par ya fue marcado TERMINADO en esta misma tx, así que

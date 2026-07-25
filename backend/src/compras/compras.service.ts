@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { BomLoaderService } from '../catalog/bom/bom-loader.service';
@@ -9,6 +10,7 @@ import {
   agruparPorProveedor,
   LineaSalida,
 } from './requerimiento-calculo';
+import { liberarReservasDeOp } from './reserva-insumos';
 
 type DecimalLike = { toNumber(): number } | number | null;
 const num = (d: DecimalLike): number =>
@@ -68,29 +70,19 @@ export class ComprasService {
     }
 
     const ids = [...bruto.keys()];
-    const [stockRows, materialRows] = await Promise.all([
-      ids.length
-        ? this.prisma.inventarioMaterial.findMany({
-            where: { materialId: { in: ids } },
-          })
-        : Promise.resolve([]),
-      ids.length
-        ? this.prisma.material.findMany({
-            where: { id: { in: ids } },
-            select: {
-              id: true,
-              codigo: true,
-              nombreCanonico: true,
-              proveedorId: true,
-              proveedor: { select: { id: true, nombre: true } },
-            },
-          })
-        : Promise.resolve([]),
-    ]);
+    const materialRows = ids.length
+      ? await this.prisma.material.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true,
+            codigo: true,
+            nombreCanonico: true,
+            proveedorId: true,
+            proveedor: { select: { id: true, nombre: true } },
+          },
+        })
+      : [];
 
-    const stock = new Map<number, number>(
-      (stockRows as any[]).map((r) => [r.materialId, num(r.cantDisponible)]),
-    );
     const proveedorPorMaterial = new Map<number, number | null>(
       (materialRows as any[]).map((m) => [m.id, m.proveedorId ?? null]),
     );
@@ -98,22 +90,57 @@ export class ComprasService {
       (materialRows as any[]).map((m) => [m.id, m]),
     );
 
-    const lineasData = construirLineasRequerimiento(
-      bruto,
-      stock,
-      proveedorPorMaterial,
-    );
+    // El amarre de insumos vive dentro de la transacción: lock pesimista sobre
+    // el stock (mismo patrón del amarre de PT) para que dos pedidos concurrentes
+    // no reserven el mismo material a la vez.
+    const { requerimiento, lineasData } = await this.prisma.$transaction(
+      async (tx) => {
+        // Recalcular re-amarra desde cero: se libera el amarre previo de la OP.
+        await liberarReservasDeOp(tx, op.id);
 
-    const requerimiento = await this.prisma.$transaction(async (tx) => {
-      const consecutivo = await siguienteConsecutivo(tx, 'req');
-      return tx.requerimientoCompra.create({
-        data: {
-          consecutivo,
-          opId: op.id,
-          lineas: { create: lineasData },
-        },
-      });
-    });
+        if (ids.length) {
+          await tx.$queryRaw`SELECT id FROM "InventarioMaterial" WHERE "materialId" IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+        }
+        const stockRows = ids.length
+          ? await tx.inventarioMaterial.findMany({
+              where: { materialId: { in: ids } },
+            })
+          : [];
+        const stock = new Map<number, number>(
+          (stockRows as any[]).map((r) => [r.materialId, num(r.cantDisponible)]),
+        );
+        const reservado = new Map<number, number>(
+          (stockRows as any[]).map((r) => [r.materialId, num(r.cantReservada)]),
+        );
+
+        const lineasData = construirLineasRequerimiento(
+          bruto,
+          stock,
+          reservado,
+          proveedorPorMaterial,
+        );
+
+        const consecutivo = await siguienteConsecutivo(tx, 'req');
+        const requerimiento = await tx.requerimientoCompra.create({
+          data: {
+            consecutivo,
+            opId: op.id,
+            lineas: { create: lineasData },
+          },
+        });
+
+        // Amarra la bodega: lo reservado sube al agregado por material.
+        for (const l of lineasData) {
+          if (l.cantReservada > 0) {
+            await tx.inventarioMaterial.update({
+              where: { materialId: l.materialId },
+              data: { cantReservada: { increment: l.cantReservada } },
+            });
+          }
+        }
+        return { requerimiento, lineasData };
+      },
+    );
 
     const lineasSalida: LineaSalida[] = lineasData.map((l) => {
       const m = matInfo.get(l.materialId);
@@ -131,6 +158,7 @@ export class ComprasService {
       opId: requerimiento.opId,
       fecha: requerimiento.fecha,
       estado: requerimiento.estado ?? 'CALCULADO',
+      reservaActiva: true,
       grupos: agruparPorProveedor(lineasSalida),
     };
   }
@@ -153,6 +181,7 @@ export class ComprasService {
       proveedorId: l.proveedorId,
       cantNecesaria: num(l.cantNecesaria),
       cantDisponible: num(l.cantDisponible),
+      cantReservada: num(l.cantReservada),
       cantAComprar: num(l.cantAComprar),
       materialCodigo: l.material.codigo,
       materialNombre: l.material.nombreCanonico,
@@ -164,6 +193,7 @@ export class ComprasService {
       opId: r.opId,
       fecha: r.fecha,
       estado: r.estado,
+      reservaActiva: (r as any).reservaActiva ?? false,
       grupos: agruparPorProveedor(lineasSalida),
     };
   }
@@ -172,7 +202,7 @@ export class ComprasService {
     return this.prisma.requerimientoCompra.findMany({
       where: { opId },
       orderBy: { consecutivo: 'desc' },
-      select: { id: true, consecutivo: true, fecha: true },
+      select: { id: true, consecutivo: true, fecha: true, reservaActiva: true },
     });
   }
 

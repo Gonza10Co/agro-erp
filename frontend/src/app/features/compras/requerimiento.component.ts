@@ -21,7 +21,14 @@ import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/co
         <div class="page-header">
           <div>
             <div class="ph-title">Requerimiento de compra REQ-{{ r.consecutivo }}</div>
-            <div class="cell-sub">Calculado {{ r.fecha | date:'dd MMM y' }}</div>
+            <div class="cell-sub">
+              Calculado {{ r.fecha | date:'dd MMM y' }}
+              @if (r.reservaActiva === false) {
+                · <span class="liberado">amarre liberado</span>
+              } @else if (tieneAmarre()) {
+                · <span class="amarrado">insumos de bodega amarrados a este pedido</span>
+              }
+            </div>
           </div>
           @if (puedeGenerar()) {
             <button class="btn btn-primary" type="button" [class.is-loading]="generando()"
@@ -59,13 +66,14 @@ import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/co
               </div>
               <div class="card-body">
                 <table class="tbl">
-                  <thead><tr><th>Insumo</th><th class="num">Necesita</th><th class="num">Stock</th><th class="num">A comprar</th></tr></thead>
+                  <thead><tr><th>Insumo</th><th class="num">Necesita</th><th class="num">Stock</th><th class="num">Amarrado</th><th class="num">A comprar</th></tr></thead>
                   <tbody>
                     @for (l of g.lineas; track l.materialId) {
                       <tr>
                         <td><span class="mono">{{ l.materialCodigo }}</span> · {{ l.materialNombre }}</td>
                         <td class="num">{{ l.cantNecesaria | number:'1.0-2' }}</td>
                         <td class="num">{{ l.cantDisponible | number:'1.0-2' }}</td>
+                        <td class="num amarre" [class.cero]="!l.cantReservada">{{ l.cantReservada | number:'1.0-2' }}</td>
                         <td class="num comprar" [class.cero]="l.cantAComprar === 0">{{ l.cantAComprar | number:'1.0-2' }}</td>
                       </tr>
                     }
@@ -98,6 +106,10 @@ import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/co
     .mono{font-family:var(--font-mono)}
     .comprar{font-weight:var(--fw-semibold);color:var(--accent)}
     .comprar.cero{color:var(--text-subtle);font-weight:400}
+    .amarre{font-weight:var(--fw-semibold);color:var(--success, #2e9e5b)}
+    .amarre.cero{color:var(--text-subtle);font-weight:400}
+    .amarrado{color:var(--success, #2e9e5b)}
+    .liberado{color:var(--text-muted)}
     .banner-ok{background:color-mix(in srgb, var(--success, #2e9e5b) 8%, transparent);border:var(--bw) solid var(--success, #2e9e5b);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);display:flex;gap:var(--sp-3);align-items:baseline;flex-wrap:wrap}
     .banner-ok a{color:var(--accent)}
     .banner-err{background:color-mix(in srgb, var(--error) 8%, transparent);border:var(--bw) solid var(--error);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);color:var(--error)}
@@ -119,6 +131,11 @@ export class RequerimientoComponent implements OnInit {
     const r = this.req();
     if (!r || r.estado === 'CON_ORDEN') return false;
     return r.grupos.some((g) => g.proveedor && g.lineas.some((l) => l.cantAComprar > 0));
+  });
+
+  tieneAmarre = computed(() => {
+    const r = this.req();
+    return !!r && r.grupos.some((g) => g.lineas.some((l) => (l.cantReservada ?? 0) > 0));
   });
 
   ngOnInit(): void {

@@ -16,13 +16,15 @@ function prismaMock() {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     },
     ordenCompraProveedorLinea: { update: jest.fn() },
     recepcionCompra: { create: jest.fn() },
     devolucionProveedor: { create: jest.fn() },
     inventarioMaterial: { upsert: jest.fn(), updateMany: jest.fn() },
     movimientoInventario: { create: jest.fn(), createMany: jest.fn() },
-    material: { findUnique: jest.fn(), update: jest.fn() },
+    material: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+    proveedor: { findUnique: jest.fn() },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   return prisma;
@@ -68,8 +70,9 @@ describe('ComprasProveedorService.generarDesdeRequerimiento', () => {
       consecutivo: 9,
       estado: 'CALCULADO',
       lineas: [
-        { materialId: 1, proveedorId: 7, cantAComprar: 80, material: { codigo: 'M1', nombreCanonico: 'Cuero' } },
-        { materialId: 2, proveedorId: 7, cantAComprar: 30, material: { codigo: 'M2', nombreCanonico: 'Hilo' } },
+        // M1 con promedio móvil, M2 solo costo base, M3 sin costo → null.
+        { materialId: 1, proveedorId: 7, cantAComprar: 80, material: { codigo: 'M1', nombreCanonico: 'Cuero', costoPromedio: 1200 } },
+        { materialId: 2, proveedorId: 7, cantAComprar: 30, material: { codigo: 'M2', nombreCanonico: 'Hilo', costoBase: 900 } },
         { materialId: 3, proveedorId: 8, cantAComprar: 50, material: { codigo: 'M3', nombreCanonico: 'PVC' } },
         { materialId: 4, proveedorId: null, cantAComprar: 10, material: { codigo: 'M4', nombreCanonico: 'Ojal' } },
         { materialId: 5, proveedorId: 9, cantAComprar: 0, material: { codigo: 'M5', nombreCanonico: 'Caja' } },
@@ -88,9 +91,14 @@ describe('ComprasProveedorService.generarDesdeRequerimiento', () => {
     const primera = prisma.ordenCompraProveedor.create.mock.calls[0][0].data;
     expect(primera.proveedorId).toBe(7);
     expect(primera.requerimientoId).toBe(1);
+    // Precio en línea: prellenado con promedio móvil (M1) o costo base (M2).
     expect(primera.lineas.create).toEqual([
-      { materialId: 1, cantPedida: 80 },
-      { materialId: 2, cantPedida: 30 },
+      { materialId: 1, cantPedida: 80, costoUnitario: 1200 },
+      { materialId: 2, cantPedida: 30, costoUnitario: 900 },
+    ]);
+    const segunda = prisma.ordenCompraProveedor.create.mock.calls[1][0].data;
+    expect(segunda.lineas.create).toEqual([
+      { materialId: 3, cantPedida: 50, costoUnitario: null }, // sin costo conocido
     ]);
     expect(prisma.requerimientoCompra.update).toHaveBeenCalledWith({
       where: { id: 1 },
@@ -130,6 +138,13 @@ describe('ComprasProveedorService.registrarRecepcion', () => {
 
   it('409 si la OCP ya está COMPLETA', async () => {
     prisma.ordenCompraProveedor.findUnique.mockResolvedValue({ ...ocp(), estado: 'COMPLETA' });
+    await expect(
+      service.registrarRecepcion(10, { lineas: [{ ocpLineaId: 1, cantidad: 5 }] }, user),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('409 si la OCP está ANULADA', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue({ ...ocp(), estado: 'ANULADA' });
     await expect(
       service.registrarRecepcion(10, { lineas: [{ ocpLineaId: 1, cantidad: 5 }] }, user),
     ).rejects.toThrow(ConflictException);
@@ -382,5 +397,140 @@ describe('ComprasProveedorService.listar / obtener', () => {
       expect.objectContaining({ cantPedida: 200, cantRecibida: 100, pendiente: 100 }),
     );
     expect(res.recepciones).toHaveLength(1);
+  });
+});
+
+describe('ComprasProveedorService.crearManual', () => {
+  let prisma: any;
+  let service: ComprasProveedorService;
+  beforeEach(() => {
+    prisma = prismaMock();
+    service = new ComprasProveedorService(prisma);
+  });
+
+  it('400 si el core rechaza (línea repetida)', async () => {
+    await expect(
+      service.crearManual({
+        proveedorId: 7,
+        lineas: [
+          { materialId: 1, cantPedida: 5 },
+          { materialId: 1, cantPedida: 3 },
+        ],
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('404 si el proveedor no existe', async () => {
+    prisma.proveedor.findUnique.mockResolvedValue(null);
+    await expect(
+      service.crearManual({ proveedorId: 99, lineas: [{ materialId: 1, cantPedida: 5 }] }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('400 si algún material no existe', async () => {
+    prisma.proveedor.findUnique.mockResolvedValue({ id: 7 });
+    prisma.material.findMany.mockResolvedValue([{ id: 1 }]); // el 2 no existe
+    await expect(
+      service.crearManual({
+        proveedorId: 7,
+        lineas: [
+          { materialId: 1, cantPedida: 5 },
+          { materialId: 2, cantPedida: 3 },
+        ],
+      }),
+    ).rejects.toThrow('Materiales inexistentes: 2');
+  });
+
+  it('crea la OCP sin requerimiento, con costo opcional por línea', async () => {
+    prisma.proveedor.findUnique.mockResolvedValue({ id: 7 });
+    prisma.material.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 12n }]);
+    prisma.ordenCompraProveedor.create.mockResolvedValue({ id: 55, consecutivo: 12, estado: 'PENDIENTE' });
+
+    const r = await service.crearManual({
+      proveedorId: 7,
+      observaciones: 'reposición',
+      lineas: [
+        { materialId: 1, cantPedida: 5, costoUnitario: 800 },
+        { materialId: 2, cantPedida: 3 },
+      ],
+    });
+
+    const data = prisma.ordenCompraProveedor.create.mock.calls[0][0].data;
+    expect(data.proveedorId).toBe(7);
+    expect(data.requerimientoId).toBeUndefined(); // manual: sin requerimiento
+    expect(data.lineas.create).toEqual([
+      { materialId: 1, cantPedida: 5, costoUnitario: 800 },
+      { materialId: 2, cantPedida: 3, costoUnitario: null },
+    ]);
+    expect(r).toEqual({ id: 55, consecutivo: 12, estado: 'PENDIENTE' });
+  });
+});
+
+describe('ComprasProveedorService.anular', () => {
+  let prisma: any;
+  let service: ComprasProveedorService;
+  beforeEach(() => {
+    prisma = prismaMock();
+    service = new ComprasProveedorService(prisma);
+  });
+
+  it('404 si la OCP no existe', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue(null);
+    await expect(service.anular(9)).rejects.toThrow(NotFoundException);
+  });
+
+  it('409 si tiene recepciones registradas', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue({
+      id: 9, consecutivo: 4, estado: 'PARCIAL', requerimientoId: 1,
+      _count: { recepciones: 2, devoluciones: 0 },
+    });
+    await expect(service.anular(9)).rejects.toThrow(ConflictException);
+  });
+
+  it('anula y, si era la última viva del requerimiento, lo reabre a CALCULADO', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue({
+      id: 9, consecutivo: 4, estado: 'PENDIENTE', requerimientoId: 1,
+      _count: { recepciones: 0, devoluciones: 0 },
+    });
+    prisma.ordenCompraProveedor.count.mockResolvedValue(0); // no quedan vivas
+
+    const r = await service.anular(9);
+
+    expect(prisma.ordenCompraProveedor.update).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { estado: 'ANULADA' },
+    });
+    expect(prisma.requerimientoCompra.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { estado: 'CALCULADO' },
+    });
+    expect(r).toMatchObject({ estado: 'ANULADA', requerimientoReabierto: true });
+  });
+
+  it('si el requerimiento tiene otras OCP vivas NO lo reabre', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue({
+      id: 9, consecutivo: 4, estado: 'PENDIENTE', requerimientoId: 1,
+      _count: { recepciones: 0, devoluciones: 0 },
+    });
+    prisma.ordenCompraProveedor.count.mockResolvedValue(1); // queda otra viva
+
+    const r = await service.anular(9);
+
+    expect(prisma.requerimientoCompra.update).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ estado: 'ANULADA', requerimientoReabierto: false });
+  });
+
+  it('una OCP manual (sin requerimiento) se anula sin tocar requerimientos', async () => {
+    prisma.ordenCompraProveedor.findUnique.mockResolvedValue({
+      id: 9, consecutivo: 4, estado: 'PENDIENTE', requerimientoId: null,
+      _count: { recepciones: 0, devoluciones: 0 },
+    });
+
+    const r = await service.anular(9);
+
+    expect(prisma.ordenCompraProveedor.count).not.toHaveBeenCalled();
+    expect(prisma.requerimientoCompra.update).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ estado: 'ANULADA', requerimientoReabierto: false });
   });
 });

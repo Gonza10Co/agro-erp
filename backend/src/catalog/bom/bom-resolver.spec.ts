@@ -510,3 +510,76 @@ describe('aplicarOverrides con despiece por pieza', () => {
     expect(r.find((l) => l.piezaId === LATERAL)?.materialId).toBe(SINTETICO);
   });
 });
+
+describe('aplicarOverrides con pieza objetivo (variantes ECONOMICA / S-P)', () => {
+  const CAPELLADA = 1;
+  const LATERAL = 2;
+  const BOTELLA = 3;
+  const SOPORTE_LATERAL = 4;
+  const MICROPIEL = 10;
+  const MICROFIBRA_PVC = 20;
+  const PUNTERA = 30;
+  const CONTRAFUERTE_SP = 40;
+
+  it('REPLACE con pieza objetivo cambia SOLO esa pieza (ECONOMICA: lateral a microfibra)', () => {
+    const base = [
+      lineaFija(MICROPIEL, 0.6, CAPELLADA),
+      lineaFija(MICROPIEL, 0.4, LATERAL),
+      lineaFija(MICROPIEL, 0.2, BOTELLA),
+    ];
+    const ov: Override[] = [
+      { accion: 'REPLACE', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: MICROFIBRA_PVC, piezaObjetivoId: LATERAL, consumoFijo: null, heredaCurva: true, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r).toHaveLength(3);
+    expect(r.find((l) => l.piezaId === CAPELLADA)?.materialId).toBe(MICROPIEL);
+    expect(r.find((l) => l.piezaId === BOTELLA)?.materialId).toBe(MICROPIEL);
+    const lateral = r.find((l) => l.piezaId === LATERAL)!;
+    expect(lateral.materialId).toBe(MICROFIBRA_PVC);
+    expect(lateral.consumoFijo).toBe(0.4); // hereda el consumo de la línea original
+  });
+
+  it('SET_CONSUMO con pieza objetivo no toca las demás piezas', () => {
+    const base = [lineaFija(MICROPIEL, 0.6, CAPELLADA), lineaFija(MICROPIEL, 0.4, LATERAL)];
+    const ov: Override[] = [
+      { accion: 'SET_CONSUMO', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: null, piezaObjetivoId: LATERAL, consumoFijo: 1.5, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.piezaId === CAPELLADA)?.consumoFijo).toBe(0.6);
+    expect(r.find((l) => l.piezaId === LATERAL)?.consumoFijo).toBe(1.5);
+  });
+
+  it('REMOVE con pieza objetivo saca solo esa línea', () => {
+    const base = [lineaFija(MICROPIEL, 0.6, CAPELLADA), lineaFija(MICROPIEL, 0.4, LATERAL)];
+    const ov: Override[] = [
+      { accion: 'REMOVE', orden: 0, materialObjetivoId: MICROPIEL, materialNuevoId: null, piezaObjetivoId: LATERAL, consumoFijo: null, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r).toHaveLength(1);
+    expect(r[0].piezaId).toBe(CAPELLADA);
+  });
+
+  it('ADD con pieza objetivo crea la línea EN esa pieza (ECONOMICA: micropiel al soporte lateral)', () => {
+    const ov: Override[] = [
+      { accion: 'ADD', orden: 0, materialObjetivoId: null, materialNuevoId: MICROPIEL, piezaObjetivoId: SOPORTE_LATERAL, consumoFijo: 0.1, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides([lineaFija(MICROPIEL, 0.6, CAPELLADA)], ov);
+    expect(r).toHaveLength(2); // no colisiona con la micropiel de la capellada
+    expect(r.find((l) => l.piezaId === SOPORTE_LATERAL)).toMatchObject({
+      materialId: MICROPIEL,
+      consumoFijo: 0.1,
+    });
+  });
+
+  it('el caso S/P: REMOVE de la puntera + ADD del contrafuerte preformado', () => {
+    const base = [lineaFija(PUNTERA, 1), lineaFija(MICROPIEL, 0.6, CAPELLADA)];
+    const ov: Override[] = [
+      { accion: 'REMOVE', orden: 0, materialObjetivoId: PUNTERA, materialNuevoId: null, consumoFijo: null, heredaCurva: false, consumoPorTalla: {} },
+      { accion: 'ADD', orden: 0, materialObjetivoId: null, materialNuevoId: CONTRAFUERTE_SP, consumoFijo: 1, heredaCurva: false, consumoPorTalla: {} },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r.find((l) => l.materialId === PUNTERA)).toBeUndefined();
+    expect(r.find((l) => l.materialId === CONTRAFUERTE_SP)).toMatchObject({ consumoFijo: 1 });
+    expect(r).toHaveLength(2);
+  });
+});

@@ -5,23 +5,51 @@ import {
 } from './requerimiento-calculo';
 
 describe('construirLineasRequerimiento', () => {
-  it('neto = max(0, necesaria − disponible)', () => {
+  it('amarra lo libre de bodega y compra el resto: aComprar = necesaria − reservada', () => {
     const bruto = new Map([[1, 100], [2, 50], [3, 30]]);
     const stock = new Map([[1, 30], [2, 80]]); // mat3 sin registro
+    const reservado = new Map<number, number>(); // nadie más tiene amarres
     const prov = new Map<number, number | null>([[1, 7], [2, 7], [3, null]]);
 
-    const lineas = construirLineasRequerimiento(bruto, stock, prov);
+    const lineas = construirLineasRequerimiento(bruto, stock, reservado, prov);
 
     expect(lineas).toEqual([
-      { materialId: 1, proveedorId: 7, cantNecesaria: 100, cantDisponible: 30, cantAComprar: 70 },
-      { materialId: 2, proveedorId: 7, cantNecesaria: 50, cantDisponible: 80, cantAComprar: 0 },
-      { materialId: 3, proveedorId: null, cantNecesaria: 30, cantDisponible: 0, cantAComprar: 30 },
+      { materialId: 1, proveedorId: 7, cantNecesaria: 100, cantDisponible: 30, cantReservada: 30, cantAComprar: 70 },
+      { materialId: 2, proveedorId: 7, cantNecesaria: 50, cantDisponible: 80, cantReservada: 50, cantAComprar: 0 },
+      { materialId: 3, proveedorId: null, cantNecesaria: 30, cantDisponible: 0, cantReservada: 0, cantAComprar: 30 },
+    ]);
+  });
+
+  it('lo ya reservado por otros pedidos NO se cuenta como disponible', () => {
+    const bruto = new Map([[1, 100]]);
+    const stock = new Map([[1, 80]]);
+    const reservado = new Map([[1, 60]]); // otro pedido amarró 60 → libres 20
+
+    const lineas = construirLineasRequerimiento(
+      bruto, stock, reservado, new Map<number, number | null>([[1, 7]]),
+    );
+
+    expect(lineas).toEqual([
+      { materialId: 1, proveedorId: 7, cantNecesaria: 100, cantDisponible: 80, cantReservada: 20, cantAComprar: 80 },
+    ]);
+  });
+
+  it('sobre-reserva ajena (reservado > disponible) no produce amarre negativo', () => {
+    const lineas = construirLineasRequerimiento(
+      new Map([[1, 10]]),
+      new Map([[1, 5]]),
+      new Map([[1, 9]]), // consumo manual bajó el stock con la reserva viva
+      new Map<number, number | null>([[1, null]]),
+    );
+    expect(lineas).toEqual([
+      { materialId: 1, proveedorId: null, cantNecesaria: 10, cantDisponible: 5, cantReservada: 0, cantAComprar: 10 },
     ]);
   });
 
   it('descarta materiales con necesaria == 0', () => {
     const lineas = construirLineasRequerimiento(
       new Map([[1, 0], [2, 5]]),
+      new Map(),
       new Map(),
       new Map<number, number | null>([[1, null], [2, null]]),
     );
@@ -33,7 +61,7 @@ describe('agruparPorProveedor', () => {
   const linea = (over: Partial<LineaSalida>): LineaSalida => ({
     materialId: 1, materialCodigo: 'M1', materialNombre: 'Mat 1',
     proveedorId: 7, proveedorNombre: 'Curtiembre XYZ',
-    cantNecesaria: 10, cantDisponible: 0, cantAComprar: 10, ...over,
+    cantNecesaria: 10, cantDisponible: 0, cantReservada: 0, cantAComprar: 10, ...over,
   });
 
   it('agrupa por proveedor y manda los sin-proveedor al final', () => {

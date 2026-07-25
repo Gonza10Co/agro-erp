@@ -77,6 +77,8 @@ describe('OpDetalleComponent', () => {
   it('carga la OP por id y muestra el consecutivo en el hero', () => {
     const { fixture, http } = setup('12');
     fixture.detectChanges();
+    // La carga también pide los requerimientos de insumos de la OP (la promesa).
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
     const req = http.expectOne('http://localhost:3001/pedidos/op/12');
     expect(req.request.method).toBe('GET');
     req.flush({
@@ -95,6 +97,7 @@ describe('OpDetalleComponent', () => {
   it('alterna entre vista por talla y por bodega', () => {
     const { fixture, http } = setup('12');
     fixture.detectChanges();
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
     http.expectOne('http://localhost:3001/pedidos/op/12').flush({
       id: 12, consecutivo: 1187, ocId: 41, fecha: '2026-05-28T00:00:00.000Z', estado: 'AMARRADA',
       oc: { id: 41, consecutivo: 2041, clienteId: 3, fecha: '2026-05-28T00:00:00.000Z', estado: 'EN_PRODUCCION',
@@ -123,14 +126,36 @@ describe('OpDetalleComponent', () => {
             cliente: { id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } },
       lineas: [],
     };
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
     http.expectOne('http://localhost:3001/pedidos/op/12').flush({ ...base, estado: 'AMARRADA' });
     fixture.detectChanges();
     fixture.componentInstance.anular();
     const req = http.expectOne('http://localhost:3001/pedidos/op/12/anular');
     expect(req.request.method).toBe('POST');
     req.flush({ ...base, estado: 'ANULADA' });
-    // tras anular, recarga (segundo GET)
+    // tras anular, recarga (segundo GET de OP + requerimientos)
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
     http.expectOne('http://localhost:3001/pedidos/op/12').flush({ ...base, estado: 'ANULADA' });
+    http.verify();
+  });
+
+  it('muestra la sección de insumos con los requerimientos amarrados de la OP', () => {
+    const { fixture, http } = setup('12');
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([
+      { id: 99, consecutivo: 3, fecha: '2026-07-21T00:00:00.000Z', reservaActiva: true },
+    ]);
+    http.expectOne('http://localhost:3001/pedidos/op/12').flush({
+      id: 12, consecutivo: 1187, ocId: 41, fecha: '2026-05-28T00:00:00.000Z', estado: 'AMARRADA',
+      oc: { id: 41, consecutivo: 2041, clienteId: 3, fecha: '2026-05-28T00:00:00.000Z', estado: 'EN_PRODUCCION',
+            cliente: { id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } },
+      lineas: [],
+    });
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Insumos del pedido');
+    expect(text).toContain('REQ-3');
+    expect(text).toContain('amarre activo');
     http.verify();
   });
 });

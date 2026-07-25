@@ -7,8 +7,10 @@ import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
 import { DespachosApi } from '../../../core/api/despachos.api';
 import { ComprasApi } from '../../../core/api/compras.api';
+import { RequerimientoResumen } from '../../../core/api/models/compras.models';
 import { FabricacionApi } from '../../../core/api/fabricacion.api';
 import { AuthService } from '../../../core/auth/auth.service';
+import { puedeVerNivel } from '../../../core/auth/modulos';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
 
@@ -99,6 +101,24 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
           </div>
         </div>
 
+        <!-- INSUMOS DEL PEDIDO (EN_STAGE): amarre de bodega + qué falta comprar -->
+        @if (puedeOperarProduccion && reqs().length) {
+          <div class="card" style="margin-bottom:var(--sp-4)"><div class="card-body req-strip">
+            <div>
+              <h3 style="font-size:var(--text-h3);font-weight:var(--fw-semibold)">Insumos del pedido</h3>
+              <p class="cell-sub">Al confirmar el pedido se amarraron los insumos disponibles en bodega y se calculó exactamente qué falta comprar.</p>
+            </div>
+            <div class="req-links">
+              @for (r of reqs(); track r.id) {
+                <a class="btn btn-ghost" [routerLink]="['/compras/requerimiento', r.id]">
+                  REQ-{{ r.consecutivo }}
+                  @if (r.reservaActiva) { <span class="req-activo">· amarre activo</span> }
+                </a>
+              }
+            </div>
+          </div></div>
+        }
+
         <!-- AMARRE -->
         <div class="card">
           <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-4) var(--sp-5);border-bottom:var(--bw) solid var(--border)">
@@ -159,6 +179,9 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
     </div>
   `,
   styles: [`
+    .req-strip{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
+    .req-links{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .req-activo{color:var(--success, #2e9e5b);font-size:var(--text-caption)}
     .op-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-5)}
     .op-id{display:flex;align-items:center;gap:14px}
     .op-id .seal{width:50px;height:50px;border-radius:var(--r-md);background:var(--primary-subtle);color:var(--primary);display:grid;place-items:center;flex:none}
@@ -229,6 +252,7 @@ export class OpDetalleComponent implements OnInit {
   carteraBloqueada = signal(false);
   motivo = signal('');
   generandoOF = signal(false);
+  reqs = signal<RequerimientoResumen[]>([]);
 
   resumen = computed(() => {
     const o = this.op();
@@ -240,9 +264,10 @@ export class OpDetalleComponent implements OnInit {
   porTalla = computed(() => { const o = this.op(); return o ? filasPorTalla(o) : []; });
   porBodega = computed(() => { const o = this.op(); return o ? filasPorBodega(o) : []; });
   puedeAutorizar = computed(() => { const r = this.auth.rol(); return r === 'GERENTE' || r === 'ADMIN'; });
-  // Generar OF / Calcular requerimientos / Despachar saltan a módulos aún no entregados
-  // (fabricación/compras/despachos). Para el CLIENTE la OP es seguimiento del amarre + anular.
-  readonly puedeOperarProduccion = ['ADMIN', 'GERENTE'].includes(this.auth.rol() ?? '');
+  // Operar producción (Generar OF / requerimientos / Despachar) e insumos del pedido:
+  // sección EN_STAGE — el día de la demo de Compras sube a ENTREGADO ("merge a cliente").
+  // Normalizado a puedeVerNivel (antes lista fija ADMIN/GERENTE que dejaba ciego a STAGE).
+  readonly puedeOperarProduccion = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {
@@ -260,6 +285,13 @@ export class OpDetalleComponent implements OnInit {
       next: o => { this.op.set(o); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
+    // Insumos del pedido (la promesa): requerimientos que amarraron bodega al confirmar.
+    if (this.puedeOperarProduccion) {
+      this.comprasApi.listarPorOp(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: r => this.reqs.set(r),
+        error: () => this.reqs.set([]),
+      });
+    }
   }
 
   badge(o: OrdenProduccion) { return badgeOP(o.estado); }

@@ -1,6 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { OpService } from './op.service';
 
+// ComprasService espiable: generarDesdeOC dispara el requerimiento automático.
+let compras: any;
+beforeEach(() => {
+  compras = { calcularRequerimiento: jest.fn().mockResolvedValue({ id: 900 }) };
+});
+
 function makeTx() {
   return {
     $queryRawUnsafe: jest.fn(),
@@ -35,7 +41,7 @@ describe('OpService.generarDesdeOC', () => {
       estado: 'BORRADOR',
       lineas: [],
     });
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await expect(service.generarDesdeOC(1)).rejects.toBeInstanceOf(
       BadRequestException,
     );
@@ -52,7 +58,7 @@ describe('OpService.generarDesdeOC', () => {
     tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
     tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'AMARRADA' });
 
-    await new OpService(prisma).generarDesdeOC(1);
+    await new OpService(prisma, compras).generarDesdeOC(1);
 
     expect(tx.ordenProduccion.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ lineaId: 4 }) }),
@@ -89,7 +95,7 @@ describe('OpService.generarDesdeOC', () => {
       estado: 'AMARRADA',
     });
 
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await service.generarDesdeOC(1);
 
     expect(tx.ordenProduccion.create).toHaveBeenCalledWith(
@@ -149,12 +155,61 @@ describe('OpService.generarDesdeOC', () => {
     tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 80 });
     tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'AMARRADA' });
 
-    const svc = new OpService(prisma);
+    const svc = new OpService(prisma, compras);
     await svc.generarDesdeOC(1);
 
     expect(tx.$queryRaw).toHaveBeenCalled();
     const sql = (tx.$queryRaw as jest.Mock).mock.calls[0][0].join('?');
     expect(sql).toContain('FOR UPDATE');
+  });
+
+  it('con producción pendiente dispara el requerimiento automático (amarre de insumos)', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'CONFIRMADA', lineas: [] });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({
+      id: 50,
+      estado: 'AMARRADA',
+      lineas: [{ tallas: [{ cantAProducir: 70 }] }],
+    });
+
+    const r = await new OpService(prisma, compras).generarDesdeOC(1);
+
+    expect(compras.calcularRequerimiento).toHaveBeenCalledWith(50);
+    expect(r.requerimientoId).toBe(900);
+  });
+
+  it('si todo quedó amarrado de PT no genera requerimiento (nada que producir)', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'CONFIRMADA', lineas: [] });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({
+      id: 50,
+      estado: 'AMARRADA',
+      lineas: [{ tallas: [{ cantAProducir: 0 }] }],
+    });
+
+    const r = await new OpService(prisma, compras).generarDesdeOC(1);
+
+    expect(compras.calcularRequerimiento).not.toHaveBeenCalled();
+    expect(r.requerimientoId).toBeNull();
+  });
+
+  it('si el requerimiento automático falla (BOM incompleto) la OP queda creada igual', async () => {
+    prisma.ordenCompra.findUnique.mockResolvedValue({ id: 1, estado: 'CONFIRMADA', lineas: [] });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({
+      id: 50,
+      estado: 'AMARRADA',
+      lineas: [{ tallas: [{ cantAProducir: 70 }] }],
+    });
+    compras.calcularRequerimiento.mockRejectedValue(new Error('BOM incompleto'));
+
+    const r = await new OpService(prisma, compras).generarDesdeOC(1);
+
+    expect(r.id).toBe(50);
+    expect(r.requerimientoId).toBeNull();
   });
 });
 
@@ -167,6 +222,8 @@ describe('OpService.anular', () => {
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      inventarioMaterial: { update: jest.fn() },
     };
     const prisma: any = {
       ordenProduccion: {
@@ -185,7 +242,7 @@ describe('OpService.anular', () => {
       },
       $transaction: jest.fn((cb: any) => cb(tx)),
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await service.anular(50);
     expect(tx.inventarioPT.update).toHaveBeenCalledWith({
       where: { id: 70 },
@@ -212,6 +269,8 @@ describe('OpService.anular', () => {
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      inventarioMaterial: { update: jest.fn() },
     };
     const prisma: any = {
       ordenProduccion: {
@@ -230,7 +289,7 @@ describe('OpService.anular', () => {
       },
       $transaction: jest.fn((cb: any) => cb(tx)),
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await service.anular(50);
     expect(tx.par.updateMany).toHaveBeenCalledWith({
       where: { of: { opId: 50 }, estado: 'EN_PROCESO' },
@@ -250,6 +309,8 @@ describe('OpService.anular', () => {
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      inventarioMaterial: { update: jest.fn() },
     };
     const prisma: any = {
       ordenProduccion: {
@@ -268,11 +329,52 @@ describe('OpService.anular', () => {
       },
       $transaction: jest.fn((cb: any) => cb(tx)),
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await service.anular(50);
     expect(tx.par.updateMany).toHaveBeenCalledWith({
       where: { of: { opId: 50 }, estado: 'EN_PROCESO' },
       data: { estado: 'CANCELADO' },
+    });
+  });
+
+  it('al anular libera el amarre de insumos (requerimientos con reserva activa)', async () => {
+    const tx = {
+      inventarioPT: { update: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn() },
+      ordenProduccion: { update: jest.fn() },
+      ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      requerimientoCompra: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 7, lineas: [{ materialId: 3, cantReservada: 40 }, { materialId: 4, cantReservada: 0 }] },
+        ]),
+        update: jest.fn(),
+      },
+      inventarioMaterial: { update: jest.fn() },
+    };
+    const prisma: any = {
+      ordenProduccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50, ocId: 1, estado: 'AMARRADA',
+          lineas: [{ tallas: [{ id: 80, reservas: [] }] }],
+        }),
+      },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+    await new OpService(prisma, compras).anular(50);
+    // Solo busca reservas ACTIVAS de esa OP y las devuelve al neto disponible.
+    expect(tx.requerimientoCompra.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { opId: 50, reservaActiva: true } }),
+    );
+    expect(tx.inventarioMaterial.update).toHaveBeenCalledTimes(1); // la línea en 0 no se toca
+    expect(tx.inventarioMaterial.update).toHaveBeenCalledWith({
+      where: { materialId: 3 },
+      data: { cantReservada: { decrement: 40 } },
+    });
+    expect(tx.requerimientoCompra.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { reservaActiva: false },
     });
   });
 });
@@ -282,7 +384,7 @@ describe('OpService lectura', () => {
     const prisma: any = {
       ordenProduccion: { findMany: jest.fn().mockResolvedValue([{ id: 2 }, { id: 1 }]) },
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     const r = await service.listar();
     expect(prisma.ordenProduccion.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { consecutivo: 'desc' } }),
@@ -294,7 +396,7 @@ describe('OpService lectura', () => {
     const prisma: any = {
       ordenProduccion: { findUnique: jest.fn().mockResolvedValue(null) },
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     await expect(service.obtener(99)).rejects.toThrow('OP 99 no existe');
   });
 
@@ -308,7 +410,7 @@ describe('OpService lectura', () => {
         }),
       },
     };
-    const service = new OpService(prisma);
+    const service = new OpService(prisma, compras);
     const r = await service.obtener(50);
     expect(r).toMatchObject({ id: 50, estado: 'AMARRADA' });
   });

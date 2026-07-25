@@ -1,6 +1,8 @@
 import {
   costoPromedioMovil,
   estadoOcp,
+  validarAnulacionOcp,
+  validarOcpManual,
   validarRecepcion,
   validarDevolucion,
 } from './compras-proveedor-core';
@@ -144,5 +146,38 @@ describe('validarDevolucion', () => {
         { materialId: 7, cantidad: 3 },
       ]),
     ).toMatch(/repetido/i);
+  });
+});
+
+describe('validarOcpManual', () => {
+  it('acepta líneas válidas con costo opcional', () => {
+    expect(
+      validarOcpManual([
+        { materialId: 1, cantPedida: 5, costoUnitario: 800 },
+        { materialId: 2, cantPedida: 3 },
+      ]),
+    ).toBeNull();
+  });
+  it('rechaza vacío, cantidades no positivas, costo en 0 y repetidos', () => {
+    expect(validarOcpManual([])).toContain('al menos una línea');
+    expect(validarOcpManual([{ materialId: 1, cantPedida: 0 }])).toContain('mayor a 0');
+    expect(validarOcpManual([{ materialId: 1, cantPedida: 5, costoUnitario: 0 }])).toContain('costo');
+    expect(
+      validarOcpManual([
+        { materialId: 1, cantPedida: 5 },
+        { materialId: 1, cantPedida: 2 },
+      ]),
+    ).toContain('repetido');
+  });
+});
+
+describe('validarAnulacionOcp', () => {
+  it('permite anular una OCP sin mercancía movida', () => {
+    expect(validarAnulacionOcp({ estado: 'PENDIENTE', recepciones: 0, devoluciones: 0 })).toBeNull();
+  });
+  it('rechaza anulada, con recepciones o con devoluciones', () => {
+    expect(validarAnulacionOcp({ estado: 'ANULADA', recepciones: 0, devoluciones: 0 })).toContain('ya está anulada');
+    expect(validarAnulacionOcp({ estado: 'PARCIAL', recepciones: 1, devoluciones: 0 })).toContain('recepciones');
+    expect(validarAnulacionOcp({ estado: 'PENDIENTE', recepciones: 0, devoluciones: 1 })).toContain('devoluciones');
   });
 });

@@ -4,6 +4,7 @@ export interface LineaRequerimientoData {
   proveedorId: number | null;
   cantNecesaria: number;
   cantDisponible: number;
+  cantReservada: number;
   cantAComprar: number;
 }
 
@@ -20,24 +21,33 @@ export interface GrupoRequerimiento {
 }
 
 /**
- * Cruza necesidad bruta contra stock y arma las líneas netas.
+ * Cruza necesidad bruta contra stock y arma las líneas netas, amarrando lo libre
+ * de bodega: reservada = min(necesaria, disponible − reservadoPorOtros) y
+ * aComprar = necesaria − reservada. Lo ya amarrado por otros pedidos no cuenta
+ * como disponible (dos pedidos no pueden contar el mismo stock).
  * Preserva el orden de inserción de `bruto`. Descarta materiales con necesaria == 0.
  */
 export function construirLineasRequerimiento(
   bruto: Map<number, number>,
   stock: Map<number, number>,
+  reservadoPorOtros: Map<number, number>,
   proveedorPorMaterial: Map<number, number | null>,
 ): LineaRequerimientoData[] {
   const out: LineaRequerimientoData[] = [];
   for (const [materialId, cantNecesaria] of bruto) {
     if (cantNecesaria <= 0) continue;
     const cantDisponible = stock.get(materialId) ?? 0;
+    // El neto libre nunca es negativo (un consumo manual pudo bajar el stock
+    // por debajo de lo reservado; se compra completo y ya).
+    const libre = Math.max(0, cantDisponible - (reservadoPorOtros.get(materialId) ?? 0));
+    const cantReservada = Math.min(cantNecesaria, libre);
     out.push({
       materialId,
       proveedorId: proveedorPorMaterial.get(materialId) ?? null,
       cantNecesaria,
       cantDisponible,
-      cantAComprar: Math.max(0, cantNecesaria - cantDisponible),
+      cantReservada,
+      cantAComprar: cantNecesaria - cantReservada,
     });
   }
   return out;

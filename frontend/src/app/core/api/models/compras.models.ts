@@ -6,6 +6,8 @@ export interface LineaRequerimiento {
   proveedorNombre: string | null;
   cantNecesaria: number;
   cantDisponible: number;
+  /** Amarre de insumos: lo que este pedido reservó de bodega al calcularse. */
+  cantReservada: number;
   cantAComprar: number;
 }
 
@@ -20,12 +22,22 @@ export interface Requerimiento {
   opId: number;
   fecha: string;
   estado?: 'CALCULADO' | 'CON_ORDEN';
+  /** false = el amarre ya se liberó (OP anulada/despachada o recálculo posterior). */
+  reservaActiva?: boolean;
   grupos: GrupoRequerimiento[];
+}
+
+/** Fila del listado de requerimientos de una OP (GET /requerimientos?opId). */
+export interface RequerimientoResumen {
+  id: number;
+  consecutivo: number;
+  fecha: string;
+  reservaActiva: boolean;
 }
 
 // ── Demo 13: OCP a proveedor ──
 
-export type EstadoOcp = 'PENDIENTE' | 'PARCIAL' | 'COMPLETA';
+export type EstadoOcp = 'PENDIENTE' | 'PARCIAL' | 'COMPLETA' | 'ANULADA';
 
 export interface OcpResumen {
   id: number;
@@ -36,6 +48,8 @@ export interface OcpResumen {
   estado: EstadoOcp;
   totalPedido: number;
   totalRecibido: number;
+  /** Σ cantPedida × costoUnitario de las líneas con costo; null si ninguna lo tiene. */
+  valorEstimado: number | null;
 }
 
 export interface OcpLinea {
@@ -47,6 +61,8 @@ export interface OcpLinea {
   cantPedida: number;
   cantRecibida: number;
   pendiente: number;
+  /** Precio pactado al ordenar (prellenado con el costo de referencia del material). */
+  costoUnitario: number | null;
 }
 
 export interface RecepcionCompra {
@@ -79,9 +95,24 @@ export interface OcpDetalle {
   fecha: string;
   estado: EstadoOcp;
   observaciones: string | null;
+  valorEstimado: number | null;
   lineas: OcpLinea[];
   recepciones: RecepcionCompra[];
   devoluciones: DevolucionProveedor[];
+}
+
+export interface ProveedorItem {
+  id: number;
+  nit: string;
+  nombre: string;
+  ciudad: string | null;
+}
+
+// OCP manual: compra directa sin requerimiento.
+export interface CrearOcpManualDto {
+  proveedorId: number;
+  lineas: { materialId: number; cantPedida: number; costoUnitario?: number }[];
+  observaciones?: string;
 }
 
 export interface ResultadoGenerarOrdenes {
