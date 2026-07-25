@@ -4,8 +4,14 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-07-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-07-25** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **Entrega 4 desplegada a prod el 2026-07-25** (merge `--no-ff` develop→master `61eeb06`, CI verde,
+> las 4 migraciones aditivas aplicadas solas por `migrate deploy`). **Todo sigue en `EN_STAGE`: el
+> cliente no ve nada nuevo** hasta que se voltean los gates el día de la demo. Sin tag todavía
+> (`entrega-4` se pone el día que se muestra). Falta correr `seed:basarili` contra prod — ese seed
+> libera los ejes de variantes al cliente de una, así que va el día de la demo.
 
 ---
 
@@ -18,7 +24,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** 409 backend + 287 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
+**Tests:** 450 backend (53 suites) + 315 frontend, verdes 🟢 en el CI · ambos builds limpios.
 
 ---
 
