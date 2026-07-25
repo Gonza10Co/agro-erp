@@ -10,7 +10,7 @@ import { ComprasApi } from '../../../core/api/compras.api';
 import { RequerimientoResumen } from '../../../core/api/models/compras.models';
 import { FabricacionApi } from '../../../core/api/fabricacion.api';
 import { AuthService } from '../../../core/auth/auth.service';
-import { puedeVerNivel } from '../../../core/auth/modulos';
+import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
 
@@ -43,13 +43,15 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               </div>
             </div>
           </div>
-          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || (puedeOperarProduccion && requerible())) {
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || ((puedeOperarProduccion || puedeRecalcular) && requerible())) {
             <div class="page-actions">
               @if (despachable() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
               }
               @if (requerible() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="generandoOF()" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
+              }
+              @if (requerible() && puedeRecalcular) {
                 <button class="btn btn-secondary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="requerir()">Calcular requerimientos</button>
               }
               @if (o.estado === 'AMARRADA' || o.estado === 'CREADA') {
@@ -101,8 +103,8 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
           </div>
         </div>
 
-        <!-- INSUMOS DEL PEDIDO (EN_STAGE): amarre de bodega + qué falta comprar -->
-        @if (puedeOperarProduccion && reqs().length) {
+        <!-- INSUMOS DEL PEDIDO (sección 'amarre-insumos'): amarre de bodega + qué falta comprar -->
+        @if (puedeVerAmarre && reqs().length) {
           <div class="card" style="margin-bottom:var(--sp-4)"><div class="card-body req-strip">
             <div>
               <h3 style="font-size:var(--text-h3);font-weight:var(--fw-semibold)">Insumos del pedido</h3>
@@ -266,8 +268,12 @@ export class OpDetalleComponent implements OnInit {
   puedeAutorizar = computed(() => { const r = this.auth.rol(); return r === 'GERENTE' || r === 'ADMIN'; });
   // Operar producción (Generar OF / requerimientos / Despachar) e insumos del pedido:
   // sección EN_STAGE — el día de la demo de Compras sube a ENTREGADO ("merge a cliente").
-  // Normalizado a puedeVerNivel (antes lista fija ADMIN/GERENTE que dejaba ciego a STAGE).
-  readonly puedeOperarProduccion = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Gates por sección (NIVEL_SECCION es el tablero: acá no se decide el nivel).
+  // Separados a propósito: el amarre y su recálculo ya son del cliente, mientras
+  // que generar OF y despachar siguen siendo piso de planta.
+  readonly puedeOperarProduccion = puedeVerSeccion(this.auth.rol(), 'operar-produccion');
+  readonly puedeVerAmarre = puedeVerSeccion(this.auth.rol(), 'amarre-insumos');
+  readonly puedeRecalcular = puedeVerSeccion(this.auth.rol(), 'recalcular-requerimiento');
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {
@@ -286,7 +292,7 @@ export class OpDetalleComponent implements OnInit {
       error: () => this.cargando.set(false),
     });
     // Insumos del pedido (la promesa): requerimientos que amarraron bodega al confirmar.
-    if (this.puedeOperarProduccion) {
+    if (this.puedeVerAmarre) {
       this.comprasApi.listarPorOp(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: r => this.reqs.set(r),
         error: () => this.reqs.set([]),

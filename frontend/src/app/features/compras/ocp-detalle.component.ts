@@ -5,7 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ComprasApi } from '../../core/api/compras.api';
 import { OcpDetalle } from '../../core/api/models/compras.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { puedeVerNivel } from '../../core/auth/modulos';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import { RegistrarRecepcionComponent } from './registrar-recepcion.component';
 import { RegistrarDevolucionComponent } from './registrar-devolucion.component';
@@ -32,10 +32,10 @@ import { badgeOcp } from './ocp-badge';
               {{ o.proveedor.nombre }} · {{ o.fecha | date:'dd MMM y' }}
               @if (o.requerimiento) {
                 · origen <a class="link-req" [routerLink]="['/compras/requerimiento', o.requerimiento.id]">REQ-{{ o.requerimiento.consecutivo }}</a>
-              } @else {
+              } @else if (puedeVerOcpManual) {
                 · orden manual
               }
-              @if (o.valorEstimado != null) {
+              @if (puedeVerCosto && o.valorEstimado != null) {
                 · total estimado <b>{{ '$' + (o.valorEstimado | number:'1.0-0') }}</b>
               }
             </div>
@@ -63,14 +63,16 @@ import { badgeOcp } from './ocp-badge';
         <div class="card" style="margin-bottom:var(--sp-4)">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Insumo</th><th>Unidad</th><th class="num">Pedido</th><th class="num">$ unit.</th><th class="num">Recibido</th><th class="num">Pendiente</th></tr></thead>
+              <thead><tr><th>Insumo</th><th>Unidad</th><th class="num">Pedido</th>@if (puedeVerCosto) { <th class="num">$ unit.</th> }<th class="num">Recibido</th><th class="num">Pendiente</th></tr></thead>
               <tbody>
                 @for (l of o.lineas; track l.id) {
                   <tr>
                     <td><span class="cell-mono">{{ l.materialCodigo }}</span> · {{ l.materialNombre }}</td>
                     <td class="cell-sub">{{ l.unidad }}</td>
                     <td class="num cell-mono">{{ l.cantPedida | number:'1.0-2' }}</td>
-                    <td class="num cell-mono cell-sub">{{ l.costoUnitario != null ? '$' + (l.costoUnitario | number:'1.0-0') : '—' }}</td>
+                    @if (puedeVerCosto) {
+                      <td class="num cell-mono cell-sub">{{ l.costoUnitario != null ? '$' + (l.costoUnitario | number:'1.0-0') : '—' }}</td>
+                    }
                     <td class="num cell-mono">{{ l.cantRecibida | number:'1.0-2' }}</td>
                     <td class="num cell-mono" [class.pend]="l.pendiente > 0">{{ l.pendiente | number:'1.0-2' }}</td>
                   </tr>
@@ -157,8 +159,10 @@ export class OcpDetalleComponent implements OnInit {
   drawer = signal<'recepcion' | 'devolucion' | null>(null);
   anulando = signal(false);
   errorAccion = signal('');
-  // Anular OCP: sección EN_STAGE hasta liberarla al cliente el día de la demo.
-  readonly puedeAnularOcp = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Secciones de la Entrega 4: se liberan al cliente el día de su demo (NIVEL_SECCION).
+  readonly puedeAnularOcp = puedeVerSeccion(this.auth.rol(), 'ocp-anular');
+  readonly puedeVerOcpManual = puedeVerSeccion(this.auth.rol(), 'ocp-manual');
+  readonly puedeVerCosto = puedeVerSeccion(this.auth.rol(), 'costo-ocp');
 
   hayRecibido = computed(() => (this.ocp()?.lineas ?? []).some((l) => l.cantRecibida > 0));
   // Solo se anula una orden sin mercancía movida (mismo criterio del backend).

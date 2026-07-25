@@ -33,7 +33,7 @@ export const routes: Routes = [
       { path: 'cartera', data: { modulo: 'cartera' }, loadComponent: () => import('./features/cartera/cartera-list.component').then(m => m.CarteraListComponent) },
       { path: 'compras/requerimiento/:id', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/requerimiento.component').then(m => m.RequerimientoComponent) },
       { path: 'compras/ordenes', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/ocp-list.component').then(m => m.OcpListComponent) },
-      { path: 'compras/ordenes/nueva', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/ocp-crear.component').then(m => m.OcpCrearComponent) },
+      { path: 'compras/ordenes/nueva', data: { modulo: 'compras', seccion: 'ocp-manual' }, loadComponent: () => import('./features/compras/ocp-crear.component').then(m => m.OcpCrearComponent) },
       { path: 'compras/ordenes/:id', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/ocp-detalle.component').then(m => m.OcpDetalleComponent) },
       { path: 'inventario', data: { modulo: 'inventario' }, loadComponent: () => import('./features/inventario/inventario-consolidado.component').then(m => m.InventarioConsolidadoComponent) },
       { path: 'fabricacion', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/of-list.component').then(m => m.OfListComponent) },

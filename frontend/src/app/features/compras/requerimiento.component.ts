@@ -3,6 +3,8 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ComprasApi } from '../../core/api/compras.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/compras.models';
 
 @Component({
@@ -23,10 +25,12 @@ import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/co
             <div class="ph-title">Requerimiento de compra REQ-{{ r.consecutivo }}</div>
             <div class="cell-sub">
               Calculado {{ r.fecha | date:'dd MMM y' }}
-              @if (r.reservaActiva === false) {
-                · <span class="liberado">amarre liberado</span>
-              } @else if (tieneAmarre()) {
-                · <span class="amarrado">insumos de bodega amarrados a este pedido</span>
+              @if (puedeVerAmarre) {
+                @if (r.reservaActiva === false) {
+                  · <span class="liberado">amarre liberado</span>
+                } @else if (tieneAmarre()) {
+                  · <span class="amarrado">insumos de bodega amarrados a este pedido</span>
+                }
               }
             </div>
           </div>
@@ -66,14 +70,16 @@ import { Requerimiento, ResultadoGenerarOrdenes } from '../../core/api/models/co
               </div>
               <div class="card-body">
                 <table class="tbl">
-                  <thead><tr><th>Insumo</th><th class="num">Necesita</th><th class="num">Stock</th><th class="num">Amarrado</th><th class="num">A comprar</th></tr></thead>
+                  <thead><tr><th>Insumo</th><th class="num">Necesita</th><th class="num">Stock</th>@if (puedeVerAmarre) { <th class="num">Amarrado</th> }<th class="num">A comprar</th></tr></thead>
                   <tbody>
                     @for (l of g.lineas; track l.materialId) {
                       <tr>
                         <td><span class="mono">{{ l.materialCodigo }}</span> · {{ l.materialNombre }}</td>
                         <td class="num">{{ l.cantNecesaria | number:'1.0-2' }}</td>
                         <td class="num">{{ l.cantDisponible | number:'1.0-2' }}</td>
-                        <td class="num amarre" [class.cero]="!l.cantReservada">{{ l.cantReservada | number:'1.0-2' }}</td>
+                        @if (puedeVerAmarre) {
+                          <td class="num amarre" [class.cero]="!l.cantReservada">{{ l.cantReservada | number:'1.0-2' }}</td>
+                        }
                         <td class="num comprar" [class.cero]="l.cantAComprar === 0">{{ l.cantAComprar | number:'1.0-2' }}</td>
                       </tr>
                     }
@@ -120,6 +126,8 @@ export class RequerimientoComponent implements OnInit {
   private readonly api = inject(ComprasApi);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  // El amarre de insumos es la Entrega 4: se muestra en su demo, no antes.
+  readonly puedeVerAmarre = puedeVerSeccion(inject(AuthService).rol(), 'amarre-insumos');
   req = signal<Requerimiento | null>(null);
   estado = signal<'cargando' | 'ok' | 'error'>('cargando');
   generando = signal(false);

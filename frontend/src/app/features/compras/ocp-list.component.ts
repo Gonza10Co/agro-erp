@@ -5,7 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ComprasApi } from '../../core/api/compras.api';
 import { OcpResumen } from '../../core/api/models/compras.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { puedeVerNivel } from '../../core/auth/modulos';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 import { badgeOcp } from './ocp-badge';
 
 @Component({
@@ -35,16 +35,18 @@ import { badgeOcp } from './ocp-badge';
         <div class="card">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Orden</th><th>Proveedor</th><th>Origen</th><th>Fecha</th><th class="num">Recibido / Pedido</th><th class="num">Valor est.</th><th>Avance</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Orden</th><th>Proveedor</th><th>Origen</th><th>Fecha</th><th class="num">Recibido / Pedido</th>@if (puedeVerCosto) { <th class="num">Valor est.</th> }<th>Avance</th><th>Estado</th></tr></thead>
               <tbody>
                 @for (o of items(); track o.id) {
                   <tr class="fila-link" [routerLink]="['/compras/ordenes', o.id]">
                     <td class="cell-mono">OCP-{{ o.consecutivo }}</td>
                     <td>{{ o.proveedor.nombre }}</td>
-                    <td class="cell-sub cell-mono">{{ o.requerimiento ? 'REQ-' + o.requerimiento.consecutivo : 'manual' }}</td>
+                    <td class="cell-sub cell-mono">{{ o.requerimiento ? 'REQ-' + o.requerimiento.consecutivo : (puedeCrearManual ? 'manual' : '—') }}</td>
                     <td class="cell-sub">{{ o.fecha | date:'dd/MM/yyyy' }}</td>
                     <td class="num cell-mono">{{ o.totalRecibido | number:'1.0-2' }} / {{ o.totalPedido | number:'1.0-2' }}</td>
-                    <td class="num cell-mono">{{ o.valorEstimado != null ? '$' + (o.valorEstimado | number:'1.0-0') : '—' }}</td>
+                    @if (puedeVerCosto) {
+                      <td class="num cell-mono">{{ o.valorEstimado != null ? '$' + (o.valorEstimado | number:'1.0-0') : '—' }}</td>
+                    }
                     <td>
                       <div class="bar"><div class="bar-fill" [style.width.%]="avance(o)"></div></div>
                     </td>
@@ -71,8 +73,9 @@ export class OcpListComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   items = signal<OcpResumen[]>([]);
   cargando = signal(true);
-  // OCP manual: sección EN_STAGE hasta liberarla al cliente el día de la demo.
-  readonly puedeCrearManual = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Secciones de la Entrega 4: se liberan al cliente el día de su demo (NIVEL_SECCION).
+  readonly puedeCrearManual = puedeVerSeccion(this.auth.rol(), 'ocp-manual');
+  readonly puedeVerCosto = puedeVerSeccion(this.auth.rol(), 'costo-ocp');
 
   ngOnInit(): void {
     this.api.listarOrdenes().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({

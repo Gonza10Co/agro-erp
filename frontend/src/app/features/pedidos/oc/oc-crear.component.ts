@@ -7,7 +7,7 @@ import { PedidosApi } from '../../../core/api/pedidos.api';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
 import { LineasApi, Linea } from '../../../core/api/lineas.api';
 import { AuthService } from '../../../core/auth/auth.service';
-import { puedeVerNivel } from '../../../core/auth/modulos';
+import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
@@ -169,8 +169,8 @@ export class OcCrearComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  // Línea por pedido: sección EN_STAGE — el cliente no la ve hasta liberarla.
-  readonly puedeElegirLinea = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Línea por pedido (Entrega 3): el nivel vive en NIVEL_SECCION (modulos.ts).
+  readonly puedeElegirLinea = puedeVerSeccion(this.auth.rol(), 'linea-pedido');
 
   pasosLabels = ['Cliente', 'Productos', 'Curva de tallas', 'Revisar'];
 

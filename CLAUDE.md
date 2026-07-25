@@ -42,6 +42,12 @@ se muestra** (así los deploys intermedios a `master` no espoilean al cliente). 
 **rompe** al cliente (cambio de modelo, fix de un bug que él ya sufre) va a `ENTREGADO` de una.
 
 > ⚠️ El nivel de MÓDULO no alcanza. Lo nuevo que aterriza dentro de un módulo que el cliente ya
-> tiene (`pedidos`, `clientes`, `catalogo`, `maestros`) queda visible apenas se despliega. Gatear
-> por **sección** con `puedeVerNivel(rol, 'EN_STAGE')` — como el bloque costo/utilidad de la OC.
-> El gating es solo de interfaz: el backend no bloquea esos endpoints.
+> tiene (`pedidos`, `clientes`, `catalogo`, `maestros`, `compras`) queda visible apenas se
+> despliega. Toda sección nueva se declara en **`NIVEL_SECCION`** (mismo archivo) y se consulta
+> con `puedeVerSeccion(rol, 'mi-seccion')` — **nunca** `puedeVerNivel` suelto en un componente:
+> el nivel vive en el mapa, así el día de la demo se voltea una línea y no nueve.
+>
+> Y el gate de UI **no basta para pantallas nuevas**: una ruta propia necesita
+> `data: { modulo, seccion }` para que `modulo.guard.ts` bloquee la URL tecleada. El gating es
+> solo de interfaz — el backend no bloquea esos endpoints, así que sin el guard el cliente
+> entra por URL y escribe datos reales (pasó con `/compras/ordenes/nueva`).
