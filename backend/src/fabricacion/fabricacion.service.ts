@@ -129,18 +129,22 @@ export class FabricacionService {
             where: { id: par.id },
             data: { estado: 'TERMINADO' },
           });
+          // El grado viaja del par al stock: una segunda no engorda el saldo de
+          // primeras (son saldos distintos bajo la misma llave + calidad).
           const inv = await tx.inventarioPT.upsert({
             where: {
-              productoConfiguradoId_tallaId_bodegaId: {
+              productoConfiguradoId_tallaId_bodegaId_calidad: {
                 productoConfiguradoId: par.productoConfiguradoId,
                 tallaId: par.tallaId,
                 bodegaId: bodegaPT!.id,
+                calidad: par.calidad,
               },
             },
             create: {
               productoConfiguradoId: par.productoConfiguradoId,
               tallaId: par.tallaId,
               bodegaId: bodegaPT!.id,
+              calidad: par.calidad,
               cantDisponible: 1,
             },
             update: { cantDisponible: { increment: 1 } },

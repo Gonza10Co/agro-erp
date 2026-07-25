@@ -6,7 +6,8 @@ function facturaBase(over: any = {}) {
     id: 1,
     total: 1000000,
     pagos: [{ monto: 200000 }],
-    despacho: { op: { oc: { clienteId: 7 } } },
+    // Denormalizado: una factura de servicio no tiene despacho que navegar.
+    clienteId: 7,
     ...over,
   };
 }

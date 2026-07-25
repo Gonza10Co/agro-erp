@@ -103,10 +103,25 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
               <div style="font-weight:var(--fw-medium);margin-bottom:var(--sp-2)">{{ l.producto.nombreComercial }}
                 <span class="cell-sub cell-mono">curva {{ l.producto.referencia.tallaMin.valor }}–{{ l.producto.referencia.tallaMax.valor }}</span></div>
               <app-talla-grid [tallas]="tallasDe(l.producto)" [valores]="l.valores" (cambio)="setValores(l.producto.id, $event)" />
-              <div style="margin-top:var(--sp-3)">
-                <label class="label">Precio por par (COP) <span style="color:var(--accent)">*</span></label>
-                <input class="input" type="number" min="0" step="100" style="max-width:220px"
-                  [ngModel]="l.precio" (ngModelChange)="setPrecio(l.producto.id, $event)" />
+              <div class="fila-precio">
+                <div>
+                  <label class="label">Precio por par (COP) <span style="color:var(--accent)">*</span></label>
+                  <input class="input" type="number" min="0" step="100" style="max-width:220px"
+                    [ngModel]="l.precio" (ngModelChange)="setPrecio(l.producto.id, $event)" />
+                </div>
+                @if (puedeVenderSegundas) {
+                  <div>
+                    <label class="label">Calidad</label>
+                    <select class="input" style="max-width:200px"
+                      [ngModel]="l.calidad ?? 'PRIMERA'" (ngModelChange)="setCalidad(l.producto.id, $event)">
+                      <option value="PRIMERA">Primera</option>
+                      <option value="SEGUNDA">Segunda</option>
+                    </select>
+                    @if (l.calidad === 'SEGUNDA') {
+                      <p class="nota-seg">Sale del stock de segundas; lo que no alcance no se fabrica.</p>
+                    }
+                  </div>
+                }
               </div>
             </div>
           }
@@ -121,6 +136,9 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             <div class="kv"><span class="k">Línea de producción</span><span class="v">{{ lineaResumen() }}</span></div>
           }
           @for (l of lineas(); track l.producto.id) {
+            @if (puedeVenderSegundas && l.calidad === 'SEGUNDA') {
+              <div class="kv"><span class="k">Calidad</span><span class="v"><b>Segunda</b> · {{ l.producto.nombreComercial }}</span></div>
+            }
             <div class="kv" style="margin-top:var(--sp-3)">
               <span class="v"><b>{{ l.producto.nombreComercial }}</b> — {{ totalLinea(l) }} pares × {{ moneda(l.precio) }}</span>
               <span class="v cell-mono">{{ moneda(subtotalLinea(l)) }}</span>
@@ -158,6 +176,9 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
     .label{display:block;font-size:var(--text-sm);color:var(--text-muted);margin-bottom:var(--sp-2)}
     .input{width:100%;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
     .kv{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0}
+    /* Precio y calidad van juntos: el grado es lo que justifica el precio. */
+    .fila-precio{display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-top:var(--sp-3)}
+    .nota-seg{font-size:var(--text-caption);color:var(--warn,#d97706);margin-top:var(--sp-1);max-width:220px}
   `],
 })
 export class OcCrearComponent implements OnInit {
@@ -171,6 +192,8 @@ export class OcCrearComponent implements OnInit {
 
   // Línea por pedido (Entrega 3): el nivel vive en NIVEL_SECCION (modulos.ts).
   readonly puedeElegirLinea = puedeVerSeccion(this.auth.rol(), 'linea-pedido');
+  // Venta de segundas (Entrega 5): elegir el grado al pedir.
+  readonly puedeVenderSegundas = puedeVerSeccion(this.auth.rol(), 'venta-segundas');
 
   pasosLabels = ['Cliente', 'Productos', 'Curva de tallas', 'Revisar'];
 
@@ -261,6 +284,9 @@ export class OcCrearComponent implements OnInit {
   }
   setPrecio(productoId: number, precio: number) {
     this.lineas.update((ls) => ls.map((l) => (l.producto.id === productoId ? { ...l, precio: Number(precio) || 0 } : l)));
+  }
+  setCalidad(productoId: number, calidad: 'PRIMERA' | 'SEGUNDA') {
+    this.lineas.update((ls) => ls.map((l) => (l.producto.id === productoId ? { ...l, calidad } : l)));
   }
 
   pasoValido(): boolean {

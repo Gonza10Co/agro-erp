@@ -221,7 +221,7 @@ describe('FabricacionService.avanzar', () => {
   it('desde PT termina el par y suma 1 a InventarioPT', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
-      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO',
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO', calidad: 'PRIMERA',
       productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
     });
     tx.par.count.mockResolvedValue(0); // era el último par en proceso
@@ -230,10 +230,19 @@ describe('FabricacionService.avanzar', () => {
     expect(tx.par.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { estado: 'TERMINADO' } }),
     );
+    // La llave del stock incluye el grado: un par de primera no puede caer en el
+    // saldo de segundas ni al revés.
     expect(tx.inventarioPT.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { productoConfiguradoId_tallaId_bodegaId: { productoConfiguradoId: 10, tallaId: 1, bodegaId: BODEGA_ID } },
-        create: expect.objectContaining({ cantDisponible: 1 }),
+        where: {
+          productoConfiguradoId_tallaId_bodegaId_calidad: {
+            productoConfiguradoId: 10,
+            tallaId: 1,
+            bodegaId: BODEGA_ID,
+            calidad: 'PRIMERA',
+          },
+        },
+        create: expect.objectContaining({ cantDisponible: 1, calidad: 'PRIMERA' }),
         update: { cantDisponible: { increment: 1 } },
       }),
     );
@@ -243,6 +252,30 @@ describe('FabricacionService.avanzar', () => {
       expect.objectContaining({
         where: { id: 1, estado: { not: 'ANULADA' } },
         data: { estado: 'TERMINADA' },
+      }),
+    );
+  });
+
+  it('un par marcado de SEGUNDA entra al saldo de segundas, no al de primeras', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO', calidad: 'SEGUNDA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+
+    expect(tx.inventarioPT.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          productoConfiguradoId_tallaId_bodegaId_calidad: {
+            productoConfiguradoId: 10,
+            tallaId: 1,
+            bodegaId: BODEGA_ID,
+            calidad: 'SEGUNDA',
+          },
+        },
+        create: expect.objectContaining({ calidad: 'SEGUNDA', cantDisponible: 1 }),
+        update: { cantDisponible: { increment: 1 } },
       }),
     );
   });

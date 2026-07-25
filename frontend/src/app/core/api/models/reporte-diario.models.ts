@@ -10,7 +10,8 @@ export interface FilaDiaReporte {
   bodega: number;
   segundas: number;
   paresVendidos: number;
-  valor: number;
+  valor: number; // facturación de producto
+  servicios: number; // facturación de maquila/mantenimiento (línea de ingreso aparte)
 }
 
 export type AcumuladoReporte = Omit<FilaDiaReporte, 'fecha'>;
@@ -21,9 +22,15 @@ export interface Cumplimiento {
   pct: number;
 }
 
+export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
+
+export interface CumplimientoCelula extends Cumplimiento {
+  celula: Celula;
+}
+
 export interface BloqueMetas {
-  guarnicion: Cumplimiento;
-  inyeccion: Cumplimiento;
+  /** Siempre las 5 células, en orden de flujo, tengan meta o no. */
+  celulas: CumplimientoCelula[];
   facturacionPares: Cumplimiento;
   facturacionValor: Cumplimiento;
 }
@@ -50,7 +57,25 @@ export interface ReporteDiario {
   lineaId?: number | null;
 }
 
-export type TipoMeta = 'GUARNICION' | 'INYECCION' | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+/** El tipo de meta ES la célula, más las dos de facturación (espejo del backend). */
+export type TipoMeta = Celula | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+
+/** Orden de la pantalla: flujo de planta y al final la facturación. */
+export const TIPOS_META: readonly TipoMeta[] = [
+  'CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT',
+  'FACTURACION_PARES', 'FACTURACION_VALOR',
+];
+
+/** Etiquetas de las metas tal como las nombra el dueño en su Excel. */
+export const ETIQUETA_META: Record<TipoMeta, string> = {
+  CORTE: 'Corte',
+  GUARNICION: 'Guarnición',
+  ALMACEN: 'Almacén',
+  INYECCION: 'Inyección',
+  PT: 'P. Terminado',
+  FACTURACION_PARES: 'Facturación (pares)',
+  FACTURACION_VALOR: 'Facturación ($)',
+};
 
 export interface MetaItem {
   tipo: TipoMeta;

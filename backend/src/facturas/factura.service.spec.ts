@@ -13,7 +13,8 @@ function despachoBase(over: any = {}) {
       oc: {
         clienteId: 7,
         cliente: { id: 7, tipoCredito: 'D30', estadoCartera: 'AL_DIA' },
-        lineas: [{ productoConfiguradoId: 10, precioUnitario: 85000 }],
+        // El precio se pacta por (producto, grado): la línea de primeras.
+        lineas: [{ productoConfiguradoId: 10, calidad: 'PRIMERA', precioUnitario: 85000 }],
       },
     },
     ...over,
@@ -26,6 +27,9 @@ describe('FacturaService', () => {
     despacho: { findUnique: jest.fn() },
     factura: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
     cliente: { findUnique: jest.fn().mockResolvedValue({ estadoCartera: 'AL_DIA' }), update: jest.fn() },
+    linea: { findUnique: jest.fn().mockResolvedValue({ activo: true }) },
+    servicioCatalogo: { findMany: jest.fn().mockResolvedValue([]) },
+    eventoTrazabilidad: { count: jest.fn().mockResolvedValue(0) },
   };
   prisma.$transaction = jest.fn((cb: any) => cb(prisma));
   const service = new FacturaService(prisma);
@@ -33,6 +37,112 @@ describe('FacturaService', () => {
     jest.clearAllMocks();
     prisma.factura.findMany.mockResolvedValue([]);
     prisma.cliente.findUnique.mockResolvedValue({ estadoCartera: 'AL_DIA' });
+    prisma.linea.findUnique.mockResolvedValue({ activo: true });
+    prisma.servicioCatalogo.findMany.mockResolvedValue([]);
+  });
+
+  // ── Factura de SERVICIO (maquila Feroz / mantenimiento) ──
+  describe('facturarServicio', () => {
+    const dtoBase = {
+      clienteId: 7,
+      lineaId: 4,
+      lineas: [{ servicioId: 1, cantidad: 2016, precioUnitario: 4200 }],
+    };
+
+    function prepararOk() {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 7, tipoCredito: 'D30', activo: true });
+      prisma.servicioCatalogo.findMany.mockResolvedValue([{ id: 1 }]);
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 42n }]);
+      prisma.factura.create.mockResolvedValue({ id: 5, consecutivo: 42 });
+    }
+
+    it('crea una factura SERVICIO sin despacho, con cliente y línea', async () => {
+      prepararOk();
+      await service.facturarServicio(dtoBase as any);
+
+      const arg = prisma.factura.create.mock.calls[0][0];
+      expect(arg.data.tipo).toBe('SERVICIO');
+      expect(arg.data.despachoId).toBeNull();
+      expect(arg.data.clienteId).toBe(7);
+      expect(arg.data.lineaId).toBe(4);
+      // Mismo consecutivo que las de producto: la numeración no se parte.
+      expect(arg.data.consecutivo).toBe(42);
+      // 2016 × 4200 = 8.467.200 + IVA 19%
+      expect(Number(arg.data.subtotal)).toBe(8467200);
+      expect(Number(arg.data.total)).toBe(10075968);
+      expect(arg.data.lineas.create[0]).toMatchObject({ servicioId: 1, cantidad: 2016 });
+    });
+
+    it('entra a cartera como cualquier CxC (vencimiento por tipo de crédito)', async () => {
+      prepararOk();
+      await service.facturarServicio(dtoBase as any);
+      const arg = prisma.factura.create.mock.calls[0][0];
+      const dias = (arg.data.fechaVencimiento.getTime() - arg.data.fecha.getTime()) / 86400000;
+      expect(Math.round(dias)).toBe(30);
+      expect(prisma.cliente.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 7 } }),
+      );
+    });
+
+    it('404 si el cliente no existe y 400 si está inactivo', async () => {
+      prisma.cliente.findUnique.mockResolvedValue(null);
+      await expect(service.facturarServicio(dtoBase as any)).rejects.toThrow(NotFoundException);
+      prisma.cliente.findUnique.mockResolvedValue({ id: 7, tipoCredito: 'D30', activo: false });
+      await expect(service.facturarServicio(dtoBase as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('400 si un servicio del catálogo no existe o está inactivo', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 7, tipoCredito: 'D30', activo: true });
+      prisma.servicioCatalogo.findMany.mockResolvedValue([]); // ninguno vivo
+      await expect(service.facturarServicio(dtoBase as any)).rejects.toThrow(BadRequestException);
+    });
+
+    it('400 si una línea no se puede nombrar (sin servicio ni descripción)', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 7, tipoCredito: 'D30', activo: true });
+      await expect(
+        service.facturarServicio({
+          clienteId: 7,
+          lineas: [{ cantidad: 1, precioUnitario: 100 }],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('acepta líneas de descripción libre, sin catálogo', async () => {
+      prisma.cliente.findUnique.mockResolvedValue({ id: 7, tipoCredito: 'CONTADO', activo: true });
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 43n }]);
+      prisma.factura.create.mockResolvedValue({ id: 6, consecutivo: 43 });
+      await service.facturarServicio({
+        clienteId: 7,
+        lineas: [{ descripcion: 'Mantenimiento de inyectora', cantidad: 1, precioUnitario: 350000 }],
+      } as any);
+      const arg = prisma.factura.create.mock.calls[0][0];
+      expect(arg.data.lineas.create[0]).toMatchObject({
+        servicioId: null,
+        descripcion: 'Mantenimiento de inyectora',
+      });
+      // Sin línea de producción declarada, el ingreso queda global.
+      expect(arg.data.lineaId).toBeNull();
+    });
+  });
+
+  describe('sugerenciaServicio', () => {
+    it('cuenta los pares que la línea llevó a PT en el mes', async () => {
+      prisma.linea.findUnique.mockResolvedValue({ id: 4, codigo: 'FEROZ', nombre: 'Feroz' });
+      prisma.eventoTrazabilidad.count.mockResolvedValue(2016);
+      const r = await service.sugerenciaServicio(4, 2026, 7);
+      expect(r.paresTerminados).toBe(2016);
+      const where = prisma.eventoTrazabilidad.count.mock.calls[0][0].where;
+      expect(where.celula).toBe('PT');
+      expect(where.par).toEqual({ lineaId: 4 });
+      // Rango del mes: [1-jul, 1-ago)
+      expect(where.timestamp.gte.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+      expect(where.timestamp.lt.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    });
+
+    it('404 si la línea no existe', async () => {
+      prisma.linea.findUnique.mockResolvedValue(null);
+      await expect(service.sugerenciaServicio(99, 2026, 7)).rejects.toThrow(NotFoundException);
+    });
   });
 
   it('404 si el despacho no existe', async () => {
@@ -68,8 +178,8 @@ describe('FacturaService', () => {
     expect(Number(arg.data.iva)).toBe(80750);
     expect(Number(arg.data.total)).toBe(505750);
     expect(arg.data.lineas.create).toEqual([
-      { productoConfiguradoId: 10, tallaId: 38, cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
-      { productoConfiguradoId: 10, tallaId: 40, cantidad: 2, precioUnitario: 85000, subtotal: 170000 },
+      { productoConfiguradoId: 10, tallaId: 38, calidad: 'PRIMERA', cantidad: 3, precioUnitario: 85000, subtotal: 255000 },
+      { productoConfiguradoId: 10, tallaId: 40, calidad: 'PRIMERA', cantidad: 2, precioUnitario: 85000, subtotal: 170000 },
     ]);
   });
 

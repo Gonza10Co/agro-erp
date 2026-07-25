@@ -11,14 +11,22 @@ export function codigoReposicion(codigo: string): string {
 
 export type ErrorReporte = 'SIN_DESCRIPCION' | 'ROL_INSUFICIENTE';
 
-/** Reglas del acta de baja: rol GERENTE/ADMIN + descripción obligatoria. REPROCESO no exige nada. */
+/**
+ * Reglas por clase de daño:
+ *  - BAJA: rol GERENTE/ADMIN + descripción (es un acta: se destruye producto).
+ *  - SEGUNDA: solo descripción. No destruye nada, la marca quien revisa en planta,
+ *    pero el motivo es lo que después explica el % de segundas por célula.
+ *  - REPROCESO: no exige nada.
+ * ⚠️ Asunción a confirmar con el cliente: si marcar segunda también debe exigir
+ * autorización del gerente, basta sumar la clase a la guarda de rol.
+ */
 export function validarReporte(
   clase: ClaseDano,
   descripcion: string | undefined,
   rol: string,
 ): ErrorReporte | null {
-  if (clase !== 'BAJA') return null;
-  if (rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
+  if (clase === 'REPROCESO') return null;
+  if (clase === 'BAJA' && rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
   if (!descripcion?.trim()) return 'SIN_DESCRIPCION';
   return null;
 }
@@ -35,6 +43,7 @@ export interface CentroIndicador {
   total: number;
   bajas: number;
   reprocesos: number;
+  segundas: number; // el par sigue vivo pero se vende de segunda
   paresProcesados: number;
   pctDano: number | null; // null si no hay denominador
 }
@@ -59,13 +68,17 @@ export function agruparIndicadores(
 ): { centros: CentroIndicador[]; topDanos: TopDano[] } {
   const centros = CENTROS_DE_COSTO.map((celula) => {
     const deCelula = incidencias.filter((i) => i.tipoDano.celulaCausante === celula);
-    const bajas = deCelula.filter((i) => i.tipoDano.clase === 'BAJA').length;
+    const cuantas = (clase: ClaseDano) =>
+      deCelula.filter((i) => i.tipoDano.clase === clase).length;
     const paresProcesados = eventosPorCelula[celula] ?? 0;
     return {
       celula,
       total: deCelula.length,
-      bajas,
-      reprocesos: deCelula.length - bajas,
+      // Cada clase se cuenta explícitamente: cuando reprocesos era "todo lo que no
+      // es baja", agregar SEGUNDA lo habría inflado en silencio.
+      bajas: cuantas('BAJA'),
+      reprocesos: cuantas('REPROCESO'),
+      segundas: cuantas('SEGUNDA'),
       paresProcesados,
       pctDano: paresProcesados > 0 ? deCelula.length / paresProcesados : null,
     };

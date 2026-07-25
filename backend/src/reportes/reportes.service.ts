@@ -35,16 +35,32 @@ export class ReportesService {
           timestamp: { gte: desde, lt: hasta },
           ...(porLinea ? { par: { lineaId } } : {}),
         },
-        select: { celula: true, subPaso: true, timestamp: true },
+        // El grado del par separa la columna Bodega (primeras) de Segundas.
+        select: {
+          celula: true,
+          subPaso: true,
+          timestamp: true,
+          par: { select: { calidad: true } },
+        },
       }),
       this.prisma.factura.findMany({
-        // Factura → despacho → OP: la OP hereda la línea de la OC.
+        // Dos caminos a la línea: las de producto la heredan vía despacho→OP (y
+        // desde ahora también la llevan denormalizada), las de SERVICIO la traen
+        // directo porque no tienen despacho. Sin el OR, la maquila de Feroz
+        // quedaría fuera de su propio reporte.
         where: {
           fecha: { gte: desde, lt: hasta },
           estado: 'EMITIDA',
-          ...(porLinea ? { despacho: { op: { lineaId } } } : {}),
+          ...(porLinea
+            ? { OR: [{ lineaId }, { despacho: { op: { lineaId } } }] }
+            : {}),
         },
-        select: { fecha: true, subtotal: true, lineas: { select: { cantidad: true } } },
+        select: {
+          fecha: true,
+          tipo: true,
+          subtotal: true,
+          lineas: { select: { cantidad: true } },
+        },
       }),
       // Kardex PT: cada movimiento sella la línea del pedido que lo originó
       // (par.lineaId / op.lineaId). Los históricos previos a la columna quedaron
@@ -83,11 +99,13 @@ export class ReportesService {
         celula: e.celula as Celula,
         subPaso: e.subPaso ?? null,
         timestamp: e.timestamp,
+        esSegunda: e.par?.calidad === 'SEGUNDA',
       })),
       ventas: facturas.map((f) => ({
         fecha: f.fecha,
         pares: f.lineas.reduce((acc, l) => acc + l.cantidad, 0),
         valor: Number(f.subtotal), // valor de venta sin IVA, para comparar contra la meta comercial
+        esServicio: f.tipo === 'SERVICIO',
       })),
       metas: metas.map((m) => ({ tipo: m.tipo as TipoMeta, valor: Number(m.valor) })),
       saldoInicialPT,

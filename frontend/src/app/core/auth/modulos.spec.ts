@@ -88,6 +88,10 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     // escriben hacia módulos INTERNOS que el cliente no puede abrir.
     expect(puedeVerSeccion('CLIENTE', 'linea-pedido')).toBeFalse();
     expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeFalse();
+    // Entrega 5: el selector de calidad cae dentro de `pedidos`, que el cliente ya
+    // tiene — sin gate aparecería en su wizard apenas se despliegue.
+    expect(puedeVerSeccion('CLIENTE', 'venta-segundas')).toBeFalse();
+    expect(puedeVerSeccion('CLIENTE', 'factura-servicio')).toBeFalse();
   });
 
   it('el CLIENTE sí ve la Entrega 4, liberada el 2026-07-25', () => {

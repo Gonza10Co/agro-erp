@@ -3,13 +3,28 @@
 // acumulado, metas con % de cumplimiento y kardex de Producto Terminado).
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
-export type TipoMeta = 'GUARNICION' | 'INYECCION' | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+
+/** Las 5 células en el orden del flujo de planta. Manda el orden de la pantalla. */
+export const CELULAS: readonly Celula[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
+
+/**
+ * Una meta es por célula (el nombre del tipo ES la célula) o de facturación.
+ * El dueño las lleva así en su Excel: una fila de objetivo por cada centro de costo.
+ */
+export type TipoMeta = Celula | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+
+/** Todos los tipos de meta editables, en el orden en que se muestran. */
+export const TIPOS_META: readonly TipoMeta[] = [
+  ...CELULAS,
+  'FACTURACION_PARES',
+  'FACTURACION_VALOR',
+];
 
 /** Columnas de producción de la fila diaria que se alimentan de eventos de célula. */
 export type ColumnaProduccion = 'troquelado' | 'guarnicion' | 'almacen' | 'inyeccion' | 'bodega';
 
 /** Conceptos que el Excel muestra pero que aún NO se capturan en el backend. */
-export const COLUMNAS_PENDIENTES = ['EXTERNO', 'SEGUNDAS', 'SERVICIOS_MANTENIMIENTO'] as const;
+export const COLUMNAS_PENDIENTES = ['EXTERNO'] as const;
 
 const CELULA_A_COLUMNA: Record<Celula, ColumnaProduccion> = {
   CORTE: 'troquelado',
@@ -23,11 +38,13 @@ export interface EventoMin {
   celula: Celula;
   subPaso?: string | null; // poblado solo en eventos de Guarnición
   timestamp: Date;
+  esSegunda?: boolean; // el par viene marcado con grado SEGUNDA
 }
 export interface VentaMin {
   fecha: Date;
   pares: number;
   valor: number;
+  esServicio?: boolean; // maquila/mantenimiento: factura plata, no vende pares
 }
 export interface MetaMin {
   tipo: TipoMeta;
@@ -57,10 +74,11 @@ export interface FilaDia {
   almacen: number;
   externo: number; // pendiente de captura → 0
   inyeccion: number;
-  bodega: number;
-  segundas: number; // pendiente de captura → 0
+  bodega: number; // pares de PRIMERA que entraron a bodega
+  segundas: number; // pares de SEGUNDA que entraron a bodega (excluyentes con bodega)
   paresVendidos: number;
-  valor: number;
+  valor: number; // facturación de PRODUCTO (lo que compara contra la meta comercial)
+  servicios: number; // facturación de SERVICIO/maquila: línea de ingreso aparte
 }
 
 export type Acumulado = Omit<FilaDia, 'fecha'>;
@@ -70,9 +88,12 @@ export interface Cumplimiento {
   real: number;
   pct: number;
 }
+export interface CumplimientoCelula extends Cumplimiento {
+  celula: Celula;
+}
 export interface BloqueMetas {
-  guarnicion: Cumplimiento;
-  inyeccion: Cumplimiento;
+  /** Una entrada por célula, siempre las 5 y en orden de flujo (aunque no tengan meta). */
+  celulas: CumplimientoCelula[];
   facturacionPares: Cumplimiento;
   facturacionValor: Cumplimiento;
 }
@@ -123,6 +144,7 @@ function filaVacia(fecha: string): FilaDia {
     segundas: 0,
     paresVendidos: 0,
     valor: 0,
+    servicios: 0,
   };
 }
 
@@ -149,13 +171,26 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     if (ev.celula === 'GUARNICION' && ev.subPaso !== 'AMARRE') continue;
     const fila = porDia.get(claveDia(ev.timestamp));
     if (!fila) continue;
+    // Al llegar a PT el grado separa las columnas: Bodega es producto de primera
+    // y Segundas va aparte (no se suman entre sí, así el total no se duplica).
+    // En las células previas el trabajo se hizo igual, marcado o no: cuenta normal.
+    if (ev.celula === 'PT' && ev.esSegunda) {
+      fila.segundas += 1;
+      continue;
+    }
     fila[columnaDeCelula(ev.celula)] += 1;
   }
 
-  // Ventas: pares vendidos y valor por día.
+  // Ventas: pares vendidos y valor por día. La maquila va a su propia columna —
+  // factura plata pero no vende pares, así que sumarla a `valor` inflaría la meta
+  // comercial y sumarla a `paresVendidos` contaría pares que nunca salieron.
   for (const v of input.ventas) {
     const fila = porDia.get(claveDia(v.fecha));
     if (!fila) continue;
+    if (v.esServicio) {
+      fila.servicios += v.valor;
+      continue;
+    }
     fila.paresVendidos += v.pares;
     fila.valor += v.valor;
   }
@@ -173,6 +208,7 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     segundas: 0,
     paresVendidos: 0,
     valor: 0,
+    servicios: 0,
   };
   for (const f of filas) {
     acumulado.troquelado += f.troquelado;
@@ -180,8 +216,10 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     acumulado.almacen += f.almacen;
     acumulado.inyeccion += f.inyeccion;
     acumulado.bodega += f.bodega;
+    acumulado.segundas += f.segundas;
     acumulado.paresVendidos += f.paresVendidos;
     acumulado.valor += f.valor;
+    acumulado.servicios += f.servicios;
   }
 
   // Metas: real vs objetivo del mes.
@@ -191,8 +229,12 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     return { meta, real, pct: pctCumplimiento(real, meta) };
   };
   const metas: BloqueMetas = {
-    guarnicion: cumplimiento(acumulado.guarnicion, 'GUARNICION'),
-    inyeccion: cumplimiento(acumulado.inyeccion, 'INYECCION'),
+    // Una por célula: el real sale de la misma columna que alimenta la fila diaria,
+    // así el % de cumplimiento nunca se despega de lo que muestra la tabla.
+    celulas: CELULAS.map((celula) => ({
+      celula,
+      ...cumplimiento(acumulado[columnaDeCelula(celula)], celula),
+    })),
     facturacionPares: cumplimiento(acumulado.paresVendidos, 'FACTURACION_PARES'),
     facturacionValor: cumplimiento(acumulado.valor, 'FACTURACION_VALOR'),
   };

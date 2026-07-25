@@ -274,6 +274,7 @@ model Linea {
   ordenesProduccion OrdenProduccion[]
   metas           Meta[]
   movimientosInventario MovimientoInventario[]
+  facturas        Factura[] // facturas de servicio atribuidas a la línea
 }
 
 model Marca {
@@ -434,6 +435,7 @@ model Cliente {
 
   marcas        Marca[]
   ordenesCompra OrdenCompra[]
+  facturas      Factura[] // denormalizado: cartera consulta por acá, sin pasar por despacho
   // A dónde se despacha. Un cliente puede tener sede en varias ciudades; la marcada
   // como principal es el destino por defecto de sus pedidos.
   sedes         SedeCliente[]
@@ -509,6 +511,9 @@ model OrdenCompraLinea {
   oc                    OrdenCompra         @relation(fields: [ocId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  // Grado pedido: el cliente puede comprar segundas a otro precio. El precio se
+  // pacta POR LÍNEA, así que una segunda va en su propia línea con su tarifa.
+  calidad               CalidadPT           @default(PRIMERA)
   precioUnitario        Decimal?            @db.Decimal(14, 2) // precio pactado por par (igual todas las tallas)
 
   tallas OrdenCompraLineaTalla[]
@@ -535,13 +540,16 @@ model InventarioPT {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   bodegaId              Int
   bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  // El grado entra en la llave: primeras y segundas del mismo producto+talla+bodega
+  // son saldos distintos. Todo lo existente queda PRIMERA (default).
+  calidad               CalidadPT           @default(PRIMERA)
   cantDisponible        Int                 @default(0)
   cantReservada         Int                 @default(0)
 
   reservas    ReservaInventarioPT[]
   movimientos MovimientoInventario[]
 
-  @@unique([productoConfiguradoId, tallaId, bodegaId])
+  @@unique([productoConfiguradoId, tallaId, bodegaId, calidad])
   @@index([productoConfiguradoId, tallaId])
 }
 
@@ -573,6 +581,8 @@ model OrdenProduccionLinea {
   op                    OrdenProduccion     @relation(fields: [opId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  // Hereda el grado pedido en la OC: el despacho descarga de ese saldo.
+  calidad               CalidadPT           @default(PRIMERA)
 
   tallas OrdenProduccionLineaTalla[]
 
@@ -634,6 +644,9 @@ model DespachoLinea {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   bodegaId              Int
   bodega                Bodega              @relation(fields: [bodegaId], references: [id])
+  // Entra en la identidad de la línea: sin esto una primera y una segunda del
+  // mismo producto+talla+bodega colapsarían en un solo renglón del remito.
+  calidad               CalidadPT           @default(PRIMERA)
   cantidad              Int
 
   @@index([despachoId])
@@ -844,6 +857,15 @@ enum EstadoPar {
 enum ClaseDano {
   BAJA // daño total: acta + reposición automática
   REPROCESO // recuperable: solo registro
+  SEGUNDA // el par sigue vivo pero baja de grado: se vende como segunda
+}
+
+// Grado de calidad del producto terminado. El cliente las lleva como "referencia
+// paralela" (SEGUNDAS FEROZ), pero acá se modela como ATRIBUTO del par y del stock:
+// duplicar SKUs implicaría ×2 sobre las marcas y crear catálogo desde el piso.
+enum CalidadPT {
+  PRIMERA
+  SEGUNDA
 }
 
 model OrdenFabricacion {
@@ -872,6 +894,9 @@ model Par {
   talla                 Talla               @relation(fields: [tallaId], references: [id])
   celulaActual          Celula              @default(CORTE)
   estado                EstadoPar           @default(EN_PROCESO)
+  // Grado con el que el par va a entrar a bodega. Se sella cuando calidad reporta
+  // una incidencia de clase SEGUNDA; el par sigue su curso normal por las células.
+  calidad               CalidadPT           @default(PRIMERA)
   subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
   lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
   linea                 Linea?              @relation(fields: [lineaId], references: [id])
@@ -974,11 +999,27 @@ enum EstadoFactura {
   ANULADA
 }
 
+enum TipoFactura {
+  PRODUCTO // factura de botas: nace de un despacho
+  SERVICIO // maquila/mantenimiento: no hay despacho ni pares que descargar
+}
+
 model Factura {
-  id               Int           @id @default(autoincrement())
-  consecutivo      Int           @unique
-  despachoId       Int           @unique
-  despacho         Despacho      @relation(fields: [despachoId], references: [id])
+  id          Int         @id @default(autoincrement())
+  consecutivo Int         @unique
+  tipo        TipoFactura @default(PRODUCTO)
+  // Nullable desde la factura de servicio: la maquila (p. ej. la inyección que
+  // Feroz le presta a la capellada de Bogotá) no despacha producto propio.
+  // PG permite N NULLs bajo un @unique, así que la 1:1 con despacho se mantiene.
+  despachoId  Int?        @unique
+  despacho    Despacho?   @relation(fields: [despachoId], references: [id])
+  // Denormalizado: antes el cliente se resolvía navegando despacho→op→oc, cadena
+  // que no existe sin despacho. Cartera consulta por acá.
+  clienteId        Int
+  cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  // A qué línea se le atribuye el ingreso (misma convención que MovimientoInventario).
+  lineaId          Int?
+  linea            Linea?        @relation(fields: [lineaId], references: [id])
   fecha            DateTime      @default(now())
   fechaVencimiento DateTime? // fecha + díasCrédito(tipoCredito) al emitir
   subtotal         Decimal       @db.Decimal(14, 2)
@@ -990,6 +1031,24 @@ model Factura {
 
   lineas FacturaLinea[]
   pagos  Pago[]
+
+  @@index([clienteId])
+  @@index([lineaId])
+}
+
+// Catálogo de servicios facturables (inyección a terceros, mantenimiento…).
+// Es una línea de ingreso aparte de la venta de botas.
+model ServicioCatalogo {
+  codigo     String   @unique
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  unidad     String   @default("PAR") // PAR, HORA, SERVICIO…
+  precioBase Decimal? @db.Decimal(14, 2)
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lineas FacturaLinea[]
 }
 
 model Pago {
@@ -1005,16 +1064,23 @@ model Pago {
 }
 
 model FacturaLinea {
-  id                    Int                 @id @default(autoincrement())
-  facturaId             Int
-  factura               Factura             @relation(fields: [facturaId], references: [id])
-  productoConfiguradoId Int
-  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
-  tallaId               Int
-  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  id        Int     @id @default(autoincrement())
+  facturaId Int
+  factura   Factura @relation(fields: [facturaId], references: [id])
+  // Producto+talla solo en facturas de PRODUCTO; servicio+descripción solo en las
+  // de SERVICIO. Nullable de ambos lados: una línea de maquila no tiene talla.
+  productoConfiguradoId Int?
+  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int?
+  talla                 Talla?               @relation(fields: [tallaId], references: [id])
+  servicioId            Int?
+  servicio              ServicioCatalogo?    @relation(fields: [servicioId], references: [id])
+  descripcion           String? // texto libre del servicio, como en la hoja del cliente
+  // Grado facturado: sin esto una segunda saldría al precio de la primera.
+  calidad               CalidadPT            @default(PRIMERA)
   cantidad              Int
-  precioUnitario        Decimal             @db.Decimal(14, 2)
-  subtotal              Decimal             @db.Decimal(14, 2)
+  precioUnitario        Decimal              @db.Decimal(14, 2)
+  subtotal              Decimal              @db.Decimal(14, 2)
 
   @@index([facturaId])
 }
@@ -1068,9 +1134,15 @@ model MovimientoInventario {
 
 // ───────────────────────── Demo 14: Metas gerenciales / Reporte diario ─────────────────────────
 
+// Una meta por CÉLULA (el nombre del tipo es la célula, como en el Excel del dueño)
+// más las dos de facturación. No hay columna `celula` a propósito: el tipo ya la
+// identifica y el unique (anio, mes, tipo, lineaId) da gratis meta por célula × línea.
 enum TipoMeta {
+  CORTE // meta de pares troquelados (mensual)
   GUARNICION // meta de pares producidos en Guarnición (mensual)
+  ALMACEN // meta de pares que pasan por Almacén (mensual)
   INYECCION // meta de pares inyectados (mensual)
+  PT // meta de pares terminados / empacados (mensual)
   FACTURACION_PARES // meta de pares facturados (mensual)
   FACTURACION_VALOR // meta de $ facturado (mensual)
 }

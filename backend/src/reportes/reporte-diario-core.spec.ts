@@ -47,12 +47,15 @@ describe('reporte-diario-core', () => {
         { celula: 'GUARNICION', subPaso: 'AMARRE', timestamp: new Date('2026-06-01T10:00:00Z') },
         { celula: 'INYECCION', timestamp: new Date('2026-06-02T10:00:00Z') },
         { celula: 'PT', timestamp: new Date('2026-06-02T11:00:00Z') },
+        // Un par que se marcó de segunda: llega a PT igual, pero no suma a Bodega.
+        { celula: 'PT', timestamp: new Date('2026-06-02T11:30:00Z'), esSegunda: true },
       ],
       ventas: [
         { fecha: new Date('2026-06-02T12:00:00Z'), pares: 50, valor: 4250000 },
         { fecha: new Date('2026-06-02T15:00:00Z'), pares: 10, valor: 850000 },
       ],
       metas: [
+        { tipo: 'CORTE', valor: 4 },
         { tipo: 'GUARNICION', valor: 1 },
         { tipo: 'INYECCION', valor: 2 },
         { tipo: 'FACTURACION_PARES', valor: 100 },
@@ -89,12 +92,75 @@ describe('reporte-diario-core', () => {
       expect(d2.valor).toBe(5100000);
     });
 
-    it('deja en 0 las columnas pendientes de captura', () => {
-      for (const f of rep.filas) {
-        expect(f.externo).toBe(0);
-        expect(f.segundas).toBe(0);
-      }
+    it('deja en 0 las columnas que aún no se capturan (ya no incluye segundas ni servicios)', () => {
+      for (const f of rep.filas) expect(f.externo).toBe(0);
       expect(rep.pendientes).toEqual(COLUMNAS_PENDIENTES);
+      expect(rep.pendientes).not.toContain('SEGUNDAS');
+      expect(rep.pendientes).not.toContain('SERVICIOS_MANTENIMIENTO');
+    });
+
+    describe('SERVICIOS (maquila)', () => {
+      const conServicio = construirReporte({
+        ...input,
+        ventas: [
+          ...input.ventas,
+          // Maquila de Feroz: 2.016 pares inyectados a la capellada de Bogotá.
+          { fecha: new Date('2026-06-10T10:00:00Z'), pares: 2016, valor: 8467200, esServicio: true },
+        ],
+      });
+
+      it('la maquila va en su propia columna, no en la venta de producto', () => {
+        const d10 = conServicio.filas.find((f) => f.fecha === '2026-06-10')!;
+        expect(d10.servicios).toBe(8467200);
+        expect(d10.valor).toBe(0);
+      });
+
+      it('no cuenta pares vendidos: el servicio no despacha producto propio', () => {
+        expect(conServicio.acumulado.paresVendidos).toBe(60); // igual que sin servicio
+      });
+
+      it('no infla la meta comercial en valor', () => {
+        // La meta de facturación sigue midiéndose contra la venta de botas.
+        expect(conServicio.metas.facturacionValor.real).toBe(5100000);
+        expect(conServicio.acumulado.servicios).toBe(8467200);
+      });
+    });
+
+    describe('SEGUNDAS', () => {
+      it('cuenta los pares de segunda que llegan a PT en su propia columna', () => {
+        const d2 = rep.filas.find((f) => f.fecha === '2026-06-02')!;
+        expect(d2.segundas).toBe(1);
+      });
+
+      it('no las suma a Bodega: son saldos distintos, no producto bueno', () => {
+        const d2 = rep.filas.find((f) => f.fecha === '2026-06-02')!;
+        expect(d2.bodega).toBe(1); // el par de primera, no los dos
+        expect(rep.acumulado.bodega).toBe(1);
+        expect(rep.acumulado.segundas).toBe(1);
+      });
+
+      it('una segunda detectada antes de PT igual cuenta en las células que recorrió', () => {
+        const conSegundaEnCorte = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'CORTE', timestamp: new Date('2026-06-05T08:00:00Z'), esSegunda: true },
+            { celula: 'PT', timestamp: new Date('2026-06-05T18:00:00Z'), esSegunda: true },
+          ],
+        });
+        const d5 = conSegundaEnCorte.filas.find((f) => f.fecha === '2026-06-05')!;
+        expect(d5.troquelado).toBe(1); // el corte se hizo: cuenta como producción
+        expect(d5.bodega).toBe(0);
+        expect(d5.segundas).toBe(1);
+      });
+
+      it('la meta de PT se mide contra producto de primera, no contra segundas', () => {
+        const conMetaPT = construirReporte({
+          ...input,
+          metas: [...input.metas, { tipo: 'PT', valor: 10 }],
+        });
+        const pt = conMetaPT.metas.celulas.find((c) => c.celula === 'PT')!;
+        expect(pt.real).toBe(1); // solo la primera
+      });
     });
 
     it('acumula cada columna del mes', () => {
@@ -106,11 +172,30 @@ describe('reporte-diario-core', () => {
     });
 
     it('arma el bloque de metas con su % de cumplimiento', () => {
-      expect(rep.metas.guarnicion).toEqual({ meta: 1, real: 1, pct: 100 });
-      expect(rep.metas.inyeccion).toEqual({ meta: 2, real: 1, pct: 50 });
       expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60 });
       expect(rep.metas.facturacionValor.real).toBe(5100000);
       expect(rep.metas.facturacionValor.pct).toBe(51);
+    });
+
+    describe('metas POR CÉLULA', () => {
+      it('trae una meta por cada célula, en el orden del flujo de planta', () => {
+        expect(rep.metas.celulas.map((c) => c.celula)).toEqual([
+          'CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT',
+        ]);
+      });
+
+      it('cruza cada célula contra su columna de producción real', () => {
+        const porCelula = Object.fromEntries(rep.metas.celulas.map((c) => [c.celula, c]));
+        // Corte: 2 eventos contra meta 4.
+        expect(porCelula['CORTE']).toEqual({ celula: 'CORTE', meta: 4, real: 2, pct: 50 });
+        // Guarnición cuenta solo el sub-paso AMARRE (la salida real de la célula).
+        expect(porCelula['GUARNICION']).toEqual({ celula: 'GUARNICION', meta: 1, real: 1, pct: 100 });
+        expect(porCelula['INYECCION']).toEqual({ celula: 'INYECCION', meta: 2, real: 1, pct: 50 });
+        // PT tiene producción real (1 par) pero todavía nadie le puso meta.
+        expect(porCelula['PT']).toEqual({ celula: 'PT', meta: 0, real: 1, pct: 0 });
+        // Almacén: sin eventos y sin meta.
+        expect(porCelula['ALMACEN']).toEqual({ celula: 'ALMACEN', meta: 0, real: 0, pct: 0 });
+      });
     });
 
     it('arma el kardex de PT arrastrando el saldo día a día', () => {
@@ -130,9 +215,12 @@ describe('reporte-diario-core', () => {
       expect(k3.saldoFinal).toBe(946); // 941 + 5
     });
 
-    it('falla sin metas: cae a meta 0 y pct 0', () => {
+    it('falla sin metas: cae a meta 0 y pct 0, pero sigue trayendo las 5 células', () => {
       const sinMetas = construirReporte({ ...input, metas: [] });
-      expect(sinMetas.metas.guarnicion).toEqual({ meta: 0, real: 1, pct: 0 });
+      expect(sinMetas.metas.celulas).toHaveLength(5);
+      const guarnicion = sinMetas.metas.celulas.find((c) => c.celula === 'GUARNICION')!;
+      expect(guarnicion).toEqual({ celula: 'GUARNICION', meta: 0, real: 1, pct: 0 });
+      expect(sinMetas.metas.facturacionPares).toEqual({ meta: 0, real: 60, pct: 0 });
     });
   });
 });

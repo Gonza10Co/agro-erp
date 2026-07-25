@@ -40,6 +40,7 @@ export class OpService {
           data: {
             opId: op.id,
             productoConfiguradoId: linea.productoConfiguradoId,
+            calidad: linea.calidad, // el grado pedido baja al despacho
           },
         });
 
@@ -49,12 +50,17 @@ export class OpService {
           // un orden canónico de adquisición (evita deadlocks entre tx cruzadas).
           // Limitación conocida: con 0 filas no bloquea inserts nuevos de fabricación
           // simultánea — el amarre puede no ver ese stock (subóptimo, nunca negativo).
-          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} ORDER BY id FOR UPDATE`;
+          // El amarre respeta el GRADO PEDIDO: un pedido de primeras nunca se
+          // llena con segundas, y uno de segundas no vacía el stock bueno.
+          // El lock se acota al mismo grado por la misma razón.
+          const calidad = linea.calidad;
+          await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${linea.productoConfiguradoId} AND "tallaId" = ${t.tallaId} AND "calidad" = ${calidad}::"CalidadPT" ORDER BY id FOR UPDATE`;
 
           const stock = await tx.inventarioPT.findMany({
             where: {
               productoConfiguradoId: linea.productoConfiguradoId,
               tallaId: t.tallaId,
+              calidad,
             },
             include: { bodega: true },
           });
@@ -70,13 +76,18 @@ export class OpService {
             disponibilidades,
           );
 
+          // Las segundas NO se fabrican a pedido: salen de un defecto, no de una
+          // orden. Lo que no alcance a amarrarse queda pendiente y se avisa; poner
+          // pares de segunda a producir mandaría a planta a arruinar botas a propósito.
+          const cantAProducir = calidad === 'SEGUNDA' ? 0 : res.cantAProducir;
+
           const opLineaTalla = await tx.ordenProduccionLineaTalla.create({
             data: {
               opLineaId: opLinea.id,
               tallaId: t.tallaId,
               cantPedida: res.cantPedida,
               cantAmarrada: res.cantAmarrada,
-              cantAProducir: res.cantAProducir,
+              cantAProducir,
             },
           });
 

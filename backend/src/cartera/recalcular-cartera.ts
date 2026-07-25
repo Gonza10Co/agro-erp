@@ -16,8 +16,11 @@ export async function recalcularEstadoCartera(
   });
   const bloqueadoManual = cliente?.estadoCartera === 'BLOQUEADO';
 
+  // Por clienteId denormalizado: incluye las facturas de servicio, que no tienen
+  // despacho. Antes se navegaba despacho→op→oc y esas habrían quedado fuera de
+  // la cartera del cliente (deuda invisible).
   const facturas = await tx.factura.findMany({
-    where: { despacho: { op: { oc: { clienteId } } } },
+    where: { clienteId },
     select: { total: true, fechaVencimiento: true, pagos: { select: { monto: true } } },
   });
 

@@ -30,6 +30,7 @@ export const routes: Routes = [
       { path: 'catalog/grupos-opcion', data: { modulo: 'maestros' }, loadComponent: () => import('./features/catalog/grupos-opcion/grupos-opcion-list.component').then(m => m.GruposOpcionListComponent) },
       { path: 'despachos', data: { modulo: 'despachos' }, loadComponent: () => import('./features/despachos/despachos-list.component').then(m => m.DespachosListComponent) },
       { path: 'facturas', data: { modulo: 'facturas' }, loadComponent: () => import('./features/facturas/facturas-list.component').then(m => m.FacturasListComponent) },
+      { path: 'facturas/servicio/nueva', data: { modulo: 'facturas', seccion: 'factura-servicio' }, loadComponent: () => import('./features/facturas/factura-servicio-crear.component').then(m => m.FacturaServicioCrearComponent) },
       { path: 'cartera', data: { modulo: 'cartera' }, loadComponent: () => import('./features/cartera/cartera-list.component').then(m => m.CarteraListComponent) },
       { path: 'compras/requerimiento/:id', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/requerimiento.component').then(m => m.RequerimientoComponent) },
       { path: 'compras/ordenes', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/ocp-list.component').then(m => m.OcpListComponent) },

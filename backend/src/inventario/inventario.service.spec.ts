@@ -36,22 +36,50 @@ describe('InventarioService', () => {
       bodegaId: 1,
       cantidad: 50,
     });
+    // Sin grado explícito la carga es de PRIMERA: las cargas que ya existían
+    // siguen comportándose igual.
     expect(prisma.inventarioPT.upsert).toHaveBeenCalledWith({
       where: {
-        productoConfiguradoId_tallaId_bodegaId: {
+        productoConfiguradoId_tallaId_bodegaId_calidad: {
           productoConfiguradoId: 1,
           tallaId: 42,
           bodegaId: 1,
+          calidad: 'PRIMERA',
         },
       },
       create: {
         productoConfiguradoId: 1,
         tallaId: 42,
         bodegaId: 1,
+        calidad: 'PRIMERA',
         cantDisponible: 50,
       },
       update: { cantDisponible: { increment: 50 } },
     });
+  });
+
+  it('permite cargar saldo de SEGUNDA sin tocar el de primera (caso SEGUNDAS FEROZ)', async () => {
+    prisma.inventarioPT.upsert.mockResolvedValue({ id: 10, cantDisponible: 336 });
+    await service.registrarStock({
+      productoConfiguradoId: 1,
+      tallaId: 42,
+      bodegaId: 1,
+      cantidad: 336,
+      calidad: 'SEGUNDA',
+    });
+    expect(prisma.inventarioPT.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          productoConfiguradoId_tallaId_bodegaId_calidad: {
+            productoConfiguradoId: 1,
+            tallaId: 42,
+            bodegaId: 1,
+            calidad: 'SEGUNDA',
+          },
+        },
+        create: expect.objectContaining({ calidad: 'SEGUNDA', cantDisponible: 336 }),
+      }),
+    );
   });
 });
 

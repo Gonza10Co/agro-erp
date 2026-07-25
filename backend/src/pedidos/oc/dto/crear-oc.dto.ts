@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -16,8 +17,13 @@ export class CrearOCTallaDto {
   @Type(() => Number) @IsInt() @Min(1) cantidad!: number;
 }
 
+const CALIDADES = ['PRIMERA', 'SEGUNDA'] as const;
+
 export class CrearOCLineaDto {
   @Type(() => Number) @IsInt() productoConfiguradoId!: number;
+  // Grado pedido. Sin declararlo acá el ValidationPipe lo descartaba en silencio
+  // y toda línea llegaba como PRIMERA al service.
+  @IsOptional() @IsIn(CALIDADES) calidad?: (typeof CALIDADES)[number];
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) precioUnitario?: number;
   @IsArray()
   @ArrayMinSize(1)

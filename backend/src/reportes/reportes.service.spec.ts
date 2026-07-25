@@ -64,7 +64,9 @@ describe('ReportesService', () => {
       const rep = await service.diario(2026, 6);
       expect(rep.acumulado.troquelado).toBe(0);
       expect(rep.kardexPT[0].saldoInicial).toBe(0);
-      expect(rep.metas.guarnicion.pct).toBe(0);
+      // Sin metas cargadas siguen viniendo las 5 células, todas en 0.
+      expect(rep.metas.celulas).toHaveLength(5);
+      expect(rep.metas.celulas.find((c) => c.celula === 'GUARNICION')!.pct).toBe(0);
       // Sin filtro: metas globales (lineaId NULL) y sin marca de línea en el response.
       expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBeNull();
       expect(rep.lineaId).toBeNull();
@@ -86,7 +88,13 @@ describe('ReportesService', () => {
 
       // La línea baja al where de cada consulta segmentable.
       expect(prisma.eventoTrazabilidad.findMany.mock.calls[0][0].where.par).toEqual({ lineaId: 4 });
-      expect(prisma.factura.findMany.mock.calls[0][0].where.despacho).toEqual({ op: { lineaId: 4 } });
+      // Dos caminos a la línea: la de servicio la trae directa (no tiene despacho),
+      // la de producto la hereda vía despacho→OP. Sin el OR, la maquila de una
+      // línea quedaría fuera de su propio reporte.
+      expect(prisma.factura.findMany.mock.calls[0][0].where.OR).toEqual([
+        { lineaId: 4 },
+        { despacho: { op: { lineaId: 4 } } },
+      ]);
       expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBe(4);
       // El kardex PT se corta por la línea sellada en cada movimiento.
       expect(prisma.movimientoInventario.findMany.mock.calls[0][0].where.lineaId).toBe(4);

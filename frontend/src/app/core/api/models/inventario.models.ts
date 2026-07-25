@@ -13,11 +13,15 @@ export interface WipCelula {
   pares: number;
 }
 
+/** Grado del producto terminado: las segundas son un saldo aparte, no un SKU. */
+export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
+
 export interface PtStock {
   producto: string;
   codigo: string;
   talla: number;
   bodega: string;
+  calidad: CalidadPT;
   cantDisponible: number;
   cantReservada: number;
 }

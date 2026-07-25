@@ -73,6 +73,10 @@ export class CalidadService {
         });
         return { incidencia, parReposicion: null };
       }
+      // SEGUNDA: el par NO muere ni se repone — sigue su curso por las células y
+      // entra a bodega con grado SEGUNDA. Solo se sella el grado y se deja el acta.
+      if (tipo.clase === 'SEGUNDA') return await this.marcarSegunda(par, tipo.id, dto, user);
+
       const marca = (par as any).productoConfigurado?.marca;
       const celulaInicial =
         (par as any).linea?.celulaInicial ?? marca?.linea?.celulaInicial ?? 'CORTE';
@@ -104,6 +108,46 @@ export class CalidadService {
       eventos.map((e) => [e.celula, e._count._all]),
     );
     return agruparIndicadores(incidencias, eventosPorCelula);
+  }
+
+  /**
+   * Baja de grado: el par queda marcado como SEGUNDA y sigue produciéndose.
+   * Sin par de reposición a propósito — el producto existe, solo vale menos.
+   * ⚠️ Asunción a confirmar: si el cliente espera que el pedido se complete igual
+   * (100 primeras pedidas → reponer la que salió de segunda), acá va la reposición.
+   */
+  private marcarSegunda(
+    par: { id: number; celulaActual: Celula },
+    tipoDanoId: number,
+    dto: ReportarIncidenciaDto,
+    user: Usuario,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // Condición sobre el estado por la misma razón que la baja: no pisar un par
+      // que otra tx acaba de terminar. Un par ya marcado no vuelve a primera.
+      const res = await tx.par.updateMany({
+        where: { id: par.id, estado: 'EN_PROCESO' },
+        data: { calidad: 'SEGUNDA' },
+      });
+      if (res.count === 0)
+        throw new ConflictException(
+          'El par cambió de estado durante el reporte — recargalo e intentá de nuevo',
+        );
+
+      const incidencia = await tx.incidenciaCalidad.create({
+        data: {
+          parId: par.id,
+          tipoDanoId,
+          celulaDeteccion: par.celulaActual,
+          operarioId: dto.operarioId,
+          descripcion: dto.descripcion,
+          autorizadoPorId: user.sub,
+        },
+        include: { tipoDano: true },
+      });
+
+      return { incidencia, parReposicion: null };
+    });
   }
 
   private darDeBaja(
