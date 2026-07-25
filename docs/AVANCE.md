@@ -4,8 +4,17 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-07-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-07-25** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **Entrega 4 desplegada a prod el 2026-07-25** (merge `--no-ff` develop→master `61eeb06`, CI verde,
+> las 4 migraciones aditivas aplicadas solas por `migrate deploy`) y **liberada al cliente el mismo
+> día**: el amarre de insumos ya le corría al generar la OP (le reservaba stock de su bodega), así
+> que ocultarle el resultado era peor que mostrárselo. Pasaron a `ENTREGADO`: `amarre-insumos`,
+> `recalcular-requerimiento`, `ocp-manual`, `ocp-anular`, `costo-ocp`. Siguen en `EN_STAGE`:
+> `linea-pedido` (titular de la demo) y `operar-produccion` (generar OF / despachar escriben hacia
+> módulos INTERNOS que el cliente no puede abrir). Sin tag todavía. Falta `seed:basarili` en prod
+> (libera los ejes de variantes de una).
 
 ---
 
@@ -18,7 +27,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** 409 backend + 287 frontend (+13 e2e), verdes 🟢 · ambos builds limpios.
+**Tests:** 450 backend (53 suites) + 327 frontend, verdes 🟢 · ambos builds limpios.
 
 ---
 

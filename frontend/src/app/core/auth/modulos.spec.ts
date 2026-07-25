@@ -1,4 +1,4 @@
-import { puedeVerModulo, puedeVerNivel, rutaInicial } from './modulos';
+import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeVerSeccion, rutaInicial } from './modulos';
 
 describe('puedeVerModulo', () => {
   it('CLIENTE ve clientes, pedidos, catálogo y sus datos maestros', () => {
@@ -79,6 +79,42 @@ describe('puedeVerNivel (gate de secciones dentro de un módulo)', () => {
   it('roles internos y desconocidos alcanzan todo', () => {
     expect(puedeVerNivel('ADMIN', 'INTERNO')).toBeTrue();
     expect(puedeVerNivel(null, 'INTERNO')).toBeTrue();
+  });
+});
+
+describe('puedeVerSeccion (tablero de la demo)', () => {
+  it('el CLIENTE NO ve lo que sigue reservado para la demo', () => {
+    // Línea por pedido (Entrega 3) es el titular de la demo; generar OF y despachar
+    // escriben hacia módulos INTERNOS que el cliente no puede abrir.
+    expect(puedeVerSeccion('CLIENTE', 'linea-pedido')).toBeFalse();
+    expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeFalse();
+  });
+
+  it('el CLIENTE sí ve la Entrega 4, liberada el 2026-07-25', () => {
+    // El amarre ya le corría al generar la OP (le reservaba stock de su bodega):
+    // ocultarle el resultado era peor que mostrárselo.
+    expect(puedeVerSeccion('CLIENTE', 'amarre-insumos')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'recalcular-requerimiento')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'ocp-manual')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'ocp-anular')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'costo-ocp')).toBeTrue();
+  });
+
+  it('el perfil STAGE ve todas las secciones (es el perfil de la demo)', () => {
+    const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
+    for (const s of secciones) {
+      expect(puedeVerSeccion('STAGE', s)).withContext(s).toBeTrue();
+    }
+  });
+
+  it('las secciones de la Entrega 2 siguen liberadas', () => {
+    expect(puedeVerSeccion('CLIENTE', 'costo-utilidad-oc')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'proforma-oc')).toBeTrue();
+  });
+
+  it('los roles internos ven todo', () => {
+    expect(puedeVerSeccion('ADMIN', 'operar-produccion')).toBeTrue();
+    expect(puedeVerSeccion(null, 'linea-pedido')).toBeTrue();
   });
 });
 

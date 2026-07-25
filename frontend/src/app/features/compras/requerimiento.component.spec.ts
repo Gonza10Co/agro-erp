@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { RequerimientoComponent } from './requerimiento.component';
 import { ComprasApi } from '../../core/api/compras.api';
@@ -25,6 +27,8 @@ describe('RequerimientoComponent', () => {
       imports: [RequerimientoComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ComprasApi, useValue: api },
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
       ],
@@ -59,6 +63,27 @@ describe('RequerimientoComponent', () => {
     expect(el.textContent).not.toContain('insumos de bodega amarrados');
   });
 
+  // El amarre se liberó al cliente el 2026-07-25: ya le corría al generar la OP,
+  // así que tiene que ver por qué se le movió el stock de bodega.
+  describe('sección amarre-insumos con rol CLIENTE', () => {
+    beforeEach(() => {
+      const payload = btoa(JSON.stringify({ sub: 1, username: 'cliente', role: 'CLIENTE' }));
+      localStorage.setItem('accessToken', `x.${payload}.y`);
+    });
+    afterEach(() => localStorage.removeItem('accessToken'));
+
+    it('muestra la columna Amarrado y la nota de insumos amarrados', () => {
+      const el: HTMLElement = setup(datos).nativeElement;
+      expect(el.textContent).toContain('Amarrado');
+      expect(el.textContent).toContain('insumos de bodega amarrados');
+    });
+
+    it('muestra la marca de amarre liberado', () => {
+      const el: HTMLElement = setup({ ...datos, reservaActiva: false }).nativeElement;
+      expect(el.textContent).toContain('amarre liberado');
+    });
+  });
+
   it('muestra "Generar órdenes de compra" cuando está CALCULADO y hay líneas con proveedor', () => {
     const el: HTMLElement = setup(datos).nativeElement;
     expect(el.textContent).toContain('Generar órdenes de compra');
@@ -82,6 +107,8 @@ describe('RequerimientoComponent', () => {
       imports: [RequerimientoComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ComprasApi, useValue: api },
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
       ],
@@ -104,6 +131,8 @@ describe('RequerimientoComponent', () => {
       imports: [RequerimientoComponent],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: ComprasApi, useValue: api },
         { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: '1' })) } },
       ],

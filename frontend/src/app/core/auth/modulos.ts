@@ -64,6 +64,49 @@ const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
 };
 
 /**
+ * Secciones gateadas DENTRO de un módulo ya visible. Existen porque el nivel de
+ * módulo no alcanza: lo nuevo aterriza en módulos que el cliente ya tiene
+ * (pedidos, compras) y quedaría a la vista apenas se despliega.
+ */
+export type Seccion =
+  // Entrega 2 — ya liberadas al cliente (se dejan acá como tablero histórico).
+  | 'costo-utilidad-oc'
+  | 'proforma-oc'
+  // Entrega 3 — línea de producción por pedido.
+  | 'linea-pedido'
+  // Entrega 4 — amarre de insumos y secundarios de compras.
+  | 'amarre-insumos'
+  | 'recalcular-requerimiento'
+  | 'operar-produccion'
+  | 'ocp-manual'
+  | 'ocp-anular'
+  | 'costo-ocp';
+
+/**
+ * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
+ * secciones pasan de EN_STAGE a ENTREGADO acá — una línea por sección, sin
+ * perseguir gates dispersos por los componentes.
+ */
+export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // Liberadas en la demo de la Entrega 2 (2026-07-17).
+  'costo-utilidad-oc': 'ENTREGADO',
+  'proforma-oc': 'ENTREGADO',
+  // Entrega 3 (desplegada 2026-07-13) — se muestra en la demo, es el titular.
+  'linea-pedido': 'EN_STAGE',
+  // Entrega 4 — liberada al cliente el 2026-07-25, sin esperar a la demo: el amarre
+  // de insumos ya le corría al generar la OP (el backend reserva su stock), así que
+  // ocultarle el resultado le escondía por qué se movía su bodega.
+  'amarre-insumos': 'ENTREGADO',
+  'recalcular-requerimiento': 'ENTREGADO',
+  'ocp-manual': 'ENTREGADO',
+  'ocp-anular': 'ENTREGADO',
+  'costo-ocp': 'ENTREGADO',
+  // Piso de planta: NO va con compras. "Generar OF" y "Despachar" escriben hacia
+  // módulos INTERNOS (fabricacion, despachos) que el cliente no puede abrir.
+  'operar-produccion': 'EN_STAGE',
+};
+
+/**
  * Alcance de cada rol. Los roles no listados (ADMIN, GERENTE, OPERARIO, nulo o
  * desconocido) caen en INTERNO por defecto → ven todo (defensivo: no rompe a
  * usuarios internos).
@@ -84,6 +127,14 @@ function alcanceRol(rol: string | null | undefined): NivelLiberacion {
  */
 export function puedeVerNivel(rol: string | null | undefined, nivel: NivelLiberacion): boolean {
   return RANK[alcanceRol(rol)] >= RANK[nivel];
+}
+
+/**
+ * ¿El rol alcanza a ver esta sección? Es el gate que deben usar las secciones
+ * nuevas: el nivel vive en NIVEL_SECCION, no regado por los componentes.
+ */
+export function puedeVerSeccion(rol: string | null | undefined, seccion: Seccion): boolean {
+  return puedeVerNivel(rol, NIVEL_SECCION[seccion]);
 }
 
 /** ¿El rol puede ver el módulo completo? (menú + guard de ruta). */

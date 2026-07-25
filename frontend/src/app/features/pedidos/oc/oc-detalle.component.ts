@@ -7,7 +7,7 @@ import { PedidosApi } from '../../../core/api/pedidos.api';
 import { LineasApi, Linea } from '../../../core/api/lineas.api';
 import { OrdenCompra, OCLinea, EstadoOP, ResumenCosteoOC } from '../../../core/api/models/pedidos.models';
 import { AuthService } from '../../../core/auth/auth.service';
-import { puedeVerNivel } from '../../../core/auth/modulos';
+import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { ToastService } from '../../../core/notificaciones/toast.service';
 import { badgeOC, badgeOP } from './estado-badge';
 import { destinoAlEditar } from './oc-crear.util';
@@ -172,12 +172,10 @@ export class OcDetalleComponent implements OnInit {
 
   oc = signal<OrdenCompra | null>(null);
   costeo = signal<ResumenCosteoOC | null>(null);
-  // Costo/utilidad: entregado en la demo de la Entrega 2 (2026-07-17).
-  readonly puedeVerCosteo = puedeVerNivel(this.auth.rol(), 'ENTREGADO');
-  // Cotización/proforma y eliminar borrador: entregados en la misma demo.
-  readonly puedeVerProforma = puedeVerNivel(this.auth.rol(), 'ENTREGADO');
-  // Línea por pedido: sección EN_STAGE hasta liberarla al cliente.
-  readonly puedeVerLinea = puedeVerNivel(this.auth.rol(), 'EN_STAGE');
+  // Gates por sección: el nivel de cada una vive en NIVEL_SECCION (modulos.ts).
+  readonly puedeVerCosteo = puedeVerSeccion(this.auth.rol(), 'costo-utilidad-oc');
+  readonly puedeVerProforma = puedeVerSeccion(this.auth.rol(), 'proforma-oc');
+  readonly puedeVerLinea = puedeVerSeccion(this.auth.rol(), 'linea-pedido');
   cargando = signal(true);
   accion = signal(false);
   error = signal('');
