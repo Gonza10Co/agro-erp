@@ -274,6 +274,7 @@ model Linea {
   ordenesProduccion OrdenProduccion[]
   metas           Meta[]
   movimientosInventario MovimientoInventario[]
+  facturas        Factura[] // facturas de servicio atribuidas a la línea
 }
 
 model Marca {
@@ -434,6 +435,7 @@ model Cliente {
 
   marcas        Marca[]
   ordenesCompra OrdenCompra[]
+  facturas      Factura[] // denormalizado: cartera consulta por acá, sin pasar por despacho
   // A dónde se despacha. Un cliente puede tener sede en varias ciudades; la marcada
   // como principal es el destino por defecto de sus pedidos.
   sedes         SedeCliente[]
@@ -989,11 +991,27 @@ enum EstadoFactura {
   ANULADA
 }
 
+enum TipoFactura {
+  PRODUCTO // factura de botas: nace de un despacho
+  SERVICIO // maquila/mantenimiento: no hay despacho ni pares que descargar
+}
+
 model Factura {
-  id               Int           @id @default(autoincrement())
-  consecutivo      Int           @unique
-  despachoId       Int           @unique
-  despacho         Despacho      @relation(fields: [despachoId], references: [id])
+  id          Int         @id @default(autoincrement())
+  consecutivo Int         @unique
+  tipo        TipoFactura @default(PRODUCTO)
+  // Nullable desde la factura de servicio: la maquila (p. ej. la inyección que
+  // Feroz le presta a la capellada de Bogotá) no despacha producto propio.
+  // PG permite N NULLs bajo un @unique, así que la 1:1 con despacho se mantiene.
+  despachoId  Int?        @unique
+  despacho    Despacho?   @relation(fields: [despachoId], references: [id])
+  // Denormalizado: antes el cliente se resolvía navegando despacho→op→oc, cadena
+  // que no existe sin despacho. Cartera consulta por acá.
+  clienteId        Int
+  cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  // A qué línea se le atribuye el ingreso (misma convención que MovimientoInventario).
+  lineaId          Int?
+  linea            Linea?        @relation(fields: [lineaId], references: [id])
   fecha            DateTime      @default(now())
   fechaVencimiento DateTime? // fecha + díasCrédito(tipoCredito) al emitir
   subtotal         Decimal       @db.Decimal(14, 2)
@@ -1005,6 +1023,24 @@ model Factura {
 
   lineas FacturaLinea[]
   pagos  Pago[]
+
+  @@index([clienteId])
+  @@index([lineaId])
+}
+
+// Catálogo de servicios facturables (inyección a terceros, mantenimiento…).
+// Es una línea de ingreso aparte de la venta de botas.
+model ServicioCatalogo {
+  codigo     String   @unique
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  unidad     String   @default("PAR") // PAR, HORA, SERVICIO…
+  precioBase Decimal? @db.Decimal(14, 2)
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  lineas FacturaLinea[]
 }
 
 model Pago {
@@ -1020,16 +1056,21 @@ model Pago {
 }
 
 model FacturaLinea {
-  id                    Int                 @id @default(autoincrement())
-  facturaId             Int
-  factura               Factura             @relation(fields: [facturaId], references: [id])
-  productoConfiguradoId Int
-  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
-  tallaId               Int
-  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  id        Int     @id @default(autoincrement())
+  facturaId Int
+  factura   Factura @relation(fields: [facturaId], references: [id])
+  // Producto+talla solo en facturas de PRODUCTO; servicio+descripción solo en las
+  // de SERVICIO. Nullable de ambos lados: una línea de maquila no tiene talla.
+  productoConfiguradoId Int?
+  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int?
+  talla                 Talla?               @relation(fields: [tallaId], references: [id])
+  servicioId            Int?
+  servicio              ServicioCatalogo?    @relation(fields: [servicioId], references: [id])
+  descripcion           String? // texto libre del servicio, como en la hoja del cliente
   cantidad              Int
-  precioUnitario        Decimal             @db.Decimal(14, 2)
-  subtotal              Decimal             @db.Decimal(14, 2)
+  precioUnitario        Decimal              @db.Decimal(14, 2)
+  subtotal              Decimal              @db.Decimal(14, 2)
 
   @@index([facturaId])
 }

@@ -268,6 +268,11 @@ async function main() {
   await prisma.pago.deleteMany({ where: { factura: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } } });
   await prisma.facturaLinea.deleteMany({ where: { factura: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } } });
   await prisma.factura.deleteMany({ where: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } });
+  // Las de SERVICIO no cuelgan de ningún despacho: se borran por tipo o quedarían
+  // duplicadas en cada corrida del seed (y sumando de más en el reporte).
+  await prisma.facturaLinea.deleteMany({ where: { factura: { tipo: 'SERVICIO' } } });
+  await prisma.pago.deleteMany({ where: { factura: { tipo: 'SERVICIO' } } });
+  await prisma.factura.deleteMany({ where: { tipo: 'SERVICIO' } });
   await prisma.movimientoInventario.deleteMany({ where: { referencia: { startsWith: 'D14-' } } });
   await prisma.despachoLinea.deleteMany({ where: { despacho: { op: { consecutivo: { in: CONS_D14 } } } } });
   await prisma.despacho.deleteMany({ where: { op: { consecutivo: { in: CONS_D14 } } } });
@@ -743,6 +748,7 @@ async function main() {
     data: {
       consecutivo: await siguienteConsecutivo(prisma, 'factura'),
       despachoId: despHist.id,
+      clienteId: clienteVencido.id,
       fecha: fechaHist,
       fechaVencimiento: vencHist,
       ivaPct: 19,
@@ -1200,6 +1206,9 @@ async function main() {
         iva,
         total: subtotal + iva,
         estado: 'EMITIDA',
+        tipo: 'PRODUCTO',
+        clienteId: clienteAlDia.id,
+        lineaId: v.linea?.id ?? null,
         lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, cantidad: v.cant, precioUnitario: PRECIO_PAR, subtotal }] },
       },
     });
@@ -1215,7 +1224,82 @@ async function main() {
       },
     });
   }
+  // ── Servicios: la maquila de Feroz (inyección a la capellada de Bogotá) ──
+  // Es lo que tapa el $0 de Feroz en el reporte por línea: produce pares pero no
+  // vende botas propias, factura el servicio.
+  const servInyeccion = await prisma.servicioCatalogo.upsert({
+    where: { codigo: 'INY-CAPELLADA' },
+    update: { nombre: 'Inyección de suela a capellada de tercero', unidad: 'PAR', precioBase: 4200 },
+    create: {
+      codigo: 'INY-CAPELLADA',
+      nombre: 'Inyección de suela a capellada de tercero',
+      unidad: 'PAR',
+      precioBase: 4200,
+    },
+  });
+  await prisma.servicioCatalogo.upsert({
+    where: { codigo: 'MANT-INYECTORA' },
+    update: { nombre: 'Mantenimiento de inyectora', unidad: 'SERVICIO', precioBase: 350000 },
+    create: {
+      codigo: 'MANT-INYECTORA',
+      nombre: 'Mantenimiento de inyectora',
+      unidad: 'SERVICIO',
+      precioBase: 350000,
+    },
+  });
+
+  // La cantidad no se inventa: son los pares que Feroz llevó a PT este mes.
+  const paresFeroz = linFeroz
+    ? await prisma.eventoTrazabilidad.count({
+        where: {
+          celula: Celula.PT,
+          timestamp: { gte: new Date(Date.UTC(anioRep, mesRep - 1, 1)), lt: new Date(Date.UTC(anioRep, mesRep, 1)) },
+          par: { lineaId: linFeroz.id },
+        },
+      })
+    : 0;
+  const TARIFA_INY = 4200;
+  let facturaServicio: { consecutivo: number; total: number } | null = null;
+  if (paresFeroz > 0) {
+    const subServ = paresFeroz * TARIFA_INY;
+    const ivaServ = Math.round(subServ * 0.19);
+    const vencServ = diaUTC(28, 10);
+    vencServ.setUTCDate(vencServ.getUTCDate() + 30);
+    const f = await prisma.factura.create({
+      data: {
+        consecutivo: await siguienteConsecutivo(prisma, 'factura'),
+        tipo: 'SERVICIO',
+        despachoId: null,
+        clienteId: clienteAlDia.id,
+        lineaId: linFeroz!.id,
+        fecha: diaUTC(28, 10),
+        fechaVencimiento: vencServ,
+        ivaPct: 19,
+        subtotal: subServ,
+        iva: ivaServ,
+        total: subServ + ivaServ,
+        estado: 'EMITIDA',
+        lineas: {
+          create: [
+            {
+              servicioId: servInyeccion.id,
+              descripcion: `Inyección de ${paresFeroz} pares — capellada de Bogotá`,
+              cantidad: paresFeroz,
+              precioUnitario: TARIFA_INY,
+              subtotal: subServ,
+            },
+          ],
+        },
+      },
+    });
+    facturaServicio = { consecutivo: f.consecutivo, total: Number(f.total) };
+  }
+
   const totalVendidos = VENTAS_D14.reduce((a, v) => a + v.cant, 0);
+  if (facturaServicio)
+    console.log(
+      `  Servicios: factura FV-${facturaServicio.consecutivo} de maquila Feroz — ${paresFeroz} pares × $${TARIFA_INY} = $${facturaServicio.total.toLocaleString('es-CO')} (con IVA)`,
+    );
   console.log(
     `  Demo 14 (reporte diario): metas Excel del mes ${mesRep}/${anioRep} (globales + por célula + por línea) + ${totalParesD14} pares producidos en ${PRODUCCION_DIA.length} días repartidos en ${PROD_LINEAS.length} líneas (${totalSegundasD14} de segunda, con su incidencia), ${VENTAS_D14.length} facturas (${totalVendidos} pares vendidos)`,
   );

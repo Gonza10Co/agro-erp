@@ -92,10 +92,38 @@ describe('reporte-diario-core', () => {
       expect(d2.valor).toBe(5100000);
     });
 
-    it('deja en 0 las columnas que aún no se capturan (ya no incluye segundas)', () => {
+    it('deja en 0 las columnas que aún no se capturan (ya no incluye segundas ni servicios)', () => {
       for (const f of rep.filas) expect(f.externo).toBe(0);
       expect(rep.pendientes).toEqual(COLUMNAS_PENDIENTES);
       expect(rep.pendientes).not.toContain('SEGUNDAS');
+      expect(rep.pendientes).not.toContain('SERVICIOS_MANTENIMIENTO');
+    });
+
+    describe('SERVICIOS (maquila)', () => {
+      const conServicio = construirReporte({
+        ...input,
+        ventas: [
+          ...input.ventas,
+          // Maquila de Feroz: 2.016 pares inyectados a la capellada de Bogotá.
+          { fecha: new Date('2026-06-10T10:00:00Z'), pares: 2016, valor: 8467200, esServicio: true },
+        ],
+      });
+
+      it('la maquila va en su propia columna, no en la venta de producto', () => {
+        const d10 = conServicio.filas.find((f) => f.fecha === '2026-06-10')!;
+        expect(d10.servicios).toBe(8467200);
+        expect(d10.valor).toBe(0);
+      });
+
+      it('no cuenta pares vendidos: el servicio no despacha producto propio', () => {
+        expect(conServicio.acumulado.paresVendidos).toBe(60); // igual que sin servicio
+      });
+
+      it('no infla la meta comercial en valor', () => {
+        // La meta de facturación sigue midiéndose contra la venta de botas.
+        expect(conServicio.metas.facturacionValor.real).toBe(5100000);
+        expect(conServicio.acumulado.servicios).toBe(8467200);
+      });
     });
 
     describe('SEGUNDAS', () => {

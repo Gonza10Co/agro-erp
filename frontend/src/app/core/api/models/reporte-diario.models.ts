@@ -10,7 +10,8 @@ export interface FilaDiaReporte {
   bodega: number;
   segundas: number;
   paresVendidos: number;
-  valor: number;
+  valor: number; // facturación de producto
+  servicios: number; // facturación de maquila/mantenimiento (línea de ingreso aparte)
 }
 
 export type AcumuladoReporte = Omit<FilaDiaReporte, 'fecha'>;

@@ -88,7 +88,13 @@ describe('ReportesService', () => {
 
       // La línea baja al where de cada consulta segmentable.
       expect(prisma.eventoTrazabilidad.findMany.mock.calls[0][0].where.par).toEqual({ lineaId: 4 });
-      expect(prisma.factura.findMany.mock.calls[0][0].where.despacho).toEqual({ op: { lineaId: 4 } });
+      // Dos caminos a la línea: la de servicio la trae directa (no tiene despacho),
+      // la de producto la hereda vía despacho→OP. Sin el OR, la maquila de una
+      // línea quedaría fuera de su propio reporte.
+      expect(prisma.factura.findMany.mock.calls[0][0].where.OR).toEqual([
+        { lineaId: 4 },
+        { despacho: { op: { lineaId: 4 } } },
+      ]);
       expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBe(4);
       // El kardex PT se corta por la línea sellada en cada movimiento.
       expect(prisma.movimientoInventario.findMany.mock.calls[0][0].where.lineaId).toBe(4);

@@ -50,6 +50,46 @@ export function lineasDeFactura(
   });
 }
 
+export interface LineaServicioEntrada {
+  servicioId?: number | null;
+  descripcion?: string | null;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface LineaServicioData {
+  servicioId: number | null;
+  descripcion: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
+
+/**
+ * Líneas de una factura de SERVICIO (maquila, mantenimiento). A diferencia de las
+ * de producto no hay precio pactado en una OC: el precio viene en la línea, porque
+ * el servicio se negocia por tarifa. Cada línea debe poder nombrarse: sin servicio
+ * del catálogo ni descripción, la factura saldría con un renglón mudo.
+ */
+export function lineasDeServicio(
+  lineas: LineaServicioEntrada[],
+): LineaServicioData[] {
+  return lineas.map((l, i) => {
+    if (l.servicioId == null && !l.descripcion?.trim())
+      throw new Error(`La línea ${i + 1} necesita un servicio o una descripción`);
+    if (l.cantidad <= 0) throw new Error(`La línea ${i + 1} debe tener cantidad mayor a 0`);
+    if (l.precioUnitario < 0)
+      throw new Error(`La línea ${i + 1} no puede tener precio negativo`);
+    return {
+      servicioId: l.servicioId ?? null,
+      descripcion: l.descripcion?.trim() || null,
+      cantidad: l.cantidad,
+      precioUnitario: l.precioUnitario,
+      subtotal: redondear(l.cantidad * l.precioUnitario),
+    };
+  });
+}
+
 /** Suma los subtotales y aplica el IVA (porcentaje). */
 export function totales(lineas: { subtotal: number }[], ivaPct: number): Totales {
   const subtotal = redondear(lineas.reduce((s, l) => s + l.subtotal, 0));

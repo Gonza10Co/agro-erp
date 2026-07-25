@@ -68,6 +68,7 @@ import {
                 <th class="seg" title="Pares que salieron de segunda (no entran al saldo de primeras)">Segundas</th>
                 <th>Pares vendidos</th>
                 <th>Valor</th>
+                <th class="serv" title="Maquila y mantenimiento: línea de ingreso aparte de la venta de botas">Servicios</th>
               </tr>
             </thead>
             <tbody>
@@ -82,6 +83,7 @@ import {
                   <td class="seg" [class.cero]="!f.segundas">{{ num(f.segundas) }}</td>
                   <td>{{ num(f.paresVendidos) }}</td>
                   <td>{{ f.valor ? moneda(f.valor) : '—' }}</td>
+                  <td class="serv">{{ f.servicios ? moneda(f.servicios) : '—' }}</td>
                 </tr>
               }
             </tbody>
@@ -96,6 +98,7 @@ import {
                 <td class="seg">{{ num(d.acumulado.segundas) }}</td>
                 <td>{{ num(d.acumulado.paresVendidos) }}</td>
                 <td>{{ moneda(d.acumulado.valor) }}</td>
+                <td class="serv">{{ moneda(d.acumulado.servicios) }}</td>
               </tr>
             </tfoot>
           </table>
@@ -177,6 +180,8 @@ import {
     /* Segundas: producto vendible pero de menor grado — se marca, no se esconde. */
     .tbl td.seg{color:var(--warn,#d97706);font-weight:var(--fw-semibold)}
     .tbl td.seg.cero{color:var(--text-subtle);font-weight:400}
+    /* Servicios: ingreso que no viene de vender botas (maquila Feroz). */
+    .tbl td.serv{color:var(--accent)}
     .tbl tr.vacia td{color:var(--text-subtle);opacity:.55}
     .tbl tfoot .acum td{background:var(--warn-bg,#fef9c3);color:#000;font-weight:var(--fw-semibold);border-top:2px solid var(--border)}
     .tbl td.pos{color:var(--ok,#16a34a)} .tbl td.neg{color:var(--warn,#d97706)}

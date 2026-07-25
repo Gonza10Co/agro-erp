@@ -13,13 +13,11 @@ export class CarteraService {
   constructor(private readonly prisma: PrismaService) {}
 
   async registrarPago(dto: RegistrarPagoDto) {
+    // clienteId sale directo de la factura: una factura de servicio no tiene
+    // despacho, así que la vieja cadena despacho→op→oc ya no sirve.
     const factura = await this.prisma.factura.findUnique({
       where: { id: dto.facturaId },
-      select: {
-        total: true,
-        pagos: { select: { monto: true } },
-        despacho: { select: { op: { select: { oc: { select: { clienteId: true } } } } } },
-      },
+      select: { total: true, clienteId: true, pagos: { select: { monto: true } } },
     });
     if (!factura) throw new NotFoundException(`Factura ${dto.facturaId} no existe`);
 
@@ -33,7 +31,7 @@ export class CarteraService {
         `El monto (${dto.monto}) supera el saldo pendiente (${saldoActual})`,
       );
 
-    const clienteId = factura.despacho.op.oc.clienteId;
+    const clienteId = factura.clienteId;
     const hoy = new Date();
 
     return this.prisma.$transaction(async (tx) => {
@@ -56,10 +54,9 @@ export class CarteraService {
         total: true,
         fecha: true,
         fechaVencimiento: true,
+        tipo: true,
         pagos: { select: { monto: true } },
-        despacho: {
-          select: { op: { select: { oc: { select: { cliente: { select: { id: true, nombre: true } } } } } } },
-        },
+        cliente: { select: { id: true, nombre: true } },
       },
     });
 
@@ -72,7 +69,10 @@ export class CarteraService {
         return {
           facturaId: f.id,
           consecutivo: f.consecutivo,
-          cliente: f.despacho.op.oc.cliente,
+          cliente: f.cliente,
+          // Las de servicio entran a cartera igual que las de producto; el tipo
+          // permite distinguirlas en pantalla sin una consulta aparte.
+          tipo: f.tipo,
           total: Number(f.total),
           pagado,
           saldo,
@@ -87,11 +87,12 @@ export class CarteraService {
   async obtenerCliente(clienteId: number) {
     const hoy = new Date();
     const facturas = await this.prisma.factura.findMany({
-      where: { despacho: { op: { oc: { clienteId } } } },
+      where: { clienteId },
       orderBy: { fechaVencimiento: 'asc' },
       select: {
         id: true,
         consecutivo: true,
+        tipo: true,
         total: true,
         fecha: true,
         fechaVencimiento: true,
@@ -106,6 +107,7 @@ export class CarteraService {
       return {
         facturaId: f.id,
         consecutivo: f.consecutivo,
+        tipo: f.tipo,
         total: Number(f.total),
         pagado,
         saldo,

@@ -1,7 +1,10 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FacturasApi } from '../../core/api/facturas.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 import { FacturaListItem } from '../../core/api/models/pedidos.models';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import { FacturaDetalleComponent } from './factura-detalle.component';
@@ -9,10 +12,15 @@ import { FacturaDetalleComponent } from './factura-detalle.component';
 @Component({
   selector: 'app-facturas-list',
   standalone: true,
-  imports: [DatePipe, DrawerComponent, FacturaDetalleComponent],
+  imports: [DatePipe, RouterLink, DrawerComponent, FacturaDetalleComponent],
   template: `
     <div class="page">
-      <div class="page-header"><div class="ph-title">Facturas</div></div>
+      <div class="page-header">
+        <div class="ph-title">Facturas</div>
+        @if (puedeFacturarServicio) {
+          <a class="btn btn-primary" routerLink="/facturas/servicio/nueva">Factura de servicio</a>
+        }
+      </div>
 
       @if (cargando()) {
         <div class="card"><div class="card-body">Cargando facturas…</div></div>
@@ -28,13 +36,20 @@ import { FacturaDetalleComponent } from './factura-detalle.component';
         <div class="card">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Factura</th><th>Cliente</th><th>OP</th><th>Fecha</th><th class="num">Total</th><th>Estado</th></tr></thead>
+              <thead><tr><th>Factura</th><th>Cliente</th><th>Origen</th><th>Fecha</th><th class="num">Total</th><th>Estado</th></tr></thead>
               <tbody>
                 @for (f of facturas(); track f.id) {
                   <tr [class.is-selected]="seleccionada()?.id === f.id" (click)="abrir(f)" style="cursor:pointer">
                     <td class="cell-mono">FAC-{{ f.consecutivo }}</td>
-                    <td>{{ f.despacho.op.oc.cliente.nombre }}</td>
-                    <td class="cell-sub cell-mono">OP-{{ f.despacho.op.consecutivo }}</td>
+                    <td>{{ f.cliente.nombre }}</td>
+                    <td class="cell-sub cell-mono">
+                      @if (f.tipo === 'SERVICIO') {
+                        <span class="badge-serv">Servicio</span>
+                        @if (f.linea) { <span class="cell-sub">· {{ f.linea.nombre }}</span> }
+                      } @else if (f.despacho) {
+                        OP-{{ f.despacho.op.consecutivo }}
+                      }
+                    </td>
                     <td class="cell-sub">{{ f.fecha | date:'dd/MM/yyyy' }}</td>
                     <td class="num cell-mono">{{ moneda(f.total) }}</td>
                     <td><span class="badge badge-neutral"><span class="dot"></span>{{ f.estado }}</span></td>
@@ -53,10 +68,17 @@ import { FacturaDetalleComponent } from './factura-detalle.component';
       }
     </app-drawer>
   `,
+  styles: [`
+    /* Marca la factura que no viene de vender botas (maquila / mantenimiento). */
+    .badge-serv{display:inline-block;padding:1px 8px;border-radius:99px;font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--accent);border:var(--bw) solid currentColor}
+  `],
 })
 export class FacturasListComponent implements OnInit {
   private readonly api = inject(FacturasApi);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
+  // Facturación de maquila: sección de la Entrega 5 (nivel en NIVEL_SECCION).
+  readonly puedeFacturarServicio = puedeVerSeccion(this.auth.rol(), 'factura-servicio');
   facturas = signal<FacturaListItem[]>([]);
   cargando = signal(true);
   seleccionada = signal<FacturaListItem | null>(null);

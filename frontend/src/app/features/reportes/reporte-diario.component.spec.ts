@@ -7,10 +7,11 @@ const REPORTE = {
   anio: 2026,
   mes: 6,
   filas: [
-    { fecha: '2026-06-01', troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 0, valor: 0 },
-    { fecha: '2026-06-02', troquelado: 0, guarnicion: 0, almacen: 0, externo: 0, inyeccion: 0, bodega: 0, segundas: 0, paresVendidos: 8, valor: 809200 },
+    { fecha: '2026-06-01', troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 0, valor: 0, servicios: 0 },
+    // Día con maquila: factura plata pero no vende pares propios.
+    { fecha: '2026-06-02', troquelado: 0, guarnicion: 0, almacen: 0, externo: 0, inyeccion: 0, bodega: 0, segundas: 0, paresVendidos: 8, valor: 809200, servicios: 8467200 },
   ],
-  acumulado: { troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 8, valor: 809200 },
+  acumulado: { troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 3, segundas: 1, paresVendidos: 8, valor: 809200, servicios: 8467200 },
   metas: {
     celulas: [
       { celula: 'CORTE', meta: 70, real: 48, pct: 68.6 },
@@ -27,7 +28,7 @@ const REPORTE = {
     { fecha: '2026-06-02', saldoInicial: 504, ingreso: 0, venta: 8, devolucion: 0, saldoFinal: 496 },
     { fecha: '2026-06-03', saldoInicial: 496, ingreso: 0, venta: 0, devolucion: 0, saldoFinal: 496 },
   ],
-  pendientes: ['EXTERNO', 'SERVICIOS_MANTENIMIENTO'],
+  pendientes: ['EXTERNO'],
 };
 
 describe('ReporteDiarioComponent', () => {
@@ -83,6 +84,20 @@ describe('ReporteDiarioComponent', () => {
     const thSegundas = encabezados.find((th) => th.textContent?.trim() === 'Segundas')!;
     expect(thSegundas.classList.contains('pend')).toBeFalse();
     expect(thSegundas.classList.contains('seg')).toBeTrue();
+  });
+
+  it('muestra la maquila en su propia columna, aparte de la venta de producto', () => {
+    const fixture = setup();
+    flush();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    const encabezados = Array.from(el.querySelectorAll('thead th')).map((th) => th.textContent?.trim());
+    expect(encabezados).toContain('Servicios');
+    // El acumulado trae los dos montos separados: $809.200 de botas y $8.467.200
+    // de maquila. Si se sumaran, la meta comercial saldría inflada.
+    const acum = el.querySelector('tfoot tr.acum')!.textContent!;
+    expect(acum).toContain('809.200');
+    expect(acum).toContain('8.467.200');
   });
 
   it('pinta las 7 tarjetas en la pantalla', () => {

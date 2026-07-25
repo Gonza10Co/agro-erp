@@ -24,7 +24,7 @@ export const TIPOS_META: readonly TipoMeta[] = [
 export type ColumnaProduccion = 'troquelado' | 'guarnicion' | 'almacen' | 'inyeccion' | 'bodega';
 
 /** Conceptos que el Excel muestra pero que aún NO se capturan en el backend. */
-export const COLUMNAS_PENDIENTES = ['EXTERNO', 'SERVICIOS_MANTENIMIENTO'] as const;
+export const COLUMNAS_PENDIENTES = ['EXTERNO'] as const;
 
 const CELULA_A_COLUMNA: Record<Celula, ColumnaProduccion> = {
   CORTE: 'troquelado',
@@ -44,6 +44,7 @@ export interface VentaMin {
   fecha: Date;
   pares: number;
   valor: number;
+  esServicio?: boolean; // maquila/mantenimiento: factura plata, no vende pares
 }
 export interface MetaMin {
   tipo: TipoMeta;
@@ -76,7 +77,8 @@ export interface FilaDia {
   bodega: number; // pares de PRIMERA que entraron a bodega
   segundas: number; // pares de SEGUNDA que entraron a bodega (excluyentes con bodega)
   paresVendidos: number;
-  valor: number;
+  valor: number; // facturación de PRODUCTO (lo que compara contra la meta comercial)
+  servicios: number; // facturación de SERVICIO/maquila: línea de ingreso aparte
 }
 
 export type Acumulado = Omit<FilaDia, 'fecha'>;
@@ -142,6 +144,7 @@ function filaVacia(fecha: string): FilaDia {
     segundas: 0,
     paresVendidos: 0,
     valor: 0,
+    servicios: 0,
   };
 }
 
@@ -178,10 +181,16 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     fila[columnaDeCelula(ev.celula)] += 1;
   }
 
-  // Ventas: pares vendidos y valor por día.
+  // Ventas: pares vendidos y valor por día. La maquila va a su propia columna —
+  // factura plata pero no vende pares, así que sumarla a `valor` inflaría la meta
+  // comercial y sumarla a `paresVendidos` contaría pares que nunca salieron.
   for (const v of input.ventas) {
     const fila = porDia.get(claveDia(v.fecha));
     if (!fila) continue;
+    if (v.esServicio) {
+      fila.servicios += v.valor;
+      continue;
+    }
     fila.paresVendidos += v.pares;
     fila.valor += v.valor;
   }
@@ -199,6 +208,7 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     segundas: 0,
     paresVendidos: 0,
     valor: 0,
+    servicios: 0,
   };
   for (const f of filas) {
     acumulado.troquelado += f.troquelado;
@@ -209,6 +219,7 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     acumulado.segundas += f.segundas;
     acumulado.paresVendidos += f.paresVendidos;
     acumulado.valor += f.valor;
+    acumulado.servicios += f.servicios;
   }
 
   // Metas: real vs objetivo del mes.

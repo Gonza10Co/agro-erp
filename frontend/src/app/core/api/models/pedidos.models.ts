@@ -136,13 +136,19 @@ export type EstadoFactura = 'EMITIDA' | 'ANULADA';
 
 export interface FacturarParams { despachoId: number; ivaPct?: number; }
 
+export type TipoFactura = 'PRODUCTO' | 'SERVICIO';
+
 export interface FacturaListItem {
   id: number;
   consecutivo: number;
+  tipo: TipoFactura;
   fecha: string;
   total: string;
   estado: EstadoFactura;
-  despacho: { consecutivo: number; op: { consecutivo: number; oc: { cliente: { nombre: string } } } };
+  /** Denormalizado: una factura de servicio no tiene despacho que navegar. */
+  cliente: { nombre: string };
+  linea: { codigo: string; nombre: string } | null;
+  despacho: { consecutivo: number; op: { consecutivo: number } } | null;
 }
 
 export interface FacturaLinea {
