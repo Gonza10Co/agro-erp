@@ -3,7 +3,22 @@
 // acumulado, metas con % de cumplimiento y kardex de Producto Terminado).
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
-export type TipoMeta = 'GUARNICION' | 'INYECCION' | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+
+/** Las 5 células en el orden del flujo de planta. Manda el orden de la pantalla. */
+export const CELULAS: readonly Celula[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
+
+/**
+ * Una meta es por célula (el nombre del tipo ES la célula) o de facturación.
+ * El dueño las lleva así en su Excel: una fila de objetivo por cada centro de costo.
+ */
+export type TipoMeta = Celula | 'FACTURACION_PARES' | 'FACTURACION_VALOR';
+
+/** Todos los tipos de meta editables, en el orden en que se muestran. */
+export const TIPOS_META: readonly TipoMeta[] = [
+  ...CELULAS,
+  'FACTURACION_PARES',
+  'FACTURACION_VALOR',
+];
 
 /** Columnas de producción de la fila diaria que se alimentan de eventos de célula. */
 export type ColumnaProduccion = 'troquelado' | 'guarnicion' | 'almacen' | 'inyeccion' | 'bodega';
@@ -70,9 +85,12 @@ export interface Cumplimiento {
   real: number;
   pct: number;
 }
+export interface CumplimientoCelula extends Cumplimiento {
+  celula: Celula;
+}
 export interface BloqueMetas {
-  guarnicion: Cumplimiento;
-  inyeccion: Cumplimiento;
+  /** Una entrada por célula, siempre las 5 y en orden de flujo (aunque no tengan meta). */
+  celulas: CumplimientoCelula[];
   facturacionPares: Cumplimiento;
   facturacionValor: Cumplimiento;
 }
@@ -191,8 +209,12 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     return { meta, real, pct: pctCumplimiento(real, meta) };
   };
   const metas: BloqueMetas = {
-    guarnicion: cumplimiento(acumulado.guarnicion, 'GUARNICION'),
-    inyeccion: cumplimiento(acumulado.inyeccion, 'INYECCION'),
+    // Una por célula: el real sale de la misma columna que alimenta la fila diaria,
+    // así el % de cumplimiento nunca se despega de lo que muestra la tabla.
+    celulas: CELULAS.map((celula) => ({
+      celula,
+      ...cumplimiento(acumulado[columnaDeCelula(celula)], celula),
+    })),
     facturacionPares: cumplimiento(acumulado.paresVendidos, 'FACTURACION_PARES'),
     facturacionValor: cumplimiento(acumulado.valor, 'FACTURACION_VALOR'),
   };

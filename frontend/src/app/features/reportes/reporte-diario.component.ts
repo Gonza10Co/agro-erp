@@ -4,7 +4,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReportesApi } from '../../core/api/reportes.api';
 import { LineasApi, Linea } from '../../core/api/lineas.api';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
-import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/reporte-diario.models';
+import {
+  ETIQUETA_META,
+  MetaItem,
+  ReporteDiario,
+  TIPOS_META,
+  TipoMeta,
+} from '../../core/api/models/reporte-diario.models';
 
 @Component({
   selector: 'app-reporte-diario',
@@ -129,10 +135,12 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
     <!-- Drawer: editar metas del mes (globales o de la línea filtrada) -->
     <app-drawer [open]="drawer()" [title]="'Metas de ' + nombreMes() + ' · ' + nombreLinea()" (closed)="drawer.set(false)">
       <div class="form">
-        <label class="fld"><span>Meta de Guarnición (pares)</span><input type="number" min="0" [(ngModel)]="fGuarn" /></label>
-        <label class="fld"><span>Meta de Inyección (pares)</span><input type="number" min="0" [(ngModel)]="fIny" /></label>
-        <label class="fld"><span>Meta de facturación (pares)</span><input type="number" min="0" [(ngModel)]="fFacPares" /></label>
-        <label class="fld"><span>Meta de facturación (valor $)</span><input type="number" min="0" [(ngModel)]="fFacValor" /></label>
+        @for (t of tiposMeta; track t) {
+          <label class="fld">
+            <span>{{ etiqueta[t] }} <em class="uni">{{ esValor(t) ? '($)' : '(pares)' }}</em></span>
+            <input type="number" min="0" [ngModel]="form[t]" (ngModelChange)="form[t] = $event" [name]="t" />
+          </label>
+        }
         <div class="form-actions">
           <button class="btn ghost" type="button" (click)="drawer.set(false)">Cancelar</button>
           <button class="btn" type="button" [disabled]="guardando()" (click)="guardar()">{{ guardando() ? 'Guardando…' : 'Guardar metas' }}</button>
@@ -146,7 +154,8 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
     .btn{font:inherit;font-weight:var(--fw-semibold);padding:8px 14px;border-radius:var(--r-sm);border:var(--bw) solid var(--primary);background:var(--primary);color:#fff;cursor:pointer}
     .btn.ghost{background:transparent;color:var(--text);border-color:var(--border)}
     .btn:disabled{opacity:.6;cursor:default}
-    .metas{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:var(--sp-4)}
+    /* 7 tarjetas (5 células + 2 de facturación): que fluyan según el ancho. */
+    .metas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:var(--sp-4);margin-bottom:var(--sp-4)}
     .meta-card{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-md);padding:var(--sp-4)}
     .meta-h{font-size:var(--text-caption);color:var(--text-subtle);text-transform:uppercase;letter-spacing:.04em}
     .meta-pct{font-size:var(--text-h2);font-weight:var(--fw-semibold);font-family:var(--font-mono);margin:var(--sp-1) 0}
@@ -170,9 +179,10 @@ import { BloqueMetas, MetaItem, ReporteDiario } from '../../core/api/models/repo
     .form{display:flex;flex-direction:column;gap:var(--sp-4)}
     .fld{display:flex;flex-direction:column;gap:var(--sp-1)}
     .fld span{font-size:var(--text-sm);color:var(--text-muted)}
+    .fld .uni{font-style:normal;color:var(--text-subtle);font-size:var(--text-caption)}
     .fld input{font:inherit;padding:8px 10px;border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
     .form-actions{display:flex;justify-content:flex-end;gap:var(--sp-3);margin-top:var(--sp-2)}
-    @media (max-width:900px){.metas{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:640px){.metas{grid-template-columns:repeat(2,1fr)}}
   `],
 })
 export class ReporteDiarioComponent implements OnInit {
@@ -190,24 +200,39 @@ export class ReporteDiarioComponent implements OnInit {
   drawer = signal(false);
   guardando = signal(false);
 
-  // Modelo del formulario de metas (drawer).
-  fGuarn = 0;
-  fIny = 0;
-  fFacPares = 0;
-  fFacValor = 0;
+  // Modelo del formulario de metas: un valor por tipo, para no tener un campo suelto
+  // por cada célula (hoy 7 tipos; el día que entre uno nuevo, el drawer no se toca).
+  readonly tiposMeta = TIPOS_META;
+  readonly etiqueta = ETIQUETA_META;
+  form: Record<TipoMeta, number> = this.formVacio();
+
+  private formVacio(): Record<TipoMeta, number> {
+    return Object.fromEntries(TIPOS_META.map((t) => [t, 0])) as Record<TipoMeta, number>;
+  }
+
+  /** Unidad de cada meta, para el sufijo del campo y el formato de la tarjeta. */
+  esValor(tipo: TipoMeta): boolean { return tipo === 'FACTURACION_VALOR'; }
 
   mesValor = computed(() => `${this.anio()}-${String(this.mes()).padStart(2, '0')}`);
   kardexConMov = computed(() => (this.r()?.kardexPT ?? []).filter((k) => k.ingreso || k.venta || k.devolucion));
 
+  // Una tarjeta por célula (en orden de flujo) más las dos de facturación: es el
+  // tablero del dueño, que mira cumplimiento centro de costo por centro de costo.
   metasCards = computed(() => {
     const m = this.r()?.metas;
     if (!m) return [];
     const pares = (n: number) => this.num(n);
     return [
-      { key: 'g', label: 'Meta Guarnición', ...m.guarnicion, fmt: pares },
-      { key: 'i', label: 'Meta Inyección', ...m.inyeccion, fmt: pares },
-      { key: 'fp', label: 'Facturación (pares)', ...m.facturacionPares, fmt: pares },
-      { key: 'fv', label: 'Facturación (valor)', ...m.facturacionValor, fmt: (n: number) => this.moneda(n) },
+      ...m.celulas.map((c) => ({
+        key: c.celula,
+        label: ETIQUETA_META[c.celula],
+        meta: c.meta,
+        real: c.real,
+        pct: c.pct,
+        fmt: pares,
+      })),
+      { key: 'FACTURACION_PARES', label: ETIQUETA_META.FACTURACION_PARES, ...m.facturacionPares, fmt: pares },
+      { key: 'FACTURACION_VALOR', label: ETIQUETA_META.FACTURACION_VALOR, ...m.facturacionValor, fmt: (n: number) => this.moneda(n) },
     ];
   });
 
@@ -246,20 +271,16 @@ export class ReporteDiarioComponent implements OnInit {
 
   abrirMetas(): void {
     const m = this.r()?.metas;
-    this.fGuarn = m?.guarnicion.meta ?? 0;
-    this.fIny = m?.inyeccion.meta ?? 0;
-    this.fFacPares = m?.facturacionPares.meta ?? 0;
-    this.fFacValor = m?.facturacionValor.meta ?? 0;
+    const form = this.formVacio();
+    for (const c of m?.celulas ?? []) form[c.celula] = c.meta;
+    form.FACTURACION_PARES = m?.facturacionPares.meta ?? 0;
+    form.FACTURACION_VALOR = m?.facturacionValor.meta ?? 0;
+    this.form = form;
     this.drawer.set(true);
   }
 
   guardar(): void {
-    const items: MetaItem[] = [
-      { tipo: 'GUARNICION', valor: Number(this.fGuarn) },
-      { tipo: 'INYECCION', valor: Number(this.fIny) },
-      { tipo: 'FACTURACION_PARES', valor: Number(this.fFacPares) },
-      { tipo: 'FACTURACION_VALOR', valor: Number(this.fFacValor) },
-    ];
+    const items: MetaItem[] = TIPOS_META.map((tipo) => ({ tipo, valor: Number(this.form[tipo]) }));
     this.guardando.set(true);
     this.api
       .guardarMetas(this.anio(), this.mes(), items, this.lineaSel() ?? undefined)

@@ -12,8 +12,13 @@ const REPORTE = {
   ],
   acumulado: { troquelado: 4, guarnicion: 4, almacen: 4, externo: 0, inyeccion: 4, bodega: 4, segundas: 0, paresVendidos: 8, valor: 809200 },
   metas: {
-    guarnicion: { meta: 60, real: 44, pct: 73.3 },
-    inyeccion: { meta: 60, real: 43, pct: 71.7 },
+    celulas: [
+      { celula: 'CORTE', meta: 70, real: 48, pct: 68.6 },
+      { celula: 'GUARNICION', meta: 60, real: 44, pct: 73.3 },
+      { celula: 'ALMACEN', meta: 0, real: 44, pct: 0 },
+      { celula: 'INYECCION', meta: 60, real: 43, pct: 71.7 },
+      { celula: 'PT', meta: 55, real: 43, pct: 78.2 },
+    ],
     facturacionPares: { meta: 25, real: 19, pct: 76 },
     facturacionValor: { meta: 2400000, real: 1921850, pct: 80.1 },
   },
@@ -48,13 +53,31 @@ describe('ReporteDiarioComponent', () => {
     http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario').flush(REPORTE);
   }
 
-  it('carga el reporte y arma las tarjetas de metas', () => {
+  it('carga el reporte y arma una tarjeta por célula + las 2 de facturación', () => {
     const fixture = setup();
     flush();
     const c = fixture.componentInstance;
     expect(c.r()?.acumulado.troquelado).toBe(4);
-    expect(c.metasCards().length).toBe(4);
-    expect(c.metasCards()[0].pct).toBe(73.3);
+    expect(c.metasCards().length).toBe(7);
+    // En orden de flujo de planta, con la facturación al final.
+    expect(c.metasCards().map((m) => m.key)).toEqual([
+      'CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT',
+      'FACTURACION_PARES', 'FACTURACION_VALOR',
+    ]);
+    expect(c.metasCards()[0].label).toBe('Corte');
+    expect(c.metasCards()[0].pct).toBe(68.6);
+    // La de valor formatea en pesos; las de pares, con separador de miles.
+    expect(c.metasCards()[6].fmt(2400000)).toBe('$2.400.000');
+  });
+
+  it('pinta las 7 tarjetas en la pantalla', () => {
+    const fixture = setup();
+    flush();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelectorAll('.meta-card').length).toBe(7);
+    expect(el.textContent).toContain('Almacén');
+    expect(el.textContent).toContain('P. Terminado');
   });
 
   it('el kardex solo muestra días con movimiento', () => {
@@ -130,12 +153,20 @@ describe('ReporteDiarioComponent', () => {
     flush();
     const c = fixture.componentInstance;
     c.abrirMetas();
-    expect(c.fGuarn).toBe(60);
-    c.fGuarn = 100;
+    // El drawer se precarga con las metas vigentes de las 7, células incluidas.
+    expect(c.form.GUARNICION).toBe(60);
+    expect(c.form.CORTE).toBe(70);
+    expect(c.form.ALMACEN).toBe(0);
+    c.form.GUARNICION = 100;
+    c.form.ALMACEN = 80;
     c.guardar();
     const put = http.expectOne((r) => r.url === 'http://localhost:3001/reportes/metas');
     expect(put.request.method).toBe('PUT');
-    expect(put.request.body.items[0]).toEqual({ tipo: 'GUARNICION', valor: 100 });
+    // Se mandan las 7 en orden de flujo; el backend hace upsert de cada una.
+    expect(put.request.body.items.length).toBe(7);
+    expect(put.request.body.items[0]).toEqual({ tipo: 'CORTE', valor: 70 });
+    expect(put.request.body.items[1]).toEqual({ tipo: 'GUARNICION', valor: 100 });
+    expect(put.request.body.items[2]).toEqual({ tipo: 'ALMACEN', valor: 80 });
     put.flush([]);
     expect(c.drawer()).toBe(false);
     flush(); // recarga tras guardar

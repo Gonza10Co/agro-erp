@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { PrismaClient, Celula, ClaseDano } from '@prisma/client';
+import { PrismaClient, Celula, ClaseDano, TipoMeta } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { siguienteConsecutivo } from '../src/prisma/consecutivo';
@@ -842,7 +842,7 @@ async function main() {
 
   // Metas del mes según el Excel del dueño. Upsert MANUAL (mismo patrón que el
   // service): el unique compuesto anio+mes+tipo+lineaId no cubre lineaId NULL en PG.
-  async function upsertMeta(tipo: 'GUARNICION' | 'INYECCION' | 'FACTURACION_PARES' | 'FACTURACION_VALOR', valor: number, lineaId: number | null) {
+  async function upsertMeta(tipo: TipoMeta, valor: number, lineaId: number | null) {
     const existente = await prisma.meta.findFirst({
       where: { anio: anioRep, mes: mesRep, tipo, lineaId },
     });
@@ -851,23 +851,42 @@ async function main() {
   }
 
   // Metas globales (lineaId NULL = las del Excel).
-  await upsertMeta('GUARNICION', 20160, null);
-  await upsertMeta('INYECCION', 20160, null);
+  // Guarnición e Inyección salen del Excel del dueño. Corte, Almacén y PT son
+  // metas por célula nuevas (Entrega 5): se siembran al mismo ritmo de la cadena
+  // (una bota pasa por las 5) hasta que JP pase la hoja con los objetivos reales.
+  const META_CADENA = 20160;
+  await upsertMeta('CORTE', META_CADENA, null);
+  await upsertMeta('GUARNICION', META_CADENA, null);
+  await upsertMeta('ALMACEN', META_CADENA, null);
+  await upsertMeta('INYECCION', META_CADENA, null);
+  await upsertMeta('PT', META_CADENA, null);
   await upsertMeta('FACTURACION_PARES', 30240, null);
   await upsertMeta('FACTURACION_VALOR', 1445895360, null);
 
-  // Metas por línea (reporte por línea, Entrega 3). Feroz solo inyecta (servicio a la
-  // capellada de Bogotá): no tiene meta de guarnición ni de facturación de pares.
-  const METAS_LINEA: { linea: typeof linBasarili; guarnicion: number | null; inyeccion: number; factPares: number | null; factValor: number | null }[] = [
-    { linea: linBasarili, guarnicion: 9072, inyeccion: 9072, factPares: 15120, factValor: 722947680 },
-    { linea: linAgro, guarnicion: 6048, inyeccion: 6048, factPares: 10080, factValor: 481965120 },
-    { linea: linAlta, guarnicion: 3024, inyeccion: 3024, factPares: 5040, factValor: 240982560 },
-    { linea: linFeroz, guarnicion: null, inyeccion: 2016, factPares: null, factValor: null },
+  // Metas por línea (reporte por línea, Entrega 3). Feroz arranca en INYECCIÓN
+  // (servicio a la capellada de Bogotá): no tiene metas de corte, guarnición ni
+  // almacén, ni de facturación de pares — su servicio se factura aparte.
+  const METAS_LINEA: {
+    linea: typeof linBasarili;
+    cadena: number | null; // corte + guarnición + almacén (las células de arranque)
+    inyeccion: number;
+    factPares: number | null;
+    factValor: number | null;
+  }[] = [
+    { linea: linBasarili, cadena: 9072, inyeccion: 9072, factPares: 15120, factValor: 722947680 },
+    { linea: linAgro, cadena: 6048, inyeccion: 6048, factPares: 10080, factValor: 481965120 },
+    { linea: linAlta, cadena: 3024, inyeccion: 3024, factPares: 5040, factValor: 240982560 },
+    { linea: linFeroz, cadena: null, inyeccion: 2016, factPares: null, factValor: null },
   ];
   for (const m of METAS_LINEA) {
     if (!m.linea) continue;
-    if (m.guarnicion != null) await upsertMeta('GUARNICION', m.guarnicion, m.linea.id);
+    if (m.cadena != null) {
+      await upsertMeta('CORTE', m.cadena, m.linea.id);
+      await upsertMeta('GUARNICION', m.cadena, m.linea.id);
+      await upsertMeta('ALMACEN', m.cadena, m.linea.id);
+    }
     await upsertMeta('INYECCION', m.inyeccion, m.linea.id);
+    await upsertMeta('PT', m.inyeccion, m.linea.id); // todo lo inyectado termina en PT
     if (m.factPares != null) await upsertMeta('FACTURACION_PARES', m.factPares, m.linea.id);
     if (m.factValor != null) await upsertMeta('FACTURACION_VALOR', m.factValor, m.linea.id);
   }

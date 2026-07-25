@@ -1068,9 +1068,15 @@ model MovimientoInventario {
 
 // ───────────────────────── Demo 14: Metas gerenciales / Reporte diario ─────────────────────────
 
+// Una meta por CÉLULA (el nombre del tipo es la célula, como en el Excel del dueño)
+// más las dos de facturación. No hay columna `celula` a propósito: el tipo ya la
+// identifica y el unique (anio, mes, tipo, lineaId) da gratis meta por célula × línea.
 enum TipoMeta {
+  CORTE // meta de pares troquelados (mensual)
   GUARNICION // meta de pares producidos en Guarnición (mensual)
+  ALMACEN // meta de pares que pasan por Almacén (mensual)
   INYECCION // meta de pares inyectados (mensual)
+  PT // meta de pares terminados / empacados (mensual)
   FACTURACION_PARES // meta de pares facturados (mensual)
   FACTURACION_VALOR // meta de $ facturado (mensual)
 }

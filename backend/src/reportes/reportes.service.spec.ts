@@ -64,7 +64,9 @@ describe('ReportesService', () => {
       const rep = await service.diario(2026, 6);
       expect(rep.acumulado.troquelado).toBe(0);
       expect(rep.kardexPT[0].saldoInicial).toBe(0);
-      expect(rep.metas.guarnicion.pct).toBe(0);
+      // Sin metas cargadas siguen viniendo las 5 células, todas en 0.
+      expect(rep.metas.celulas).toHaveLength(5);
+      expect(rep.metas.celulas.find((c) => c.celula === 'GUARNICION')!.pct).toBe(0);
       // Sin filtro: metas globales (lineaId NULL) y sin marca de línea en el response.
       expect(prisma.meta.findMany.mock.calls[0][0].where.lineaId).toBeNull();
       expect(rep.lineaId).toBeNull();

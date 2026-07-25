@@ -53,6 +53,7 @@ describe('reporte-diario-core', () => {
         { fecha: new Date('2026-06-02T15:00:00Z'), pares: 10, valor: 850000 },
       ],
       metas: [
+        { tipo: 'CORTE', valor: 4 },
         { tipo: 'GUARNICION', valor: 1 },
         { tipo: 'INYECCION', valor: 2 },
         { tipo: 'FACTURACION_PARES', valor: 100 },
@@ -106,11 +107,30 @@ describe('reporte-diario-core', () => {
     });
 
     it('arma el bloque de metas con su % de cumplimiento', () => {
-      expect(rep.metas.guarnicion).toEqual({ meta: 1, real: 1, pct: 100 });
-      expect(rep.metas.inyeccion).toEqual({ meta: 2, real: 1, pct: 50 });
       expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60 });
       expect(rep.metas.facturacionValor.real).toBe(5100000);
       expect(rep.metas.facturacionValor.pct).toBe(51);
+    });
+
+    describe('metas POR CÉLULA', () => {
+      it('trae una meta por cada célula, en el orden del flujo de planta', () => {
+        expect(rep.metas.celulas.map((c) => c.celula)).toEqual([
+          'CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT',
+        ]);
+      });
+
+      it('cruza cada célula contra su columna de producción real', () => {
+        const porCelula = Object.fromEntries(rep.metas.celulas.map((c) => [c.celula, c]));
+        // Corte: 2 eventos contra meta 4.
+        expect(porCelula['CORTE']).toEqual({ celula: 'CORTE', meta: 4, real: 2, pct: 50 });
+        // Guarnición cuenta solo el sub-paso AMARRE (la salida real de la célula).
+        expect(porCelula['GUARNICION']).toEqual({ celula: 'GUARNICION', meta: 1, real: 1, pct: 100 });
+        expect(porCelula['INYECCION']).toEqual({ celula: 'INYECCION', meta: 2, real: 1, pct: 50 });
+        // PT tiene producción real (1 par) pero todavía nadie le puso meta.
+        expect(porCelula['PT']).toEqual({ celula: 'PT', meta: 0, real: 1, pct: 0 });
+        // Almacén: sin eventos y sin meta.
+        expect(porCelula['ALMACEN']).toEqual({ celula: 'ALMACEN', meta: 0, real: 0, pct: 0 });
+      });
     });
 
     it('arma el kardex de PT arrastrando el saldo día a día', () => {
@@ -130,9 +150,12 @@ describe('reporte-diario-core', () => {
       expect(k3.saldoFinal).toBe(946); // 941 + 5
     });
 
-    it('falla sin metas: cae a meta 0 y pct 0', () => {
+    it('falla sin metas: cae a meta 0 y pct 0, pero sigue trayendo las 5 células', () => {
       const sinMetas = construirReporte({ ...input, metas: [] });
-      expect(sinMetas.metas.guarnicion).toEqual({ meta: 0, real: 1, pct: 0 });
+      expect(sinMetas.metas.celulas).toHaveLength(5);
+      const guarnicion = sinMetas.metas.celulas.find((c) => c.celula === 'GUARNICION')!;
+      expect(guarnicion).toEqual({ celula: 'GUARNICION', meta: 0, real: 1, pct: 0 });
+      expect(sinMetas.metas.facturacionPares).toEqual({ meta: 0, real: 60, pct: 0 });
     });
   });
 });
