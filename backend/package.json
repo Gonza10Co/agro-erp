@@ -24,7 +24,8 @@
     "seed:basarili": "tsx prisma/seed-basarili.ts",
     "seed:costos": "tsx prisma/seed-costos.ts",
     "seed:sedes": "tsx prisma/seed-sedes.ts",
-    "seed:piezas": "tsx prisma/seed-piezas.ts"
+    "seed:piezas": "tsx prisma/seed-piezas.ts",
+    "seed:servicios": "tsx prisma/seed-servicios.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
