@@ -99,7 +99,7 @@ describe('ShellComponent', () => {
     expect(text).toContain('Reporte diario');
   });
 
-  it('un rol STAGE ve lo del cliente + la próxima entrega (Compras), pero no los módulos internos', () => {
+  it('un rol STAGE ve lo del cliente + la próxima entrega (Compras, Facturas), pero no los módulos internos', () => {
     const payload = btoa(JSON.stringify({ sub: 7, username: 'stage', role: 'STAGE' }));
     localStorage.setItem('accessToken', `x.${payload}.y`);
     TestBed.configureTestingModule({
@@ -114,9 +114,11 @@ describe('ShellComponent', () => {
     expect(text).toContain('Clientes');
     expect(text).toContain('Compras');
     expect(text).toContain('Stage');
+    // Entrega 5: `facturas` pasó a EN_STAGE para poder mostrar la factura de servicio
+    // (maquila Feroz) en la demo — su única puerta es este ítem de menú.
+    expect(text).toContain('Facturas');
     // internos ocultos
     expect(text).not.toContain('Inicio');
-    expect(text).not.toContain('Facturas');
     expect(text).not.toContain('Reporte diario');
   });
 
