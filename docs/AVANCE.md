@@ -170,9 +170,10 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
   revisado: 3 pares Feroz OK). El lector físico opera en modo teclado contra la pantalla de
   operario existente (input con autofocus) — falta solo comprar lectores y decidir con el
   cliente dónde vive la etiqueta (canastilla/lote) y el código máster por caja (empaque).
-- **Esperando de JP:** Excel de sedes diligenciado (plantilla enviada 07-09) · **datos de
-  emisor de Basarili/Agro/Alta** (razón social, NIT, cuenta) para que sus proformas salgan con
-  membrete propio.
+- **Esperando de JP:** **datos de emisor de Basarili/Agro/Alta** (razón social, NIT, cuenta)
+  para que sus proformas salgan con membrete propio · la **dirección de entrega de DOTACIONES
+  RAC** (NIT 900337975), la única sede que llegó sin dirección.
+  ~~Excel de sedes diligenciado~~ **Llegó 07-29** (AGRO) — cargado, ver abajo.
   ~~¿La GRUESA cuenta cordones o pares?~~ **Respondido 07-10: 144 PARES por gruesa**
   (consumo corregido a 1/144 = 0.0069; muestras en $0 confirmadas sin costear).
   ~~Materiales FIJOS de la 106~~ **Respondido 07-29** (ficha de consumo, ver backlog §1).
@@ -262,6 +263,37 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   en `Agro/backups/prod-20260729-antes-entrega5.sql` (6,6 MB, 61 tablas; prod es **PostgreSQL
   18.4**, así que el dump necesita un `pg_dump` 18 — el del contenedor local es 16 y no sirve).
   Verificado vivo después: BOM 106 con 20 fijos, 11 reglas REMOVE, inventario y 25 OC intactos.
+
+### 2.c) Cartera real de clientes (AGRO) — 2026-07-29
+
+- [x] **Plantilla de sedes diligenciada, limpiada y cargada** ✅ 2026-07-29 —
+  `docs/PLANTILLA-SEDES-CLIENTES.xlsx` volvió con **92 filas / 91 NITs** (AGRO). No cargaba tal
+  cual: `parsearFilasSedes` **rechaza el archivo entero** ante cualquier error, y tenía cuatro.
+  Correcciones aplicadas (todas anotadas en el commit):
+  - **3 filas de ejemplo ficticias** que JP no borró (NITs `800987654-2` y `900123456-1`;
+    quedaron intercaladas al ordenar alfabéticamente, por eso se le pasaron) → eliminadas.
+    De paso se van las únicas ciudades con tilde (`Ibagué`, `Bogotá`), así que no hizo falta
+    normalizar nada.
+  - **2 filas sin `sede` y sin `principal`** (CALZADO POSADA, CALZATODO SA) → `Principal` + `SI`.
+  - **2 filas con `sede` pero sin `principal`** (DANIEL CASTRO BARRAGAN, DAS SAFETY) → `SI`.
+  - **1 fila sin dirección** (DOTACIONES RAC, NIT 900337975) → **omitida**: no se inventa una
+    dirección de entrega. El cliente sí se crea; su sede queda **pendiente de JP**.
+  Resultado: **88 sedes / 88 NITs, 0 errores** contra el validador del proyecto.
+- [x] **`npm run seed:clientes`** ✅ nuevo — `seed:sedes` **nunca inventa un cliente** (omite las
+  filas huérfanas), y en prod había 7 clientes contra 91 NITs de la plantilla: sin este paso
+  previo no cargaba casi nada. Los 89 entran **CONTADO y sin cupo** (la plantilla no trae
+  condición comercial; dar crédito no autorizado haría que la regla de cartera dejara pasar
+  despachos que debía frenar). Si el NIT ya existe actualiza nombre y ciudad pero **no** su
+  condición comercial, para no pisar un cupo ya asignado. Idempotencia verificada con doble
+  corrida. CSV al `.gitignore` (NIT + razón social reales) con su `.example.csv`.
+- **Cargado en prod** ✅ 2026-07-29 (backup previo en `Agro/backups/prod-20260729-antes-clientes.sql`):
+  96 clientes · 91 sedes · 90 principales · **25 OC intactas**. Sin sede quedan solo los 6 de
+  demo, Feroz (cliente de servicio, no se le despacha producto) y DOTACIONES RAC.
+- ⚠️ **Dato para hablar con JP:** de los 88 clientes reales, **ninguno tiene más de una sede** —
+  el único multi-sede del archivo era la fila de ejemplo. Todos quedaron con una sola "Principal".
+  Parece que volcó su lista de clientes en vez de desglosar bodegas, y el valor de la
+  funcionalidad (despachar a la bodega correcta) está justo ahí. Vale preguntarle.
+- [ ] **Faltan las plantillas de las otras líneas** (Basarili, Alta): esta es la de **AGRO**.
 
 ### 3) Git — higiene de tags y merges
 - [x] **Tags al día** ✅ 2026-07-12 — creados `demo-9` (ed05bb2), `demo-10` (f7af48d), `demo-11` (40a4ab6), `demo-12` (9ff9fad) sobre el commit de cierre de cada demo en `develop` (entraron a `master` en bloque con la 13, sin merge propio) y `demo-14` (a97b4b9, el merge que la llevó a `master`, mismo patrón que `demo-13`). Ya existían: `demo-1`, `demo-13`, `nucleo-real`, `entrega-1`, `entrega-1.1`, `entrega-2`.
