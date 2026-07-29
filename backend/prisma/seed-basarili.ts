@@ -18,6 +18,12 @@ const prisma = new PrismaClient({ adapter });
 const DIR = join(__dirname, 'data', 'basarili');
 const ruta = (f: string) => join(DIR, f);
 
+// El paso 8 (inventario de MP) PISA `cantDisponible` con el snapshot del CSV. Eso
+// está bien en una base virgen, pero en una donde ya se recibieron compras o el
+// almacenista movió material, le devuelve el stock al día en que se exportó el CSV.
+// `--sin-inventario` recarga el catálogo y los BOMs dejando el stock como está.
+const SIN_INVENTARIO = process.argv.includes('--sin-inventario');
+
 async function main() {
   console.log('Seed Basarili — cargando catálogo real desde', DIR);
 
@@ -350,7 +356,7 @@ async function main() {
   // Fuente: pestaña INVENTARIO del "CONTROL MATERIA PRIMA E INSUMOS" del cliente.
   // Idempotente: upsert por materialId (1:1). NO carga costo/proveedor (fase de costeo aparte).
   let stockMp = 0, stockOmitido = 0;
-  for (const f of leerCsv(ruta('inventario-material.csv'))) {
+  for (const f of SIN_INVENTARIO ? [] : leerCsv(ruta('inventario-material.csv'))) {
     const materialId = materialPorCodigo.get(f.codigo);
     if (!materialId) {
       console.warn(`  · inventario MP ${f.codigo}: material inexistente, omitido`);
@@ -365,7 +371,11 @@ async function main() {
     });
     stockMp++;
   }
-  console.log(`  · inventario MP: ${stockMp}${stockOmitido ? ` (omitidos: ${stockOmitido})` : ''}`);
+  console.log(
+    SIN_INVENTARIO
+      ? '  · inventario MP: OMITIDO (--sin-inventario), el stock queda como está'
+      : `  · inventario MP: ${stockMp}${stockOmitido ? ` (omitidos: ${stockOmitido})` : ''}`,
+  );
 
   console.log('Seed Basarili OK ✅');
 }
