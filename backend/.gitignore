@@ -22,6 +22,10 @@ prisma/data/material-costos.csv
 prisma/data/sedes-clientes.csv
 !prisma/data/sedes-clientes.example.csv
 
+# Cartera de clientes reales (NIT + razón social) — SENSIBLE.
+prisma/data/clientes.csv
+!prisma/data/clientes.example.csv
+
 # Scratch de generación/revisión del BOM: no son parte del pipeline de seed.
 prisma/data/basarili/_*.mjs
 prisma/data/basarili/_*.md
