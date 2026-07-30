@@ -293,7 +293,46 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   el único multi-sede del archivo era la fila de ejemplo. Todos quedaron con una sola "Principal".
   Parece que volcó su lista de clientes en vez de desglosar bodegas, y el valor de la
   funcionalidad (despachar a la bodega correcta) está justo ahí. Vale preguntarle.
-- [ ] **Faltan las plantillas de las otras líneas** (Basarili, Alta): esta es la de **AGRO**.
+  → **Respondido por los hechos el 2026-07-30**: la plantilla de BASARILI sí trae multi-sede
+  (16 clientes, PROVECOL con 5). Era cosa de la lista de AGRO, no del formato.
+- [ ] **Falta la plantilla de ALTA** (la de AGRO llegó el 29-jul, la de BASARILI el 30-jul).
+
+### 2.d) Cartera real de clientes (BASARILI) — 2026-07-30
+
+- [x] **Segunda plantilla cargada y fusionada con la de AGRO** ✅ 2026-07-30 —
+  `docs/PLANTILLA-SEDES-CLIENTES-BASARILI.xlsx`, **113 filas / 93 NITs**, de los cuales **14 ya
+  estaban** por AGRO: es el mismo cliente comprándole a las dos marcas, **un solo `Cliente`** con
+  las sedes de ambas. Las plantillas quedaron renombradas por marca (`-AGRO`, `-BASARILI`).
+- [x] **`tools/consolidar-cartera.py`** ✅ nuevo — lee las dos plantillas y escribe
+  `clientes.csv` + `sedes-clientes.csv` ya limpios. La limpieza a mano del 29-jul no escalaba a
+  dos archivos que se pisan; ahora es reproducible y deja reporte de cada corrección. Reglas:
+  - **Dedup por dirección normalizada**, no por texto: `Tv 93 #53- 32 parque empresarial el
+    dorado` (AGRO) y `TRANSVERSAL 93  53 32` (BASARILI) son el mismo predio. La clave es
+    *tipo de vía + los 4 primeros números*, así `LC 147` y `LC 150` del mismo centro comercial
+    siguen siendo dos sedes. Fusionó 8 pares.
+  - Cuando una sede ya existía en la BD **gana su nombre viejo** ("Principal"): `seed:sedes`
+    busca por (cliente, nombre de sede) y renombrar habría **duplicado** en vez de actualizar.
+  - **Razón social**: entre las variantes del mismo NIT gana la más larga (`ALPACA BOGOTA` →
+    `ALPACA BOGOTA S.A.S.`), con dos excepciones donde el nombre largo era el de la persona de
+    contacto (`BOSINCOL RUBY ANDRADE` → `BOSINCOL SAS`; `ONE SAFETY ROBINSON PARRA` → `ONE
+    SAFETY SAS`). 13 clientes de AGRO quedaron con su razón social completa.
+  - **NIT**: se le quita el dígito de verificación (`900123456-1` → `900123456`) y los espacios
+    (`3 9 8 0 6 3 0 7` → `39806307`).
+  - **Una sola principal por cliente** (lo exige `parsearFilasSedes`): 21 clientes venían con
+    ninguna o con varias → manda la primera. Nombres de sede repetidos → sufijo (`CALI 2`).
+  - **Descarta lo que no es cliente**: INTERRAPIDISIMO (transportadora), GABRIEL PUNTERAS (es
+    proveedor) y las 3 filas de ejemplo de la plantilla, que en la de AGRO habían aparecido otra vez.
+- ⚠️ **En cuarentena, pendiente de JP: dos NITs cruzados en la plantilla de BASARILI.**
+  `901694036` rotula a la vez a DOTAINDUSTRIALES WORK (correcto según AGRO) y a
+  **MAKRODOTACIONES**; y `901388889`, que en AGRO es de MAKRODOTACIONES, aparece como
+  **DOTACIONES H SAS** con la dirección que en esa misma plantilla tiene LOTUS VT
+  (`Cra 63 #21-15 sur`). Mezclarlos rompería la facturación → esas 2 filas **no se cargaron**.
+- ⚠️ **También para JP:** `901424621` cambió de `INDUSTRIAL INSAFE` (AGRO) a `INDUSTRIAL ALEPH
+  S.A.S` (BASARILI) con el mismo NIT y la misma dirección — ¿cambio de razón social?
+  Y `INVERSIONES SURTIORIENTE SAS` (`901103498`) llegó partida en dos filas, una con el nombre y
+  otra con el NIT, ambas con la misma dirección: quedó como un cliente con una sede.
+- **Cargado en prod** ✅ 2026-07-30 (backup previo en `Agro/backups/prod-20260730-antes-basarili.sql`):
+  **164 clientes reales · 183 sedes · 16 con más de una**, ninguno sin sede principal.
 
 ### 3) Git — higiene de tags y merges
 - [x] **Tags al día** ✅ 2026-07-12 — creados `demo-9` (ed05bb2), `demo-10` (f7af48d), `demo-11` (40a4ab6), `demo-12` (9ff9fad) sobre el commit de cierre de cada demo en `develop` (entraron a `master` en bloque con la 13, sin merge propio) y `demo-14` (a97b4b9, el merge que la llevó a `master`, mismo patrón que `demo-13`). Ya existían: `demo-1`, `demo-13`, `nucleo-real`, `entrega-1`, `entrega-1.1`, `entrega-2`.
