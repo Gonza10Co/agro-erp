@@ -50,11 +50,15 @@ const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // Entregado en la demo de la Entrega 2 (2026-07-17): compras de insumos con
   // costo, recepciones parciales y devoluciones a proveedor.
   compras: 'ENTREGADO',
+  // EN_STAGE — se muestra en la demo de la Entrega 5, aún oculto al cliente.
+  // `facturas` sube de INTERNO a EN_STAGE porque la factura de servicio (maquila
+  // Feroz) vive adentro y su única puerta es /facturas: con el módulo en INTERNO
+  // ni el perfil STAGE podía abrirla, así que gatear solo la sección era inerte.
+  facturas: 'EN_STAGE',
   // INTERNO — adelantado, solo roles internos.
   inicio: 'INTERNO',
   proveedores: 'INTERNO',
   despachos: 'INTERNO',
-  facturas: 'INTERNO',
   cartera: 'INTERNO',
   inventario: 'INTERNO',
   fabricacion: 'INTERNO',
@@ -94,8 +98,10 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // Liberadas en la demo de la Entrega 2 (2026-07-17).
   'costo-utilidad-oc': 'ENTREGADO',
   'proforma-oc': 'ENTREGADO',
-  // Entrega 3 (desplegada 2026-07-13) — se muestra en la demo, es el titular.
-  'linea-pedido': 'EN_STAGE',
+  // Entrega 3 — liberada en la demo del 2026-07-31. El cliente elige la línea de
+  // producción al crear la OC. Requiere al menos una `Linea` con activo=true en la
+  // base, o el wizard le bloquea el paso 1 (la línea es obligatoria para quien la ve).
+  'linea-pedido': 'ENTREGADO',
   // Entrega 4 — liberada al cliente el 2026-07-25, sin esperar a la demo: el amarre
   // de insumos ya le corría al generar la OP (el backend reserva su stock), así que
   // ocultarle el resultado le escondía por qué se movía su bodega.
@@ -107,12 +113,14 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // Piso de planta: NO va con compras. "Generar OF" y "Despachar" escriben hacia
   // módulos INTERNOS (fabricacion, despachos) que el cliente no puede abrir.
   'operar-produccion': 'EN_STAGE',
-  // Entrega 5, pendiente de su demo. El módulo `facturas` hoy es INTERNO, así que
-  // este gate es el que manda el día que se libere facturación al cliente.
+  // Entrega 5. El módulo `facturas` es EN_STAGE: la sección se queda en EN_STAGE
+  // para mostrarla en la demo con el perfil STAGE. Cuando se libere facturación al
+  // cliente hay que bajar AMBOS a ENTREGADO — el módulo manda sobre la sección.
   'factura-servicio': 'EN_STAGE',
-  // Vender segundas sí cae dentro de `pedidos`, que el cliente ya tiene: sin este
-  // gate el selector de calidad aparecería en su wizard apenas se despliegue.
-  'venta-segundas': 'EN_STAGE',
+  // Entrega 5 — liberada en la demo del 2026-07-31. Cae dentro de `pedidos`, que el
+  // cliente ya tiene. Pide segundas sin poder consultar el saldo (`inventario` sigue
+  // INTERNO): la nota del wizard le avisa que lo que no alcance no se fabrica.
+  'venta-segundas': 'ENTREGADO',
 };
 
 /**

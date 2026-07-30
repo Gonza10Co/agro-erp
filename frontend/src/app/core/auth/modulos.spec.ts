@@ -47,18 +47,25 @@ describe('puedeVerModulo', () => {
       expect(puedeVerModulo('STAGE', 'compras')).toBeTrue();
     });
 
-    // Tras el "merge a cliente" de la Entrega 2 (2026-07-17) no queda ningún MÓDULO
-    // en EN_STAGE: lo adelantado de la Entrega 3 (línea por pedido) vive dentro de
-    // "pedidos", que el cliente ya tiene, y se gatea por SECCIÓN con puedeVerNivel.
-    it('lo que STAGE ve de más hoy es de sección, no de módulo', () => {
+    it('lo que STAGE ve de más es de sección y de módulo', () => {
       expect(puedeVerNivel('STAGE', 'EN_STAGE')).toBeTrue();
       expect(puedeVerNivel('CLIENTE', 'EN_STAGE')).toBeFalse();
     });
 
+    // Entrega 5: `facturas` sube a EN_STAGE porque la factura de servicio (maquila
+    // Feroz) solo se alcanza desde /facturas. Sin esto la pantalla era invisible
+    // hasta para el perfil con el que se hace la demo.
+    it('ve facturas, el módulo de la demo de la Entrega 5', () => {
+      expect(puedeVerModulo('STAGE', 'facturas')).toBeTrue();
+      expect(puedeVerSeccion('STAGE', 'factura-servicio')).toBeTrue();
+      // …y el cliente sigue sin verlo: el módulo lo tapa aunque la sección se libere.
+      expect(puedeVerModulo('CLIENTE', 'facturas')).toBeFalse();
+    });
+
     it('NO ve los módulos INTERNOS (adelantados, solo roles internos)', () => {
       expect(puedeVerModulo('STAGE', 'inicio')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'facturas')).toBeFalse();
       expect(puedeVerModulo('STAGE', 'reportes')).toBeFalse();
+      expect(puedeVerModulo('STAGE', 'fabricacion')).toBeFalse();
     });
   });
 });
@@ -84,14 +91,20 @@ describe('puedeVerNivel (gate de secciones dentro de un módulo)', () => {
 
 describe('puedeVerSeccion (tablero de la demo)', () => {
   it('el CLIENTE NO ve lo que sigue reservado para la demo', () => {
-    // Línea por pedido (Entrega 3) es el titular de la demo; generar OF y despachar
-    // escriben hacia módulos INTERNOS que el cliente no puede abrir.
-    expect(puedeVerSeccion('CLIENTE', 'linea-pedido')).toBeFalse();
+    // Generar OF y despachar escriben hacia módulos INTERNOS (fabricacion, despachos)
+    // que el cliente no puede abrir: el gating es de UI y el POST sí correría, así que
+    // liberarlo lo dejaría creando OFs de verdad frente a una pantalla que lo rebota.
     expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeFalse();
-    // Entrega 5: el selector de calidad cae dentro de `pedidos`, que el cliente ya
-    // tiene — sin gate aparecería en su wizard apenas se despliegue.
-    expect(puedeVerSeccion('CLIENTE', 'venta-segundas')).toBeFalse();
+    // La factura de servicio (maquila Feroz) se muestra en la demo con el perfil
+    // STAGE; el módulo `facturas` la tapa para el cliente aunque la sección subiera.
     expect(puedeVerSeccion('CLIENTE', 'factura-servicio')).toBeFalse();
+  });
+
+  it('el CLIENTE ve lo liberado en la demo de la Entrega 5 (2026-07-31)', () => {
+    // Línea de producción por pedido: era el titular de la Entrega 3.
+    expect(puedeVerSeccion('CLIENTE', 'linea-pedido')).toBeTrue();
+    // Selector de calidad PRIMERA/SEGUNDA en el wizard de la OC.
+    expect(puedeVerSeccion('CLIENTE', 'venta-segundas')).toBeTrue();
   });
 
   it('el CLIENTE sí ve la Entrega 4, liberada el 2026-07-25', () => {
