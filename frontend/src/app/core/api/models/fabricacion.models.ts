@@ -133,3 +133,24 @@ export const LABEL_ESTADO_PAR: Record<EstadoPar, string> = {
   CANCELADO: 'cancelado',
   DADO_DE_BAJA: 'dado de baja',
 };
+
+/**
+ * Consumo real de materiales de una OF: lo que el BOM decía (teórico) contra lo
+ * que el almacenista entregó de verdad. La diferencia positiva es lo que se
+ * gastó de más.
+ */
+export interface ConsumoOfLinea {
+  materialId: number;
+  teorico: number;
+  entregado: number;
+  diferencia: number;
+  materialCodigo: string | null;
+  materialNombre: string | null;
+  unidad: string | null;
+}
+
+export interface ConsumoOf {
+  ofId: number;
+  consecutivo: number;
+  lineas: ConsumoOfLinea[];
+}

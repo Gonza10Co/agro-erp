@@ -42,6 +42,7 @@ export const routes: Routes = [
       { path: 'fabricacion/tablero', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/tablero.component').then(m => m.FabricacionTableroComponent) },
       { path: 'fabricacion/guarnicion', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/guarnicion-subtablero.component').then(m => m.GuarnicionSubtableroComponent) },
       { path: 'fabricacion/par/:codigo', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/par-detalle.component').then(m => m.ParDetalleComponent) },
+      { path: 'fabricacion/of/:id/consumo', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/of-consumo.component').then(m => m.OfConsumoComponent) },
       { path: 'calidad', data: { modulo: 'calidad' }, loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', data: { modulo: 'indicadores' }, loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
       { path: 'reportes/diario', data: { modulo: 'reportes' }, loadComponent: () => import('./features/reportes/reporte-diario.component').then(m => m.ReporteDiarioComponent) },

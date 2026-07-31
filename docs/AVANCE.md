@@ -137,6 +137,40 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 
 ## 🔨 EN CURSO
 
+### 📦 Entrega 6 (quincena 2026-07-30 → ~08-13) — plan en `docs/superpowers/PLAN-ENTREGA-6.md`
+
+Alcance acordado: **consumo real por OF** · **sub-pasos de inyección** · **meta diaria contra días
+hábiles**. Fuera: la cuenta de cobro de materiales de Feroz a costo de importación, bloqueada
+hasta que JP mande la ficha de costos que prometió el 30-jul.
+
+- [x] **Consumo real de materiales por OF** ✅ 2026-07-30 (`9d15972`) — el ciclo del material
+  estaba cortado a la mitad: la OP reservaba insumos y el requerimiento los amarraba, pero
+  **nada los descontaba nunca** (`CONSUMO_PRODUCCION` existía en el enum y ningún servicio lo
+  emitía), así que al despachar se liberaba la reserva como si no se hubiera gastado nada.
+  El almacenista registra **a mano** lo que entregó (cliente, 29-jul: no hay backflush), y el
+  registro es **acumulativo** porque entrega varias veces durante la corrida.
+  - `GET /fabricacion/of/:id/consumo` → teórico (BOM × pares) vs entregado vs diferencia.
+  - `POST /fabricacion/of/:id/consumo` → baja stock, descuenta reserva, escribe el kardex.
+  - ⚠️ Lo delicado: **lo consumido baja de la reserva al mismo tiempo que del stock**. Sin eso
+    el neto disponible queda subestimado (se compra de más) y `liberarReservasDeOp` devuelve al
+    cerrar una reserva ya gastada, dejando el agregado negativo. Consumir más de lo reservado es
+    normal y no la vuelve negativa: el excedente sale del stock libre. Todo en
+    `consumo-of-core.ts`, puro y con specs.
+  - `MovimientoInventario.ofId` es FK, no el texto de `referencia`: el consumo se consulta
+    agrupado por OF y parsear `"OF-31"` para eso es pedir un bug.
+  - **Verificado E2E vivo** contra la base local con la OF-95 (1992 pares, 40 materiales del BOM
+    real): el POST bajó el stock, acumuló dos entregas del mismo material, dejó el movimiento
+    valorizado y atado a la OF, y rechazó con mensaje claro una entrega mayor al stock.
+- [x] **Pantalla del almacenista** ✅ 2026-07-30 — `/fabricacion/of/:id/consumo`, tabla
+  teórico/entregado/diferencia con la columna "Entregar ahora" sobre la misma fila (en bodega se
+  mira la fila y se anota lo que salió). Repinta con lo que devuelve el backend, no optimista.
+  Vive bajo el módulo `fabricacion`, que es **INTERNO**: no necesita gate de sección propio, pero
+  por eso mismo **hoy no la ve ni el perfil STAGE** — decidir el día de la demo.
+- [ ] Sub-pasos de INYECCIÓN (montaje · inyección · finizaje · impacto).
+- [ ] Meta diaria + calendario de días hábiles.
+
+### Entregas anteriores
+
 - **Entrega 2 (vie 2026-07-17):** funcionalidad completa y E2E ✅ — **desplegada a prod
   2026-07-09** (tag `entrega-2`): migraciones aplicadas, seeds corridos (rol STAGE, 15 piezas,
   BOM ×6 con despiece, 296 costos, 3 sedes) y `fechaConfirmacion` retro-sellada en 8 OCs
