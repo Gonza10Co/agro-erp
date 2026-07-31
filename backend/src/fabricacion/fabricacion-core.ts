@@ -1,4 +1,4 @@
-import { Celula, SubPasoGuarnicion } from '@prisma/client';
+import { Celula, SubPasoGuarnicion, SubPasoInyeccion } from '@prisma/client';
 
 /** Orden físico de las células por las que viaja un par. */
 export const ORDEN_CELULAS: Celula[] = [
@@ -24,10 +24,18 @@ export function esUltimaCelula(c: Celula): boolean {
 
 /**
  * Sub-paso inicial al arrancar en una célula. Solo Guarnición arranca dentro de
- * un sub-paso (AREA); cualquier otro punto de entrada (CORTE, INYECCION…) es null.
+ * un sub-paso (AREA); cualquier otro punto de entrada (CORTE, PT…) es null.
  */
 export function subPasoInicial(celula: Celula): SubPasoGuarnicion | null {
   return celula === 'GUARNICION' ? 'AREA' : null;
+}
+
+/**
+ * Ídem para Inyección: un par que arranca ahí (la línea Feroz, que entra a que le
+ * inyecten la suela) empieza en MONTAJE.
+ */
+export function subPasoInyeccionInicial(celula: Celula): SubPasoInyeccion | null {
+  return celula === 'INYECCION' ? 'MONTAJE' : null;
 }
 
 /** Línea de producción pendiente de la OP (lo que hay que fabricar). */
@@ -48,29 +56,61 @@ export interface ParData {
   tallaId: number;
   celulaInicial: Celula;
   subPasoInicial: SubPasoGuarnicion | null;
+  subPasoInyeccionInicial: SubPasoInyeccion | null;
   lineaId: number | null;
 }
 
 export const ORDEN_SUBPASOS: SubPasoGuarnicion[] =
   ['AREA', 'ARMADO', 'VISTAS', 'CIERRE', 'PREFORMADO', 'PERFORADO', 'REVISION', 'STROBEL', 'AMARRE'];
 
+/**
+ * Inyección tampoco es una sola estación (JP, 2026-07-30): montaje → inyección
+ * propiamente dicha → finizaje (el acabado: crayola, gama, gardenia, lija) →
+ * impacto. La salida real de la célula es el último, igual que AMARRE lo es en
+ * Guarnición.
+ */
+export const ORDEN_SUBPASOS_INYECCION: SubPasoInyeccion[] =
+  ['MONTAJE', 'INYECCION', 'FINIZAJE', 'IMPACTO'];
+
+/** Sub-paso con el que se considera terminada la célula (el que cuenta como producción). */
+export const SUBPASO_SALIDA_GUARNICION: SubPasoGuarnicion = 'AMARRE';
+export const SUBPASO_SALIDA_INYECCION: SubPasoInyeccion = 'IMPACTO';
+
 export interface EstadoPar {
   celula: Celula;
   subPaso: SubPasoGuarnicion | null;
+  /** Solo en INYECCION. undefined/null en pares anteriores a los sub-pasos. */
+  subPasoInyeccion?: SubPasoInyeccion | null;
+}
+
+/** Siguiente elemento de una cadena de sub-pasos, o null si `actual` es el último. */
+function siguienteEnCadena<T>(orden: readonly T[], actual: T): T | null {
+  const i = orden.indexOf(actual);
+  if (i < 0) throw new Error(`Sub-paso desconocido: "${actual}"`);
+  return i < orden.length - 1 ? orden[i + 1] : null;
 }
 
 /** Única fuente de verdad de la transición (celula, subPaso). null = terminado (sale de PT). */
 export function siguienteEstado(e: EstadoPar): EstadoPar | null {
   if (e.celula === 'GUARNICION') {
-    const i = ORDEN_SUBPASOS.indexOf(e.subPaso!);
-    if (i < 0) throw new Error(`Sub-paso desconocido: "${e.subPaso}"`);
-    if (i < ORDEN_SUBPASOS.length - 1) return { celula: 'GUARNICION', subPaso: ORDEN_SUBPASOS[i + 1] };
-    return { celula: 'ALMACEN', subPaso: null }; // desde AMARRE: sale la capellada
+    const sig = siguienteEnCadena(ORDEN_SUBPASOS, e.subPaso!);
+    if (sig) return { celula: 'GUARNICION', subPaso: sig, subPasoInyeccion: null };
+    return { celula: 'ALMACEN', subPaso: null, subPasoInyeccion: null }; // desde AMARRE: sale la capellada
   }
+  if (e.celula === 'INYECCION' && e.subPasoInyeccion != null) {
+    const sig = siguienteEnCadena(ORDEN_SUBPASOS_INYECCION, e.subPasoInyeccion);
+    if (sig) return { celula: 'INYECCION', subPaso: null, subPasoInyeccion: sig };
+    return { celula: 'PT', subPaso: null, subPasoInyeccion: null }; // desde IMPACTO
+  }
+  // INYECCION sin sub-paso = par que entró antes de que existieran: sale a PT en
+  // un solo escaneo, como venía haciéndolo. No se lo devuelve al principio de la
+  // cadena, que sería hacerle repetir trabajo ya hecho en el piso.
   const sig = siguienteCelula(e.celula); // reusa la cadena célula existente (lanza ante célula desconocida)
   if (sig === null) return null;
-  if (sig === 'GUARNICION') return { celula: 'GUARNICION', subPaso: 'AREA' };
-  return { celula: sig, subPaso: null };
+  if (sig === 'GUARNICION') return { celula: 'GUARNICION', subPaso: 'AREA', subPasoInyeccion: null };
+  if (sig === 'INYECCION')
+    return { celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'MONTAJE' };
+  return { celula: sig, subPaso: null, subPasoInyeccion: null };
 }
 
 /**
@@ -87,6 +127,7 @@ export function generarPares(
   for (const l of lineas) {
     const celulaInicial = l.celulaInicial ?? 'CORTE';
     const subPaso = subPasoInicial(celulaInicial);
+    const subPasoIny = subPasoInyeccionInicial(celulaInicial);
     for (let i = 0; i < l.cantAProducir; i++) {
       seq++;
       out.push({
@@ -95,6 +136,7 @@ export function generarPares(
         tallaId: l.tallaId,
         celulaInicial,
         subPasoInicial: subPaso,
+        subPasoInyeccionInicial: subPasoIny,
         lineaId: l.lineaId ?? null,
       });
     }

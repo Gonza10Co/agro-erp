@@ -5,6 +5,7 @@ import {
   generarPares,
   LineaProduccion,
   siguienteEstado,
+  subPasoInyeccionInicial,
   subPasoInicial,
   ORDEN_SUBPASOS,
 } from './fabricacion-core';
@@ -48,22 +49,61 @@ describe('ORDEN_SUBPASOS', () => {
 
 describe('siguienteEstado', () => {
   it('CORTE entra a Guarnición en AREA', () => {
-    expect(siguienteEstado({ celula: 'CORTE', subPaso: null })).toEqual({ celula: 'GUARNICION', subPaso: 'AREA' });
+    expect(siguienteEstado({ celula: 'CORTE', subPaso: null }))
+      .toEqual({ celula: 'GUARNICION', subPaso: 'AREA', subPasoInyeccion: null });
   });
   it('avanza sub-paso a sub-paso dentro de Guarnición', () => {
-    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AREA' })).toEqual({ celula: 'GUARNICION', subPaso: 'ARMADO' });
-    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'STROBEL' })).toEqual({ celula: 'GUARNICION', subPaso: 'AMARRE' });
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AREA' }))
+      .toEqual({ celula: 'GUARNICION', subPaso: 'ARMADO', subPasoInyeccion: null });
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'STROBEL' }))
+      .toEqual({ celula: 'GUARNICION', subPaso: 'AMARRE', subPasoInyeccion: null });
   });
   it('desde AMARRE sale la capellada a Almacén (subPaso null)', () => {
-    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AMARRE' })).toEqual({ celula: 'ALMACEN', subPaso: null });
+    expect(siguienteEstado({ celula: 'GUARNICION', subPaso: 'AMARRE' }))
+      .toEqual({ celula: 'ALMACEN', subPaso: null, subPasoInyeccion: null });
   });
-  it('Almacén→Inyección→PT→terminado', () => {
-    expect(siguienteEstado({ celula: 'ALMACEN', subPaso: null })).toEqual({ celula: 'INYECCION', subPaso: null });
-    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null })).toEqual({ celula: 'PT', subPaso: null });
+  it('Almacén entra a Inyección en MONTAJE', () => {
+    expect(siguienteEstado({ celula: 'ALMACEN', subPaso: null }))
+      .toEqual({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'MONTAJE' });
+  });
+  it('avanza sub-paso a sub-paso dentro de Inyección', () => {
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'MONTAJE' }))
+      .toEqual({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'INYECCION' });
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'INYECCION' }))
+      .toEqual({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'FINIZAJE' });
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'FINIZAJE' }))
+      .toEqual({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'IMPACTO' });
+  });
+  it('desde IMPACTO sale a Producto Terminado', () => {
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'IMPACTO' }))
+      .toEqual({ celula: 'PT', subPaso: null, subPasoInyeccion: null });
+  });
+  it('un par que ya estaba en Inyección sin sub-paso sale a PT en un solo escaneo', () => {
+    // Compatibilidad: los pares en curso el día del cambio no vuelven al principio
+    // de la cadena a repetir trabajo que en el piso ya está hecho.
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null }))
+      .toEqual({ celula: 'PT', subPaso: null, subPasoInyeccion: null });
+    expect(siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: null }))
+      .toEqual({ celula: 'PT', subPaso: null, subPasoInyeccion: null });
+  });
+  it('PT es el final', () => {
     expect(siguienteEstado({ celula: 'PT', subPaso: null })).toBeNull();
   });
-  it('lanza ante célula desconocida', () => {
+  it('lanza ante célula o sub-paso desconocido', () => {
     expect(() => siguienteEstado({ celula: 'XXX' as any, subPaso: null })).toThrow();
+    expect(() =>
+      siguienteEstado({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'XXX' as any }),
+    ).toThrow();
+  });
+});
+
+describe('subPasoInyeccionInicial', () => {
+  it('un par que arranca en Inyección (línea Feroz) empieza en MONTAJE', () => {
+    expect(subPasoInyeccionInicial('INYECCION')).toBe('MONTAJE');
+  });
+  it('cualquier otra célula de arranque no tiene sub-paso de inyección', () => {
+    expect(subPasoInyeccionInicial('CORTE')).toBeNull();
+    expect(subPasoInyeccionInicial('GUARNICION')).toBeNull();
   });
 });
 
@@ -114,7 +154,13 @@ describe('generarPares', () => {
       { productoConfiguradoId: 20, tallaId: 3, cantAProducir: 2, celulaInicial: 'INYECCION', lineaId: 4 },
     ]);
     expect(pares).toHaveLength(2);
-    expect(pares.every((p) => p.celulaInicial === 'INYECCION' && p.subPasoInicial === null && p.lineaId === 4)).toBe(true);
+    // Arranca en el primer sub-paso de inyección: es lo que la línea Feroz viene
+    // a que le hagan (le inyectan la suela a una capellada que llega de Bogotá).
+    expect(pares.every((p) =>
+      p.celulaInicial === 'INYECCION' &&
+      p.subPasoInicial === null &&
+      p.subPasoInyeccionInicial === 'MONTAJE' &&
+      p.lineaId === 4)).toBe(true);
   });
 
   it('sin lineaId el par queda con lineaId null', () => {

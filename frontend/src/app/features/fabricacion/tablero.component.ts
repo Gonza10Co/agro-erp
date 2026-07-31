@@ -2,7 +2,10 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
-import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO } from '../../core/api/models/fabricacion.models';
+import {
+  ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO,
+  SubPasoInyeccion, LABEL_SUBPASO_INYECCION,
+} from '../../core/api/models/fabricacion.models';
 
 @Component({
   selector: 'app-fabricacion-tablero',
@@ -34,6 +37,9 @@ import { ParTablero, Celula, ORDEN_CELULAS, LABEL_CELULA, SubPasoGuarnicion, LAB
                   <span class="cell-sub">T{{ p.talla.valor }}</span>
                   @if (c === 'GUARNICION' && p.subPasoActual) {
                     <span class="cell-sub">{{ subPasoLabel(p.subPasoActual) }}</span>
+                  }
+                  @if (c === 'INYECCION' && p.subPasoInyeccion) {
+                    <span class="cell-sub">{{ subPasoInyeccionLabel(p.subPasoInyeccion) }}</span>
                   }
                 </a>
               } @empty {
@@ -96,6 +102,7 @@ export class FabricacionTableroComponent implements OnInit {
   readonly columnas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
   subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
+  subPasoInyeccionLabel = (s: SubPasoInyeccion) => LABEL_SUBPASO_INYECCION[s];
   private pares = signal<ParTablero[]>([]);
   error = signal<string | null>(null);
   protected ofId?: number;

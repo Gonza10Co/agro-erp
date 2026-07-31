@@ -39,6 +39,7 @@ export class ReportesService {
         select: {
           celula: true,
           subPaso: true,
+          subPasoInyeccion: true,
           timestamp: true,
           par: { select: { calidad: true } },
         },
@@ -98,6 +99,7 @@ export class ReportesService {
       eventos: eventos.map((e) => ({
         celula: e.celula as Celula,
         subPaso: e.subPaso ?? null,
+        subPasoInyeccion: e.subPasoInyeccion ?? null,
         timestamp: e.timestamp,
         esSegunda: e.par?.calidad === 'SEGUNDA',
       })),

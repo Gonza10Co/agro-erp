@@ -3,8 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import {
-  Celula, SubPasoGuarnicion, Operario, Maquina, ParDetalle, ORDEN_CELULAS, LABEL_CELULA, LABEL_SUBPASO,
-  LABEL_ESTADO_PAR, siguientePasoLabel,
+  Celula, SubPasoGuarnicion, SubPasoInyeccion, Operario, Maquina, ParDetalle, ORDEN_CELULAS,
+  LABEL_CELULA, LABEL_SUBPASO, LABEL_SUBPASO_INYECCION, LABEL_ESTADO_PAR, siguientePasoLabel,
 } from '../../core/api/models/fabricacion.models';
 import { CalidadApi } from '../../core/api/calidad.api';
 import { AuthService } from '../../core/auth/auth.service';
@@ -46,7 +46,7 @@ import { TipoDano } from '../../core/api/models/calidad.models';
         @if (par(); as p) {
           <div class="par-card">
             <div class="mono big">{{ p.codigo }}</div>
-            <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}@if (p.subPasoActual) { · {{ subPasoLabel(p.subPasoActual) }} }</div>
+            <div class="cell-sub">OF-{{ p.of.consecutivo }} · Talla {{ p.talla.valor }} · en {{ label(p.celulaActual) }}@if (p.subPasoActual) { · {{ subPasoLabel(p.subPasoActual) }} }@if (p.subPasoInyeccion) { · {{ subPasoInyeccionLabel(p.subPasoInyeccion) }} }</div>
             @if (p.estado !== 'EN_PROCESO') {
               <span class="badge badge-accent">{{ estadoLabel(p.estado) }}</span>
             } @else {
@@ -120,8 +120,9 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
   readonly celulas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
   subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
+  subPasoInyeccionLabel = (s: SubPasoInyeccion) => LABEL_SUBPASO_INYECCION[s];
   estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
-  siguiente = (p: ParDetalle) => siguientePasoLabel(p.celulaActual, p.subPasoActual);
+  siguiente = (p: ParDetalle) => siguientePasoLabel(p.celulaActual, p.subPasoActual, p.subPasoInyeccion);
 
   tiposDano = signal<TipoDano[]>([]);
   reportando = signal(false);

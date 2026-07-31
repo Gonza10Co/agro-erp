@@ -83,6 +83,7 @@ export class FabricacionService {
         tallaId: p.tallaId,
         celulaActual: p.celulaInicial,
         subPasoActual: p.subPasoInicial,
+        subPasoInyeccion: p.subPasoInyeccionInicial,
         lineaId: p.lineaId,
       }));
       await tx.par.createMany({ data: pares });
@@ -109,6 +110,7 @@ export class FabricacionService {
     const next = siguienteEstado({
       celula: par.celulaActual,
       subPaso: par.subPasoActual,
+      subPasoInyeccion: par.subPasoInyeccion,
     });
 
     // La bodega destino es configuración global (no cambia durante la tx):
@@ -130,6 +132,7 @@ export class FabricacionService {
             parId: par.id,
             celula: celulaActual,
             subPaso: par.subPasoActual,
+            subPasoInyeccion: par.subPasoInyeccion,
             operarioId: dto.operarioId,
             maquinaId: dto.maquinaId,
           },
@@ -201,7 +204,11 @@ export class FabricacionService {
         // resolvió arriba, en el primer escaneo).
         return tx.par.update({
           where: { id: par.id },
-          data: { celulaActual: next.celula, subPasoActual: next.subPaso },
+          data: {
+            celulaActual: next.celula,
+            subPasoActual: next.subPaso,
+            subPasoInyeccion: next.subPasoInyeccion ?? null,
+          },
         });
       });
     } catch (e: unknown) {

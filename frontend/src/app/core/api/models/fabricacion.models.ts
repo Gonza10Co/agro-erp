@@ -3,6 +3,7 @@ import { IncidenciaPar } from './calidad.models';
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
 export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO' | 'DADO_DE_BAJA';
 export type SubPasoGuarnicion = 'AREA' | 'ARMADO' | 'VISTAS' | 'CIERRE' | 'PREFORMADO' | 'PERFORADO' | 'REVISION' | 'STROBEL' | 'AMARRE';
+export type SubPasoInyeccion = 'MONTAJE' | 'INYECCION' | 'FINIZAJE' | 'IMPACTO';
 export type EstadoOF = 'ABIERTA' | 'EN_PROCESO' | 'TERMINADA' | 'ANULADA';
 
 export interface OFGenerada {
@@ -45,6 +46,7 @@ export interface ParTablero {
   codigo: string;
   celulaActual: Celula;
   subPasoActual: SubPasoGuarnicion | null;
+  subPasoInyeccion: SubPasoInyeccion | null;
   estado: EstadoPar;
   talla: { valor: string };
   of: { consecutivo: number };
@@ -54,6 +56,7 @@ export interface EventoTrazabilidad {
   id: number;
   celula: Celula;
   subPaso: SubPasoGuarnicion | null;
+  subPasoInyeccion: SubPasoInyeccion | null;
   timestamp: string;
   operario: { nombre: string };
   maquina: { nombre: string };
@@ -64,6 +67,7 @@ export interface ParDetalle {
   codigo: string;
   celulaActual: Celula;
   subPasoActual: SubPasoGuarnicion | null;
+  subPasoInyeccion: SubPasoInyeccion | null;
   estado: EstadoPar;
   of: { consecutivo: number };
   talla: { valor: string };
@@ -103,6 +107,20 @@ export const LABEL_SUBPASO: Record<SubPasoGuarnicion, string> = {
   AMARRE: 'Amarre',
 };
 
+/**
+ * Inyección tampoco es una sola estación (JP, 2026-07-30). FINIZAJE es el acabado
+ * —crayola, gama, gardenia, lija— y el IMPACTO es la salida de la célula.
+ */
+export const ORDEN_SUBPASOS_INYECCION: SubPasoInyeccion[] =
+  ['MONTAJE', 'INYECCION', 'FINIZAJE', 'IMPACTO'];
+
+export const LABEL_SUBPASO_INYECCION: Record<SubPasoInyeccion, string> = {
+  MONTAJE: 'Montaje',
+  INYECCION: 'Inyección',
+  FINIZAJE: 'Finizaje',
+  IMPACTO: 'Impacto',
+};
+
 export const LABEL_CELULA: Record<Celula, string> = {
   CORTE: 'Corte',
   GUARNICION: 'Guarnición',
@@ -117,14 +135,39 @@ export function siguienteCelulaLabel(c: Celula): string | null {
   return LABEL_CELULA[ORDEN_CELULAS[i + 1]];
 }
 
-/** Etiqueta del próximo paso real: sub-paso si está en Guarnición, célula si no. null = no hay próximo (PT). */
-export function siguientePasoLabel(celula: Celula, subPaso: SubPasoGuarnicion | null): string | null {
+/**
+ * Etiqueta del próximo paso real: sub-paso si está dentro de una célula que los
+ * tiene (Guarnición o Inyección), célula si no. null = no hay próximo (PT).
+ */
+export function siguientePasoLabel(
+  celula: Celula,
+  subPaso: SubPasoGuarnicion | null,
+  subPasoInyeccion: SubPasoInyeccion | null = null,
+): string | null {
   if (celula === 'GUARNICION' && subPaso) {
     const i = ORDEN_SUBPASOS.indexOf(subPaso);
     if (i < ORDEN_SUBPASOS.length - 1) return LABEL_SUBPASO[ORDEN_SUBPASOS[i + 1]];
     return LABEL_CELULA['ALMACEN']; // desde AMARRE
   }
+  if (celula === 'INYECCION' && subPasoInyeccion) {
+    const i = ORDEN_SUBPASOS_INYECCION.indexOf(subPasoInyeccion);
+    if (i < ORDEN_SUBPASOS_INYECCION.length - 1)
+      return LABEL_SUBPASO_INYECCION[ORDEN_SUBPASOS_INYECCION[i + 1]];
+    return LABEL_CELULA['PT']; // desde IMPACTO
+  }
   return siguienteCelulaLabel(celula);
+}
+
+/** Dónde está el par ahora mismo, con el detalle del sub-paso si lo tiene. */
+export function pasoActualLabel(
+  celula: Celula,
+  subPaso: SubPasoGuarnicion | null,
+  subPasoInyeccion: SubPasoInyeccion | null = null,
+): string {
+  if (celula === 'GUARNICION' && subPaso) return `${LABEL_CELULA[celula]} · ${LABEL_SUBPASO[subPaso]}`;
+  if (celula === 'INYECCION' && subPasoInyeccion)
+    return `${LABEL_CELULA[celula]} · ${LABEL_SUBPASO_INYECCION[subPasoInyeccion]}`;
+  return LABEL_CELULA[celula];
 }
 
 export const LABEL_ESTADO_PAR: Record<EstadoPar, string> = {

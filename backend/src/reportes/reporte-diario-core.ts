@@ -37,6 +37,7 @@ const CELULA_A_COLUMNA: Record<Celula, ColumnaProduccion> = {
 export interface EventoMin {
   celula: Celula;
   subPaso?: string | null; // poblado solo en eventos de Guarnición
+  subPasoInyeccion?: string | null; // ídem en los de Inyección
   timestamp: Date;
   esSegunda?: boolean; // el par viene marcado con grado SEGUNDA
 }
@@ -167,8 +168,19 @@ export function construirReporte(input: InputReporte): ReporteDiario {
   // En Guarnición un par genera un evento por sub-paso; la "producción" de la célula
   // es la salida real (sub-paso AMARRE, cuando la capellada pasa al Almacén), así que
   // los sub-pasos intermedios no cuentan para evitar sobreconteo.
+  // Inyección funciona igual desde que se modelaron sus sub-pasos (montaje →
+  // inyección → finizaje → impacto): cuenta el último. Los eventos anteriores al
+  // cambio no traen sub-paso y siguen contando como el escaneo único que fueron —
+  // si se descartaran, la producción de inyección de meses ya mostrados al cliente
+  // se caería a cero.
   for (const ev of input.eventos) {
     if (ev.celula === 'GUARNICION' && ev.subPaso !== 'AMARRE') continue;
+    if (
+      ev.celula === 'INYECCION' &&
+      ev.subPasoInyeccion != null &&
+      ev.subPasoInyeccion !== 'IMPACTO'
+    )
+      continue;
     const fila = porDia.get(claveDia(ev.timestamp));
     if (!fila) continue;
     // Al llegar a PT el grado separa las columnas: Bodega es producto de primera

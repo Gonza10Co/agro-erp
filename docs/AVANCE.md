@@ -166,7 +166,22 @@ hasta que JP mande la ficha de costos que prometió el 30-jul.
   mira la fila y se anota lo que salió). Repinta con lo que devuelve el backend, no optimista.
   Vive bajo el módulo `fabricacion`, que es **INTERNO**: no necesita gate de sección propio, pero
   por eso mismo **hoy no la ve ni el perfil STAGE** — decidir el día de la demo.
-- [ ] Sub-pasos de INYECCIÓN (montaje · inyección · finizaje · impacto).
+- [x] **Sub-pasos de INYECCIÓN** ✅ 2026-07-30 — JP (nota de voz del 30-jul): *"finizaje no es una
+  célula aparte, el proceso de inyección lleva montaje, lleva inyección como tal, lleva finizaje y
+  lleva el impacto"*. Se replicó el patrón de `SubPasoGuarnicion`: enum `SubPasoInyeccion`,
+  `Par.subPasoInyeccion` y `EventoTrazabilidad.subPasoInyeccion`, avance forward-only en
+  `fabricacion-core.ts`. La línea **Feroz** ahora arranca en `INYECCION · MONTAJE`.
+  - ⚠️ **El riesgo era el reporte, no el modelo**: si un par pasa a generar 4 eventos de
+    INYECCION, la producción de la célula se cuadruplica. Cuenta solo el **último sub-paso
+    (IMPACTO)**, igual que Guarnición cuenta solo AMARRE. Cubierto con 4 specs.
+  - ⚠️ **Compatibilidad, en dos frentes**: (1) los eventos históricos no traen sub-paso y
+    **siguen contando** como el escaneo único que fueron — descartarlos habría puesto en cero la
+    producción de inyección de meses que el cliente ya vio; (2) un par que ya estaba en
+    INYECCION sale a PT en **un solo escaneo**, no se lo devuelve al principio de la cadena a
+    repetir trabajo que en el piso ya está hecho.
+  - ❓ **Preguntar en la demo del martes:** si el dueño cuenta la inyección en el **impacto** (lo
+    implementado) o en la **máquina inyectora**; con lo segundo el número no le va a cuadrar con
+    su Excel. Es una pregunta de 30 segundos con la pantalla al frente.
 - [ ] Meta diaria + calendario de días hábiles.
 
 ### Entregas anteriores

@@ -840,6 +840,16 @@ enum SubPasoGuarnicion {
   AMARRE
 }
 
+// Inyección tampoco es una sola estación (JP, 2026-07-30: "el proceso de inyección
+// lleva montaje, lleva inyección como tal, lleva finizaje y lleva el impacto").
+// FINIZAJE es el acabado (crayola, gama, gardenia, lija), no una célula aparte.
+enum SubPasoInyeccion {
+  MONTAJE
+  INYECCION
+  FINIZAJE
+  IMPACTO
+}
+
 enum EstadoOF {
   ABIERTA
   EN_PROCESO
@@ -899,6 +909,10 @@ model Par {
   // una incidencia de clase SEGUNDA; el par sigue su curso normal por las células.
   calidad               CalidadPT           @default(PRIMERA)
   subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
+  // Solo poblado mientras celulaActual = INYECCION. NULL en un par que ya estaba
+  // inyectándose antes de que existieran los sub-pasos: ese sale a PT en el
+  // siguiente escaneo, como venía haciéndolo.
+  subPasoInyeccion      SubPasoInyeccion?
   lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
   linea                 Linea?              @relation(fields: [lineaId], references: [id])
   reponeAParId          Int?                @unique // si este par es una reposición, el par dado de baja que repone
@@ -925,6 +939,7 @@ model EventoTrazabilidad {
   par        Par                @relation(fields: [parId], references: [id])
   celula     Celula
   subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
+  subPasoInyeccion SubPasoInyeccion? // ídem para Inyección
   operarioId Int
   operario   Operario           @relation(fields: [operarioId], references: [id])
   maquinaId  Int

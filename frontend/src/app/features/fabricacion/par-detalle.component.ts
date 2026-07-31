@@ -4,7 +4,10 @@ import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { QRCodeComponent } from 'angularx-qrcode';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
-import { ParDetalle, EventoTrazabilidad, LABEL_CELULA, LABEL_ESTADO_PAR, LABEL_SUBPASO, SubPasoGuarnicion } from '../../core/api/models/fabricacion.models';
+import {
+  ParDetalle, EventoTrazabilidad, LABEL_CELULA, LABEL_ESTADO_PAR, LABEL_SUBPASO, SubPasoGuarnicion,
+  LABEL_SUBPASO_INYECCION, SubPasoInyeccion,
+} from '../../core/api/models/fabricacion.models';
 import { IncidenciaPar } from '../../core/api/models/calidad.models';
 
 type ItemTimeline =
@@ -49,7 +52,7 @@ type ItemTimeline =
                 @for (item of timeline(); track item.kind + '-' + itemId(item)) {
                   @if (item.kind === 'evento') {
                     <li>
-                      <span class="tl-cel">{{ label(item.evento.celula) }}@if (item.evento.subPaso) { · {{ subPasoLabel(item.evento.subPaso) }} }</span>
+                      <span class="tl-cel">{{ label(item.evento.celula) }}@if (item.evento.subPaso) { · {{ subPasoLabel(item.evento.subPaso) }} }@if (item.evento.subPasoInyeccion) { · {{ subPasoInyeccionLabel(item.evento.subPasoInyeccion) }} }</span>
                       <span class="cell-sub">{{ item.evento.operario.nombre }} · {{ item.evento.maquina.nombre }}</span>
                       <span class="cell-sub mono">{{ item.evento.timestamp | date:'dd MMM HH:mm' }}</span>
                     </li>
@@ -106,6 +109,7 @@ export class ParDetalleComponent implements OnInit {
   label = (c: ParDetalle['celulaActual']) => LABEL_CELULA[c];
   estadoLabel = (e: ParDetalle['estado']) => LABEL_ESTADO_PAR[e];
   subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
+  subPasoInyeccionLabel = (s: SubPasoInyeccion) => LABEL_SUBPASO_INYECCION[s];
   ts = (i: ItemTimeline) => i.ts;
   itemId = (i: ItemTimeline) => i.kind === 'evento' ? i.evento.id : i.incidencia.id;
 

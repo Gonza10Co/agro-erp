@@ -222,5 +222,54 @@ describe('reporte-diario-core', () => {
       expect(guarnicion).toEqual({ celula: 'GUARNICION', meta: 0, real: 1, pct: 0 });
       expect(sinMetas.metas.facturacionPares).toEqual({ meta: 0, real: 60, pct: 0 });
     });
+
+    describe('SUB-PASOS DE INYECCIÓN', () => {
+      const unPar = (fecha: string) => [
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'MONTAJE', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'INYECCION', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'FINIZAJE', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'IMPACTO', timestamp: new Date(fecha) },
+      ];
+
+      it('un par que pasa por los 4 sub-pasos cuenta UNA vez, no cuatro', () => {
+        const r = construirReporte({ ...input, eventos: unPar('2026-06-03T10:00:00Z') });
+        const dia = r.filas.find((d) => d.fecha === '2026-06-03')!;
+        expect(dia.inyeccion).toBe(1);
+      });
+
+      it('cuenta en el sub-paso de salida (IMPACTO), no cuando entra a montaje', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', subPasoInyeccion: 'MONTAJE', timestamp: new Date('2026-06-03T10:00:00Z') },
+            { celula: 'INYECCION', subPasoInyeccion: 'IMPACTO', timestamp: new Date('2026-06-04T10:00:00Z') },
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-03')!.inyeccion).toBe(0);
+        expect(r.filas.find((d) => d.fecha === '2026-06-04')!.inyeccion).toBe(1);
+      });
+
+      it('los eventos viejos sin sub-paso siguen contando (no se borra el histórico)', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', timestamp: new Date('2026-06-05T10:00:00Z') },
+            { celula: 'INYECCION', subPasoInyeccion: null, timestamp: new Date('2026-06-05T11:00:00Z') },
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-05')!.inyeccion).toBe(2);
+      });
+
+      it('mezcla de histórico y sub-pasos: 1 viejo + 1 par completo = 2', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', timestamp: new Date('2026-06-06T09:00:00Z') },
+            ...unPar('2026-06-06T10:00:00Z'),
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-06')!.inyeccion).toBe(2);
+      });
+    });
   });
 });
