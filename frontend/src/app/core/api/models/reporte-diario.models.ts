@@ -2,6 +2,7 @@
 
 export interface FilaDiaReporte {
   fecha: string; // YYYY-MM-DD
+  esHabil: boolean; // domingo o festivo → no se le exige meta
   troquelado: number;
   guarnicion: number;
   almacen: number;
@@ -14,12 +15,18 @@ export interface FilaDiaReporte {
   servicios: number; // facturación de maquila/mantenimiento (línea de ingreso aparte)
 }
 
-export type AcumuladoReporte = Omit<FilaDiaReporte, 'fecha'>;
+export type AcumuladoReporte = Omit<FilaDiaReporte, 'fecha' | 'esHabil'>;
 
 export interface Cumplimiento {
   meta: number;
   real: number;
   pct: number;
+  /** Meta prorrateada a los días hábiles ya transcurridos del mes. */
+  esperado: number;
+  /** real vs esperado: el % que de verdad dice si se va al día o atrasado. */
+  pctEsperado: number;
+  /** Ritmo diario que exige la meta del mes. */
+  diaria: number;
 }
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
@@ -33,6 +40,8 @@ export interface BloqueMetas {
   celulas: CumplimientoCelula[];
   facturacionPares: Cumplimiento;
   facturacionValor: Cumplimiento;
+  /** Días hábiles del mes y cuántos van corridos: el divisor de todo lo de arriba. */
+  habiles: { transcurridos: number; total: number };
 }
 
 export interface FilaKardexPT {

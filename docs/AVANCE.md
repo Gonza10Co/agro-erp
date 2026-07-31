@@ -182,7 +182,25 @@ hasta que JP mande la ficha de costos que prometió el 30-jul.
   - ❓ **Preguntar en la demo del martes:** si el dueño cuenta la inyección en el **impacto** (lo
     implementado) o en la **máquina inyectora**; con lo segundo el número no le va a cuadrar con
     su Excel. Es una pregunta de 30 segundos con la pantalla al frente.
-- [ ] Meta diaria + calendario de días hábiles.
+- [x] **Meta diaria contra calendario de días hábiles** ✅ 2026-07-30 — JP (29-jul) pidió metas
+  **mensuales con seguimiento diario**. El reporte comparaba el acumulado contra el mes entero:
+  el día 3 todo se veía en 10% aunque la planta fuera perfecta.
+  - `CalendarioLaboral` (fila única: qué días de la semana se trabaja) + `DiaNoHabil` (festivos y
+    paradas). `GET/PUT /reportes/calendario` para configurarlo.
+  - **La pregunta de si trabajan sábados dejó de ser bloqueante**: es un clic. Verificado vivo —
+    apagar el sábado movió julio de **26 a 22 días hábiles** y la meta diaria de CORTE de
+    **775,38 a 916,36 pares**, sin desplegar nada.
+  - `npm run seed:calendario` siembra los **18 festivos colombianos** calculados (Pascua por
+    algoritmo de Butcher + **Ley Emiliani**, que corre 10 de ellos al lunes siguiente), del año
+    pedido y el siguiente. Idempotente; no pisa la config si el cliente ya la cambió.
+  - El reporte ahora trae, por cada meta, `esperado` (prorrateado a los hábiles transcurridos),
+    `pctEsperado` y `diaria`; y cada fila dice si el día era hábil. La tarjeta muestra el % contra
+    **lo esperado a hoy**, que es el número que dice si se va al día o atrasado.
+  - ⚠️ **Sin calendario configurado el reporte se comporta igual que antes** (meta contra el mes
+    entero): desplegar esto no le cambia los números al cliente hasta que alguien lo configure.
+  - ⚠️ El front lee `metas.habiles?` con opcional a propósito: mientras Vercel y Railway terminan
+    de desplegar, el front nuevo puede estar hablando con el backend viejo, y sin eso se caía la
+    pantalla entera del reporte.
 
 ### Entregas anteriores
 
@@ -441,6 +459,7 @@ npm run start:dev
 #                         # (Basarili/Agro/Alta/Feroz; Feroz arranca en INYECCIÓN,
 #                         #  EXTERNA queda desactivada si existía)
 #   npm run seed:demo     # OCs demo con línea asignada + metas por línea (07-13)
+#   npm run seed:calendario # días laborales + festivos colombianos (07-30)
 
 # Frontend (:4200)
 cd agro-erp/frontend

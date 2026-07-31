@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { GuardarCalendarioDto } from './dto/guardar-calendario.dto';
 import {
   construirReporte,
   Celula,
@@ -28,7 +29,8 @@ export class ReportesService {
     const { desde, hasta } = rangoMes(anio, mes);
     const porLinea = lineaId != null;
 
-    const [eventos, facturas, movimientosPT, saldoPrevio, metas] = await Promise.all([
+    const [eventos, facturas, movimientosPT, saldoPrevio, metas, calLaboral, noHabiles] =
+      await Promise.all([
       this.prisma.eventoTrazabilidad.findMany({
         // La línea vive denormalizada en el Par (línea por pedido).
         where: {
@@ -87,15 +89,37 @@ export class ReportesService {
       // Sin filtro se compara contra la meta global (lineaId NULL); con filtro,
       // contra la meta propia de esa línea.
       this.prisma.meta.findMany({ where: { anio, mes, lineaId: lineaId ?? null } }),
+      // Calendario laboral: el divisor de la meta diaria. Si nadie lo configuró,
+      // el core se cae al comportamiento viejo (meta contra el mes entero).
+      this.prisma.calendarioLaboral.findUnique({ where: { id: 1 } }),
+      this.prisma.diaNoHabil.findMany({
+        where: { fecha: { gte: desde, lt: hasta } },
+        select: { fecha: true },
+      }),
     ]);
 
     const sumPrevio = (tipo: string) =>
       Number((saldoPrevio as any[]).find((g) => g.tipo === tipo)?._sum.cantidad ?? 0);
     const saldoInicialPT = sumPrevio('ENTRADA') - sumPrevio('SALIDA');
 
+    const calendario = calLaboral
+      ? {
+          // El índice es el día de la semana en UTC: 0 = domingo … 6 = sábado.
+          diasSemana: [
+            calLaboral.domingo, calLaboral.lunes, calLaboral.martes, calLaboral.miercoles,
+            calLaboral.jueves, calLaboral.viernes, calLaboral.sabado,
+          ],
+          noHabiles: noHabiles.map((d) => d.fecha.toISOString().slice(0, 10)),
+        }
+      : undefined;
+
     const reporte = construirReporte({
       anio,
       mes,
+      calendario,
+      // El corte del "esperado a la fecha". Para un mes ya cerrado quedan todos los
+      // hábiles transcurridos; para uno futuro, ninguno.
+      hoy: new Date(),
       eventos: eventos.map((e) => ({
         celula: e.celula as Celula,
         subPaso: e.subPaso ?? null,
@@ -153,5 +177,53 @@ export class ReportesService {
       }
     }
     return this.listarMetas(anio, mes, lineaId);
+  }
+
+  // ───────────────────────── Calendario laboral ─────────────────────────
+  // El divisor de la meta diaria. Que sea configurable es lo que vuelve la
+  // pregunta de "¿trabajan sábados?" un clic en vez de un despliegue.
+
+  /** Config vigente + los días no hábiles del año pedido. */
+  async calendario(anio: number) {
+    const [config, noHabiles] = await Promise.all([
+      this.prisma.calendarioLaboral.findUnique({ where: { id: 1 } }),
+      this.prisma.diaNoHabil.findMany({
+        where: {
+          fecha: { gte: new Date(Date.UTC(anio, 0, 1)), lt: new Date(Date.UTC(anio + 1, 0, 1)) },
+        },
+        orderBy: { fecha: 'asc' },
+      }),
+    ]);
+    return {
+      anio,
+      // Sin fila configurada se responde el default del modelo, así la pantalla
+      // muestra algo coherente antes del primer guardado.
+      diasSemana: {
+        lunes: config?.lunes ?? true,
+        martes: config?.martes ?? true,
+        miercoles: config?.miercoles ?? true,
+        jueves: config?.jueves ?? true,
+        viernes: config?.viernes ?? true,
+        sabado: config?.sabado ?? true,
+        domingo: config?.domingo ?? false,
+      },
+      configurado: config != null,
+      noHabiles: noHabiles.map((d) => ({
+        fecha: d.fecha.toISOString().slice(0, 10),
+        motivo: d.motivo,
+      })),
+    };
+  }
+
+  async guardarCalendario(dto: GuardarCalendarioDto, anio: number) {
+    const limpio = Object.fromEntries(
+      Object.entries(dto).filter(([, v]) => typeof v === 'boolean'),
+    );
+    await this.prisma.calendarioLaboral.upsert({
+      where: { id: 1 },
+      create: { id: 1, ...limpio },
+      update: limpio,
+    });
+    return this.calendario(anio);
   }
 }

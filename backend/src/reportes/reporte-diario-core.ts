@@ -1,3 +1,11 @@
+import {
+  CalendarioMin,
+  diasHabilesDelMes,
+  esHabil as esDiaHabil,
+  metaDiaria,
+  metaEsperadaALaFecha,
+} from './calendario-habil';
+
 // Núcleo puro del reporte diario gerencial. Sin Prisma ni Nest: todo testeable.
 // Replica el Excel maestro que el dueño revisa (producción por célula/día,
 // acumulado, metas con % de cumplimiento y kardex de Producto Terminado).
@@ -66,10 +74,15 @@ export interface InputReporte {
   metas: MetaMin[];
   saldoInicialPT: number;
   movimientosPT: MovPTMin[];
+  /** Días que la planta trabaja. Sin él la meta se mide contra el mes entero (como antes). */
+  calendario?: CalendarioMin;
+  /** Corte para el "esperado a la fecha". Sin él se toma el mes completo. */
+  hoy?: Date;
 }
 
 export interface FilaDia {
   fecha: string; // YYYY-MM-DD
+  esHabil: boolean; // false = domingo o festivo: no se le exige meta
   troquelado: number;
   guarnicion: number;
   almacen: number;
@@ -82,12 +95,18 @@ export interface FilaDia {
   servicios: number; // facturación de SERVICIO/maquila: línea de ingreso aparte
 }
 
-export type Acumulado = Omit<FilaDia, 'fecha'>;
+export type Acumulado = Omit<FilaDia, 'fecha' | 'esHabil'>;
 
 export interface Cumplimiento {
   meta: number;
   real: number;
   pct: number;
+  /** Meta prorrateada a los días hábiles ya transcurridos. */
+  esperado: number;
+  /** real vs esperado: el número que de verdad dice si se va al día o atrasado. */
+  pctEsperado: number;
+  /** Ritmo que exige la meta del mes. */
+  diaria: number;
 }
 export interface CumplimientoCelula extends Cumplimiento {
   celula: Celula;
@@ -97,6 +116,8 @@ export interface BloqueMetas {
   celulas: CumplimientoCelula[];
   facturacionPares: Cumplimiento;
   facturacionValor: Cumplimiento;
+  /** Días hábiles del mes y cuántos van corridos: el divisor de todo lo de arriba. */
+  habiles: { transcurridos: number; total: number };
 }
 
 export interface FilaKardexPT {
@@ -133,9 +154,10 @@ export function pctCumplimiento(real: number, meta: number): number {
   return Math.round((real / meta) * 1000) / 10;
 }
 
-function filaVacia(fecha: string): FilaDia {
+function filaVacia(fecha: string, esHabil = true): FilaDia {
   return {
     fecha,
+    esHabil,
     troquelado: 0,
     guarnicion: 0,
     almacen: 0,
@@ -160,9 +182,20 @@ function diasDelMes(anio: number, mes: number): string[] {
 }
 
 export function construirReporte(input: InputReporte): ReporteDiario {
-  const { anio, mes } = input;
+  const { anio, mes, calendario } = input;
+
+  // Días hábiles: el divisor de la meta. Sin calendario configurado se cae al
+  // comportamiento viejo (la meta se mide contra el mes entero), para no cambiarle
+  // el número al cliente por el solo hecho de desplegar.
+  const habilesDelMes = calendario ? diasHabilesDelMes(anio, mes, calendario) : [];
+  const corte = input.hoy ? claveDia(input.hoy) : null;
+  const habilesTranscurridos = corte
+    ? habilesDelMes.filter((d) => d <= corte).length
+    : habilesDelMes.length;
+
   const porDia = new Map<string, FilaDia>();
-  for (const fecha of diasDelMes(anio, mes)) porDia.set(fecha, filaVacia(fecha));
+  for (const fecha of diasDelMes(anio, mes))
+    porDia.set(fecha, filaVacia(fecha, calendario ? esDiaHabil(fecha, calendario) : true));
 
   // Producción: cada evento suma 1 par en la columna de su célula.
   // En Guarnición un par genera un evento por sub-paso; la "producción" de la célula
@@ -234,11 +267,24 @@ export function construirReporte(input: InputReporte): ReporteDiario {
     acumulado.servicios += f.servicios;
   }
 
-  // Metas: real vs objetivo del mes.
+  // Metas: real vs objetivo del mes y, sobre todo, vs lo esperado A LA FECHA.
+  // El % contra el mes entero es inútil hasta el día 30: el día 3 todo se ve en 10%
+  // aunque la planta vaya perfecta.
   const metaDe = (tipo: TipoMeta) => input.metas.find((m) => m.tipo === tipo)?.valor ?? 0;
   const cumplimiento = (real: number, tipo: TipoMeta): Cumplimiento => {
     const meta = metaDe(tipo);
-    return { meta, real, pct: pctCumplimiento(real, meta) };
+    const total = habilesDelMes.length;
+    const esperado = total
+      ? metaEsperadaALaFecha(meta, habilesTranscurridos, total)
+      : meta; // sin calendario: se compara contra el mes completo, como antes
+    return {
+      meta,
+      real,
+      pct: pctCumplimiento(real, meta),
+      esperado,
+      pctEsperado: pctCumplimiento(real, esperado),
+      diaria: metaDiaria(meta, total),
+    };
   };
   const metas: BloqueMetas = {
     // Una por célula: el real sale de la misma columna que alimenta la fila diaria,
@@ -247,6 +293,7 @@ export function construirReporte(input: InputReporte): ReporteDiario {
       celula,
       ...cumplimiento(acumulado[columnaDeCelula(celula)], celula),
     })),
+    habiles: { transcurridos: habilesTranscurridos, total: habilesDelMes.length },
     facturacionPares: cumplimiento(acumulado.paresVendidos, 'FACTURACION_PARES'),
     facturacionValor: cumplimiento(acumulado.valor, 'FACTURACION_VALOR'),
   };

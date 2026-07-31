@@ -6,6 +6,9 @@ describe('ReportesService', () => {
     factura: { findMany: jest.fn() },
     movimientoInventario: { findMany: jest.fn(), groupBy: jest.fn() },
     meta: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+    // Sin calendario configurado: el reporte se comporta como antes de la meta diaria.
+    calendarioLaboral: { findUnique: jest.fn().mockResolvedValue(null) },
+    diaNoHabil: { findMany: jest.fn().mockResolvedValue([]) },
   };
   const service = new ReportesService(prisma);
   beforeEach(() => jest.clearAllMocks());
@@ -41,7 +44,7 @@ describe('ReportesService', () => {
       expect(d2.paresVendidos).toBe(60);
       expect(d2.valor).toBe(5100000);
 
-      expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60 });
+      expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60, esperado: 100, pctEsperado: 60, diaria: 0 });
 
       // Sin filtro NO se restringe por línea: los históricos con lineaId NULL cuentan.
       expect(prisma.movimientoInventario.findMany.mock.calls[0][0].where.lineaId).toBeUndefined();

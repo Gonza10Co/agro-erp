@@ -1174,6 +1174,32 @@ enum TipoMeta {
   FACTURACION_VALOR // meta de $ facturado (mensual)
 }
 
+// Qué días de la semana trabaja la planta. Fila única (id = 1): es configuración
+// de la fábrica, no de cada línea. El divisor de la meta diaria sale de acá.
+// ⚠️ `sabado` está en true por defecto y es JUSTO lo que falta confirmar con el
+// cliente; se cambia desde la pantalla sin tocar código.
+model CalendarioLaboral {
+  id        Int      @id @default(1)
+  lunes     Boolean  @default(true)
+  martes    Boolean  @default(true)
+  miercoles Boolean  @default(true)
+  jueves    Boolean  @default(true)
+  viernes   Boolean  @default(true)
+  sabado    Boolean  @default(true)
+  domingo   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+// Días que la planta no trabaja: festivos colombianos (sembrados con la Ley
+// Emiliani) y paradas puntuales que cargue el cliente.
+model DiaNoHabil {
+  id     Int      @id @default(autoincrement())
+  fecha  DateTime @unique @db.Date
+  motivo String
+
+  @@index([fecha])
+}
+
 // Meta mensual configurable por tipo. Alimenta el % de cumplimiento del reporte diario.
 // lineaId NULL = meta global de la fábrica; con línea = meta de esa línea (reporte
 // por línea). OJO: el unique compuesto no ataja duplicados con lineaId NULL (en PG
