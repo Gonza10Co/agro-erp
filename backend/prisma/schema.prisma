@@ -878,7 +878,8 @@ model OrdenFabricacion {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  pares Par[]
+  pares       Par[]
+  movimientos MovimientoInventario[]
 
   @@index([opId])
 }
@@ -1012,7 +1013,10 @@ model Factura {
   // Feroz le presta a la capellada de Bogotá) no despacha producto propio.
   // PG permite N NULLs bajo un @unique, así que la 1:1 con despacho se mantiene.
   despachoId  Int?        @unique
-  despacho    Despacho?   @relation(fields: [despachoId], references: [id])
+  // RESTRICT explícito: es lo que hay en producción desde que la factura existe.
+  // El default de Prisma para una relación opcional es SET NULL, que dejaría la
+  // factura huérfana de su remito al borrar un despacho en vez de frenar el borrado.
+  despacho    Despacho?   @relation(fields: [despachoId], references: [id], onDelete: Restrict)
   // Denormalizado: antes el cliente se resolvía navegando despacho→op→oc, cadena
   // que no existe sin despacho. Cartera consulta por acá.
   clienteId        Int
@@ -1069,10 +1073,12 @@ model FacturaLinea {
   factura   Factura @relation(fields: [facturaId], references: [id])
   // Producto+talla solo en facturas de PRODUCTO; servicio+descripción solo en las
   // de SERVICIO. Nullable de ambos lados: una línea de maquila no tiene talla.
+  // RESTRICT explícito (igual que en producción): borrar un producto o una talla
+  // no puede vaciar en silencio una línea de factura ya emitida.
   productoConfiguradoId Int?
-  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id])
+  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id], onDelete: Restrict)
   tallaId               Int?
-  talla                 Talla?               @relation(fields: [tallaId], references: [id])
+  talla                 Talla?               @relation(fields: [tallaId], references: [id], onDelete: Restrict)
   servicioId            Int?
   servicio              ServicioCatalogo?    @relation(fields: [servicioId], references: [id])
   descripcion           String? // texto libre del servicio, como en la hoja del cliente
@@ -1120,6 +1126,11 @@ model MovimientoInventario {
   // NULL en movimientos de MP y en históricos previos a la columna: solo suman en "Todas las líneas".
   lineaId        Int?
   linea          Linea?           @relation(fields: [lineaId], references: [id])
+  // OF que consumió el material (motivo CONSUMO_PRODUCCION). Es FK y no solo el
+  // texto de `referencia` porque el consumo real por OF se consulta agrupado, y
+  // parsear "OF-31" para eso es pedir un bug.
+  ofId           Int?
+  of             OrdenFabricacion? @relation(fields: [ofId], references: [id])
   referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?
@@ -1129,6 +1140,7 @@ model MovimientoInventario {
   @@index([materialId, createdAt])
   @@index([inventarioPTId, createdAt])
   @@index([lineaId, createdAt])
+  @@index([ofId])
   @@index([createdAt])
 }
 
