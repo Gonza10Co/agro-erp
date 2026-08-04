@@ -4,8 +4,33 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-07-25** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-08-04** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **Entrega 6 desplegada a prod el 2026-08-04** (merge `--no-ff` `4bc4237` + tag `entrega-6`).
+> Las 3 migraciones son aditivas (`MovimientoInventario.ofId`, enum `SubPasoInyeccion` + 2
+> columnas nullable, tablas `CalendarioLaboral`/`DiaNoHabil`) y las aplicó `migrate deploy` sola.
+> Contenido: **consumo real de MP por OF** (cierra el ciclo del material: hasta hoy el sistema
+> reservaba y nunca descontaba), **sub-pasos de inyección** (montaje·inyección·finizaje·impacto;
+> cuenta solo IMPACTO) y **meta diaria contra días hábiles**. Corrido `seed:calendario` en prod:
+> 36 festivos (2026-2027) y config **lun-sáb** — confirmado por Gonza que **sí trabajan sábados**,
+> así que el default quedó correcto y agosto da **24 días hábiles**.
+>
+> **Gates para la demo del 2026-08-04:** `fabricacion` y `reportes` subieron de INTERNO a
+> **EN_STAGE**. Sin eso, 4 de las 7 cosas a mostrar no las veía ni el perfil STAGE y tocaba
+> demostrar como ADMIN (que le enseña al cliente el menú entero). El rol CLIENTE sigue sin verlos.
+> Se agregó el ítem de menú **"Órdenes de fabricación"** (`/fabricacion`): la pantalla del
+> almacenista cuelga de ahí y solo se alcanzaba tecleando la URL.
+>
+> ⚠️ **Bug de datos corregido el mismo día** (`fix(seed)`): `PRODUCCION_DIA` y `VENTAS_D14` traían
+> los días fijos (2,3,4,5,6,9,…) elegidos para julio. En agosto caían en domingo y en fechas
+> futuras, así que el reporte comparaba 14 días de producción contra 3 de meta y mostraba
+> **711% de cumplimiento**. Ahora los días salen del calendario y se cortan en hoy.
+>
+> **Estado de prod tras la siembra** (verificado vivo): agosto con producción los días 1, 3 y 4;
+> CORTE 1.944 reales vs 2.520 esperados = **77,1% a hoy** (contra 9,6% si se mide al mes entero);
+> factura de servicio **FV-14** de maquila Feroz por $1.079.568. Backup previo en
+> `Agro/backups/prod-20260804-antes-seeddemo.sql`.
 >
 > **Entrega 5 desplegada a prod el 2026-07-25** (merge `--no-ff` `3c4111b`, CI verde 481+339).
 > Las 5 migraciones aplicadas por `migrate deploy`, verificadas contra la base real: el reporte

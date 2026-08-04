@@ -81,6 +81,12 @@ const SIDEBAR_KEY = 'agro-sidebar';
           </a>
           }
           @if (puedeVer('fabricacion')) {
+          <!-- La lista de OF es la puerta a la entrega de materiales al operario: sin este
+               ítem la pantalla del almacenista solo se alcanzaba tecleando la URL. -->
+          <a class="nav-item" routerLink="/fabricacion" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Órdenes de fabricación">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/></svg></span>
+            <span class="nav-label">Órdenes de fabricación</span>
+          </a>
           <a class="nav-item" routerLink="/fabricacion/tablero" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Tablero de fabricación">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16"/><rect x="10" y="4" width="5" height="10"/><rect x="17" y="4" width="4" height="7"/></svg></span>
             <span class="nav-label">Tablero de fabricación</span>
