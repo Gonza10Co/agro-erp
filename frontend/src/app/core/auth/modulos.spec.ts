@@ -62,10 +62,22 @@ describe('puedeVerModulo', () => {
       expect(puedeVerModulo('CLIENTE', 'facturas')).toBeFalse();
     });
 
+    // Entrega 6: `fabricacion` y `reportes` suben a EN_STAGE por la misma razón que
+    // `facturas` en la Entrega 5 — son la única puerta a lo que se muestra ese día
+    // (consumo real de MP, sub-pasos de inyección, meta diaria contra días hábiles).
+    it('ve fabricacion y reportes, los módulos de la demo de la Entrega 6', () => {
+      expect(puedeVerModulo('STAGE', 'fabricacion')).toBeTrue();
+      expect(puedeVerModulo('STAGE', 'reportes')).toBeTrue();
+      // …y el cliente sigue sin verlos hasta que se liberen.
+      expect(puedeVerModulo('CLIENTE', 'fabricacion')).toBeFalse();
+      expect(puedeVerModulo('CLIENTE', 'reportes')).toBeFalse();
+    });
+
     it('NO ve los módulos INTERNOS (adelantados, solo roles internos)', () => {
       expect(puedeVerModulo('STAGE', 'inicio')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'reportes')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'fabricacion')).toBeFalse();
+      expect(puedeVerModulo('STAGE', 'despachos')).toBeFalse();
+      expect(puedeVerModulo('STAGE', 'inventario')).toBeFalse();
+      expect(puedeVerModulo('STAGE', 'indicadores')).toBeFalse();
     });
   });
 });
@@ -91,9 +103,10 @@ describe('puedeVerNivel (gate de secciones dentro de un módulo)', () => {
 
 describe('puedeVerSeccion (tablero de la demo)', () => {
   it('el CLIENTE NO ve lo que sigue reservado para la demo', () => {
-    // Generar OF y despachar escriben hacia módulos INTERNOS (fabricacion, despachos)
-    // que el cliente no puede abrir: el gating es de UI y el POST sí correría, así que
-    // liberarlo lo dejaría creando OFs de verdad frente a una pantalla que lo rebota.
+    // Generar OF y despachar escriben hacia módulos que el cliente no puede abrir
+    // (`despachos` sigue INTERNO; `fabricacion` subió a EN_STAGE en la Entrega 6, que
+    // tampoco alcanza): el gating es de UI y el POST sí correría, así que liberarlo
+    // lo dejaría creando OFs de verdad frente a una pantalla que lo rebota.
     expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeFalse();
     // La factura de servicio (maquila Feroz) se muestra en la demo con el perfil
     // STAGE; el módulo `facturas` la tapa para el cliente aunque la sección subiera.
