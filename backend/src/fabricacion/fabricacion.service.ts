@@ -4,15 +4,36 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Celula } from '@prisma/client';
+import { Celula, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { generarPares, siguienteEstado, LineaProduccion } from './fabricacion-core';
 import { AvanzarDto } from './dto/avanzar.dto';
+import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
+import {
+  consolidarConsumo,
+  repartirDescargaDeReserva,
+  LineaReservaMin,
+} from './consumo-of-core';
+import { BomLoaderService } from '../catalog/bom/bom-loader.service';
+import { resolverBom } from '../catalog/bom/bom-resolver';
+import { EntradaResolucion } from '../catalog/bom/bom-resolver.types';
+
+type DecimalLike = { toNumber(): number } | number | null | undefined;
+const num = (d: DecimalLike): number =>
+  d == null ? 0 : typeof d === 'number' ? d : d.toNumber();
 
 @Injectable()
 export class FabricacionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bomLoader: BomLoaderService,
+  ) {}
+
+  /** Envoltorio espiable del resolver puro de Demo 2 (igual que en compras). */
+  protected resolver(entrada: EntradaResolucion) {
+    return resolverBom(entrada);
+  }
 
   async generarOF(opId: number) {
     const op = await this.prisma.ordenProduccion.findUnique({
@@ -62,6 +83,7 @@ export class FabricacionService {
         tallaId: p.tallaId,
         celulaActual: p.celulaInicial,
         subPasoActual: p.subPasoInicial,
+        subPasoInyeccion: p.subPasoInyeccionInicial,
         lineaId: p.lineaId,
       }));
       await tx.par.createMany({ data: pares });
@@ -88,6 +110,7 @@ export class FabricacionService {
     const next = siguienteEstado({
       celula: par.celulaActual,
       subPaso: par.subPasoActual,
+      subPasoInyeccion: par.subPasoInyeccion,
     });
 
     // La bodega destino es configuración global (no cambia durante la tx):
@@ -109,6 +132,7 @@ export class FabricacionService {
             parId: par.id,
             celula: celulaActual,
             subPaso: par.subPasoActual,
+            subPasoInyeccion: par.subPasoInyeccion,
             operarioId: dto.operarioId,
             maquinaId: dto.maquinaId,
           },
@@ -180,7 +204,11 @@ export class FabricacionService {
         // resolvió arriba, en el primer escaneo).
         return tx.par.update({
           where: { id: par.id },
-          data: { celulaActual: next.celula, subPasoActual: next.subPaso },
+          data: {
+            celulaActual: next.celula,
+            subPasoActual: next.subPaso,
+            subPasoInyeccion: next.subPasoInyeccion ?? null,
+          },
         });
       });
     } catch (e: unknown) {
@@ -301,5 +329,225 @@ export class FabricacionService {
       where: { activo: true, ...(celula ? { celula } : {}) },
       orderBy: { nombre: 'asc' },
     });
+  }
+
+  // ─────────────────── Consumo real de materiales por OF ───────────────────
+  // El almacenista registra a mano lo que entregó (decisión del cliente del
+  // 2026-07-29: no hay backflush contra el BOM). Hasta acá el material solo se
+  // reservaba al confirmar el pedido; esto es lo que por fin lo descuenta.
+
+  /** Consumo teórico de la OF: BOM resuelto × pares, por material. */
+  private async teoricoDeOf(ofId: number): Promise<Map<number, number>> {
+    // Un par DADO_DE_BAJA sí gastó material (por eso lleva acta); el CANCELADO
+    // nunca llegó a producirse, así que no suma al teórico.
+    const grupos = await this.prisma.par.groupBy({
+      by: ['productoConfiguradoId', 'tallaId'],
+      where: { ofId, estado: { not: 'CANCELADO' } },
+      _count: true,
+    });
+    if (!grupos.length) return new Map();
+
+    const pcs = await this.prisma.productoConfigurado.findMany({
+      where: { id: { in: [...new Set(grupos.map((g) => g.productoConfiguradoId))] } },
+      include: { opciones: true },
+    });
+    const tallas = await this.prisma.talla.findMany({
+      where: { id: { in: [...new Set(grupos.map((g) => g.tallaId))] } },
+      select: { id: true, valor: true },
+    });
+    const pcPorId = new Map(pcs.map((p: any) => [p.id, p]));
+    const valorTalla = new Map(tallas.map((t) => [t.id, t.valor]));
+
+    // El BOM no depende de la talla: se carga una vez por producto y solo se
+    // varía `talla` al resolver cada curva (mismo patrón que el requerimiento).
+    const entradaPorPc = new Map<number, EntradaResolucion>();
+    const teorico = new Map<number, number>();
+    for (const g of grupos) {
+      const pc: any = pcPorId.get(g.productoConfiguradoId);
+      const talla = valorTalla.get(g.tallaId);
+      if (!pc || talla == null) continue;
+      if (!entradaPorPc.has(pc.id)) {
+        entradaPorPc.set(
+          pc.id,
+          await this.bomLoader.cargarEntrada({
+            referenciaId: pc.referenciaId,
+            marcaId: pc.marcaId,
+            opcionIds: pc.opciones.map((o: any) => o.opcionId),
+            talla,
+          }),
+        );
+      }
+      const { comprados } = this.resolver({ ...entradaPorPc.get(pc.id)!, talla });
+      for (const c of comprados) {
+        teorico.set(
+          c.materialId,
+          (teorico.get(c.materialId) ?? 0) + c.consumo * (g._count as number),
+        );
+      }
+    }
+    return teorico;
+  }
+
+  /** Lo ya entregado a la OF, por material, según el kardex. */
+  private async entregadoDeOf(ofId: number): Promise<Map<number, number>> {
+    const filas = await this.prisma.movimientoInventario.groupBy({
+      by: ['materialId'],
+      where: { ofId, motivo: 'CONSUMO_PRODUCCION' },
+      _sum: { cantidad: true },
+    });
+    return new Map(
+      filas
+        .filter((f) => f.materialId != null)
+        .map((f) => [f.materialId as number, num(f._sum.cantidad)]),
+    );
+  }
+
+  /**
+   * Tabla teórico vs entregado de la OF: es la pantalla del almacenista y la
+   * base del costeo real (la diferencia es lo que se gastó de más o de menos).
+   */
+  async consumoDeOf(ofId: number) {
+    const of = await this.prisma.ordenFabricacion.findUnique({ where: { id: ofId } });
+    if (!of) throw new NotFoundException(`OF ${ofId} no existe`);
+
+    const [teorico, entregado] = await Promise.all([
+      this.teoricoDeOf(ofId),
+      this.entregadoDeOf(ofId),
+    ]);
+    const filas = consolidarConsumo(teorico, entregado);
+
+    const materiales = await this.prisma.material.findMany({
+      where: { id: { in: filas.map((f) => f.materialId) } },
+      select: {
+        id: true,
+        codigo: true,
+        nombreCanonico: true,
+        unidadMedida: { select: { codigo: true } },
+      },
+    });
+    const info = new Map(materiales.map((m: any) => [m.id, m]));
+
+    return {
+      ofId,
+      consecutivo: of.consecutivo,
+      lineas: filas.map((f) => ({
+        ...f,
+        materialCodigo: info.get(f.materialId)?.codigo ?? null,
+        materialNombre: info.get(f.materialId)?.nombreCanonico ?? null,
+        unidad: info.get(f.materialId)?.unidadMedida?.codigo ?? null,
+      })),
+    };
+  }
+
+  /**
+   * Registra una entrega de materiales a la OF. Es acumulativo a propósito: el
+   * almacenista entrega varias veces a lo largo de la corrida, así que dos
+   * registros del mismo material suman, no se pisan.
+   */
+  async registrarConsumo(ofId: number, dto: RegistrarConsumoDto, user: any) {
+    const of = await this.prisma.ordenFabricacion.findUnique({
+      where: { id: ofId },
+      select: { id: true, consecutivo: true, estado: true, opId: true },
+    });
+    if (!of) throw new NotFoundException(`OF ${ofId} no existe`);
+    if (of.estado === 'ANULADA')
+      throw new ConflictException('La OF está anulada: no admite consumo');
+
+    // Dos entregas del mismo material en el mismo POST se suman antes de tocar
+    // la bodega, para no descontar la reserva en dos pasadas.
+    const pedido = new Map<number, number>();
+    for (const l of dto.lineas) {
+      pedido.set(l.materialId, (pedido.get(l.materialId) ?? 0) + l.cantidad);
+    }
+    const ids = [...pedido.keys()].sort((a, b) => a - b);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Lock pesimista en el mismo orden que el amarre de insumos, para que dos
+      // almacenistas registrando a la vez no se pisen el stock.
+      await tx.$queryRaw`SELECT id FROM "InventarioMaterial" WHERE "materialId" IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+
+      const stock = await tx.inventarioMaterial.findMany({
+        where: { materialId: { in: ids } },
+      });
+      const stockPorMaterial = new Map(stock.map((s: any) => [s.materialId, s]));
+
+      const materiales = await tx.material.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, codigo: true, costoPromedio: true, costoBase: true },
+      });
+      const costoPorMaterial = new Map(
+        materiales.map((m: any) => [m.id, num(m.costoPromedio) || num(m.costoBase)]),
+      );
+      const codigoPorMaterial = new Map(materiales.map((m: any) => [m.id, m.codigo]));
+
+      // Reservas vivas de la OP dueña, para descargarlas contra lo consumido.
+      const reqs = await tx.requerimientoCompra.findMany({
+        where: { opId: of.opId, reservaActiva: true },
+        orderBy: { id: 'asc' },
+        include: {
+          lineas: {
+            where: { materialId: { in: ids } },
+            select: { id: true, materialId: true, cantReservada: true },
+            orderBy: { id: 'asc' },
+          },
+        },
+      });
+      const reservasPorMaterial = new Map<number, LineaReservaMin[]>();
+      for (const r of reqs) {
+        for (const l of r.lineas as any[]) {
+          const acc = reservasPorMaterial.get(l.materialId) ?? [];
+          acc.push({ id: l.id, cantReservada: num(l.cantReservada) });
+          reservasPorMaterial.set(l.materialId, acc);
+        }
+      }
+
+      for (const [materialId, cantidad] of pedido) {
+        const inv: any = stockPorMaterial.get(materialId);
+        const disponible = num(inv?.cantDisponible);
+        if (!inv || disponible < cantidad)
+          throw new BadRequestException(
+            `Material ${codigoPorMaterial.get(materialId) ?? materialId}: hay ${disponible} en bodega y se quieren entregar ${cantidad}`,
+          );
+
+        // Lo consumido deja de estar amarrado: baja de la reserva al mismo
+        // tiempo que del stock, o al cerrar la OP se liberaría dos veces.
+        const descarga = repartirDescargaDeReserva(
+          cantidad,
+          reservasPorMaterial.get(materialId) ?? [],
+        );
+        for (const l of descarga.porLinea) {
+          await tx.requerimientoCompraLinea.update({
+            where: { id: l.id },
+            data: { cantReservada: { decrement: l.descontar } },
+          });
+        }
+
+        await tx.inventarioMaterial.update({
+          where: { materialId },
+          data: {
+            cantDisponible: { decrement: cantidad },
+            ...(descarga.total > 0
+              ? { cantReservada: { decrement: descarga.total } }
+              : {}),
+          },
+        });
+
+        await tx.movimientoInventario.create({
+          data: {
+            tipo: 'SALIDA',
+            motivo: 'CONSUMO_PRODUCCION',
+            materialId,
+            cantidad,
+            costoUnitario: costoPorMaterial.get(materialId) || null,
+            ofId,
+            referencia: `OF-${of.consecutivo}`,
+            observaciones: dto.observaciones,
+            usuarioId: user?.sub ?? null,
+          },
+        });
+      }
+    });
+
+    return this.consumoDeOf(ofId);
   }
 }

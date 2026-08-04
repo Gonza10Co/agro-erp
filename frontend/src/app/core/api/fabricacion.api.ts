@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
+  ConsumoOf,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -42,5 +43,19 @@ export class FabricacionApi {
     let params = new HttpParams();
     if (celula) params = params.set('celula', celula);
     return this.http.get<Maquina[]>(`${this.base}/fabricacion/maquinas`, { params });
+  }
+  consumoDeOf(id: number) {
+    return this.http.get<ConsumoOf>(`${this.base}/fabricacion/of/${id}/consumo`);
+  }
+  /** El registro es acumulativo: dos entregas del mismo material suman. */
+  registrarConsumo(
+    id: number,
+    lineas: { materialId: number; cantidad: number }[],
+    observaciones?: string,
+  ) {
+    return this.http.post<ConsumoOf>(`${this.base}/fabricacion/of/${id}/consumo`, {
+      lineas,
+      ...(observaciones ? { observaciones } : {}),
+    });
   }
 }

@@ -7,12 +7,14 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { Celula } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { FabricacionService } from './fabricacion.service';
 import { AvanzarDto } from './dto/avanzar.dto';
+import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('fabricacion')
@@ -32,6 +34,22 @@ export class FabricacionController {
   @Get('of/:id')
   obtenerOF(@Param('id', ParseIntPipe) id: number) {
     return this.service.obtenerOF(id);
+  }
+
+  /** Teórico (BOM × pares) vs entregado por el almacenista. */
+  @Get('of/:id/consumo')
+  consumoDeOf(@Param('id', ParseIntPipe) id: number) {
+    return this.service.consumoDeOf(id);
+  }
+
+  /** Registro manual de la entrega de materiales a la OF (acumulativo). */
+  @Post('of/:id/consumo')
+  registrarConsumo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RegistrarConsumoDto,
+    @Req() req: any,
+  ) {
+    return this.service.registrarConsumo(id, dto, req.user);
   }
 
   @Post('par/:codigo/avanzar')

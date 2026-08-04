@@ -1,0 +1,13 @@
+# Fin de línea normalizado en el repo (LF) y textos detectados solos.
+* text=auto
+
+# ⚠️ Las migraciones de Prisma DEBEN quedar en LF también en el working copy de
+# Windows. Prisma guarda en `_prisma_migrations.checksum` el sha256 del archivo
+# tal como está en disco: si `core.autocrlf` las reescribe con CRLF, el checksum
+# deja de cuadrar y `prisma migrate dev` exige resetear la base de desarrollo
+# ("the migration was modified after it was applied"), aunque el SQL sea idéntico
+# al que corre en producción (Linux, LF). Pasó el 2026-07-30.
+*.sql text eol=lf
+
+# Los CSV de datos que comen los seeds viajan igual en todos lados.
+*.csv text eol=lf

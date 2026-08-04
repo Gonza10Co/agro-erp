@@ -201,4 +201,57 @@ describe('ReporteDiarioComponent', () => {
     expect(c.drawer()).toBe(false);
     flush(); // recarga tras guardar
   });
+  describe('meta diaria contra días hábiles', () => {
+    /** El mismo reporte, pero como lo devuelve un backend con calendario configurado. */
+    const CON_CALENDARIO = {
+      ...REPORTE,
+      metas: {
+        celulas: [
+          { celula: 'CORTE', meta: 22000, real: 3000, pct: 13.6, esperado: 3000, pctEsperado: 100, diaria: 1000 },
+          { celula: 'GUARNICION', meta: 22000, real: 1500, pct: 6.8, esperado: 3000, pctEsperado: 50, diaria: 1000 },
+          { celula: 'ALMACEN', meta: 0, real: 0, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 },
+          { celula: 'INYECCION', meta: 0, real: 0, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 },
+          { celula: 'PT', meta: 0, real: 0, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 },
+        ],
+        facturacionPares: { meta: 25, real: 19, pct: 76, esperado: 3.4, pctEsperado: 558.8, diaria: 1.14 },
+        facturacionValor: { meta: 2400000, real: 1921850, pct: 80.1, esperado: 327272.73, pctEsperado: 587.2, diaria: 109090.91 },
+        habiles: { transcurridos: 3, total: 22 },
+      },
+    };
+
+    it('muestra el % contra lo ESPERADO A HOY, no contra el mes entero', () => {
+      const fixture = setup();
+      http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario').flush(CON_CALENDARIO);
+      fixture.detectChanges();
+      const c = fixture.componentInstance;
+
+      const corte = c.metasCards().find((m) => m.key === 'CORTE')!;
+      // Va al día: 3.000 de 3.000 esperados, aunque solo lleve el 13,6% del mes.
+      expect(corte.pctMostrado).toBe(100);
+      expect(corte.pct).toBe(13.6);
+      expect(c.hayCalendario()).toBe(true);
+    });
+
+    it('dice cuántos días hábiles van del mes', () => {
+      const fixture = setup();
+      http.expectOne((r) => r.url === 'http://localhost:3001/reportes/diario').flush(CON_CALENDARIO);
+      fixture.detectChanges();
+      const texto = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(texto).toContain('3');
+      expect(texto).toContain('22');
+      expect(texto).toContain('días hábiles');
+    });
+
+    it('sin calendario configurado sigue mostrando el % del mes, como antes', () => {
+      const fixture = setup();
+      flush(); // REPORTE viejo, sin habiles
+      fixture.detectChanges();
+      const c = fixture.componentInstance;
+
+      expect(c.hayCalendario()).toBe(false);
+      const corte = c.metasCards().find((m) => m.key === 'CORTE')!;
+      expect(corte.pctMostrado).toBe(68.6);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('días hábiles');
+    });
+  });
 });

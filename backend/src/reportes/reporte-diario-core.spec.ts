@@ -172,7 +172,7 @@ describe('reporte-diario-core', () => {
     });
 
     it('arma el bloque de metas con su % de cumplimiento', () => {
-      expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60 });
+      expect(rep.metas.facturacionPares).toEqual({ meta: 100, real: 60, pct: 60, esperado: 100, pctEsperado: 60, diaria: 0 });
       expect(rep.metas.facturacionValor.real).toBe(5100000);
       expect(rep.metas.facturacionValor.pct).toBe(51);
     });
@@ -187,14 +187,14 @@ describe('reporte-diario-core', () => {
       it('cruza cada célula contra su columna de producción real', () => {
         const porCelula = Object.fromEntries(rep.metas.celulas.map((c) => [c.celula, c]));
         // Corte: 2 eventos contra meta 4.
-        expect(porCelula['CORTE']).toEqual({ celula: 'CORTE', meta: 4, real: 2, pct: 50 });
+        expect(porCelula['CORTE']).toEqual({ celula: 'CORTE', meta: 4, real: 2, pct: 50, esperado: 4, pctEsperado: 50, diaria: 0 });
         // Guarnición cuenta solo el sub-paso AMARRE (la salida real de la célula).
-        expect(porCelula['GUARNICION']).toEqual({ celula: 'GUARNICION', meta: 1, real: 1, pct: 100 });
-        expect(porCelula['INYECCION']).toEqual({ celula: 'INYECCION', meta: 2, real: 1, pct: 50 });
+        expect(porCelula['GUARNICION']).toEqual({ celula: 'GUARNICION', meta: 1, real: 1, pct: 100, esperado: 1, pctEsperado: 100, diaria: 0 });
+        expect(porCelula['INYECCION']).toEqual({ celula: 'INYECCION', meta: 2, real: 1, pct: 50, esperado: 2, pctEsperado: 50, diaria: 0 });
         // PT tiene producción real (1 par) pero todavía nadie le puso meta.
-        expect(porCelula['PT']).toEqual({ celula: 'PT', meta: 0, real: 1, pct: 0 });
+        expect(porCelula['PT']).toEqual({ celula: 'PT', meta: 0, real: 1, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 });
         // Almacén: sin eventos y sin meta.
-        expect(porCelula['ALMACEN']).toEqual({ celula: 'ALMACEN', meta: 0, real: 0, pct: 0 });
+        expect(porCelula['ALMACEN']).toEqual({ celula: 'ALMACEN', meta: 0, real: 0, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 });
       });
     });
 
@@ -219,8 +219,132 @@ describe('reporte-diario-core', () => {
       const sinMetas = construirReporte({ ...input, metas: [] });
       expect(sinMetas.metas.celulas).toHaveLength(5);
       const guarnicion = sinMetas.metas.celulas.find((c) => c.celula === 'GUARNICION')!;
-      expect(guarnicion).toEqual({ celula: 'GUARNICION', meta: 0, real: 1, pct: 0 });
-      expect(sinMetas.metas.facturacionPares).toEqual({ meta: 0, real: 60, pct: 0 });
+      expect(guarnicion).toEqual({ celula: 'GUARNICION', meta: 0, real: 1, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 });
+      expect(sinMetas.metas.facturacionPares).toEqual({ meta: 0, real: 60, pct: 0, esperado: 0, pctEsperado: 0, diaria: 0 });
+    });
+
+    describe('META DIARIA contra días hábiles', () => {
+      // Junio 2026: 22 días hábiles de lunes a viernes. Meta de corte 22.000 pares
+      // → 1.000 diarios. El input base tiene 2 pares troquelados el día 1.
+      const LUN_A_VIE = { diasSemana: [false, true, true, true, true, true, false], noHabiles: [] };
+      const conCalendario = (extra: Partial<InputReporte> = {}) =>
+        construirReporte({
+          ...input,
+          metas: [{ tipo: 'CORTE' as const, valor: 22000 }],
+          calendario: LUN_A_VIE,
+          ...extra,
+        });
+
+      it('reparte la meta mensual en el ritmo diario que exige', () => {
+        const corte = conCalendario().metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(corte.diaria).toBe(1000);
+      });
+
+      it('el día 3 del mes NO se compara contra el mes entero', () => {
+        // 3 de junio de 2026 es miércoles: van 3 hábiles de 22 → se esperan 3.000.
+        const r = conCalendario({ hoy: new Date('2026-06-03T18:00:00Z') });
+        const corte = r.metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(r.metas.habiles).toEqual({ transcurridos: 3, total: 22 });
+        expect(corte.esperado).toBe(3000);
+        expect(corte.meta).toBe(22000); // la del mes sigue ahí, para el contexto
+      });
+
+      it('el % contra lo esperado es el que dice si se va atrasado', () => {
+        const r = conCalendario({ hoy: new Date('2026-06-03T18:00:00Z') });
+        const corte = r.metas.celulas.find((c) => c.celula === 'CORTE')!;
+        // 2 pares contra 3.000 esperados es 0.1%; contra el mes entero daría 0%.
+        expect(corte.pctEsperado).toBe(0.1);
+        expect(corte.pct).toBe(0);
+      });
+
+      it('los festivos bajan el divisor: menos días para la misma meta', () => {
+        const conFestivos = conCalendario({
+          calendario: { ...LUN_A_VIE, noHabiles: ['2026-06-15', '2026-06-22', '2026-06-29'] },
+        });
+        const corte = conFestivos.metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(conFestivos.metas.habiles.total).toBe(19);
+        expect(corte.diaria).toBe(1157.89); // 22000 / 19, hay que apretar el ritmo
+      });
+
+      it('trabajar sábados reparte la misma meta en más días', () => {
+        const conSabados = conCalendario({
+          calendario: { diasSemana: [false, true, true, true, true, true, true], noHabiles: [] },
+        });
+        const corte = conSabados.metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(conSabados.metas.habiles.total).toBe(26);
+        expect(corte.diaria).toBe(846.15);
+      });
+
+      it('marca en cada fila si el día era hábil (para no exigirle meta a un domingo)', () => {
+        const r = conCalendario();
+        expect(r.filas.find((f) => f.fecha === '2026-06-05')!.esHabil).toBe(true); // viernes
+        expect(r.filas.find((f) => f.fecha === '2026-06-07')!.esHabil).toBe(false); // domingo
+      });
+
+      it('sin calendario configurado el reporte se comporta como antes', () => {
+        // Compatibilidad: desplegar esto no puede cambiarle los números al cliente
+        // hasta que alguien configure el calendario.
+        const r = construirReporte(input);
+        const corte = r.metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(corte.esperado).toBe(corte.meta);
+        expect(corte.pctEsperado).toBe(corte.pct);
+        expect(r.metas.habiles).toEqual({ transcurridos: 0, total: 0 });
+        expect(r.filas.every((f) => f.esHabil)).toBe(true);
+      });
+
+      it('un mes ya cerrado (sin "hoy") se mide contra la meta completa', () => {
+        const corte = conCalendario().metas.celulas.find((c) => c.celula === 'CORTE')!;
+        expect(corte.esperado).toBe(22000);
+      });
+    });
+
+    describe('SUB-PASOS DE INYECCIÓN', () => {
+      const unPar = (fecha: string) => [
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'MONTAJE', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'INYECCION', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'FINIZAJE', timestamp: new Date(fecha) },
+        { celula: 'INYECCION' as const, subPasoInyeccion: 'IMPACTO', timestamp: new Date(fecha) },
+      ];
+
+      it('un par que pasa por los 4 sub-pasos cuenta UNA vez, no cuatro', () => {
+        const r = construirReporte({ ...input, eventos: unPar('2026-06-03T10:00:00Z') });
+        const dia = r.filas.find((d) => d.fecha === '2026-06-03')!;
+        expect(dia.inyeccion).toBe(1);
+      });
+
+      it('cuenta en el sub-paso de salida (IMPACTO), no cuando entra a montaje', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', subPasoInyeccion: 'MONTAJE', timestamp: new Date('2026-06-03T10:00:00Z') },
+            { celula: 'INYECCION', subPasoInyeccion: 'IMPACTO', timestamp: new Date('2026-06-04T10:00:00Z') },
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-03')!.inyeccion).toBe(0);
+        expect(r.filas.find((d) => d.fecha === '2026-06-04')!.inyeccion).toBe(1);
+      });
+
+      it('los eventos viejos sin sub-paso siguen contando (no se borra el histórico)', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', timestamp: new Date('2026-06-05T10:00:00Z') },
+            { celula: 'INYECCION', subPasoInyeccion: null, timestamp: new Date('2026-06-05T11:00:00Z') },
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-05')!.inyeccion).toBe(2);
+      });
+
+      it('mezcla de histórico y sub-pasos: 1 viejo + 1 par completo = 2', () => {
+        const r = construirReporte({
+          ...input,
+          eventos: [
+            { celula: 'INYECCION', timestamp: new Date('2026-06-06T09:00:00Z') },
+            ...unPar('2026-06-06T10:00:00Z'),
+          ],
+        });
+        expect(r.filas.find((d) => d.fecha === '2026-06-06')!.inyeccion).toBe(2);
+      });
     });
   });
 });

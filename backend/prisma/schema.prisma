@@ -840,6 +840,16 @@ enum SubPasoGuarnicion {
   AMARRE
 }
 
+// Inyección tampoco es una sola estación (JP, 2026-07-30: "el proceso de inyección
+// lleva montaje, lleva inyección como tal, lleva finizaje y lleva el impacto").
+// FINIZAJE es el acabado (crayola, gama, gardenia, lija), no una célula aparte.
+enum SubPasoInyeccion {
+  MONTAJE
+  INYECCION
+  FINIZAJE
+  IMPACTO
+}
+
 enum EstadoOF {
   ABIERTA
   EN_PROCESO
@@ -878,7 +888,8 @@ model OrdenFabricacion {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  pares Par[]
+  pares       Par[]
+  movimientos MovimientoInventario[]
 
   @@index([opId])
 }
@@ -898,6 +909,10 @@ model Par {
   // una incidencia de clase SEGUNDA; el par sigue su curso normal por las células.
   calidad               CalidadPT           @default(PRIMERA)
   subPasoActual         SubPasoGuarnicion? // solo poblado mientras celulaActual = GUARNICION
+  // Solo poblado mientras celulaActual = INYECCION. NULL en un par que ya estaba
+  // inyectándose antes de que existieran los sub-pasos: ese sale a PT en el
+  // siguiente escaneo, como venía haciéndolo.
+  subPasoInyeccion      SubPasoInyeccion?
   lineaId               Int? // denormalizado de productoConfigurado.marca.lineaId: permite groupBy/filtrar reportes por línea
   linea                 Linea?              @relation(fields: [lineaId], references: [id])
   reponeAParId          Int?                @unique // si este par es una reposición, el par dado de baja que repone
@@ -924,6 +939,7 @@ model EventoTrazabilidad {
   par        Par                @relation(fields: [parId], references: [id])
   celula     Celula
   subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
+  subPasoInyeccion SubPasoInyeccion? // ídem para Inyección
   operarioId Int
   operario   Operario           @relation(fields: [operarioId], references: [id])
   maquinaId  Int
@@ -1012,7 +1028,10 @@ model Factura {
   // Feroz le presta a la capellada de Bogotá) no despacha producto propio.
   // PG permite N NULLs bajo un @unique, así que la 1:1 con despacho se mantiene.
   despachoId  Int?        @unique
-  despacho    Despacho?   @relation(fields: [despachoId], references: [id])
+  // RESTRICT explícito: es lo que hay en producción desde que la factura existe.
+  // El default de Prisma para una relación opcional es SET NULL, que dejaría la
+  // factura huérfana de su remito al borrar un despacho en vez de frenar el borrado.
+  despacho    Despacho?   @relation(fields: [despachoId], references: [id], onDelete: Restrict)
   // Denormalizado: antes el cliente se resolvía navegando despacho→op→oc, cadena
   // que no existe sin despacho. Cartera consulta por acá.
   clienteId        Int
@@ -1069,10 +1088,12 @@ model FacturaLinea {
   factura   Factura @relation(fields: [facturaId], references: [id])
   // Producto+talla solo en facturas de PRODUCTO; servicio+descripción solo en las
   // de SERVICIO. Nullable de ambos lados: una línea de maquila no tiene talla.
+  // RESTRICT explícito (igual que en producción): borrar un producto o una talla
+  // no puede vaciar en silencio una línea de factura ya emitida.
   productoConfiguradoId Int?
-  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id])
+  productoConfigurado   ProductoConfigurado? @relation(fields: [productoConfiguradoId], references: [id], onDelete: Restrict)
   tallaId               Int?
-  talla                 Talla?               @relation(fields: [tallaId], references: [id])
+  talla                 Talla?               @relation(fields: [tallaId], references: [id], onDelete: Restrict)
   servicioId            Int?
   servicio              ServicioCatalogo?    @relation(fields: [servicioId], references: [id])
   descripcion           String? // texto libre del servicio, como en la hoja del cliente
@@ -1120,6 +1141,11 @@ model MovimientoInventario {
   // NULL en movimientos de MP y en históricos previos a la columna: solo suman en "Todas las líneas".
   lineaId        Int?
   linea          Linea?           @relation(fields: [lineaId], references: [id])
+  // OF que consumió el material (motivo CONSUMO_PRODUCCION). Es FK y no solo el
+  // texto de `referencia` porque el consumo real por OF se consulta agrupado, y
+  // parsear "OF-31" para eso es pedir un bug.
+  ofId           Int?
+  of             OrdenFabricacion? @relation(fields: [ofId], references: [id])
   referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?
@@ -1129,6 +1155,7 @@ model MovimientoInventario {
   @@index([materialId, createdAt])
   @@index([inventarioPTId, createdAt])
   @@index([lineaId, createdAt])
+  @@index([ofId])
   @@index([createdAt])
 }
 
@@ -1145,6 +1172,32 @@ enum TipoMeta {
   PT // meta de pares terminados / empacados (mensual)
   FACTURACION_PARES // meta de pares facturados (mensual)
   FACTURACION_VALOR // meta de $ facturado (mensual)
+}
+
+// Qué días de la semana trabaja la planta. Fila única (id = 1): es configuración
+// de la fábrica, no de cada línea. El divisor de la meta diaria sale de acá.
+// ⚠️ `sabado` está en true por defecto y es JUSTO lo que falta confirmar con el
+// cliente; se cambia desde la pantalla sin tocar código.
+model CalendarioLaboral {
+  id        Int      @id @default(1)
+  lunes     Boolean  @default(true)
+  martes    Boolean  @default(true)
+  miercoles Boolean  @default(true)
+  jueves    Boolean  @default(true)
+  viernes   Boolean  @default(true)
+  sabado    Boolean  @default(true)
+  domingo   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+// Días que la planta no trabaja: festivos colombianos (sembrados con la Ley
+// Emiliani) y paradas puntuales que cargue el cliente.
+model DiaNoHabil {
+  id     Int      @id @default(autoincrement())
+  fecha  DateTime @unique @db.Date
+  motivo String
+
+  @@index([fecha])
 }
 
 // Meta mensual configurable por tipo. Alimenta el % de cumplimiento del reporte diario.

@@ -5,6 +5,7 @@ import { ReportesApi } from '../../core/api/reportes.api';
 import { LineasApi, Linea } from '../../core/api/lineas.api';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import {
+  Cumplimiento,
   ETIQUETA_META,
   MetaItem,
   ReporteDiario,
@@ -38,12 +39,26 @@ import {
           @for (m of metasCards(); track m.key) {
             <div class="meta-card">
               <div class="meta-h">{{ m.label }}</div>
-              <div class="meta-pct" [class.ok]="m.pct >= 100" [class.warn]="m.pct < 100">{{ m.pct }}%</div>
-              <div class="meta-bar"><div class="meta-fill" [class.ok]="m.pct >= 100" [style.width.%]="cap(m.pct)"></div></div>
+              <div class="meta-pct" [class.ok]="m.pctMostrado >= 100" [class.warn]="m.pctMostrado < 100">{{ m.pctMostrado }}%</div>
+              <div class="meta-bar"><div class="meta-fill" [class.ok]="m.pctMostrado >= 100" [style.width.%]="cap(m.pctMostrado)"></div></div>
               <div class="meta-s">{{ m.fmt(m.real) }} / {{ m.fmt(m.meta) }}</div>
+              @if (hayCalendario()) {
+                <div class="meta-esp">
+                  esperado a hoy: {{ m.fmt(m.esperado) }}
+                  @if (m.diaria) { <span class="cell-sub">· {{ m.fmt(m.diaria) }}/día</span> }
+                </div>
+              }
             </div>
           }
         </div>
+
+        @if (hayCalendario()) {
+          <p class="nota-habiles">
+            Van <b>{{ d.metas.habiles?.transcurridos }}</b> de
+            <b>{{ d.metas.habiles?.total }}</b> días hábiles del mes (sin domingos ni festivos):
+            el % compara contra lo esperado a hoy, no contra el mes entero.
+          </p>
+        }
 
         <!-- Nota honesta sobre columnas no capturadas aún -->
         @if (d.pendientes.length) {
@@ -160,6 +175,9 @@ import {
     .btn.ghost{background:transparent;color:var(--text);border-color:var(--border)}
     .btn:disabled{opacity:.6;cursor:default}
     /* 7 tarjetas (5 células + 2 de facturación): que fluyan según el ancho. */
+    .meta-esp{font-size:var(--text-caption);color:var(--text-subtle);margin-top:var(--sp-1)}
+    .nota-habiles{font-size:var(--text-sm);color:var(--text-subtle);margin:0 0 var(--sp-4)}
+    .fila-no-habil{opacity:.55}
     .metas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:var(--sp-4);margin-bottom:var(--sp-4)}
     .meta-card{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-md);padding:var(--sp-4)}
     .meta-h{font-size:var(--text-caption);color:var(--text-subtle);text-transform:uppercase;letter-spacing:.04em}
@@ -228,21 +246,31 @@ export class ReporteDiarioComponent implements OnInit {
 
   // Una tarjeta por célula (en orden de flujo) más las dos de facturación: es el
   // tablero del dueño, que mira cumplimiento centro de costo por centro de costo.
+  /**
+   * Hay calendario configurado si el mes trae días hábiles calculados. El opcional
+   * no sobra: mientras Vercel y Railway terminan de desplegar, este front puede
+   * estar hablando con un backend que todavía no manda `habiles`, y sin el `?.`
+   * se cae la pantalla entera del reporte.
+   */
+  hayCalendario = computed(() => (this.r()?.metas?.habiles?.total ?? 0) > 0);
+
   metasCards = computed(() => {
     const m = this.r()?.metas;
     if (!m) return [];
     const pares = (n: number) => this.num(n);
+    // Con calendario configurado el % que manda es contra lo ESPERADO A HOY: el
+    // del mes entero se ve en 10% el día 3 aunque la planta vaya perfecta.
+    const conEsperado = this.hayCalendario();
+    const card = (key: string, label: string, c: Cumplimiento, fmt: (n: number) => string) => ({
+      key, label, meta: c.meta, real: c.real, pct: c.pct,
+      esperado: c.esperado, diaria: c.diaria,
+      pctMostrado: conEsperado ? c.pctEsperado : c.pct,
+      fmt,
+    });
     return [
-      ...m.celulas.map((c) => ({
-        key: c.celula,
-        label: ETIQUETA_META[c.celula],
-        meta: c.meta,
-        real: c.real,
-        pct: c.pct,
-        fmt: pares,
-      })),
-      { key: 'FACTURACION_PARES', label: ETIQUETA_META.FACTURACION_PARES, ...m.facturacionPares, fmt: pares },
-      { key: 'FACTURACION_VALOR', label: ETIQUETA_META.FACTURACION_VALOR, ...m.facturacionValor, fmt: (n: number) => this.moneda(n) },
+      ...m.celulas.map((c) => card(c.celula, ETIQUETA_META[c.celula], c, pares)),
+      card('FACTURACION_PARES', ETIQUETA_META.FACTURACION_PARES, m.facturacionPares, pares),
+      card('FACTURACION_VALOR', ETIQUETA_META.FACTURACION_VALOR, m.facturacionValor, (n: number) => this.moneda(n)),
     ];
   });
 

@@ -29,6 +29,7 @@ import { descargarEtiquetasPdf } from './of-etiquetas-pdf';
                   <td>{{ o.fecha | date:'dd MMM y' }}</td>
                   <td style="display:flex;gap:var(--sp-2)">
                     <a class="btn btn-sm" [routerLink]="['/fabricacion/tablero']" [queryParams]="{ ofId: o.id }">Ver tablero</a>
+                    <a class="btn btn-sm" [routerLink]="['/fabricacion/of', o.id, 'consumo']">Materiales</a>
                     <button class="btn btn-sm" type="button" [disabled]="descargando() === o.id" (click)="imprimirEtiquetas(o)">
                       {{ descargando() === o.id ? 'Generando…' : 'Etiquetas' }}
                     </button>
