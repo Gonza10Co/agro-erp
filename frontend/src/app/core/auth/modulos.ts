@@ -55,16 +55,22 @@ const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // Feroz) vive adentro y su única puerta es /facturas: con el módulo en INTERNO
   // ni el perfil STAGE podía abrirla, así que gatear solo la sección era inerte.
   facturas: 'EN_STAGE',
+  // Suben a EN_STAGE para la demo de la Entrega 6 (2026-08-04). Son la casa de todo
+  // lo que hay que mostrar ese día: `fabricacion` guarda la pantalla del almacenista
+  // (consumo real de MP) y los sub-pasos de inyección; `reportes`, la meta diaria
+  // contra días hábiles y las metas por célula de la Entrega 5. Con ambos en INTERNO
+  // ni el perfil STAGE los abría, y la alternativa era demostrar como ADMIN, que le
+  // enseña al cliente el menú entero. Siguen ocultos al rol CLIENTE.
+  fabricacion: 'EN_STAGE',
+  reportes: 'EN_STAGE',
   // INTERNO — adelantado, solo roles internos.
   inicio: 'INTERNO',
   proveedores: 'INTERNO',
   despachos: 'INTERNO',
   cartera: 'INTERNO',
   inventario: 'INTERNO',
-  fabricacion: 'INTERNO',
   calidad: 'INTERNO',
   indicadores: 'INTERNO',
-  reportes: 'INTERNO',
 };
 
 /**
@@ -111,7 +117,8 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'ocp-anular': 'ENTREGADO',
   'costo-ocp': 'ENTREGADO',
   // Piso de planta: NO va con compras. "Generar OF" y "Despachar" escriben hacia
-  // módulos INTERNOS (fabricacion, despachos) que el cliente no puede abrir.
+  // módulos que el cliente no puede abrir — `despachos` sigue INTERNO y `fabricacion`
+  // subió a EN_STAGE en la Entrega 6, que tampoco alcanza al rol CLIENTE.
   'operar-produccion': 'EN_STAGE',
   // Entrega 5. El módulo `facturas` es EN_STAGE: la sección se queda en EN_STAGE
   // para mostrarla en la demo con el perfil STAGE. Cuando se libere facturación al

@@ -117,9 +117,14 @@ describe('ShellComponent', () => {
     // Entrega 5: `facturas` pasó a EN_STAGE para poder mostrar la factura de servicio
     // (maquila Feroz) en la demo — su única puerta es este ítem de menú.
     expect(text).toContain('Facturas');
+    // Entrega 6: `fabricacion` y `reportes` pasaron a EN_STAGE por lo mismo. Son la
+    // puerta al consumo real de materiales, a los sub-pasos de inyección y a la meta
+    // diaria contra días hábiles — todo lo que se muestra el 2026-08-04.
+    expect(text).toContain('Reporte diario');
+    expect(text).toContain('Tablero de fabricación');
     // internos ocultos
     expect(text).not.toContain('Inicio');
-    expect(text).not.toContain('Reporte diario');
+    expect(text).not.toContain('Despachos');
   });
 
   it('arranca colapsada si la preferencia guardada es "colapsada"', () => {
