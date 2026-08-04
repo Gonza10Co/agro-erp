@@ -3,6 +3,7 @@ import { PrismaClient, Celula, ClaseDano, TipoMeta } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { siguienteConsecutivo } from '../src/prisma/consecutivo';
+import { diasHabilesDelMes } from '../src/reportes/calendario-habil';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -922,14 +923,45 @@ async function main() {
     },
   });
 
-  // Producción del mes: cantidades por día hábil (≈ Excel del dueño, ~20.000 pares para
-  // que el % contra las metas reales sea creíble). Cada par recorre las 5 células ese día.
-  const PRODUCCION_DIA: { d: number; cant: number }[] = [
-    { d: 2, cant: 1200 }, { d: 3, cant: 1440 }, { d: 4, cant: 1440 }, { d: 5, cant: 1522 },
-    { d: 6, cant: 1440 }, { d: 9, cant: 1276 }, { d: 10, cant: 1608 }, { d: 11, cant: 1440 },
-    { d: 12, cant: 1440 }, { d: 13, cant: 1440 }, { d: 16, cant: 1343 }, { d: 17, cant: 1440 },
-    { d: 18, cant: 1440 }, { d: 19, cant: 1451 },
-  ];
+  // Producción del mes: cantidades por día hábil (≈ Excel del dueño), una fila por día
+  // ya trabajado. Cada par recorre las 5 células ese día.
+  //
+  // Los días salen del CALENDARIO y se cortan en HOY. Antes eran una lista fija
+  // (2,3,4,5,6,9,…) elegida a mano para julio: aplicada a cualquier otro mes caía en
+  // domingos y —peor— en fechas que todavía no llegaban, así que el reporte comparaba
+  // 14 días de producción contra los 3 días de meta transcurridos y mostraba un 711%
+  // de cumplimiento. La producción sembrada nunca puede ir por delante del calendario.
+  const calBD = await prisma.calendarioLaboral.findUnique({ where: { id: 1 } });
+  const noHabilesBD = await prisma.diaNoHabil.findMany({ select: { fecha: true } });
+  const calMin = {
+    // El índice es el día de la semana en UTC: 0 = domingo … 6 = sábado.
+    diasSemana: [
+      calBD?.domingo ?? false,
+      calBD?.lunes ?? true,
+      calBD?.martes ?? true,
+      calBD?.miercoles ?? true,
+      calBD?.jueves ?? true,
+      calBD?.viernes ?? true,
+      calBD?.sabado ?? true,
+    ],
+    noHabiles: noHabilesBD.map((x) => x.fecha.toISOString().slice(0, 10)),
+  };
+  const habilesMes = diasHabilesDelMes(anioRep, mesRep, calMin).map((c) => Number(c.slice(8, 10)));
+  const hoyDia = ahora.getUTCDate();
+  // Si hoy es el primer día del mes y no es hábil, se siembra igual ese día: un reporte
+  // completamente vacío no deja mostrar nada y el caso solo aparece 1 o 2 días al año.
+  const diasTrabajados = habilesMes.filter((d) => d <= hoyDia);
+  if (diasTrabajados.length === 0) diasTrabajados.push(hoyDia);
+
+  // Ritmo diario ≈ 89% de la meta diaria: es la proporción que traía el patrón fijo
+  // contra la meta del mes, y deja el cumplimiento en un número creíble (ni 100%
+  // sospechoso ni un rojo que distraiga). Se varía ±8% para que las barras del
+  // reporte no salgan todas idénticas.
+  const ritmoBase = (META_CADENA / habilesMes.length) * 0.89;
+  const PRODUCCION_DIA: { d: number; cant: number }[] = diasTrabajados.map((d, i) => ({
+    d,
+    cant: Math.round(ritmoBase * (1 + ((i % 5) - 2) * 0.04)),
+  }));
 
   async function enLotes<T>(items: T[], tam: number, fn: (lote: T[]) => Promise<unknown>) {
     for (let i = 0; i < items.length; i += tam) await fn(items.slice(i, i + tam));
@@ -1157,11 +1189,22 @@ async function main() {
   // Alta queda SOBRE su meta y Basarili por debajo — variedad para el reporte por línea.
   // Feroz no factura pares (el servicio de inyección se factura aparte, aún sin modelar).
   const PRECIO_PAR = 47814;
+  // Ventas del mes, con el mismo criterio que la producción: caen en días hábiles ya
+  // transcurridos y las cantidades se prorratean a la fracción del mes que va corrida.
+  // Con las cifras del mes entero (9000/9000/7500) el día 4 la facturación mostraba
+  // 674% contra lo esperado a la fecha.
+  const fraccionMes = diasTrabajados.length / habilesMes.length;
+  // Las 3 ventas se reparten a lo largo de los días trabajados (una por tercio). El
+  // clamp importa: a principio de mes puede haber un solo día hábil y las tres caen ahí.
+  const diaVenta = (i: number): number => {
+    const idx = Math.floor(((i + 1) / 3) * diasTrabajados.length) - 1;
+    return diasTrabajados[Math.min(Math.max(idx, 0), diasTrabajados.length - 1)];
+  };
   const VENTAS_D14 = [
-    { cons: 9015, d: 6, cant: 9000, linea: linBasarili },
-    { cons: 9016, d: 12, cant: 9000, linea: linAgro },
-    { cons: 9017, d: 19, cant: 7500, linea: linAlta },
-  ];
+    { cons: 9015, d: diaVenta(0), cant: Math.round(9000 * fraccionMes), linea: linBasarili },
+    { cons: 9016, d: diaVenta(1), cant: Math.round(9000 * fraccionMes), linea: linAgro },
+    { cons: 9017, d: diaVenta(2), cant: Math.round(7500 * fraccionMes), linea: linAlta },
+  ].filter((v) => v.cant > 0);
   for (const v of VENTAS_D14) {
     const ocv = await prisma.ordenCompra.create({
       data: {
@@ -1263,7 +1306,11 @@ async function main() {
   if (paresFeroz > 0) {
     const subServ = paresFeroz * TARIFA_INY;
     const ivaServ = Math.round(subServ * 0.19);
-    const vencServ = diaUTC(28, 10);
+    // La cuenta de cobro de la maquila se emite con corte al último día trabajado, no
+    // al 28 fijo: en un mes en curso esa fecha todavía no ha llegado y quedaba una
+    // factura emitida en el futuro.
+    const diaCorteServ = diasTrabajados[diasTrabajados.length - 1];
+    const vencServ = diaUTC(diaCorteServ, 10);
     vencServ.setUTCDate(vencServ.getUTCDate() + 30);
     const f = await prisma.factura.create({
       data: {
@@ -1272,7 +1319,7 @@ async function main() {
         despachoId: null,
         clienteId: clienteAlDia.id,
         lineaId: linFeroz!.id,
-        fecha: diaUTC(28, 10),
+        fecha: diaUTC(diaCorteServ, 10),
         fechaVencimiento: vencServ,
         ivaPct: 19,
         subtotal: subServ,
