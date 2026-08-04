@@ -437,6 +437,15 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
 - [ ] Futuros anotados: precio en línea de OCP (costos de compra), nota crédito proveedor (Gálago), anulación de OCP, abonos a cuenta no ligados a factura, cron de recálculo de cartera, retenciones (reteFuente/IVA/ICA).
 - [ ] **`seed:demo` borra facturas de SERVICIO sin filtro** — `factura.deleteMany({ where: { tipo: 'SERVICIO' } })` (y sus líneas y pagos) no acota a los datos de demo, a diferencia del resto de su limpieza, que sí filtra por consecutivo. Hoy no hace daño (prod tiene 0), pero el día que el cliente facture maquila y alguien corra el seed, se las lleva. Acotar por los consecutivos de demo.
 - [ ] **`Linea.id` no es determinista entre entornos** — Feroz es `id=4` en prod y `12` en local. Resolver siempre por `codigo` (el seed ya lo hace; vale para cualquier script nuevo).
+- [ ] 🔧 **PARA MAÑANA (2026-08-05) — la observación de la entrega de materiales no se puede leer.**
+  El campo "Observación (opcional): a quién se le entregó, turno…" de `/fabricacion/of/:id/consumo`
+  se captura, se guarda en `MovimientoInventario.observaciones`, el backend lo devuelve en
+  `GET /inventario/movimientos` y el modelo del frontend lo tipa (`MovimientoKardex.observaciones`)
+  — pero **la tabla del kardex nunca lo pinta**: sus columnas son Fecha·Tipo·Motivo·Ítem·Cantidad·
+  Referencia·Usuario (`inventario-consolidado.component.ts:162`). O sea se le pide un dato al
+  almacenista que después nadie puede consultar desde la interfaz. **Arreglo:** agregar la columna
+  al kardex (y su spec). ~10 min. Detectado el 2026-08-04 preparando la demo; no se tocó ese día
+  para no meter un deploy extra a horas de la reunión, y no la afecta porque `inventario` es INTERNO.
 
 ---
 
