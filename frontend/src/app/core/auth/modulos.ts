@@ -38,8 +38,12 @@ const RANK: Record<NivelLiberacion, number> = { ENTREGADO: 0, EN_STAGE: 1, INTER
 /**
  * Nivel de liberación de cada módulo. Este mapa ES el tablero de la demo:
  * subir un módulo de EN_STAGE a ENTREGADO lo "mergea a cliente" tras aprobar la demo.
+ *
+ * Desde el 2026-08-12 el mapa está TODO en ENTREGADO — el cliente ve el sistema
+ * completo. Los niveles EN_STAGE e INTERNO quedan sin usar acá a propósito: son el
+ * andamiaje para la próxima entrega, que nace en EN_STAGE como siempre.
  */
-const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
+export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // ENTREGADO — visible al cliente (demos 1-2: pedidos + clientes + catálogo/BOM).
   clientes: 'ENTREGADO',
   pedidos: 'ENTREGADO',
@@ -50,27 +54,27 @@ const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // Entregado en la demo de la Entrega 2 (2026-07-17): compras de insumos con
   // costo, recepciones parciales y devoluciones a proveedor.
   compras: 'ENTREGADO',
-  // EN_STAGE — se muestra en la demo de la Entrega 5, aún oculto al cliente.
-  // `facturas` sube de INTERNO a EN_STAGE porque la factura de servicio (maquila
-  // Feroz) vive adentro y su única puerta es /facturas: con el módulo en INTERNO
-  // ni el perfil STAGE podía abrirla, así que gatear solo la sección era inerte.
-  facturas: 'EN_STAGE',
-  // Suben a EN_STAGE para la demo de la Entrega 6 (2026-08-04). Son la casa de todo
-  // lo que hay que mostrar ese día: `fabricacion` guarda la pantalla del almacenista
-  // (consumo real de MP) y los sub-pasos de inyección; `reportes`, la meta diaria
-  // contra días hábiles y las metas por célula de la Entrega 5. Con ambos en INTERNO
-  // ni el perfil STAGE los abría, y la alternativa era demostrar como ADMIN, que le
-  // enseña al cliente el menú entero. Siguen ocultos al rol CLIENTE.
-  fabricacion: 'EN_STAGE',
-  reportes: 'EN_STAGE',
-  // INTERNO — adelantado, solo roles internos.
-  inicio: 'INTERNO',
-  proveedores: 'INTERNO',
-  despachos: 'INTERNO',
-  cartera: 'INTERNO',
-  inventario: 'INTERNO',
-  calidad: 'INTERNO',
-  indicadores: 'INTERNO',
+  // Liberados al cliente el 2026-08-08, tras demostrarse las Entregas 5 y 6.
+  // `facturas` es la puerta de la factura de servicio (maquila Feroz); `fabricacion`
+  // guarda la pantalla del almacenista (consumo real de MP) y los sub-pasos de
+  // inyección; `reportes`, la meta diaria contra días hábiles y las metas por célula.
+  // Ninguno enlaza hacia módulos que sigan INTERNO, así que no deja botones muertos.
+  facturas: 'ENTREGADO',
+  fabricacion: 'ENTREGADO',
+  reportes: 'ENTREGADO',
+  // Liberados al cliente el 2026-08-12: el sistema entero queda a la vista. La razón
+  // no fue que estuvieran "listos" (lo estaban hace demos), sino que mantenerlos
+  // INTERNOS ya le abría huecos a lo que SÍ tenía: veía la factura sin el despacho
+  // que la origina, pedía segundas sin poder consultar el saldo, y la regla de
+  // cartera le bloqueaba un despacho que no podía ir a mirar. Ocultar la mitad de un
+  // ciclo cerrado confunde más que mostrarlo completo.
+  despachos: 'ENTREGADO',
+  cartera: 'ENTREGADO',
+  inventario: 'ENTREGADO',
+  proveedores: 'ENTREGADO',
+  calidad: 'ENTREGADO',
+  indicadores: 'ENTREGADO',
+  inicio: 'ENTREGADO',
 };
 
 /**
@@ -116,17 +120,21 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'ocp-manual': 'ENTREGADO',
   'ocp-anular': 'ENTREGADO',
   'costo-ocp': 'ENTREGADO',
-  // Piso de planta: NO va con compras. "Generar OF" y "Despachar" escriben hacia
-  // módulos que el cliente no puede abrir — `despachos` sigue INTERNO y `fabricacion`
-  // subió a EN_STAGE en la Entrega 6, que tampoco alcanza al rol CLIENTE.
-  'operar-produccion': 'EN_STAGE',
-  // Entrega 5. El módulo `facturas` es EN_STAGE: la sección se queda en EN_STAGE
-  // para mostrarla en la demo con el perfil STAGE. Cuando se libere facturación al
-  // cliente hay que bajar AMBOS a ENTREGADO — el módulo manda sobre la sección.
-  'factura-servicio': 'EN_STAGE',
+  // Piso de planta — liberada el 2026-08-12, el día que se liberó `despachos` (era
+  // justo la condición que la retenía: "Despachar" escribe hacia allá y antes dejaba
+  // un botón que no llevaba a ninguna parte). ⚠️ Deja de ser consulta: el cliente
+  // genera OFs y despacha de verdad. El gate era solo de UI — el backend nunca
+  // bloqueó estos endpoints, así que lo que cambia es quién ve el botón, no qué
+  // permite el servidor.
+  'operar-produccion': 'ENTREGADO',
+  // Entrega 5 — liberada al cliente el 2026-08-08, junto con su módulo `facturas`
+  // (el módulo manda sobre la sección: había que bajar ambos, no solo uno).
+  'factura-servicio': 'ENTREGADO',
   // Entrega 5 — liberada en la demo del 2026-07-31. Cae dentro de `pedidos`, que el
-  // cliente ya tiene. Pide segundas sin poder consultar el saldo (`inventario` sigue
-  // INTERNO): la nota del wizard le avisa que lo que no alcance no se fabrica.
+  // cliente ya tiene. Desde el 2026-08-12 ya puede consultar el saldo de segundas
+  // antes de pedirlas (`inventario` se liberó); la nota del wizard sigue avisando
+  // que lo que no alcance no se fabrica — las segundas salen de un defecto, no de
+  // una orden.
   'venta-segundas': 'ENTREGADO',
 };
 
@@ -168,6 +176,8 @@ export function puedeVerModulo(rol: string | null | undefined, modulo: Modulo): 
 
 /** Ruta de aterrizaje según el rol (a dónde enviar si cae en una ruta no permitida). */
 export function rutaInicial(rol: string | null | undefined): string {
-  // Los internos aterrizan en el panel de inicio; cliente y stage, en la capa comercial.
+  // Desde el 2026-08-12 `inicio` es ENTREGADO, así que TODOS aterrizan en el panel.
+  // Antes cliente y stage caían en la capa comercial (/pedidos/oc) porque el
+  // dashboard enlazaba a módulos que no podían abrir; ya no queda ninguno.
   return puedeVerModulo(rol, 'inicio') ? '/inicio' : '/pedidos/oc';
 }

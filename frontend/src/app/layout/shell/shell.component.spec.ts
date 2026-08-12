@@ -58,7 +58,7 @@ describe('ShellComponent', () => {
     expect(localStorage.getItem('agro-sidebar')).toBe('expandida');
   });
 
-  it('un rol CLIENTE solo ve los ítems de demos 1-2', () => {
+  it('un rol CLIENTE ve el menú completo (liberado el 2026-08-12)', () => {
     const payload = btoa(JSON.stringify({ sub: 9, username: 'cliente', role: 'CLIENTE' }));
     localStorage.setItem('accessToken', `x.${payload}.y`);
     TestBed.configureTestingModule({
@@ -73,13 +73,17 @@ describe('ShellComponent', () => {
     expect(text).toContain('Órdenes de Producción');
     expect(text).toContain('Clientes');
     expect(text).toContain('Configurador de BOM');
-    // ocultos (demos posteriores)
-    expect(text).not.toContain('Inicio');
-    expect(text).not.toContain('Despachos');
-    expect(text).not.toContain('Facturas');
-    expect(text).not.toContain('Cartera');
-    expect(text).not.toContain('Indicadores');
-    expect(text).not.toContain('Reporte diario');
+    // visibles desde el 2026-08-08: Entregas 5 y 6 liberadas al cliente.
+    expect(text).toContain('Facturas');
+    expect(text).toContain('Reporte diario');
+    // visibles desde el 2026-08-12: se liberó el resto del sistema. Ya no hay
+    // módulos INTERNOS, así que el cliente ve el mismo menú que un rol interno.
+    expect(text).toContain('Inicio');
+    expect(text).toContain('Despachos');
+    expect(text).toContain('Cartera');
+    expect(text).toContain('Indicadores');
+    // El teaser "Planta · MES — Próximamente" se borró al liberar fabricación
+    // (2026-08-08): el MES ya existe, anunciarlo como futuro se contradecía.
     expect(text).not.toContain('Próximamente');
   });
 
@@ -99,7 +103,7 @@ describe('ShellComponent', () => {
     expect(text).toContain('Reporte diario');
   });
 
-  it('un rol STAGE ve lo del cliente + la próxima entrega (Compras, Facturas), pero no los módulos internos', () => {
+  it('un rol STAGE ve el menú completo, igual que el cliente', () => {
     const payload = btoa(JSON.stringify({ sub: 7, username: 'stage', role: 'STAGE' }));
     localStorage.setItem('accessToken', `x.${payload}.y`);
     TestBed.configureTestingModule({
@@ -122,9 +126,11 @@ describe('ShellComponent', () => {
     // diaria contra días hábiles — todo lo que se muestra el 2026-08-04.
     expect(text).toContain('Reporte diario');
     expect(text).toContain('Tablero de fabricación');
-    // internos ocultos
-    expect(text).not.toContain('Inicio');
-    expect(text).not.toContain('Despachos');
+    // Desde el 2026-08-12 tampoco quedan internos ocultos para STAGE. Su privilegio
+    // (alcanzar EN_STAGE) sigue vivo en el escalafón, pero hoy no hay nada ahí:
+    // volverá a notarse cuando la próxima entrega nazca oculta al cliente.
+    expect(text).toContain('Inicio');
+    expect(text).toContain('Despachos');
   });
 
   it('arranca colapsada si la preferencia guardada es "colapsada"', () => {

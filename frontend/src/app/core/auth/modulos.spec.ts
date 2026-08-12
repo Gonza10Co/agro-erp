@@ -11,16 +11,27 @@ describe('puedeVerModulo', () => {
     expect(puedeVerModulo('CLIENTE', 'compras')).toBeTrue();
   });
 
-  it('CLIENTE NO ve los módulos de demos posteriores', () => {
-    expect(puedeVerModulo('CLIENTE', 'inicio')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'despachos')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'facturas')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'cartera')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'inventario')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'fabricacion')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'calidad')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'indicadores')).toBeFalse();
-    expect(puedeVerModulo('CLIENTE', 'reportes')).toBeFalse();
+  it('CLIENTE ve lo liberado el 2026-08-08 (Entregas 5 y 6, ya demostradas)', () => {
+    // Facturación, con la factura de servicio de la maquila Feroz adentro.
+    expect(puedeVerModulo('CLIENTE', 'facturas')).toBeTrue();
+    // Piso de planta en modo consulta: ve el avance, pero no opera (ver
+    // `operar-produccion`, que se queda en EN_STAGE mientras despachos sea INTERNO).
+    expect(puedeVerModulo('CLIENTE', 'fabricacion')).toBeTrue();
+    // Reporte diario gerencial: meta diaria contra días hábiles y metas por célula.
+    expect(puedeVerModulo('CLIENTE', 'reportes')).toBeTrue();
+  });
+
+  it('CLIENTE ve el sistema completo, liberado el 2026-08-12', () => {
+    // Cierra el ciclo: el despacho que origina la factura, la cartera que lo
+    // bloquea y el inventario que descarga. Tenerlos INTERNOS le abría huecos en
+    // los módulos que sí tenía, no le ocultaba una demo futura.
+    expect(puedeVerModulo('CLIENTE', 'despachos')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'cartera')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'inventario')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'proveedores')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'calidad')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'indicadores')).toBeTrue();
+    expect(puedeVerModulo('CLIENTE', 'inicio')).toBeTrue();
   });
 
   it('ADMIN y GERENTE ven todo', () => {
@@ -52,32 +63,24 @@ describe('puedeVerModulo', () => {
       expect(puedeVerNivel('CLIENTE', 'EN_STAGE')).toBeFalse();
     });
 
-    // Entrega 5: `facturas` sube a EN_STAGE porque la factura de servicio (maquila
-    // Feroz) solo se alcanza desde /facturas. Sin esto la pantalla era invisible
-    // hasta para el perfil con el que se hace la demo.
-    it('ve facturas, el módulo de la demo de la Entrega 5', () => {
+    // Entregas 5 y 6 — liberadas al cliente el 2026-08-08. STAGE las sigue viendo,
+    // ahora por herencia: su alcance incluye todo lo ENTREGADO. Se dejan asertadas
+    // para que una regresión que las devuelva a INTERNO no pase inadvertida.
+    it('ve facturas, fabricacion y reportes, ya liberados al cliente', () => {
       expect(puedeVerModulo('STAGE', 'facturas')).toBeTrue();
       expect(puedeVerSeccion('STAGE', 'factura-servicio')).toBeTrue();
-      // …y el cliente sigue sin verlo: el módulo lo tapa aunque la sección se libere.
-      expect(puedeVerModulo('CLIENTE', 'facturas')).toBeFalse();
-    });
-
-    // Entrega 6: `fabricacion` y `reportes` suben a EN_STAGE por la misma razón que
-    // `facturas` en la Entrega 5 — son la única puerta a lo que se muestra ese día
-    // (consumo real de MP, sub-pasos de inyección, meta diaria contra días hábiles).
-    it('ve fabricacion y reportes, los módulos de la demo de la Entrega 6', () => {
       expect(puedeVerModulo('STAGE', 'fabricacion')).toBeTrue();
       expect(puedeVerModulo('STAGE', 'reportes')).toBeTrue();
-      // …y el cliente sigue sin verlos hasta que se liberen.
-      expect(puedeVerModulo('CLIENTE', 'fabricacion')).toBeFalse();
-      expect(puedeVerModulo('CLIENTE', 'reportes')).toBeFalse();
     });
 
-    it('NO ve los módulos INTERNOS (adelantados, solo roles internos)', () => {
-      expect(puedeVerModulo('STAGE', 'inicio')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'despachos')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'inventario')).toBeFalse();
-      expect(puedeVerModulo('STAGE', 'indicadores')).toBeFalse();
+    // Ya no queda ningún módulo INTERNO (2026-08-12): STAGE los ve todos, ahora por
+    // herencia de ENTREGADO. Lo que se asserta es que el ESCALAFÓN sigue vivo, para
+    // que la próxima entrega pueda volver a nacer oculta al cliente.
+    it('sigue alcanzando EN_STAGE, que es lo que lo distingue del cliente', () => {
+      expect(puedeVerNivel('STAGE', 'EN_STAGE')).toBeTrue();
+      expect(puedeVerNivel('STAGE', 'INTERNO')).toBeFalse();
+      expect(puedeVerModulo('STAGE', 'inicio')).toBeTrue();
+      expect(puedeVerModulo('STAGE', 'despachos')).toBeTrue();
     });
   });
 });
@@ -102,15 +105,26 @@ describe('puedeVerNivel (gate de secciones dentro de un módulo)', () => {
 });
 
 describe('puedeVerSeccion (tablero de la demo)', () => {
-  it('el CLIENTE NO ve lo que sigue reservado para la demo', () => {
-    // Generar OF y despachar escriben hacia módulos que el cliente no puede abrir
-    // (`despachos` sigue INTERNO; `fabricacion` subió a EN_STAGE en la Entrega 6, que
-    // tampoco alcanza): el gating es de UI y el POST sí correría, así que liberarlo
-    // lo dejaría creando OFs de verdad frente a una pantalla que lo rebota.
-    expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeFalse();
-    // La factura de servicio (maquila Feroz) se muestra en la demo con el perfil
-    // STAGE; el módulo `facturas` la tapa para el cliente aunque la sección subiera.
-    expect(puedeVerSeccion('CLIENTE', 'factura-servicio')).toBeFalse();
+  it('el CLIENTE ya OPERA producción, liberado el 2026-08-12', () => {
+    // "Generar OF" y "Despachar" escriben hacia `despachos`, que se liberó el mismo
+    // día: era la condición que retenía esta sección. Ojo: el gate siempre fue de
+    // UI (el POST corría igual), así que lo que cambia es que ahora ve el botón.
+    expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeTrue();
+  });
+
+  it('no queda ninguna sección reservada: el tablero está todo en ENTREGADO', () => {
+    // Centinela de la próxima entrega: cuando algo nuevo nazca en EN_STAGE, este
+    // test cae y obliga a decidir a conciencia si va oculto al cliente o no.
+    const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
+    for (const s of secciones) {
+      expect(puedeVerSeccion('CLIENTE', s)).withContext(s).toBeTrue();
+    }
+  });
+
+  it('el CLIENTE ve la factura de servicio, liberada el 2026-08-08', () => {
+    // Entrega 5, la maquila de Feroz. Subió junto con su módulo `facturas`: el
+    // módulo manda sobre la sección, así que había que bajar ambos.
+    expect(puedeVerSeccion('CLIENTE', 'factura-servicio')).toBeTrue();
   });
 
   it('el CLIENTE ve lo liberado en la demo de la Entrega 5 (2026-07-31)', () => {
@@ -149,11 +163,12 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
 });
 
 describe('rutaInicial', () => {
-  it('CLIENTE aterriza en /pedidos/oc', () => {
-    expect(rutaInicial('CLIENTE')).toBe('/pedidos/oc');
-  });
-  it('STAGE también aterriza en la capa comercial (/pedidos/oc)', () => {
-    expect(rutaInicial('STAGE')).toBe('/pedidos/oc');
+  // Desde el 2026-08-12 `inicio` es ENTREGADO ⇒ todos aterrizan en el panel. Antes
+  // cliente y stage caían en /pedidos/oc porque el dashboard enlazaba a módulos que
+  // no podían abrir; ya no queda ninguno.
+  it('CLIENTE y STAGE aterrizan en el panel de inicio', () => {
+    expect(rutaInicial('CLIENTE')).toBe('/inicio');
+    expect(rutaInicial('STAGE')).toBe('/inicio');
   });
   it('los roles internos aterrizan en /inicio', () => {
     expect(rutaInicial('ADMIN')).toBe('/inicio');

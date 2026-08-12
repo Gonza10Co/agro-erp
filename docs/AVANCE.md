@@ -4,8 +4,28 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-08-04** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-08-12** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **🔓 SISTEMA COMPLETO LIBERADO AL CLIENTE — 2026-08-12.** `NIVEL_MODULO` y `NIVEL_SECCION`
+> quedan **todos en ENTREGADO**: no hay nada oculto al rol CLIENTE. Suben de una vez `despachos`,
+> `cartera`, `inventario`, `proveedores`, `calidad`, `indicadores`, `inicio` y la sección
+> `operar-produccion`. El disparador no fue que estuvieran "listos" (lo estaban hace demos), sino
+> que mantenerlos INTERNOS **le abría huecos a lo que sí tenía**: veía la factura sin el despacho
+> que la origina, pedía segundas sin poder consultar el saldo, y la regla de cartera le bloqueaba
+> un despacho que no podía ir a mirar.
+>
+> Dos consecuencias que NO son cosméticas:
+> 1. **`operar-produccion` deja de ser consulta**: el cliente genera OFs y despacha de verdad.
+>    El gate siempre fue de UI — el backend nunca bloqueó esos endpoints —, así que lo que
+>    cambia es quién ve el botón, no qué permite el servidor.
+> 2. **`rutaInicial` manda a todos a `/inicio`**: con `inicio` liberado, cliente y stage aterrizan
+>    en el dashboard en vez de `/pedidos/oc`. Correcto, porque ya no enlaza a módulos cerrados.
+>
+> El escalafón ENTREGADO/EN_STAGE/INTERNO **sigue vivo** para la próxima entrega, que nace en
+> `EN_STAGE` como siempre. Como ya no queda ningún ejemplo real de módulo oculto, los specs del
+> guard **simulan uno** (mutan el mapa y lo restauran): así prueban el mecanismo y no el estado
+> del tablero. Front 357 tests en verde.
 >
 > **Entrega 6 desplegada a prod el 2026-08-04** (merge `--no-ff` `4bc4237` + tag `entrega-6`).
 > Las 3 migraciones son aditivas (`MovimientoInventario.ofId`, enum `SubPasoInyeccion` + 2

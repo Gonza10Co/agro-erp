@@ -165,15 +165,6 @@ const SIDEBAR_KEY = 'agro-sidebar';
           </a>
         </div>
         }
-        @if (puedeVer('fabricacion')) {
-        <div class="nav-group">
-          <div class="nav-group-h">Planta · MES<span class="nav-tag">Próximamente</span></div>
-          <a class="nav-item is-soon" href="#" tabindex="-1" aria-disabled="true">
-            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.5 15.5M20 20L8.5 8.5"/></svg></span>
-            <span class="nav-label">Corte & Guarnición</span>
-          </a>
-        </div>
-        }
       </nav>
       <div class="sidebar-foot">
         <div class="user-card">
