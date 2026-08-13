@@ -18,6 +18,10 @@ import { FacturasModule } from './facturas/factura.module';
 import { CarteraModule } from './cartera/cartera.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportesModule } from './reportes/reportes.module';
+// Administración: accesos al sistema (User) y gente de planta (Operario). Son
+// entidades distintas — el operario no tiene login, solo firma escaneos.
+import { UsersModule } from './users/users.module';
+import { OperariosModule } from './operarios/operarios.module';
 
 @Module({
   imports: [
@@ -39,6 +43,8 @@ import { ReportesModule } from './reportes/reportes.module';
     CarteraModule,
     DashboardModule,
     ReportesModule,
+    UsersModule,
+    OperariosModule,
   ],
   controllers: [AppController],
 })
