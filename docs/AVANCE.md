@@ -510,6 +510,17 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
 - [x] **Tags al día** ✅ 2026-07-12 — creados `demo-9` (ed05bb2), `demo-10` (f7af48d), `demo-11` (40a4ab6), `demo-12` (9ff9fad) sobre el commit de cierre de cada demo en `develop` (entraron a `master` en bloque con la 13, sin merge propio) y `demo-14` (a97b4b9, el merge que la llevó a `master`, mismo patrón que `demo-13`). Ya existían: `demo-1`, `demo-13`, `nucleo-real`, `entrega-1`, `entrega-1.1`, `entrega-2`.
 - [x] **Merges verificados** ✅ 2026-07-12 — `master` contiene todo `develop` (las demos 2-12 entraron en los merges en bloque; no hay nada sin mergear). Regla vigente: cada entrega/demo nueva sí lleva su merge `--no-ff` + tag.
 
+- [x] **Rotar la contraseña de la base en Railway** ✅ 2026-08-13 — pendiente desde el 29-jul.
+  Rotada y verificada con un login real contra prod. Costó **~8 min de caída** (se estimaron 2)
+  por dos trampas de la CLI que quedan anotadas en la memoria `urls-produccion`: **(a)**
+  `railway variable set --skip-deploys` actualiza la variable pero **deja el contenedor con el
+  valor viejo en memoria** — el backend sigue respondiendo 401 en `/auth/me` (la app vive) y da
+  **500 en todo lo que toca la base**; hace falta `railway redeploy --service backend`; **(b)**
+  las variables **tardan segundos en reflejarse** en `railway variables --kv`, así que verificar
+  enseguida da un falso negativo. Confirmado de paso que `backend.DATABASE_URL` **es una
+  referencia** a `Postgres.DATABASE_URL`: basta actualizar el servicio Postgres.
+  ⚠️ Verificar SIEMPRE con un **login real**, no con `/auth/me`: el 401 engaña.
+
 ### 4) Deudas técnicas menores (anotadas, no bloquean)
 - [ ] `op-detalle` muestra flash de skeleton al recargar tras Anular.
 - [ ] Anular OP es destructivo y no pide confirmación (validar con cliente).
