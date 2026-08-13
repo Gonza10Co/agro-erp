@@ -159,7 +159,7 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
           <h4>Kardex — últimos movimientos</h4>
           @if (kardex().length) {
             <table class="tabla">
-              <thead><tr><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Ítem</th><th class="num">Cantidad</th><th>Referencia</th><th>Usuario</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Motivo</th><th>Ítem</th><th class="num">Cantidad</th><th>Referencia</th><th>Usuario</th><th>Observaciones</th></tr></thead>
               <tbody>
                 @for (mv of kardex(); track mv.id) {
                   <tr>
@@ -170,6 +170,10 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
                     <td class="num cell-mono">{{ mv.cantidad | number:'1.0-2' }} {{ mv.material?.unidadMedida?.codigo ?? 'par' }}</td>
                     <td class="cell-mono cell-sub">{{ mv.referencia ?? '—' }}</td>
                     <td class="cell-sub">{{ mv.usuario?.username ?? 'sistema' }}</td>
+                    <!-- El motivo que el almacenista escribió al mover a mano. Se venía
+                         guardando desde siempre y no había dónde leerlo. Va también en el
+                         title: el texto es libre y puede pasarse del ancho de la celda. -->
+                    <td class="cell-sub" [title]="mv.observaciones ?? ''">{{ mv.observaciones ?? '—' }}</td>
                   </tr>
                 }
               </tbody>
