@@ -46,6 +46,11 @@ export const routes: Routes = [
       { path: 'calidad', data: { modulo: 'calidad' }, loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', data: { modulo: 'indicadores' }, loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
       { path: 'reportes/diario', data: { modulo: 'reportes' }, loadComponent: () => import('./features/reportes/reporte-diario.component').then(m => m.ReporteDiarioComponent) },
+      // Administración. El `data.modulo` no es decorativo: sin él el cliente
+      // entraría tecleando la URL aunque el menú esté oculto — el backend no
+      // gatea por nivel de liberación (pasó con /compras/ordenes/nueva).
+      { path: 'administracion/usuarios', data: { modulo: 'administracion' }, loadComponent: () => import('./features/administracion/usuarios-list.component').then(m => m.UsuariosListComponent) },
+      { path: 'administracion/operarios', data: { modulo: 'administracion' }, loadComponent: () => import('./features/administracion/operarios-list.component').then(m => m.OperariosListComponent) },
       { path: '', pathMatch: 'full', redirectTo: 'inicio' },
     ],
   },

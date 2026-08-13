@@ -21,7 +21,15 @@ describe('puedeVerModulo', () => {
     expect(puedeVerModulo('CLIENTE', 'reportes')).toBeTrue();
   });
 
-  it('CLIENTE ve el sistema completo, liberado el 2026-08-12', () => {
+  it('CLIENTE NO ve administracion: es la proxima entrega (EN_STAGE)', () => {
+    // El escalafón vuelve a tener uso tras la liberación total del 2026-08-12.
+    // Sube a ENTREGADO el día que se muestre la demo, no antes.
+    expect(puedeVerModulo('CLIENTE', 'administracion')).toBeFalse();
+    expect(puedeVerModulo('STAGE', 'administracion')).toBeTrue();
+    expect(puedeVerModulo('ADMIN', 'administracion')).toBeTrue();
+  });
+
+  it('CLIENTE ve el resto del sistema, liberado el 2026-08-12', () => {
     // Cierra el ciclo: el despacho que origina la factura, la cartera que lo
     // bloquea y el inventario que descarga. Tenerlos INTERNOS le abría huecos en
     // los módulos que sí tenía, no le ocultaba una demo futura.
@@ -81,6 +89,8 @@ describe('puedeVerModulo', () => {
       expect(puedeVerNivel('STAGE', 'INTERNO')).toBeFalse();
       expect(puedeVerModulo('STAGE', 'inicio')).toBeTrue();
       expect(puedeVerModulo('STAGE', 'despachos')).toBeTrue();
+      // Y eso es exactamente lo que le deja ver la próxima entrega en la demo.
+      expect(puedeVerModulo('STAGE', 'administracion')).toBeTrue();
     });
   });
 });

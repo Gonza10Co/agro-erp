@@ -165,6 +165,20 @@ const SIDEBAR_KEY = 'agro-sidebar';
           </a>
         </div>
         }
+
+        @if (puedeVer('administracion')) {
+        <div class="nav-group">
+          <div class="nav-group-h">Administración</div>
+          <a class="nav-item" routerLink="/administracion/usuarios" routerLinkActive="is-active" title="Usuarios del sistema">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>
+            <span class="nav-label">Usuarios</span>
+          </a>
+          <a class="nav-item" routerLink="/administracion/operarios" routerLinkActive="is-active" title="Operarios de planta">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20v-1a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v1"/><circle cx="12" cy="7" r="3"/><path d="M9 4.5a3.5 3.5 0 0 1 6 0"/></svg></span>
+            <span class="nav-label">Operarios</span>
+          </a>
+        </div>
+        }
       </nav>
       <div class="sidebar-foot">
         <div class="user-card">

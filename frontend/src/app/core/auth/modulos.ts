@@ -27,7 +27,8 @@ export type Modulo =
   | 'fabricacion'
   | 'calidad'
   | 'indicadores'
-  | 'reportes';
+  | 'reportes'
+  | 'administracion';
 
 /** Nivel de madurez de un módulo o sección (menor = más liberado al cliente). */
 export type NivelLiberacion = 'ENTREGADO' | 'EN_STAGE' | 'INTERNO';
@@ -39,9 +40,9 @@ const RANK: Record<NivelLiberacion, number> = { ENTREGADO: 0, EN_STAGE: 1, INTER
  * Nivel de liberación de cada módulo. Este mapa ES el tablero de la demo:
  * subir un módulo de EN_STAGE a ENTREGADO lo "mergea a cliente" tras aprobar la demo.
  *
- * Desde el 2026-08-12 el mapa está TODO en ENTREGADO — el cliente ve el sistema
- * completo. Los niveles EN_STAGE e INTERNO quedan sin usar acá a propósito: son el
- * andamiaje para la próxima entrega, que nace en EN_STAGE como siempre.
+ * El 2026-08-12 el mapa quedó TODO en ENTREGADO — el cliente ve el sistema completo.
+ * Desde el 2026-08-13 vuelve a haber un módulo en EN_STAGE (`administracion`): es la
+ * próxima entrega, que como siempre nace oculta al cliente.
  */
 export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // ENTREGADO — visible al cliente (demos 1-2: pedidos + clientes + catálogo/BOM).
@@ -75,6 +76,10 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   calidad: 'ENTREGADO',
   indicadores: 'ENTREGADO',
   inicio: 'ENTREGADO',
+  // EN_STAGE — la próxima entrega, aún oculta al cliente. Administración de
+  // usuarios (accesos al sistema) y operarios (gente de planta). Nace acá por
+  // la regla de siempre: solo sube a ENTREGADO el día que se muestra.
+  administracion: 'EN_STAGE',
 };
 
 /**

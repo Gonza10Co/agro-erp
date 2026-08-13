@@ -29,6 +29,22 @@ export class AuthService {
     }
   }
 
+  /**
+   * Id del usuario en sesión (`sub` del JWT). Lo usa el ABM para no ofrecerle
+   * a alguien desactivarse a sí mismo — el backend lo rechaza igual, pero
+   * mostrar un botón que siempre falla es peor que no mostrarlo.
+   */
+  userId(): number | null {
+    const t = this.accessToken;
+    if (!t) return null;
+    try {
+      const payload = JSON.parse(atob(t.split('.')[1]));
+      return payload.sub ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   usuario(): { username: string; role: string } | null {
     const t = this.accessToken;
     if (!t) return null;
