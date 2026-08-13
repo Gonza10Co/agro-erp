@@ -350,7 +350,17 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
 
 ### 2) Deploy a producción
 - [x] **Conectar el servicio `backend` de Railway a GitHub (branch `master`)** ✅ 2026-06-16 — backend auto-despliega desde `master` e igual que Vercel; el primer deploy aplicó las 13 migraciones pendientes (DB al día).
-- [ ] **Re-desplegar el frontend (Vercel)** — quedó atrás del backend (commit setup inicial). Redeploy en Vercel o push a `master`.
+- [x] **Re-desplegar el frontend (Vercel)** ✅ 2026-08-13 — el front llevaba **9 días atrasado**
+  (último deploy 04-ago) porque el push del 12-ago no disparó nada. Dos causas independientes:
+  **(a)** el **webhook de la GitHub App no llega** — la config está impecable (`productionBranch:
+  master`, repo conectado, sin `ignoreCommand`, sin pausa), y ya había pasado en jun-2026, así
+  que es reincidente; **(b)** `npm install` **rompe todo build limpio** por el lock podado por
+  Windows (`vite/node_modules/esbuild`: `Expected "0.25.12" but got "0.28.0"`) — los deploys
+  anteriores sobrevivían por la caché de build. Fix en `vercel.json` (`df0c695`): se adopta la
+  receta del CI. ⚠️ **El `vercel.json` de la raíz MANDA sobre el dashboard/API**: cambiar el
+  Install Command por API no tuvo ningún efecto. Deploy verificado: 225s, prod 200 con el bundle
+  nuevo. **Queda pendiente arreglar el webhook** — hasta entonces, verificar a mano que cada push
+  a `master` creó su deployment (`npx vercel ls frontend`).
 - [x] **Datos de prod definidos** ✅ 2026-06-17 — catálogo real del cliente cargado en local vía `seed:basarili` (CSVs del Drive). En prod se corre el seed **una vez** contra Railway.
 - [x] **Capturar consumos de BOM** ✅ 2026-07-09 — cargados los consumos REALES con curva por talla y despiece (refs 101-106) desde `CONSUMOSXREFERENCIA`; los 16 bloques sin prueba industrial (celda blanca) quedaron en cero a la espera del cliente.
 - [ ] **ABM de usuarios** 🔺 **subió de prioridad el 2026-08-12** — hoy operan con usuarios
