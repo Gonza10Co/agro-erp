@@ -354,13 +354,26 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   (último deploy 04-ago) porque el push del 12-ago no disparó nada. Dos causas independientes:
   **(a)** el **webhook de la GitHub App no llega** — la config está impecable (`productionBranch:
   master`, repo conectado, sin `ignoreCommand`, sin pausa), y ya había pasado en jun-2026, así
-  que es reincidente; **(b)** `npm install` **rompe todo build limpio** por el lock podado por
-  Windows (`vite/node_modules/esbuild`: `Expected "0.25.12" but got "0.28.0"`) — los deploys
+  que es reincidente; **(b)** `npm install` **rompe todo build limpio**
+  (`vite/node_modules/esbuild`: `Expected "0.25.12" but got "0.28.0"`) — los deploys
   anteriores sobrevivían por la caché de build. Fix en `vercel.json` (`df0c695`): se adopta la
   receta del CI. ⚠️ **El `vercel.json` de la raíz MANDA sobre el dashboard/API**: cambiar el
   Install Command por API no tuvo ningún efecto. Deploy verificado: 225s, prod 200 con el bundle
-  nuevo. **Queda pendiente arreglar el webhook** — hasta entonces, verificar a mano que cada push
-  a `master` creó su deployment (`npx vercel ls frontend`).
+  nuevo. ✅ **Webhook arreglado** el mismo día con `vercel git disconnect && vercel git connect`,
+  y **probado con un commit sonda** (`--allow-empty`): a los 15s ya estaba construyendo solo. En
+  jun-2026 se dio por arreglado sin probar y se volvió a caer sin que nadie se enterara — de ahí
+  la sonda.
+  ⚠️ **CORRECCIÓN sobre la causa de (b)** (mismo día, tras medirlo): el commit `df0c695` culpó al
+  "lock podado por Windows". **Es falso.** El lock está COMPLETO: trae los binarios `@esbuild` en
+  0.25.12 (52 plataformas) *y* en 0.28.0 (26), y un lock regenerado desde cero con
+  `npm install --package-lock-only` da los mismos 1812 paquetes y los mismos 22 bindings de
+  `@unrs`. **Regenerar el lock NO arregla nada — no gasten tiempo ahí.** La causa real es la
+  coexistencia de dos versiones de esbuild (`vite` pide `^0.25`; `tsx` y `@angular/build`, `0.28`):
+  `node_modules/.bin/esbuild` queda dedupeado al de la raíz, y el `install.js` del esbuild anidado
+  lo ejecuta para validarse y ve la versión que no es. Cualquier `npm install` limpio lo reproduce
+  en cualquier SO ⇒ **`--ignore-scripts` es la solución correcta**, no un paliativo, y es lo que el
+  CI lleva semanas haciendo. Corolario: **`tools/fix-lock-bindings.mjs` quedó inerte** — sale por
+  su early-return de la línea 19 porque el binding que repone ya está en el lock.
 - [x] **Datos de prod definidos** ✅ 2026-06-17 — catálogo real del cliente cargado en local vía `seed:basarili` (CSVs del Drive). En prod se corre el seed **una vez** contra Railway.
 - [x] **Capturar consumos de BOM** ✅ 2026-07-09 — cargados los consumos REALES con curva por talla y despiece (refs 101-106) desde `CONSUMOSXREFERENCIA`; los 16 bloques sin prueba industrial (celda blanca) quedaron en cero a la espera del cliente.
 - [x] **ABM de usuarios Y operarios** ✅ 2026-08-13 (EN_STAGE) — módulo `administracion`.
