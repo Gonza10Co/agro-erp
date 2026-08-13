@@ -378,8 +378,27 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   expirara, que era justo el hueco a cerrar. El actor sale del token (`req.user.sub`), nunca del
   body. En operarios el nombre no se repite dentro de una célula (dos "Juan Pérez" en CORTE harían
   imposible saber quién escaneó) y el listado de administración incluye a los retirados, para
-  poder reactivarlos. 568 tests backend + 372 frontend en verde. **Falta:** verificación E2E viva
-  y liberar el gate a ENTREGADO el día de la demo.
+  poder reactivarlos. 568 tests backend + 372 frontend en verde.
+  **✅ Verificado E2E vivo local (2026-08-13)**, base restaurada al terminar: el `passwordHash`
+  no viaja en el listado (campos: id/username/isActive/createdAt/role) · crear → **entrar con el
+  usuario nuevo** → desactivar ⇒ sus refresh tokens en la base pasan de **1 a 0** y el login
+  responde **401** · auto-desactivarse **400**, auto-degradarse **400**, username repetido **409**
+  · desactivar a un ADMIN habiendo otro activo **200** (no bloquea de más) · operario duplicado en
+  la misma célula **409**, mismo nombre en otra célula **201**, y al retirarlo **sale del selector
+  del piso** (`?soloActivos`) pero **sigue en administración**.
+  🔎 **Dos hallazgos de la verificación, ninguno introducido por este cambio:**
+  1. **No existe `POST /auth/refresh`.** El login emite y **persiste** un `refreshToken`, pero no
+     hay endpoint para canjearlo — el token se guarda y nunca se usa. La revocación que este ABM
+     agrega cubre por adelantado ese vector, pero hoy la sesión larga sencillamente no existe.
+  2. El **access token dura 15 min** y el JWT es stateless ⇒ un usuario recién desactivado
+     **sigue operando hasta 15 minutos** con el token que ya tenía en la mano. Es el estándar y no
+     se arregla desde el ABM (haría falta una lista de revocación o validar `isActive` en el
+     guard), pero conviene saberlo antes de prometerle al cliente "corte inmediato".
+  ⚠️ El guardarraíl del **último ADMIN** quedó como red defensiva, no como camino alcanzable:
+  siendo `/usuarios` solo-ADMIN y estando prohibido tocarse a sí mismo, el actor siempre es otro
+  ADMIN activo, así que el conteo nunca llega a cero. Protege si algún día el servicio se llama
+  sin actor (seed, script). Está cubierto por tests unitarios, no por la E2E.
+  **Falta:** liberar el gate a ENTREGADO el día de la demo.
 
 ### 2.b) Tablero de la demo de la Entrega 5 (2026-07-29 → viernes 2026-07-31)
 
