@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install",
+  "installCommand": "npm ci --ignore-scripts && node tools/fix-lock-bindings.mjs",
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist/frontend/browser",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
