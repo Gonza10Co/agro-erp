@@ -376,10 +376,22 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   ⚠️⚠️ **PERO el lock SÍ está podado para `unrs-resolver`**: tiene **2 claves reales**
   (`linux-x64-gnu`, `win32-x64-msvc`) de las **22** que el paquete declara — **falta darwin**. Ese
   es el daño real que sufre el Mac (tests: `Module ts-jest ... was not found`), y **regenerarlo lo
-  arregla**: `npm install --package-lock-only` produce las 22 claves. Queda como tarea pendiente,
-  coordinada con un deploy y re-verificando los 940 tests. `tools/fix-lock-bindings.mjs` está
-  **inerte hoy** (repone `linux-x64-gnu`, que ya está) pero **no se puede borrar**: es la red por
-  si el lock se regenera donde linux se pode.
+  arregla**, pero NO regenerando el lock. ✅ **Resuelto el 2026-08-13** (`7f9f6cd`) por la vía
+  quirúrgica: `tools/fix-lock-bindings.mjs` pasa de reponer un binding cableado a recorrer una
+  lista, y ahora repone también `darwin-arm64`. Diff en el lock: **+1 entrada, 0 eliminadas, 0
+  versiones movidas**. Con eso **se cae el paso manual** que había que hacer en cada instalación
+  del Mac (`npm pack` + `tar`); verificado con `npm ci --ignore-scripts` limpio + 568/375 tests +
+  `ng build`.
+  ❌ **Regenerar el lock entero quedó DESCARTADO, medido:** sin flags borra **112 entradas**
+  (incluida `@esbuild/linux-x64`) ⇒ rompe el build de producción; con `--os=darwin --cpu=arm64`
+  sí da un lock más completo pero **mueve 259 versiones** (`@angular/core` 19.2.24→19.2.25 y
+  varios paquetes hacia atrás) ⇒ es una actualización de dependencias, no un arreglo, y merece su
+  propia sesión. Ojo: `--package-lock-only` **respeta el lock existente**; para reconstruirlo hay
+  que borrarlo primero, y ahí es donde poda.
+  ⚠️ Ahora que la Mac es la única máquina de desarrollo, **la poda cambia de lado**: cada
+  `npm install` local agrega darwin y borra `linux-x64-gnu`, el que necesitan CI y Vercel. El
+  script es más necesario que antes — **no borrarlo aunque parezca inerte**: queda inerte justo
+  cuando el lock está sano, que es su trabajo.
   🧮 **Lección de método:** al auditar un lock, contar `Object.keys(lock.packages)` — las entradas
   reales — y NO las `optionalDependencies` que un paquete *declara*. Confundirlas fue justo lo que
   me hizo afirmar que el lock estaba completo cuando estaba podado.
