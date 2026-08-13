@@ -363,11 +363,23 @@ Llegaron con el Sheet **`CONSUMO POR REFERENCIAS`** (12 pestañas, solo lectura 
   a `master` creó su deployment (`npx vercel ls frontend`).
 - [x] **Datos de prod definidos** ✅ 2026-06-17 — catálogo real del cliente cargado en local vía `seed:basarili` (CSVs del Drive). En prod se corre el seed **una vez** contra Railway.
 - [x] **Capturar consumos de BOM** ✅ 2026-07-09 — cargados los consumos REALES con curva por talla y despiece (refs 101-106) desde `CONSUMOSXREFERENCIA`; los 16 bloques sin prueba industrial (celda blanca) quedaron en cero a la espera del cliente.
-- [ ] **ABM de usuarios** 🔺 **subió de prioridad el 2026-08-12** — hoy operan con usuarios
-  sembrados y `backend/src/users` **no tiene controller**: es solo el servicio interno del login,
-  sin endpoints ni pantalla. Dejó de ser "diferido" el día que se liberó el sistema completo: el
-  cliente ahora genera OFs y despacha de verdad, y el MES registra **operario por escaneo en cada
-  célula** — sin ABM no puede dar de alta a su propia gente ni retirar a quien se va.
+- [x] **ABM de usuarios Y operarios** ✅ 2026-08-13 (EN_STAGE) — módulo `administracion`.
+  Al construirlo salió que **eran dos entidades distintas y ninguna tenía ABM**: `User` (login al
+  sistema) y `Operario` (gente de planta, **sin login**, que queda firmada en cada escaneo del
+  MES). Ambas se sembraban por seed ⇒ cada persona que entraba o salía exigía tocar la base a
+  mano. **Ninguna se borra**: `User` firma despachos, incidencias, movimientos de inventario y
+  recepciones; `Operario`, eventos de trazabilidad e incidencias — un DELETE rompería la
+  trazabilidad, que es el corazón del MES. Ambas ya traían su bandera (`isActive`/`activo`).
+  Guardarraíles de usuarios, todos con test: el `passwordHash` **nunca sale por la API**; nadie
+  puede desactivarse ni cambiarse el rol a sí mismo; **no se puede desactivar NI degradar al
+  último ADMIN activo** (dejaría el sistema sin quién lo administre, y el ABM es lo único que lo
+  revertiría); y **desactivar o resetear contraseña revocan los refresh tokens** — sin eso
+  desactivar no servía de nada, quien se va seguía entrando con su sesión viva hasta que
+  expirara, que era justo el hueco a cerrar. El actor sale del token (`req.user.sub`), nunca del
+  body. En operarios el nombre no se repite dentro de una célula (dos "Juan Pérez" en CORTE harían
+  imposible saber quién escaneó) y el listado de administración incluye a los retirados, para
+  poder reactivarlos. 568 tests backend + 372 frontend en verde. **Falta:** verificación E2E viva
+  y liberar el gate a ENTREGADO el día de la demo.
 
 ### 2.b) Tablero de la demo de la Entrega 5 (2026-07-29 → viernes 2026-07-31)
 
