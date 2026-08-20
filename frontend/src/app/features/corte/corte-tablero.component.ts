@@ -1,5 +1,4 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe, DatePipe, PercentPipe } from '@angular/common';
 import { CorteApi } from '../../core/api/corte.api';
@@ -23,7 +22,7 @@ function claseCumplimiento(v: number | null): string {
 @Component({
   selector: 'app-corte-tablero',
   standalone: true,
-  imports: [RouterLink, FormsModule, DecimalPipe, DatePipe, PercentPipe],
+  imports: [FormsModule, DecimalPipe, DatePipe, PercentPipe],
   template: `
     <div class="page">
       <div class="page-header">
@@ -130,7 +129,9 @@ function claseCumplimiento(v: number | null): string {
                 @for (o of ordenes(); track o.id) {
                   <tr>
                     <td>
-                      <a class="mono" [routerLink]="['/corte/ordenes', o.id]">{{ o.codigo }}</a>
+                      <!-- Sin enlace todavía: el detalle de la orden es de la Quincena 2.
+                           Un link a una ruta que no existe deja al usuario en blanco. -->
+                      <span class="mono">{{ o.codigo }}</span>
                       @if (o.alertas.length) {
                         <span class="badge badge-warning">{{ o.alertas.length }}</span>
                       }
@@ -142,7 +143,7 @@ function claseCumplimiento(v: number | null): string {
                     <td class="num">{{ o.indicadores.programado | number }}</td>
                     <td class="num">{{ o.indicadores.cortado | number }}</td>
                     <td class="num">
-                      <span class="badge" [class]="'badge ' + clase(o.indicadores.cumplimiento)">
+                      <span [class]="'badge ' + clase(o.indicadores.cumplimiento)">
                         {{
                           o.indicadores.cumplimiento !== null
                             ? (o.indicadores.cumplimiento | percent: '1.0-1')

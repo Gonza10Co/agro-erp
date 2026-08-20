@@ -1,4 +1,6 @@
 import {
+  fechaDeJornada,
+  rangoDeJornadas,
   ORDEN_ESTADOS_CORTE,
   siguienteEstadoCorte,
   esTransicionValida,
@@ -215,5 +217,51 @@ describe('lectura del formato de programación del cliente', () => {
     expect(() => lineasDesdeProgramacion({ codigo: 'X', tallas: { 99: 10 } }, 7, idPorTalla)).toThrow(
       /talla 99/i,
     );
+  });
+});
+
+describe('fecha de la jornada', () => {
+  // La orden de corte ES del día: si la fecha se corre, la orden cambia de
+  // identidad. `new Date('2026-08-01')` cae en medianoche UTC, que en Colombia
+  // (UTC-5) es el 31 de julio a las 19:00 — un día menos en pantalla.
+  it('conserva el día que se programó, no el de la zona horaria', () => {
+    const f = fechaDeJornada('2026-08-01');
+    expect(f.toISOString().slice(0, 10)).toBe('2026-08-01');
+  });
+
+  it('lo ancla al mediodía UTC para que aguante todo el continente', () => {
+    expect(fechaDeJornada('2026-08-01').getUTCHours()).toBe(12);
+  });
+
+  it('en hora de Colombia sigue cayendo el mismo día', () => {
+    const f = fechaDeJornada('2026-08-01');
+    const enBogota = new Date(f.getTime() - 5 * 3600_000);
+    expect(enBogota.toISOString().slice(0, 10)).toBe('2026-08-01');
+  });
+
+  it('acepta también una fecha con hora y se queda con el día', () => {
+    expect(fechaDeJornada('2026-08-03T22:30:00Z').toISOString().slice(0, 10)).toBe('2026-08-03');
+  });
+
+  it('rechaza una fecha que no se entiende', () => {
+    expect(() => fechaDeJornada('no-es-fecha')).toThrow(/fecha/i);
+  });
+});
+
+describe('rango de jornadas para filtrar', () => {
+  it('el día "hasta" queda INCLUIDO: la orden de ese día vive al mediodía', () => {
+    const { gte, lte } = rangoDeJornadas('2026-08-01', '2026-08-31');
+    const ordenDel31 = fechaDeJornada('2026-08-31');
+    expect(ordenDel31.getTime()).toBeLessThanOrEqual(lte!.getTime());
+    expect(ordenDel31.getTime()).toBeGreaterThanOrEqual(gte!.getTime());
+  });
+
+  it('el día "desde" también queda incluido', () => {
+    const { gte } = rangoDeJornadas('2026-08-01', undefined);
+    expect(fechaDeJornada('2026-08-01').getTime()).toBeGreaterThanOrEqual(gte!.getTime());
+  });
+
+  it('sin filtros no arma rango', () => {
+    expect(rangoDeJornadas(undefined, undefined)).toEqual({});
   });
 });

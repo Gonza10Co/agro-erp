@@ -41,6 +41,39 @@ export function selloDeEstado(estado: EstadoOrdenCorte): string | null {
   return SELLOS[estado] ?? null;
 }
 
+/**
+ * Normaliza la fecha de la jornada al MEDIODÍA UTC del día programado.
+ *
+ * La orden de corte *es* del día, así que la fecha es parte de su identidad. Un
+ * `new Date('2026-08-01')` cae en medianoche UTC, que en Colombia (UTC-5) ya es
+ * el 31 de julio a las 19:00: la orden aparecería un día antes en pantalla.
+ * Anclarla al mediodía deja el mismo día en cualquier zona de UTC-11 a UTC+11.
+ */
+export function fechaDeJornada(fecha: string): Date {
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`No se entiende la fecha "${fecha}" de la jornada`);
+  }
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0, 0),
+  );
+}
+
+/**
+ * Rango para filtrar jornadas. Como cada orden se guarda al mediodía UTC, el
+ * filtro tiene que abrir el día completo: con `lte` en medianoche, la orden del
+ * último día del rango quedaría por fuera.
+ */
+export function rangoDeJornadas(
+  desde?: string,
+  hasta?: string,
+): { gte?: Date; lte?: Date } {
+  const r: { gte?: Date; lte?: Date } = {};
+  if (desde) r.gte = new Date(fechaDeJornada(desde).getTime() - 12 * 3600_000);
+  if (hasta) r.lte = new Date(fechaDeJornada(hasta).getTime() + 12 * 3600_000);
+  return r;
+}
+
 export interface LineaCorteResumen {
   cantProgramada: number;
   cantCortada: number;

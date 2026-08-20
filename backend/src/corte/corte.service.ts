@@ -8,6 +8,8 @@ import { EstadoOrdenCorte } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   alertasDeOrden,
+  fechaDeJornada,
+  rangoDeJornadas,
   esTransicionValida,
   indicadoresDeOrden,
   selloDeEstado,
@@ -41,9 +43,7 @@ export class CorteService {
     if (filtros.lineaId) where.lineaId = filtros.lineaId;
     if (filtros.estado) where.estado = filtros.estado;
     if (filtros.desde || filtros.hasta) {
-      where.fecha = {};
-      if (filtros.desde) where.fecha.gte = new Date(filtros.desde);
-      if (filtros.hasta) where.fecha.lte = new Date(filtros.hasta);
+      where.fecha = rangoDeJornadas(filtros.desde, filtros.hasta);
     }
 
     const ordenes = await this.prisma.ordenCorte.findMany({
@@ -97,7 +97,7 @@ export class CorteService {
     return this.prisma.ordenCorte.create({
       data: {
         codigo: dto.codigo,
-        fecha: new Date(dto.fecha),
+        fecha: fechaDeJornada(dto.fecha),
         lineaId: dto.lineaId,
         marcaId: dto.marcaId ?? null,
         observaciones: dto.observaciones ?? null,

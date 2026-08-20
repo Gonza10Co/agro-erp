@@ -55,6 +55,15 @@ describe('crear orden de corte', () => {
     expect(arg.data.lineas.create).toHaveLength(1);
   });
 
+  it('ancla la fecha al día programado: no se corre por zona horaria', async () => {
+    const { service, prisma } = makePrisma({
+      root: { ordenCorte: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 1 }) } },
+    });
+    await service.crear(dto);
+    const fecha: Date = prisma.ordenCorte.create.mock.calls[0][0].data.fecha;
+    expect(fecha.toISOString().slice(0, 10)).toBe('2026-08-01');
+  });
+
   it('rechaza la misma referencia y talla repetida', async () => {
     const { service } = makePrisma({
       root: { ordenCorte: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() } },
