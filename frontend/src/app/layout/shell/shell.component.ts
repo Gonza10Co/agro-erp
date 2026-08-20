@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.component';
 import { AuthService } from '../../core/auth/auth.service';
-import { Modulo, puedeVerModulo } from '../../core/auth/modulos';
+import { Modulo, Seccion, puedeVerModulo, puedeVerSeccion } from '../../core/auth/modulos';
 
 const SIDEBAR_KEY = 'agro-sidebar';
 
@@ -83,6 +83,14 @@ const SIDEBAR_KEY = 'agro-sidebar';
           @if (puedeVer('fabricacion')) {
           <!-- La lista de OF es la puerta a la entrega de materiales al operario: sin este
                ítem la pantalla del almacenista solo se alcanzaba tecleando la URL. -->
+          @if (puedeVerSec('programacion-corte')) {
+          <!-- Va primero: el corte ocurre ANTES de que el par exista, así que el menú
+               sigue el orden físico de la planta. -->
+          <a class="nav-item" routerLink="/corte" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Control de corte">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5L20 18M8 16.5L20 6"/></svg></span>
+            <span class="nav-label">Control de corte</span>
+          </a>
+          }
           <a class="nav-item" routerLink="/fabricacion" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Órdenes de fabricación">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/></svg></span>
             <span class="nav-label">Órdenes de fabricación</span>
@@ -209,6 +217,11 @@ export class ShellComponent {
 
   puedeVer(modulo: Modulo): boolean {
     return puedeVerModulo(this.usuario?.role ?? null, modulo);
+  }
+
+  /** Ítems que viven dentro de un módulo ya liberado pero aún no van al cliente. */
+  puedeVerSec(seccion: Seccion): boolean {
+    return puedeVerSeccion(this.usuario?.role ?? null, seccion);
   }
 
   toggleSidebar(): void {

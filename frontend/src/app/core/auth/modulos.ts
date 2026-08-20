@@ -102,7 +102,9 @@ export type Seccion =
   | 'costo-ocp'
   // Entrega 5 — facturación de servicios (maquila Feroz) y venta de segundas.
   | 'factura-servicio'
-  | 'venta-segundas';
+  | 'venta-segundas'
+  // Quincena 1 del rediseño lote↔par — programación y control de corte.
+  | 'programacion-corte';
 
 /**
  * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
@@ -110,6 +112,10 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // Quincena 1 del rediseño lote↔par (2026-08-20). Nace EN_STAGE: es la próxima
+  // entrega. Controla la orden de corte del día — programado vs. cortado, piezas
+  // repuestas y consumo real. Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md
+  'programacion-corte': 'EN_STAGE',
   // Liberadas en la demo de la Entrega 2 (2026-07-17).
   'costo-utilidad-oc': 'ENTREGADO',
   'proforma-oc': 'ENTREGADO',
