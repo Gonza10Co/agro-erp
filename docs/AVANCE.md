@@ -4,7 +4,7 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-08-12** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-08-20** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
 > **🔓 SISTEMA COMPLETO LIBERADO AL CLIENTE — 2026-08-12.** `NIVEL_MODULO` y `NIVEL_SECCION`
@@ -181,6 +181,44 @@ Ritmo nuevo acordado con Juan José: **entregas pequeñas cada 15 días**. Todo 
 ---
 
 ## 🔨 EN CURSO
+
+### ✂️ Quincena 1 del rediseño lote↔par — CONTROL DE CORTE (2026-08-20) · EN_STAGE
+
+Responde la pregunta que Gabriel hizo el 04-ago ("¿en cuál de los cortes se pone el código de
+barras?") con el diseño que confirmó JP en el audio del 19-ago. Spec completo en
+`docs/specs/2026-08-20-trazabilidad-lote-par-design.md`.
+
+**El principio:** se traza lo que existe. Antes de Strobel existe la ORDEN DE CORTE del día;
+desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden** — no toca
+`Par` ni `generarOF`, así que no hay riesgo sobre lo que el cliente ya opera.
+
+- [x] **Modelo** — `OrdenCorte` (código `AGR-861`, fecha, línea, marca) con los 4 toques del
+      reloj · `OrdenCorteLinea` (programado/cortado/amarrado por producto y talla, `ofId`
+      nullable porque OF↔OrdenCorte es N↔N) · `AvanceCorte` + `ConsumoCorteMaterial`
+      (el registro agregado que reemplaza el Excel del jefe de corte).
+      Migración `20260820131212_programacion_corte`.
+- [x] **Core puro** — máquina de estados forward-only, indicadores, alertas y lectura del
+      formato del cliente (columnas 34…46). `orden-corte-core.ts`.
+- [x] **API** `/corte` — tablero, listar, obtener, crear, avanzar, registrar avance.
+- [x] **Tablero** `/corte` con los indicadores que pidió Gabriel: cumplimiento de corte,
+      piezas que se vuelven a cortar, WIP en piso y órdenes con alerta.
+- [x] **Verificado E2E** con los datos reales de la programación de agosto: `AGR-861` da
+      1.206 pares, igual que la columna TOTAL del formato. Forward-only, la exigencia de
+      cantidades al entregar y el tope de reposiciones rechazan como deben; las alertas
+      saltan en `AGR-862` y callan en `AGR-861`.
+- [x] ⚠️ **Bug de zona horaria encontrado en pantalla y corregido**: una orden creada con
+      fecha `2026-08-01` aparecía como 31/07. La orden de corte *es* del día, así que la
+      fecha es parte de su identidad → `fechaDeJornada()` la ancla al mediodía UTC y
+      `rangoDeJornadas()` abre el día completo en el filtro.
+
+**Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago):**
+- [ ] Importar el **Excel del jefe de corte** (programación + consumo teórico vs. real).
+- [ ] Formatos de programación de **Basarili** y **Línea Alta** (solo llegó el de Agro).
+- [ ] **Piezas por par por referencia** (24 / 22 / 18) para cuadrar piezas contra pares.
+- [ ] Pantalla de **detalle de la orden** (líneas por talla, avances, consumos) — el tablero
+      no enlaza a ningún detalle todavía, a propósito.
+- [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
+
 
 ### 📦 Entrega 6 (quincena 2026-07-30 → ~08-13) — plan en `docs/superpowers/PLAN-ENTREGA-6.md`
 
