@@ -206,17 +206,22 @@ desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden*
       1.206 pares, igual que la columna TOTAL del formato. Forward-only, la exigencia de
       cantidades al entregar y el tope de reposiciones rechazan como deben; las alertas
       saltan en `AGR-862` y callan en `AGR-861`.
+- [x] **Detalle de la orden** `/corte/ordenes/:id` — recorrido con los 4 toques, programación
+      por talla, alta de avances y **consumo de material consolidado** (el mismo material llega
+      repartido entre los avances de varios días; se suma y se ordena por desviación).
 - [x] ⚠️ **Bug de zona horaria encontrado en pantalla y corregido**: una orden creada con
       fecha `2026-08-01` aparecía como 31/07. La orden de corte *es* del día, así que la
       fecha es parte de su identidad → `fechaDeJornada()` la ancla al mediodía UTC y
       `rangoDeJornadas()` abre el día completo en el filtro.
+- [x] ⚠️ **Tres bugs más, cazados al compilar contra Prisma y al mirar la pantalla:**
+      `Material.nombre` no existe (es `nombreCanonico`), `Referencia.nombre` tampoco
+      (es `nombreInterno` — la columna salía vacía), y el pipe de fecha imprimía
+      *"Saturday 1 de August"*: faltaba registrar el locale `es-CO`.
 
 **Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago):**
 - [ ] Importar el **Excel del jefe de corte** (programación + consumo teórico vs. real).
 - [ ] Formatos de programación de **Basarili** y **Línea Alta** (solo llegó el de Agro).
 - [ ] **Piezas por par por referencia** (24 / 22 / 18) para cuadrar piezas contra pares.
-- [ ] Pantalla de **detalle de la orden** (líneas por talla, avances, consumos) — el tablero
-      no enlaza a ningún detalle todavía, a propósito.
 - [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
 
 
