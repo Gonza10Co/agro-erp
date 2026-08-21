@@ -8,11 +8,13 @@ import { EstadoOrdenCorte } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   alertasDeOrden,
+  consolidarConsumos,
   fechaDeJornada,
   rangoDeJornadas,
   esTransicionValida,
   indicadoresDeOrden,
   selloDeEstado,
+  siguienteEstadoCorte,
   UMBRALES_CORTE_DEFAULT,
 } from './orden-corte-core';
 import { CrearOrdenCorteDto } from './dto/crear-orden-corte.dto';
@@ -80,6 +82,10 @@ export class CorteService {
       ...orden,
       indicadores: indicadoresDeOrden(orden),
       alertas: alertasDeOrden(orden, UMBRALES_CORTE_DEFAULT),
+      // El mismo material llega repartido entre los avances de varios días: se
+      // consolida acá para poder compararlo contra el BOM de un vistazo.
+      consumos: consolidarConsumos(orden.avances),
+      siguienteEstado: siguienteEstadoCorte(orden.estado),
     };
   }
 

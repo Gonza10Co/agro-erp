@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { FiltrosCorte, OrdenCorteItem, TableroCorte } from './models/corte.models';
+import { FiltrosCorte, OrdenCorteDetalle, OrdenCorteItem, TableroCorte } from './models/corte.models';
 
 @Injectable({ providedIn: 'root' })
 export class CorteApi {
@@ -26,11 +26,11 @@ export class CorteApi {
   }
 
   obtener(id: number) {
-    return this.http.get<OrdenCorteItem>(`${this.base}/corte/ordenes/${id}`);
+    return this.http.get<OrdenCorteDetalle>(`${this.base}/corte/ordenes/${id}`);
   }
 
   avanzar(id: number, estado: string, cantidades?: Record<number, number>) {
-    return this.http.patch<OrdenCorteItem>(`${this.base}/corte/ordenes/${id}/estado`, {
+    return this.http.patch<OrdenCorteDetalle>(`${this.base}/corte/ordenes/${id}/estado`, {
       estado,
       cantidades,
     });

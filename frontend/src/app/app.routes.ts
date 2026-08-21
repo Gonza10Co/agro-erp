@@ -46,6 +46,7 @@ export const routes: Routes = [
       // Quincena 1 del rediseño lote↔par: el tramo previo a que el par exista.
       // La sección va en data para que modulo.guard bloquee la URL tecleada.
       { path: 'corte', data: { modulo: 'fabricacion', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-tablero.component').then(m => m.CorteTableroComponent) },
+      { path: 'corte/ordenes/:id', data: { modulo: 'fabricacion', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-orden-detalle.component').then(m => m.CorteOrdenDetalleComponent) },
       { path: 'calidad', data: { modulo: 'calidad' }, loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', data: { modulo: 'indicadores' }, loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
       { path: 'reportes/diario', data: { modulo: 'reportes' }, loadComponent: () => import('./features/reportes/reporte-diario.component').then(m => m.ReporteDiarioComponent) },

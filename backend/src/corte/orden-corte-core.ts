@@ -74,6 +74,67 @@ export function rangoDeJornadas(
   return r;
 }
 
+/**
+ * Cantidad tal como puede llegar: `Decimal` de Prisma en runtime, string cuando
+ * viene serializada en JSON, o number en los tests. Se normaliza con `Number()`.
+ */
+export type CantidadDecimal = string | number | { toString(): string };
+
+/** Consumo tal como sale de Prisma (el material trae `nombreCanonico`, no `nombre`). */
+export interface ConsumoCrudo {
+  material: { id: number; codigo: string; nombreCanonico: string };
+  cantTeorica: CantidadDecimal;
+  cantReal: CantidadDecimal;
+}
+
+export interface ConsumoConsolidado {
+  materialId: number;
+  codigo: string;
+  nombre: string;
+  cantTeorica: number;
+  cantReal: number;
+  /** Cuánto se gastó de más sobre lo teórico (0.1 = 10% de más). Null si no hay teórico. */
+  desviacion: number | null;
+}
+
+/**
+ * Junta el consumo de todos los avances de la orden por material. Una orden se
+ * corta en varios días, así que el mismo material llega repartido en avances
+ * distintos y hay que sumarlo antes de comparar contra el BOM.
+ *
+ * Sale ordenado por desviación descendente: arriba queda el material que más se
+ * pasó del teórico, que es lo que hay que ir a mirar.
+ */
+export function consolidarConsumos(
+  avances: Array<{ consumos?: ConsumoCrudo[] | null }>,
+): ConsumoConsolidado[] {
+  const porMaterial = new Map<number, ConsumoConsolidado>();
+
+  for (const avance of avances) {
+    for (const c of avance.consumos ?? []) {
+      const acc = porMaterial.get(c.material.id) ?? {
+        materialId: c.material.id,
+        codigo: c.material.codigo,
+        nombre: c.material.nombreCanonico,
+        cantTeorica: 0,
+        cantReal: 0,
+        desviacion: null,
+      };
+      acc.cantTeorica += Number(c.cantTeorica);
+      acc.cantReal += Number(c.cantReal);
+      porMaterial.set(c.material.id, acc);
+    }
+  }
+
+  const lista = [...porMaterial.values()].map((m) => ({
+    ...m,
+    desviacion: m.cantTeorica > 0 ? m.cantReal / m.cantTeorica - 1 : null,
+  }));
+
+  // Los que no tienen teórico van al final: no se pueden comparar.
+  return lista.sort((a, b) => (b.desviacion ?? -Infinity) - (a.desviacion ?? -Infinity));
+}
+
 export interface LineaCorteResumen {
   cantProgramada: number;
   cantCortada: number;

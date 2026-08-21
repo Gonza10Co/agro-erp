@@ -86,3 +86,50 @@ export interface FiltrosCorte {
   desde?: string;
   hasta?: string;
 }
+
+export interface LineaOrdenCorte {
+  id: number;
+  productoConfigurado: {
+    id: number;
+    referencia: { id: number; codigo: string; nombreInterno: string } | null;
+    marca: { id: number; codigo: string; nombre: string } | null;
+  };
+  talla: { id: number; valor: number };
+  cantProgramada: number;
+  cantCortada: number;
+  cantAmarrada: number;
+  ofId: number | null;
+}
+
+export interface ConsumoConsolidado {
+  materialId: number;
+  codigo: string;
+  nombre: string;
+  cantTeorica: number;
+  cantReal: number;
+  /** Cuánto se gastó de más sobre lo teórico (0.1 = 10% de más). */
+  desviacion: number | null;
+}
+
+export interface AvanceCorte {
+  id: number;
+  fecha: string;
+  piezasCortadas: number;
+  piezasDanadas: number;
+  piezasRepuestas: number;
+  observaciones: string | null;
+  operario: { id: number; nombre: string } | null;
+}
+
+export interface OrdenCorteDetalle extends OrdenCorteItem {
+  observaciones: string | null;
+  inicioCorte: string | null;
+  entregaCorte: string | null;
+  inicioGuarnicion: string | null;
+  cierreGuarnicion: string | null;
+  lineas: LineaOrdenCorte[];
+  avances: AvanceCorte[];
+  consumos: ConsumoConsolidado[];
+  /** Null cuando la orden ya está cerrada o anulada: no hay botón que ofrecer. */
+  siguienteEstado: EstadoOrdenCorte | null;
+}

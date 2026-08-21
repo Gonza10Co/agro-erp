@@ -1,4 +1,5 @@
 import {
+  consolidarConsumos,
   fechaDeJornada,
   rangoDeJornadas,
   ORDEN_ESTADOS_CORTE,
@@ -263,5 +264,66 @@ describe('rango de jornadas para filtrar', () => {
 
   it('sin filtros no arma rango', () => {
     expect(rangoDeJornadas(undefined, undefined)).toEqual({});
+  });
+});
+
+describe('consolidar el consumo de material de la orden', () => {
+  // Una orden se corta en varios días; el mismo material aparece en varios avances.
+  const avances = [
+    { consumos: [
+      { material: { id: 3, codigo: 'MP-001', nombreCanonico: 'Micropiel negra' }, cantTeorica: '10.0000', cantReal: '11.0000' },
+      { material: { id: 5, codigo: 'MP-002', nombreCanonico: 'Malla falcao' }, cantTeorica: '4.0000', cantReal: '4.0000' },
+    ] },
+    { consumos: [
+      { material: { id: 3, codigo: 'MP-001', nombreCanonico: 'Micropiel negra' }, cantTeorica: '20.0000', cantReal: '19.0000' },
+    ] },
+  ];
+
+  it('suma el mismo material aunque venga en avances distintos', () => {
+    const r = consolidarConsumos(avances);
+    const micro = r.find((x) => x.materialId === 3)!;
+    expect(micro.cantTeorica).toBeCloseTo(30, 4);
+    expect(micro.cantReal).toBeCloseTo(30, 4);
+  });
+
+  it('convierte los Decimal de Prisma, que llegan como string', () => {
+    const r = consolidarConsumos(avances);
+    expect(typeof r[0].cantReal).toBe('number');
+  });
+
+  it('la desviación es cuánto se gastó de más sobre lo teórico', () => {
+    const r = consolidarConsumos([
+      { consumos: [{ material: { id: 1, codigo: 'X', nombreCanonico: 'X' }, cantTeorica: '100', cantReal: '110' }] },
+    ]);
+    expect(r[0].desviacion).toBeCloseTo(0.1, 5);
+  });
+
+  it('gastar menos de lo teórico da desviación negativa', () => {
+    const r = consolidarConsumos([
+      { consumos: [{ material: { id: 1, codigo: 'X', nombreCanonico: 'X' }, cantTeorica: '100', cantReal: '90' }] },
+    ]);
+    expect(r[0].desviacion).toBeCloseTo(-0.1, 5);
+  });
+
+  it('un material sin consumo teórico no divide por cero', () => {
+    const r = consolidarConsumos([
+      { consumos: [{ material: { id: 1, codigo: 'X', nombreCanonico: 'X' }, cantTeorica: '0', cantReal: '5' }] },
+    ]);
+    expect(r[0].desviacion).toBeNull();
+  });
+
+  it('ordena por desviación: lo que más se pasó va primero', () => {
+    const r = consolidarConsumos([
+      { consumos: [
+        { material: { id: 1, codigo: 'A', nombreCanonico: 'A' }, cantTeorica: '100', cantReal: '105' },
+        { material: { id: 2, codigo: 'B', nombreCanonico: 'B' }, cantTeorica: '100', cantReal: '130' },
+        { material: { id: 3, codigo: 'C', nombreCanonico: 'C' }, cantTeorica: '100', cantReal: '95' },
+      ] },
+    ]);
+    expect(r.map((x) => x.codigo)).toEqual(['B', 'A', 'C']);
+  });
+
+  it('una orden sin avances no rompe', () => {
+    expect(consolidarConsumos([])).toEqual([]);
   });
 });

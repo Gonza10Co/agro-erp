@@ -238,4 +238,32 @@ describe('obtener detalle', () => {
     const { service } = makePrisma({ root: { ordenCorte: { findUnique: jest.fn().mockResolvedValue(null) } } });
     await expect(service.obtener(99)).rejects.toThrow(NotFoundException);
   });
+
+  it('consolida el consumo de material de todos los avances', async () => {
+    const { service } = makePrisma({
+      root: {
+        ordenCorte: {
+          findUnique: jest.fn().mockResolvedValue({
+            ...ordenBase,
+            avances: [
+              { piezasCortadas: 100, piezasDanadas: 0, piezasRepuestas: 0,
+                consumos: [{ material: { id: 3, codigo: 'MP-001', nombreCanonico: 'Micropiel' }, cantTeorica: '10', cantReal: '12' }] },
+              { piezasCortadas: 100, piezasDanadas: 0, piezasRepuestas: 0,
+                consumos: [{ material: { id: 3, codigo: 'MP-001', nombreCanonico: 'Micropiel' }, cantTeorica: '10', cantReal: '10' }] },
+            ],
+          }),
+        },
+      },
+    });
+    const o: any = await service.obtener(1);
+    expect(o.consumos).toHaveLength(1);
+    expect(o.consumos[0].cantReal).toBe(22);
+    expect(o.consumos[0].desviacion).toBeCloseTo(0.1, 5);
+  });
+
+  it('dice cuál es el siguiente estado, para que la UI sepa qué botón ofrecer', async () => {
+    const { service } = makePrisma();
+    const o: any = await service.obtener(1);
+    expect(o.siguienteEstado).toBe('EN_CORTE');
+  });
 });
