@@ -12,6 +12,7 @@ import { OpModule } from './pedidos/op/op.module';
 import { DespachoModule } from './despachos/despacho.module';
 import { ComprasModule } from './compras/compras.module';
 import { FabricacionModule } from './fabricacion/fabricacion.module';
+import { CorteModule } from './corte/corte.module';
 import { CalidadModule } from './calidad/calidad.module';
 import { IndicadoresModule } from './indicadores/indicadores.module';
 import { FacturasModule } from './facturas/factura.module';
@@ -37,6 +38,7 @@ import { OperariosModule } from './operarios/operarios.module';
     DespachoModule,
     ComprasModule,
     FabricacionModule,
+    CorteModule,
     CalidadModule,
     IndicadoresModule,
     FacturasModule,

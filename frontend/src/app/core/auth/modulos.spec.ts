@@ -122,13 +122,22 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     expect(puedeVerSeccion('CLIENTE', 'operar-produccion')).toBeTrue();
   });
 
-  it('no queda ninguna sección reservada: el tablero está todo en ENTREGADO', () => {
-    // Centinela de la próxima entrega: cuando algo nuevo nazca en EN_STAGE, este
-    // test cae y obliga a decidir a conciencia si va oculto al cliente o no.
+  it('las únicas secciones ocultas al cliente son las de la próxima entrega', () => {
+    // Centinela: cuando algo nuevo nazca en EN_STAGE hay que sumarlo acá a
+    // conciencia. El 2026-08-12 la lista quedó vacía (se liberó todo); el
+    // 2026-08-20 entra `programacion-corte`, la Quincena 1 del rediseño lote↔par.
+    const RESERVADAS: Seccion[] = ['programacion-corte'];
+
     const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
     for (const s of secciones) {
-      expect(puedeVerSeccion('CLIENTE', s)).withContext(s).toBeTrue();
+      const visible = !RESERVADAS.includes(s);
+      expect(puedeVerSeccion('CLIENTE', s)).withContext(s).toBe(visible);
     }
+  });
+
+  it('el perfil STAGE sí ve la Quincena 1 (control de corte) antes de la demo', () => {
+    expect(puedeVerSeccion('STAGE', 'programacion-corte')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'programacion-corte')).toBeFalse();
   });
 
   it('el CLIENTE ve la factura de servicio, liberada el 2026-08-08', () => {

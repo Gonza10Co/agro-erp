@@ -117,6 +117,7 @@ model Material {
   movimientos       MovimientoInventario[]
   lineasOcp         OrdenCompraProveedorLinea[]
   lineasDevolucion  DevolucionProveedorLinea[]
+  consumosCorte     ConsumoCorteMaterial[]
 }
 
 model MaterialAlias {
@@ -143,6 +144,7 @@ model Talla {
   lineasDespacho DespachoLinea[]
   lineasFactura  FacturaLinea[]
   pares          Par[]
+  lineasCorte    OrdenCorteLinea[]
 }
 
 model Referencia {
@@ -268,13 +270,14 @@ model Linea {
   nit           String?
   datosPago     String? // bloque de consignación tal cual se imprime (banco · cuenta · titular)
 
-  marcas          Marca[]
-  pares           Par[]
-  ordenesCompra   OrdenCompra[]
-  ordenesProduccion OrdenProduccion[]
-  metas           Meta[]
+  marcas                Marca[]
+  pares                 Par[]
+  ordenesCompra         OrdenCompra[]
+  ordenesProduccion     OrdenProduccion[]
+  metas                 Meta[]
   movimientosInventario MovimientoInventario[]
-  facturas        Factura[] // facturas de servicio atribuidas a la línea
+  facturas              Factura[] // facturas de servicio atribuidas a la línea
+  ordenesCorte          OrdenCorte[]
 }
 
 model Marca {
@@ -291,6 +294,7 @@ model Marca {
   overrides             ReglaOverride[]
   referenciaMarcas      ReferenciaMarca[]
   productosConfigurados ProductoConfigurado[]
+  ordenesCorte          OrdenCorte[]
 
   @@index([lineaId])
 }
@@ -365,6 +369,7 @@ model ProductoConfigurado {
   activo          Boolean    @default(true)
 
   opciones       ProductoConfiguradoOpcion[]
+  lineasCorte    OrdenCorteLinea[]
   lineasOC       OrdenCompraLinea[]
   lineasOP       OrdenProduccionLinea[]
   inventarioPT   InventarioPT[]
@@ -420,13 +425,13 @@ enum EstadoOP {
 }
 
 model Cliente {
-  id          Int           @id @default(autoincrement())
-  nit         String        @unique
-  nombre      String
-  ciudad      String? // ciudad fiscal (la de la factura), NO la de entrega
-  telefono    String? // contacto principal
-  direccion   String? // domicilio / dirección fiscal
-  tipoCredito TipoCredito   @default(CONTADO)
+  id            Int           @id @default(autoincrement())
+  nit           String        @unique
+  nombre        String
+  ciudad        String? // ciudad fiscal (la de la factura), NO la de entrega
+  telefono      String? // contacto principal
+  direccion     String? // domicilio / dirección fiscal
+  tipoCredito   TipoCredito   @default(CONTADO)
   cupo          Decimal?      @db.Decimal(14, 2)
   estadoCartera EstadoCartera @default(AL_DIA)
   activo        Boolean       @default(true)
@@ -475,14 +480,14 @@ model Bodega {
 }
 
 model OrdenCompra {
-  id            Int      @id @default(autoincrement())
-  consecutivo   Int      @unique
-  ocCliente     String?
+  id                Int          @id @default(autoincrement())
+  consecutivo       Int          @unique
+  ocCliente         String?
   clienteId         Int
-  cliente           Cliente   @relation(fields: [clienteId], references: [id])
-  fecha             DateTime  @default(now())
+  cliente           Cliente      @relation(fields: [clienteId], references: [id])
+  fecha             DateTime     @default(now())
   fechaConfirmacion DateTime? // se sella al confirmar; el reloj de demora corre desde acá
-  estado            EstadoOC  @default(BORRADOR)
+  estado            EstadoOC     @default(BORRADOR)
   observaciones     String?
   // A qué sede va este pedido (trazabilidad y filtros). Si se omite, la sede principal.
   sedeEntregaId     Int?
@@ -492,10 +497,10 @@ model OrdenCompra {
   direccionDespacho String?
   // La línea de producción se decide POR PEDIDO (cliente 2026-07-06: el mapeo
   // marca→línea NO es fijo). De acá se hereda a la OP y a cada Par.
-  lineaId       Int?
-  linea         Linea?   @relation(fields: [lineaId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  lineaId           Int?
+  linea             Linea?       @relation(fields: [lineaId], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   lineas          OrdenCompraLinea[]
   ordenProduccion OrdenProduccion?
@@ -680,16 +685,16 @@ model InventarioMaterial {
 }
 
 model RequerimientoCompra {
-  id          Int                 @id @default(autoincrement())
-  consecutivo Int                 @unique
-  opId        Int
-  op          OrdenProduccion     @relation(fields: [opId], references: [id])
-  fecha       DateTime            @default(now())
-  estado      EstadoRequerimiento @default(CALCULADO)
+  id            Int                 @id @default(autoincrement())
+  consecutivo   Int                 @unique
+  opId          Int
+  op            OrdenProduccion     @relation(fields: [opId], references: [id])
+  fecha         DateTime            @default(now())
+  estado        EstadoRequerimiento @default(CALCULADO)
   // La reserva de bodega sigue viva. Se apaga al anular/despachar la OP o al
   // recalcular el requerimiento (el nuevo re-amarra; este queda como histórico).
-  reservaActiva Boolean           @default(true)
-  createdAt   DateTime            @default(now())
+  reservaActiva Boolean             @default(true)
+  createdAt     DateTime            @default(now())
 
   lineas        RequerimientoCompraLinea[]
   ordenesCompra OrdenCompraProveedor[]
@@ -748,14 +753,14 @@ model OrdenCompraProveedor {
 }
 
 model OrdenCompraProveedorLinea {
-  id           Int                  @id @default(autoincrement())
-  ocpId        Int
-  ocp          OrdenCompraProveedor @relation(fields: [ocpId], references: [id])
-  materialId   Int
-  material     Material             @relation(fields: [materialId], references: [id])
-  cantPedida   Decimal              @db.Decimal(14, 4)
-  cantRecibida Decimal              @default(0) @db.Decimal(14, 4)
-  costoUnitario Decimal?            @db.Decimal(14, 4) // precio pactado con el proveedor (opcional)
+  id            Int                  @id @default(autoincrement())
+  ocpId         Int
+  ocp           OrdenCompraProveedor @relation(fields: [ocpId], references: [id])
+  materialId    Int
+  material      Material             @relation(fields: [materialId], references: [id])
+  cantPedida    Decimal              @db.Decimal(14, 4)
+  cantRecibida  Decimal              @default(0) @db.Decimal(14, 4)
+  costoUnitario Decimal?             @db.Decimal(14, 4) // precio pactado con el proveedor (opcional)
 
   lineasRecepcion RecepcionCompraLinea[]
 
@@ -779,13 +784,13 @@ model RecepcionCompra {
 }
 
 model RecepcionCompraLinea {
-  id          Int                       @id @default(autoincrement())
-  recepcionId Int
-  recepcion   RecepcionCompra           @relation(fields: [recepcionId], references: [id])
-  ocpLineaId  Int
-  ocpLinea    OrdenCompraProveedorLinea @relation(fields: [ocpLineaId], references: [id])
-  cantidad    Decimal                   @db.Decimal(14, 4)
-  costoUnitario Decimal?                @db.Decimal(14, 4) // a cuánto se recibió; alimenta el costo promedio del material
+  id            Int                       @id @default(autoincrement())
+  recepcionId   Int
+  recepcion     RecepcionCompra           @relation(fields: [recepcionId], references: [id])
+  ocpLineaId    Int
+  ocpLinea      OrdenCompraProveedorLinea @relation(fields: [ocpLineaId], references: [id])
+  cantidad      Decimal                   @db.Decimal(14, 4)
+  costoUnitario Decimal?                  @db.Decimal(14, 4) // a cuánto se recibió; alimenta el costo promedio del material
 
   @@index([recepcionId])
 }
@@ -819,6 +824,124 @@ model DevolucionProveedorLinea {
 }
 
 // ───────────────────────── Módulo 5: MES / Fabricación ─────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════
+// PROGRAMACIÓN DE CORTE — la unidad de trabajo ANTES de que el par exista
+//
+// En corte el par no existe: las piezas salen apiladas por material y no
+// pertenecen a ningún par hasta que alguien las arma (JP, 2026-08-19). Por eso
+// el tramo Corte→Strobel se controla por ORDEN DEL DÍA, no por par.
+//
+// La orden está amarrada a la FECHA, no al pedido: "para hoy 19 tenemos la orden
+// 680 con los 1.200 pares que vamos a trabajar hoy". Su número ya se escribe hoy
+// a mano en las canastas — acá solo se vuelve dato.
+//
+// Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md
+// ═══════════════════════════════════════════════════════════════════════
+
+enum EstadoOrdenCorte {
+  PROGRAMADA // está en el plan del día, la mesa no ha arrancado
+  EN_CORTE // toque 1: corte arrancó
+  ENTREGADA // toque 2: corte entregó las canastas
+  EN_GUARNICION // toque 3: guarnición las recibió
+  CERRADA // toque 4: el último par de la orden pasó por Amarre
+  ANULADA
+}
+
+model OrdenCorte {
+  id      Int      @id @default(autoincrement())
+  // El número que hoy va escrito en la canasta: "AGR-861". El sufijo -1 marca
+  // las órdenes asignadas a Feroz ("AGR-868-1").
+  codigo  String   @unique
+  fecha   DateTime // día de trabajo programado
+  lineaId Int // la planta que la corta: Agro | Basarili | Alta | Feroz
+  linea   Linea    @relation(fields: [lineaId], references: [id])
+  // La programación del cliente se hace por marca. Nullable porque una orden
+  // puede mezclar marcas (aparece "FEROZ BASARILI" como marca propia).
+  marcaId Int?
+  marca   Marca?   @relation(fields: [marcaId], references: [id])
+
+  estado EstadoOrdenCorte @default(PROGRAMADA)
+
+  // Los cuatro toques que dan el reloj. Sin ellos no hay alertas de demora:
+  // el resto del control funciona igual, por eso son nullables.
+  inicioCorte      DateTime?
+  entregaCorte     DateTime?
+  inicioGuarnicion DateTime?
+  cierreGuarnicion DateTime?
+
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lineas  OrdenCorteLinea[]
+  avances AvanceCorte[]
+
+  @@index([fecha, lineaId])
+  @@index([estado])
+}
+
+model OrdenCorteLinea {
+  id                    Int                 @id @default(autoincrement())
+  ordenCorteId          Int
+  ordenCorte            OrdenCorte          @relation(fields: [ordenCorteId], references: [id], onDelete: Cascade)
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+
+  cantProgramada Int // lo que dice el formato del cliente
+  cantCortada    Int @default(0) // lo que corte reportó al entregar
+  cantAmarrada   Int @default(0) // pares que llegaron a Amarre (lo llena la Quincena 2)
+
+  // A qué OF alimenta este renglón. Nullable: una orden puede cortar contra
+  // stock. La relación OF↔OrdenCorte es N↔N y se resuelve por acá — un pedido
+  // grande se reparte en varias órdenes de días distintos.
+  ofId Int?
+  of   OrdenFabricacion? @relation(fields: [ofId], references: [id])
+
+  @@unique([ordenCorteId, productoConfiguradoId, tallaId])
+  @@index([ofId])
+}
+
+// Registro agregado del avance diario de corte: reemplaza el Excel que hoy lleva
+// el jefe de corte. Es por ORDEN y por día, nunca por par.
+model AvanceCorte {
+  id           Int        @id @default(autoincrement())
+  ordenCorteId Int
+  ordenCorte   OrdenCorte @relation(fields: [ordenCorteId], references: [id], onDelete: Cascade)
+  fecha        DateTime   @default(now())
+
+  piezasCortadas  Int
+  piezasDanadas   Int @default(0)
+  // El indicador que pidió Gabriel: las piezas que hay que volver a cortar.
+  // Se reponen al instante, así que el atado nunca sale incompleto.
+  piezasRepuestas Int @default(0)
+
+  operarioId    Int?
+  operario      Operario? @relation(fields: [operarioId], references: [id])
+  observaciones String?
+  createdAt     DateTime  @default(now())
+
+  consumos ConsumoCorteMaterial[]
+
+  @@index([ordenCorteId])
+}
+
+// Consumo de material de un avance: teórico (del BOM) contra real (lo que midió
+// el jefe de corte). De acá sale el aprovechamiento.
+model ConsumoCorteMaterial {
+  id            Int         @id @default(autoincrement())
+  avanceCorteId Int
+  avanceCorte   AvanceCorte @relation(fields: [avanceCorteId], references: [id], onDelete: Cascade)
+  materialId    Int
+  material      Material    @relation(fields: [materialId], references: [id])
+
+  cantTeorica Decimal @db.Decimal(14, 4)
+  cantReal    Decimal @db.Decimal(14, 4)
+
+  @@unique([avanceCorteId, materialId])
+}
 
 enum Celula {
   CORTE
@@ -890,6 +1013,7 @@ model OrdenFabricacion {
 
   pares       Par[]
   movimientos MovimientoInventario[]
+  lineasCorte OrdenCorteLinea[]
 
   @@index([opId])
 }
@@ -934,17 +1058,17 @@ model Par {
 }
 
 model EventoTrazabilidad {
-  id         Int                @id @default(autoincrement())
-  parId      Int
-  par        Par                @relation(fields: [parId], references: [id])
-  celula     Celula
-  subPaso    SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
+  id               Int                @id @default(autoincrement())
+  parId            Int
+  par              Par                @relation(fields: [parId], references: [id])
+  celula           Celula
+  subPaso          SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
   subPasoInyeccion SubPasoInyeccion? // ídem para Inyección
-  operarioId Int
-  operario   Operario           @relation(fields: [operarioId], references: [id])
-  maquinaId  Int
-  maquina    Maquina            @relation(fields: [maquinaId], references: [id])
-  timestamp  DateTime           @default(now())
+  operarioId       Int
+  operario         Operario           @relation(fields: [operarioId], references: [id])
+  maquinaId        Int
+  maquina          Maquina            @relation(fields: [maquinaId], references: [id])
+  timestamp        DateTime           @default(now())
 
   @@index([parId])
   @@index([celula])
@@ -956,8 +1080,9 @@ model Operario {
   celula Celula
   activo Boolean @default(true)
 
-  eventos     EventoTrazabilidad[]
-  incidencias IncidenciaCalidad[]
+  eventos      EventoTrazabilidad[]
+  incidencias  IncidenciaCalidad[]
+  avancesCorte AvanceCorte[]
 }
 
 model Maquina {
@@ -1021,17 +1146,17 @@ enum TipoFactura {
 }
 
 model Factura {
-  id          Int         @id @default(autoincrement())
-  consecutivo Int         @unique
-  tipo        TipoFactura @default(PRODUCTO)
+  id               Int           @id @default(autoincrement())
+  consecutivo      Int           @unique
+  tipo             TipoFactura   @default(PRODUCTO)
   // Nullable desde la factura de servicio: la maquila (p. ej. la inyección que
   // Feroz le presta a la capellada de Bogotá) no despacha producto propio.
   // PG permite N NULLs bajo un @unique, así que la 1:1 con despacho se mantiene.
-  despachoId  Int?        @unique
+  despachoId       Int?          @unique
   // RESTRICT explícito: es lo que hay en producción desde que la factura existe.
   // El default de Prisma para una relación opcional es SET NULL, que dejaría la
   // factura huérfana de su remito al borrar un despacho en vez de frenar el borrado.
-  despacho    Despacho?   @relation(fields: [despachoId], references: [id], onDelete: Restrict)
+  despacho         Despacho?     @relation(fields: [despachoId], references: [id], onDelete: Restrict)
   // Denormalizado: antes el cliente se resolvía navegando despacho→op→oc, cadena
   // que no existe sin despacho. Cartera consulta por acá.
   clienteId        Int
@@ -1083,9 +1208,9 @@ model Pago {
 }
 
 model FacturaLinea {
-  id        Int     @id @default(autoincrement())
-  facturaId Int
-  factura   Factura @relation(fields: [facturaId], references: [id])
+  id                    Int                  @id @default(autoincrement())
+  facturaId             Int
+  factura               Factura              @relation(fields: [facturaId], references: [id])
   // Producto+talla solo en facturas de PRODUCTO; servicio+descripción solo en las
   // de SERVICIO. Nullable de ambos lados: una línea de maquila no tiene talla.
   // RESTRICT explícito (igual que en producción): borrar un producto o una talla
@@ -1128,19 +1253,19 @@ enum MotivoMovimiento {
 // de materia prima (materialId) XOR de producto terminado (inventarioPTId).
 // `cantidad` siempre positiva; el sentido lo da `tipo`.
 model MovimientoInventario {
-  id             Int              @id @default(autoincrement())
+  id             Int               @id @default(autoincrement())
   tipo           TipoMovimiento
   motivo         MotivoMovimiento
   materialId     Int?
-  material       Material?        @relation(fields: [materialId], references: [id])
+  material       Material?         @relation(fields: [materialId], references: [id])
   inventarioPTId Int?
-  inventarioPT   InventarioPT?    @relation(fields: [inventarioPTId], references: [id])
-  cantidad       Decimal          @db.Decimal(14, 4)
-  costoUnitario  Decimal?         @db.Decimal(14, 4) // valoriza el movimiento (kardex valorizado)
+  inventarioPT   InventarioPT?     @relation(fields: [inventarioPTId], references: [id])
+  cantidad       Decimal           @db.Decimal(14, 4)
+  costoUnitario  Decimal?          @db.Decimal(14, 4) // valoriza el movimiento (kardex valorizado)
   // Línea de producción del pedido que originó el movimiento PT (par.lineaId / op.lineaId).
   // NULL en movimientos de MP y en históricos previos a la columna: solo suman en "Todas las líneas".
   lineaId        Int?
-  linea          Linea?           @relation(fields: [lineaId], references: [id])
+  linea          Linea?            @relation(fields: [lineaId], references: [id])
   // OF que consumió el material (motivo CONSUMO_PRODUCCION). Es FK y no solo el
   // texto de `referencia` porque el consumo real por OF se consulta agrupado, y
   // parsear "OF-31" para eso es pedir un bug.
@@ -1149,8 +1274,8 @@ model MovimientoInventario {
   referencia     String? // documento origen: "OF-31", "DSP-12", "REQ-7"…
   observaciones  String?
   usuarioId      Int?
-  usuario        User?            @relation(fields: [usuarioId], references: [id])
-  createdAt      DateTime         @default(now())
+  usuario        User?             @relation(fields: [usuarioId], references: [id])
+  createdAt      DateTime          @default(now())
 
   @@index([materialId, createdAt])
   @@index([inventarioPTId, createdAt])
