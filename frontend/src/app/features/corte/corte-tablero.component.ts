@@ -20,6 +20,17 @@ function claseCumplimiento(v: number | null): string {
   return 'badge-error';
 }
 
+/**
+ * El cumplimiento solo es una medida cuando corte ya entregó: antes de eso lo
+ * cortado vale 0 por definición, y pintar "0%" en rojo acusa a una orden que
+ * apenas está programada. Mismo criterio que la alerta de desviación del
+ * backend (ver `alertasDeOrden` en orden-corte-core.ts).
+ */
+export function cumplimientoMedible(estado: EstadoOrdenCorte, cumplimiento: number | null): number | null {
+  if (estado === 'PROGRAMADA' || estado === 'EN_CORTE') return null;
+  return cumplimiento;
+}
+
 @Component({
   selector: 'app-corte-tablero',
   standalone: true,
@@ -142,10 +153,10 @@ function claseCumplimiento(v: number | null): string {
                     <td class="num">{{ o.indicadores.programado | number }}</td>
                     <td class="num">{{ o.indicadores.cortado | number }}</td>
                     <td class="num">
-                      <span [class]="'badge ' + clase(o.indicadores.cumplimiento)">
+                      <span [class]="'badge ' + clase(medible(o.estado, o.indicadores.cumplimiento))">
                         {{
-                          o.indicadores.cumplimiento !== null
-                            ? (o.indicadores.cumplimiento | percent: '1.0-1')
+                          medible(o.estado, o.indicadores.cumplimiento) !== null
+                            ? (medible(o.estado, o.indicadores.cumplimiento) | percent: '1.0-1')
                             : '—'
                         }}
                       </span>
@@ -259,5 +270,9 @@ export class CorteTableroComponent implements OnInit {
 
   clase(v: number | null): string {
     return claseCumplimiento(v);
+  }
+
+  medible(estado: EstadoOrdenCorte, cumplimiento: number | null): number | null {
+    return cumplimientoMedible(estado, cumplimiento);
   }
 }
