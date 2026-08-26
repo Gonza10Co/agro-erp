@@ -4,8 +4,29 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-08-20** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-08-26** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **✂️ CONTROL DE CORTE DESPLEGADO A PROD — 2026-08-26** (merge `--no-ff` `790c536` + tag
+> `quincena-1-corte`). CI verde antes del merge (frontend 1m46s + backend 1m01s). **Los dos
+> auto-deploys dispararon solos**: Vercel a los 7s del push (el fix del webhook del 13-ago
+> sigue vivo) y Railway con el sha del merge. La migración `20260820131212_programacion_corte`
+> la aplicó `migrate deploy` sola: verificado con **login real** del perfil `stage` contra prod
+> y `GET /corte/tablero` → **200** con el resumen en ceros.
+>
+> ⚠️ **El tablero de corte en prod está VACÍO y no hay `seed:corte`.** El E2E de la quincena se
+> hizo con datos creados al vuelo; `AGR-861` solo vive en los tests y en los docs. Antes de
+> mostrarlo hay que sembrar la programación de agosto o crear la orden en vivo en la pantalla.
+> A favor: el módulo **no toca inventario** (0 referencias a `MovimientoInventario` en
+> `corte.service.ts`), así que sembrarlo en prod es aditivo y reversible — no aplica el riesgo
+> de la memoria `ensayo-local-copia-prod`, que es sobre el amarre y el consumo de material.
+>
+> El gate `programacion-corte` **se deja en `EN_STAGE`**: la quincena está incompleta a propósito
+> (faltan los 4 datos de JP) y el tablero hoy solo sabe de la línea Agro con umbrales sin
+> calibrar — liberarlo le mostraría alertas falsas. A diferencia del 12-ago, ocultarlo **no le
+> abre ningún hueco** a lo que ya opera: el módulo es aditivo y todavía no toca `Par` ni
+> `generarOF`. Se demuestra con el perfil `stage`. Ambas rutas (`/corte` y `/corte/ordenes/:id`)
+> llevan `data.seccion`, así que el cliente no entra por URL.
 >
 > **🔓 SISTEMA COMPLETO LIBERADO AL CLIENTE — 2026-08-12.** `NIVEL_MODULO` y `NIVEL_SECCION`
 > quedan **todos en ENTREGADO**: no hay nada oculto al rol CLIENTE. Suben de una vez `despachos`,

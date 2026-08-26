@@ -169,11 +169,14 @@ describe('tablero', () => {
   const conDatos = [
     {
       id: 1, codigo: 'AGR-861', fecha: new Date(), estado: 'ENTREGADA', linea: null, marca: null,
+      // Ya entregó, así que su desviación sí se mide (ver alertasDeOrden).
+      inicioCorte: new Date('2026-08-19T07:00:00Z'), entregaCorte: new Date('2026-08-19T15:00:00Z'),
       lineas: [{ cantProgramada: 1000, cantCortada: 950, cantAmarrada: 900 }],
       avances: [{ piezasCortadas: 24000, piezasDanadas: 100, piezasRepuestas: 200 }],
     },
     {
       id: 2, codigo: 'AGR-862', fecha: new Date(), estado: 'EN_CORTE', linea: null, marca: null,
+      inicioCorte: new Date('2026-08-19T07:00:00Z'),
       lineas: [{ cantProgramada: 500, cantCortada: 500, cantAmarrada: 480 }],
       avances: [{ piezasCortadas: 12000, piezasDanadas: 0, piezasRepuestas: 50 }],
     },
