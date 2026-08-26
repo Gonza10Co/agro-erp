@@ -27,7 +27,8 @@
     "seed:calendario": "tsx prisma/seed-calendario.ts",
     "seed:sedes": "tsx prisma/seed-sedes.ts",
     "seed:piezas": "tsx prisma/seed-piezas.ts",
-    "seed:servicios": "tsx prisma/seed-servicios.ts"
+    "seed:servicios": "tsx prisma/seed-servicios.ts",
+    "seed:corte": "tsx prisma/seed-corte.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

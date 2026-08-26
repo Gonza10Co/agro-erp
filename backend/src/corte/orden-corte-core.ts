@@ -258,7 +258,14 @@ export function alertasDeOrden(orden: OrdenParaIndicadores, umbrales: UmbralesCo
     });
   }
 
-  if (i.cumplimiento !== null && Math.abs(1 - i.cumplimiento) > umbrales.desviacionMax) {
+  // Solo tiene sentido medir la desviación cuando corte YA entregó: hasta ese
+  // toque lo cortado vale 0 por definición, y medirlo antes marca con 100% de
+  // desviación a toda orden que apenas está programada.
+  if (
+    orden.entregaCorte &&
+    i.cumplimiento !== null &&
+    Math.abs(1 - i.cumplimiento) > umbrales.desviacionMax
+  ) {
     alertas.push({
       tipo: 'DESVIACION_CANTIDAD',
       mensaje: `Se cortaron ${i.cortado} pares contra ${i.programado} programados (${pct(i.cumplimiento)} de cumplimiento).`,

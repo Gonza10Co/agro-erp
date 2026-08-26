@@ -153,10 +153,32 @@ describe('alertas', () => {
 
   it('avisa cuando lo cortado se desvía de lo programado', () => {
     const a = alertasDeOrden(
-      { lineas: [{ cantProgramada: 1000, cantCortada: 800, cantAmarrada: 0 }], avances: [] },
+      {
+        lineas: [{ cantProgramada: 1000, cantCortada: 800, cantAmarrada: 0 }],
+        avances: [],
+        inicioCorte: new Date('2026-08-19T07:00:00Z'),
+        entregaCorte: new Date('2026-08-19T17:00:00Z'),
+      },
       UMBRALES_CORTE_DEFAULT,
     );
     expect(a.map((x) => x.tipo)).toContain('DESVIACION_CANTIDAD');
+  });
+
+  it('NO avisa por desviación mientras corte no haya entregado', () => {
+    // Una orden recién programada tiene 0 cortado por definición: medirle
+    // cumplimiento ahí la marca con 100% de desviación sin que pase nada malo.
+    // Con la programación del mes cargada, TODAS las órdenes futuras saldrían
+    // "con alerta" y el contador del tablero dejaría de significar algo.
+    const programada = {
+      lineas: [{ cantProgramada: 820, cantCortada: 0, cantAmarrada: 0 }],
+      avances: [],
+    };
+    expect(alertasDeOrden(programada, UMBRALES_CORTE_DEFAULT)).toEqual([]);
+
+    const enCorte = { ...programada, inicioCorte: new Date('2026-08-24T06:20:00Z') };
+    expect(alertasDeOrden(enCorte, UMBRALES_CORTE_DEFAULT).map((x) => x.tipo)).not.toContain(
+      'DESVIACION_CANTIDAD',
+    );
   });
 
   it('avisa cuando las reposiciones se pasan del umbral', () => {
@@ -180,7 +202,12 @@ describe('alertas', () => {
 
   it('cada alerta explica qué pasó, no solo que pasó', () => {
     const a = alertasDeOrden(
-      { lineas: [{ cantProgramada: 1000, cantCortada: 500, cantAmarrada: 0 }], avances: [] },
+      {
+        lineas: [{ cantProgramada: 1000, cantCortada: 500, cantAmarrada: 0 }],
+        avances: [],
+        inicioCorte: new Date('2026-08-19T07:00:00Z'),
+        entregaCorte: new Date('2026-08-19T17:00:00Z'),
+      },
       UMBRALES_CORTE_DEFAULT,
     );
     expect(a[0].mensaje).toMatch(/500/);
