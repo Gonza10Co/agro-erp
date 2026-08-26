@@ -100,7 +100,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** 481 backend (53 suites) + 339 frontend, verdes 🟢 · ambos builds limpios.
+**Tests:** 636 backend (61 suites) + 395 frontend, verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -239,11 +239,33 @@ desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden*
       (es `nombreInterno` — la columna salía vacía), y el pipe de fecha imprimía
       *"Saturday 1 de August"*: faltaba registrar el locale `es-CO`.
 
-**Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago):**
+- [x] **`seed:corte` + dos bugs que destapó** (2026-08-26). El tablero llegaba a prod en ceros:
+      el E2E de la quincena se hizo con datos creados al vuelo y `AGR-861` solo vivía en los
+      tests. El seed carga 5 órdenes de agosto de la línea Agro — **solo la 861 trae la
+      programación real** de JP (1.206 pares), las otras 4 van rotuladas como ejemplo en
+      `observaciones` — y arma un cierre sano, una desviación, WIP en piso y una orden en curso.
+      Idempotente, con `--limpiar`, y reversible: corte no escribe inventario ni pares.
+      Los dos bugs son el mismo criterio en dos capas: **lo cortado vale 0 hasta el toque de
+      entrega**, así que medirlo antes marcaba con 100% de desviación a toda orden apenas
+      programada — alerta en el backend y **"0%" en rojo** en la tabla. Con el mes cargado, las
+      22 órdenes futuras habrían salido "con alerta" y el contador del tablero no significaría
+      nada. Ahora la desviación y el semáforo esperan a `entregaCorte`. Captura en
+      `capturas-demos/corte-tablero-sembrado.png`; el tablero del front estrena spec.
+
+> ⚠️ **Decisión pendiente con el cliente — qué mide el KPI "Cumplimiento de corte".** Hoy es
+> `cortado / programado` de **todas** las órdenes del rango, así que las que aún no han
+> entregado lo empujan hacia abajo: con las 5 sembradas marca **57,9%** cuando lo entregado va
+> en 87,9%. El subtítulo ("2.817 de 4.866 pares") lo explica y filtrar por fechas lo corrige,
+> pero el número grande es el primero que va a leer Gabriel. Es la misma conversación de
+> calibración que los umbrales — **no se cambia la semántica del indicador sin él**.
+
+**Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago y recordados el 26-ago):**
 - [ ] Importar el **Excel del jefe de corte** (programación + consumo teórico vs. real).
 - [ ] Formatos de programación de **Basarili** y **Línea Alta** (solo llegó el de Agro).
 - [ ] **Piezas por par por referencia** (24 / 22 / 18) para cuadrar piezas contra pares.
+      El seed asume **24** (dato de planta de JP) para convertir pares a piezas.
 - [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
+- [ ] Decidir qué mide el KPI de cumplimiento (ver el recuadro de arriba).
 
 
 ### 📦 Entrega 6 (quincena 2026-07-30 → ~08-13) — plan en `docs/superpowers/PLAN-ENTREGA-6.md`
