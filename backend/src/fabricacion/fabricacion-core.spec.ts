@@ -174,6 +174,28 @@ describe('generarPares', () => {
     ]);
     expect(pares[0]).toMatchObject({ celulaInicial: 'GUARNICION', subPasoInicial: 'AREA' });
   });
+
+  it('la línea puede fijar en qué sub-paso nace el par', () => {
+    // El punto de conversión lote→par. Cuál es exactamente lo decide la planta
+    // (Amarre o Alistamiento), así que viaja como dato, no como código.
+    const pares = generarPares(9, [
+      {
+        productoConfiguradoId: 30,
+        tallaId: 1,
+        cantAProducir: 2,
+        celulaInicial: 'GUARNICION',
+        subPasoInicial: 'AMARRE',
+      },
+    ]);
+    expect(pares.every((p) => p.subPasoInicial === 'AMARRE')).toBe(true);
+  });
+
+  it('sin punto de nacimiento configurado se comporta igual que siempre', () => {
+    const pares = generarPares(10, [
+      { productoConfiguradoId: 30, tallaId: 1, cantAProducir: 1, celulaInicial: 'GUARNICION', subPasoInicial: null },
+    ]);
+    expect(pares[0].subPasoInicial).toBe('AREA');
+  });
 });
 
 describe('subPasoInicial', () => {
@@ -182,5 +204,16 @@ describe('subPasoInicial', () => {
     expect(subPasoInicial('CORTE')).toBeNull();
     expect(subPasoInicial('INYECCION')).toBeNull();
     expect(subPasoInicial('PT')).toBeNull();
+  });
+
+  it('acepta el punto de nacimiento que fije la línea', () => {
+    expect(subPasoInicial('GUARNICION', 'AMARRE')).toBe('AMARRE');
+    expect(subPasoInicial('GUARNICION', 'STROBEL')).toBe('STROBEL');
+  });
+
+  it('el punto de nacimiento no aplica fuera de guarnición', () => {
+    // Feroz nace en INYECCION: un sub-paso de guarnición ahí no significa nada.
+    expect(subPasoInicial('INYECCION', 'AMARRE')).toBeNull();
+    expect(subPasoInicial('CORTE', 'AMARRE')).toBeNull();
   });
 });

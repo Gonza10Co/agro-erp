@@ -67,6 +67,13 @@ export class FabricacionService {
             op.linea?.celulaInicial ??
             l.productoConfigurado?.marca?.linea?.celulaInicial ??
             'CORTE',
+          // Punto de conversión lote→par. Hoy nadie lo tiene puesto, así que el
+          // par sigue entrando a guarnición por AREA; el día que la planta
+          // decida dónde se pega la etiqueta, se llena el campo y no el código.
+          subPasoInicial:
+            op.linea?.subPasoInicial ??
+            l.productoConfigurado?.marca?.linea?.subPasoInicial ??
+            null,
           lineaId: op.lineaId ?? l.productoConfigurado?.marca?.lineaId ?? null,
         })),
     );

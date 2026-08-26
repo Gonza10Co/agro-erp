@@ -26,8 +26,16 @@ export function esUltimaCelula(c: Celula): boolean {
  * Sub-paso inicial al arrancar en una célula. Solo Guarnición arranca dentro de
  * un sub-paso (AREA); cualquier otro punto de entrada (CORTE, PT…) es null.
  */
-export function subPasoInicial(celula: Celula): SubPasoGuarnicion | null {
-  return celula === 'GUARNICION' ? 'AREA' : null;
+export function subPasoInicial(
+  celula: Celula,
+  nacimiento?: SubPasoGuarnicion | null,
+): SubPasoGuarnicion | null {
+  if (celula !== 'GUARNICION') return null;
+  // `nacimiento` es el punto de conversión lote→par que fija la línea. Si la
+  // planta decide que la etiqueta se pega en Amarre, el par nace ahí y no
+  // recorre los 8 pasos previos, en los que todavía no existía. Sin configurar,
+  // el par sigue entrando por AREA como hasta hoy.
+  return nacimiento ?? 'AREA';
 }
 
 /**
@@ -45,6 +53,12 @@ export interface LineaProduccion {
   cantAProducir: number;
   /** Célula donde arranca la línea. Default CORTE; la línea Feroz entra en INYECCION. */
   celulaInicial?: Celula;
+  /**
+   * Sub-paso de guarnición donde NACE el par: el punto de conversión lote→par.
+   * Null = comportamiento histórico (entra por AREA). Se llena el día que el
+   * par deje de nacer en corte; cuál sub-paso exacto lo decide la planta.
+   */
+  subPasoInicial?: SubPasoGuarnicion | null;
   /** Id de la línea de negocio (denormalizado en el par para reportes). Null si la marca no tiene línea. */
   lineaId?: number | null;
 }
@@ -126,7 +140,7 @@ export function generarPares(
   let seq = 0;
   for (const l of lineas) {
     const celulaInicial = l.celulaInicial ?? 'CORTE';
-    const subPaso = subPasoInicial(celulaInicial);
+    const subPaso = subPasoInicial(celulaInicial, l.subPasoInicial);
     const subPasoIny = subPasoInyeccionInicial(celulaInicial);
     for (let i = 0; i < l.cantAProducir; i++) {
       seq++;

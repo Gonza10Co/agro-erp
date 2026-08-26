@@ -263,6 +263,11 @@ model Linea {
   codigo        String  @unique
   nombre        String
   celulaInicial Celula  @default(CORTE)
+  // Sub-paso de guarnición donde NACE el par: el punto de conversión lote→par.
+  // NULL = comportamiento histórico (el par entra a guarnición por AREA). Se
+  // llena el día que el par deje de nacer en corte; cuál sub-paso exacto es
+  // decisión de planta (Amarre vs. Alistamiento), por eso es dato y no código.
+  subPasoInicial SubPasoGuarnicion?
   activo        Boolean @default(true)
   // Datos de la empresa que emite cotizaciones/proformas a nombre de esta línea.
   // Nullable: una línea sin estos datos no puede emitir proforma (no aparece en el selector).
@@ -876,6 +881,7 @@ model OrdenCorte {
 
   lineas  OrdenCorteLinea[]
   avances AvanceCorte[]
+  pares   Par[]
 
   @@index([fecha, lineaId])
   @@index([estado])
@@ -1023,6 +1029,12 @@ model Par {
   codigo                String              @unique
   ofId                  Int
   of                    OrdenFabricacion    @relation(fields: [ofId], references: [id])
+  // De qué orden de corte salió este par. Es la trazabilidad hacia atrás sin
+  // código de barras en corte: de una bota defectuosa en PT se llega a la orden
+  // del día, al turno, al material y a su consumo. NULL en los pares nacidos
+  // antes del rediseño y en los de líneas que no pasan por corte (Feroz).
+  ordenCorteId          Int?
+  ordenCorte            OrdenCorte?         @relation(fields: [ordenCorteId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
   tallaId               Int
@@ -1053,6 +1065,7 @@ model Par {
 
   @@index([ofId])
   @@index([celulaActual])
+  @@index([ordenCorteId])
   @@index([subPasoActual])
   @@index([lineaId])
 }

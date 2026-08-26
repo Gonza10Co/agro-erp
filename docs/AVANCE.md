@@ -105,7 +105,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** 636 backend (61 suites) + 395 frontend, verdes 🟢 · ambos builds limpios.
+**Tests:** 642 backend (61 suites) + 395 frontend, verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -272,6 +272,36 @@ desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden*
 - [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
 - [ ] Decidir qué mide el KPI de cumplimiento (ver el recuadro de arriba).
 
+
+### 🔗 Quincena 2 — EL PUENTE (2026-08-26) · en `develop`, sin desplegar
+
+Plan completo en `docs/superpowers/PLAN-QUINCENA-2.md`. Se hizo **solo la mitad que no
+depende de la planta**, y toda aditiva: el comportamiento del cliente no cambia en nada.
+
+- [x] **`Par.ordenCorteId`** (nullable + índice + FK) — el par ya puede decir de qué orden
+      de corte salió. Es la trazabilidad hacia atrás que reemplaza al código en corte: de
+      una bota defectuosa en PT se llega a la orden del día, el turno, el material y su
+      consumo real.
+- [x] **`Linea.subPasoInicial`** — el **punto de conversión lote→par es un dato, no código**.
+      `subPasoInicial(celula, nacimiento)` y `generarPares` lo respetan, y `generarOF` lo lee
+      con la misma cascada que la célula (línea de la OP > línea de la marca > histórico).
+      Así la decisión de planta (¿Amarre o Alistamiento?) deja de ser un rediseño y pasa a
+      ser un `UPDATE`, igual que `celulaInicial` ya hace que Feroz arranque en Inyección.
+- [x] Migración aditiva `20260826161102_par_conoce_su_orden_de_corte`.
+
+**El campo nace vacío en toda la base**, así que el par sigue entrando a guarnición por
+`AREA` como siempre. Es capacidad instalada, no un cambio de conducta — hay spec que lo
+fija (`hoy ninguna línea lo tiene puesto, así que nada cambia para el cliente`).
+
+**Falta el corte del cordón** (`generarOF` deja de parir pares · nacimiento en el punto de
+conversión · `avanzar()` desde ahí · reporte diario desde `AvanceCorte` · adiós botón de
+etiquetas). Eso **sí** rompe el flujo que el cliente usa a diario: 12+ archivos y 27 specs.
+Va después de la demo y con respuesta de la planta.
+
+> ⚠️ **Hallazgo que el diseño original no contemplaba:** `calidad.service.ts:180` **también
+> crea pares** (los de reposición). Hay que decidir de qué orden de corte nacen — heredar la
+> del par que reemplazan (recomendado) o la del día en que se repusieron — o nacerán
+> huérfanos el día que se toque `generarOF`. No depende de la planta; se resuelve interno.
 
 ### 📦 Entrega 6 (quincena 2026-07-30 → ~08-13) — plan en `docs/superpowers/PLAN-ENTREGA-6.md`
 

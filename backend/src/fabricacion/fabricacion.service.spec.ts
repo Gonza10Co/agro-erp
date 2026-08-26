@@ -145,6 +145,43 @@ describe('FabricacionService.generarOF', () => {
     await new FabricacionService(prisma).generarOF(100);
     expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ celulaActual: 'CORTE', subPasoActual: null });
   });
+
+  it('la línea puede fijar el sub-paso donde nace el par (punto de conversión lote→par)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineaId: 2, linea: { celulaInicial: 'GUARNICION', subPasoInicial: 'AMARRE' },
+      lineas: [
+        {
+          productoConfiguradoId: 10,
+          productoConfigurado: { marca: { lineaId: 2, linea: { celulaInicial: 'CORTE' } } },
+          tallas: [{ tallaId: 1, cantAProducir: 3 }],
+        },
+      ],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    const data = tx.par.createMany.mock.calls[0][0].data;
+    expect(data.every((p: any) => p.celulaActual === 'GUARNICION' && p.subPasoActual === 'AMARRE')).toBe(true);
+  });
+
+  it('hoy ninguna línea lo tiene puesto, así que nada cambia para el cliente', async () => {
+    // El campo nace vacío en toda la base: es capacidad instalada, no un cambio
+    // de comportamiento. El corte del cordón es la Quincena 2.
+    const { prisma, tx } = makePrisma();
+    prisma.ordenProduccion.findUnique.mockResolvedValue({
+      id: 100, ordenesFabricacion: [],
+      lineaId: 1, linea: { celulaInicial: 'GUARNICION', subPasoInicial: null },
+      lineas: [
+        {
+          productoConfiguradoId: 10,
+          productoConfigurado: { marca: { lineaId: 1, linea: { celulaInicial: 'GUARNICION' } } },
+          tallas: [{ tallaId: 1, cantAProducir: 1 }],
+        },
+      ],
+    });
+    await new FabricacionService(prisma).generarOF(100);
+    expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ subPasoActual: 'AREA' });
+  });
 });
 
 describe('FabricacionService.obtenerOF', () => {
