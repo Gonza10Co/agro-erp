@@ -14,7 +14,12 @@
 > la aplicó `migrate deploy` sola: verificado con **login real** del perfil `stage` contra prod
 > y `GET /corte/tablero` → **200** con el resumen en ceros.
 >
-> ⚠️ **El tablero de corte en prod está VACÍO y no hay `seed:corte`.** El E2E de la quincena se
+> ✅ **Tablero sembrado y verificado en prod (2026-08-26).** `seed:corte` corrido contra la
+> base pública: 5 órdenes, 1 sola alerta (la 862, la que sí se desvió). Verificado en pantalla
+> con el perfil `stage` contra prod — captura en `capturas-demos/corte-tablero-prod.png`.
+> Para revertir: `npm run seed:corte -- --limpiar` (borra solo esas 5 órdenes).
+>
+> ~~⚠️ **El tablero de corte en prod está VACÍO y no hay `seed:corte`.**~~ El E2E de la quincena se
 > hizo con datos creados al vuelo; `AGR-861` solo vive en los tests y en los docs. Antes de
 > mostrarlo hay que sembrar la programación de agosto o crear la orden en vivo en la pantalla.
 > A favor: el módulo **no toca inventario** (0 referencias a `MovimientoInventario` en
