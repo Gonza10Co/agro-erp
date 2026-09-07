@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { PantallaOperarioComponent } from './pantalla-operario.component';
@@ -270,5 +270,96 @@ describe('sub-pasos de Guarnición', () => {
     expect(boton).toBeDefined();
     expect(boton!.textContent).toContain('Guarnición');
     http.verify();
+  });
+});
+
+describe('lectura por cámara', () => {
+  const PAR = {
+    id: 9, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'CORTE',
+    of: { consecutivo: 5 }, talla: { valor: 38 }, eventos: [],
+  };
+
+  /** Doble del lector: el componente solo lo pausa/reanuda, la cámara real no entra al test. */
+  function conLector(fixture: ReturnType<typeof setup>['fixture']) {
+    const lector = {
+      pausar: jasmine.createSpy('pausar'),
+      reanudar: jasmine.createSpy('reanudar'),
+      cerrar: jasmine.createSpy('cerrar').and.resolveTo(),
+    };
+    fixture.componentInstance['lector'] = lector;
+    return lector;
+  }
+
+  it('una lectura pausa la cámara y busca el par como si lo hubiera tipeado el lector físico', () => {
+    const { fixture, http } = setup();
+    const comp = fixture.componentInstance;
+    const lector = conLector(fixture);
+
+    comp.onLectura('OF5-0001');
+    expect(lector.pausar).toHaveBeenCalled();
+    http.expectOne(`${BASE}/par/OF5-0001`).flush(PAR);
+    expect(comp.par()?.codigo).toBe('OF5-0001');
+    expect(lector.reanudar).not.toHaveBeenCalled(); // se atiende el par antes de seguir leyendo
+    http.verify();
+  });
+
+  it('con un par en pantalla ignora nuevas lecturas; "Leer otro" lo descarta y reanuda', () => {
+    const { fixture, http } = setup();
+    const comp = fixture.componentInstance;
+    const lector = conLector(fixture);
+    comp.par.set(PAR as never);
+
+    comp.onLectura('OF5-0002');
+    http.verify(); // ninguna búsqueda: el par en pantalla manda
+
+    comp.leerOtro();
+    expect(comp.par()).toBeNull();
+    expect(comp.codigo).toBe('');
+    expect(lector.reanudar).toHaveBeenCalled();
+  });
+
+  it('si el par no existe, la cámara vuelve a leer tras la gracia y no repite el error en bucle', fakeAsync(() => {
+    const { fixture, http } = setup();
+    const comp = fixture.componentInstance;
+    const lector = conLector(fixture);
+
+    comp.onLectura('OF5-0099');
+    http.expectOne(`${BASE}/par/OF5-0099`).flush('no existe', { status: 404, statusText: 'Not Found' });
+    expect(comp.esError()).toBeTrue();
+    expect(lector.reanudar).not.toHaveBeenCalled();
+    tick(1500);
+    expect(lector.reanudar).toHaveBeenCalled();
+
+    comp.onLectura('OF5-0099'); // el mismo QR sigue frente a la cámara
+    http.verify(); // no se vuelve a buscar
+    tick(3000);
+    comp.onLectura('OF5-0099'); // pasado el tiempo sí es un reintento deliberado
+    http.expectOne(`${BASE}/par/OF5-0099`).flush(PAR);
+    http.verify();
+    flush();
+  }));
+
+  it('tras avanzar espera 1,5 s antes de reanudar: la etiqueta sigue frente a la cámara', fakeAsync(() => {
+    const { fixture, http } = setup();
+    const comp = fixture.componentInstance;
+    const lector = conLector(fixture);
+    comp.par.set(PAR as never);
+
+    comp.avanzar(comp.par()!);
+    http.expectOne(`${BASE}/par/OF5-0001/avanzar`).flush({});
+    expect(comp.par()).toBeNull();
+    expect(lector.reanudar).not.toHaveBeenCalled();
+    tick(1500);
+    expect(lector.reanudar).toHaveBeenCalled();
+    http.verify();
+    flush();
+  }));
+
+  it('sin cámara en el navegador no ofrece el botón', () => {
+    const { fixture } = setup();
+    const comp = fixture.componentInstance;
+    const boton = botonPorTexto(fixture, 'cámara');
+    // jsdom/Chrome headless: el botón aparece exactamente cuando el navegador expone getUserMedia.
+    expect(!!boton).toBe(comp.tieneCamara);
   });
 });

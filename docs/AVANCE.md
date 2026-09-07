@@ -735,3 +735,20 @@ npm start
 ```
 
 Más comandos y convenciones en `agro-erp/CLAUDE.md`. Planes por demo en `agro-erp/docs/plans/`.
+
+### 📱 Ensayo desde el celular (el celular como lector de códigos)
+
+La pantalla del operario (`/fabricacion/operario`) lee QR/Code128 con la cámara del
+celular (`lector-camara.ts`, html5-qrcode cargado bajo demanda) y las etiquetas de OF
+llevan QR + Code128. La cámara exige **HTTPS**, y un front HTTPS contra un API HTTP es
+contenido mixto (bloqueado), así que el modo `movil` sirve el front por HTTPS y manda
+el API por el proxy de `ng serve` (`proxy.conf.json`: `/api` → `localhost:3001`).
+
+```bash
+npm run dev:front:movil        # = ng serve --configuration movil  (ssl · host 0.0.0.0 · proxy)
+# En el celular, misma wifi:  https://<IP-del-Mac>:4200   (aceptar el certificado autofirmado)
+# El backend se levanta igual que siempre (:3001); el proxy lo alcanza por localhost.
+```
+
+`environment.movil.ts` pone `apiUrl: '/api'`; los demás environments no cambian.
+Verificado 2026-09-07 en la Mac: build prod y movil limpios, 400 tests front en verde.
