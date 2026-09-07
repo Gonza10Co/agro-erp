@@ -24,8 +24,11 @@ import { lineasDesdeProgramacion, fechaDeJornada } from '../src/corte/orden-cort
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-/** Piezas que se cortan por par. Dato de planta (JP, 19-ago) para la línea Agro. */
-const PIEZAS_POR_PAR = 24;
+/**
+ * Respaldo si la referencia no informa `piezasPorPar` (dato de planta, JP 19-ago).
+ * El valor real viene del despiece: seed:basarili → piezas-por-par.csv → Referencia.
+ */
+const PIEZAS_POR_PAR_RESPALDO = 24;
 
 const NOTA_EJEMPLO = 'Orden de ejemplo cargada para demostrar el tablero de corte.';
 const NOTA_REAL = 'Programación real del formato de agosto (columnas 34–46).';
@@ -155,10 +158,11 @@ async function main() {
 
   const producto = await prisma.productoConfigurado.findFirst({
     orderBy: { id: 'asc' },
-    select: { id: true, marcaId: true, referencia: { select: { nombreInterno: true } } },
+    select: { id: true, marcaId: true, referencia: { select: { nombreInterno: true, piezasPorPar: true } } },
   });
   if (!producto) throw new Error('No hay ningún ProductoConfigurado. Correr antes seed:basarili.');
-  console.log(`  Producto de la programación: ${producto.referencia.nombreInterno} (id ${producto.id})`);
+  const piezasPorPar = producto.referencia.piezasPorPar ?? PIEZAS_POR_PAR_RESPALDO;
+  console.log(`  Producto de la programación: ${producto.referencia.nombreInterno} (id ${producto.id}, ${piezasPorPar} piezas/par)`);
 
   const materiales = await prisma.material.findMany({
     where: { nombreCanonico: { in: MATERIALES_CORTE.map((m) => m.nombre) } },
@@ -205,7 +209,7 @@ async function main() {
         data: {
           ordenCorteId: orden.id,
           fecha: new Date(a.fecha),
-          piezasCortadas: a.pares * PIEZAS_POR_PAR,
+          piezasCortadas: a.pares * piezasPorPar,
           piezasDanadas: a.danadas,
           piezasRepuestas: a.repuestas,
           operarioId: operario?.id ?? null,

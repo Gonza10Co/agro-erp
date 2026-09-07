@@ -7,6 +7,8 @@ export interface ReferenciaAbm {
   codigo: string;
   nombreInterno: string;
   activo: boolean;
+  /** Piezas que se cortan por par; null = no informado. */
+  piezasPorPar?: number | null;
   ejes?: unknown[];
   marcas?: unknown[];
 }
@@ -16,6 +18,7 @@ export interface CrearReferenciaDto {
   nombreInterno: string;
   tallaMinId: number;
   tallaMaxId: number;
+  piezasPorPar?: number;
 }
 
 @Injectable({ providedIn: 'root' })

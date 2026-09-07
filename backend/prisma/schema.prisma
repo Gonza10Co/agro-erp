@@ -156,6 +156,9 @@ model Referencia {
   tallaMaxId    Int
   tallaMax      Talla   @relation("TallaMax", fields: [tallaMaxId], references: [id])
   activo        Boolean @default(true)
+  /// Piezas que se cortan por par (forros, bullones, strobel y contrafuerte incluidos).
+  /// Sale del despiece del cliente (REFERENCIAS.xlsx, 07-sep-2026); NULL = no informado.
+  piezasPorPar  Int?
 
   boms                  Bom[]
   overrides             ReglaOverride[]

@@ -59,9 +59,12 @@ async function main() {
   console.log(`  · categorías: ${categoriaPorNombre.size}`);
 
   // 3b. Líneas de producción (Basarili, Agro, Alta, Feroz). Datos maestros fijos.
-  // Feroz (capellada de Bogotá; hoy solo se le presta servicio de inyección)
-  // arranca en INYECCION; las demás en CORTE. La línea de un pedido la decide
-  // el cliente al pedir (una misma marca puede fabricarse por cualquier línea).
+  // Feroz (capellada de Bogotá) arranca en INYECCION; las demás en CORTE. Ojo: a Feroz
+  // también se le cortan piezas sueltas en Ibagué (cuellos, forros — informe de corte
+  // ago-2026), pero sus pares nacen con la capellada hecha. La línea de un pedido la
+  // decide el cliente al pedir (una misma marca puede fabricarse por cualquier línea).
+  // El estado `activo` NO se toca acá: lo gobierna seed:lineas-activas (arranque en uso
+  // real por una sola línea) y recargar el catálogo no debe revertirlo.
   const lineas: Array<{ codigo: string; nombre: string; celulaInicial: 'CORTE' | 'INYECCION' }> = [
     { codigo: 'BASARILI', nombre: 'Basarili', celulaInicial: 'CORTE' },
     { codigo: 'AGRO', nombre: 'Agro', celulaInicial: 'CORTE' },
@@ -71,7 +74,7 @@ async function main() {
   for (const l of lineas) {
     await prisma.linea.upsert({
       where: { codigo: l.codigo },
-      update: { nombre: l.nombre, celulaInicial: l.celulaInicial, activo: true },
+      update: { nombre: l.nombre, celulaInicial: l.celulaInicial },
       create: l,
     });
   }
@@ -154,6 +157,25 @@ async function main() {
     referenciaPorCodigo.set(f.codigo, r.id);
   }
   console.log(`  · referencias: ${referenciaPorCodigo.size}`);
+
+  // 6b. Piezas por par (despiece del cliente, REFERENCIAS.xlsx del 07-sep-2026): una fila por
+  // referencia × material × pieza; la referencia guarda el TOTAL. Las referencias del CSV que
+  // no existen en el catálogo (la 107, la variante "105 ECONOMICA") se avisan y se saltan.
+  const piezasPorReferencia = new Map<string, number>();
+  for (const f of leerCsv(ruta('piezas-por-par.csv'))) {
+    piezasPorReferencia.set(f.referencia, (piezasPorReferencia.get(f.referencia) ?? 0) + Number(f.piezasPorPar));
+  }
+  let refsConPiezas = 0;
+  for (const [codigo, piezasPorPar] of piezasPorReferencia) {
+    const id = referenciaPorCodigo.get(codigo);
+    if (!id) {
+      console.warn(`  · piezas por par: referencia ${codigo} no está en el catálogo, omitida (${piezasPorPar} piezas)`);
+      continue;
+    }
+    await prisma.referencia.update({ where: { id }, data: { piezasPorPar } });
+    refsConPiezas++;
+  }
+  console.log(`  · piezas por par: ${refsConPiezas} referencias`);
 
   // 7. BOMs por referencia: líneas FIJO + líneas CURVA (agrupadas por material Y PIEZA).
   // Idempotencia: se toma/crea el BOM activo y se recrean sus líneas.

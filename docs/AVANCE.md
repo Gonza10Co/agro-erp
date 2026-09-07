@@ -267,7 +267,7 @@ desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden*
 **Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago y recordados el 26-ago):**
 - [ ] Importar el **Excel del jefe de corte** (programación + consumo teórico vs. real).
 - [ ] Formatos de programación de **Basarili** y **Línea Alta** (solo llegó el de Agro).
-- [ ] **Piezas por par por referencia** (24 / 22 / 18) para cuadrar piezas contra pares.
+- [x] Piezas por par por referencia — ✅ 2026-09-07: `Referencia.piezasPorPar` cargado desde el despiece de JP (`piezas-por-par.csv`: 101=28 · 102=28 · 103=28 · 104=32 · 105=30 · 106=34; la 107 y la variante 105 ECONÓMICA=34 quedan en el CSV a la espera). `seed-corte` lo lee de la referencia (respaldo 24). Ninguna referencia da los 24 del audio de agosto: JP contaba solo lo que pasa por cortadora.
       El seed asume **24** (dato de planta de JP) para convertir pares a piezas.
 - [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
 - [ ] Decidir qué mide el KPI de cumplimiento (ver el recuadro de arriba).
@@ -735,6 +735,21 @@ npm start
 ```
 
 Más comandos y convenciones en `agro-erp/CLAUDE.md`. Planes por demo en `agro-erp/docs/plans/`.
+
+### 🚦 Arranque en uso real por UNA línea (decisión 2026-09-07)
+
+El cliente empieza a usar la aplicación **solo con Basarili**; Agro, Alta y Feroz entran cuando
+el flujo esté probado de punta a punta con datos reales. Interruptor:
+
+```bash
+npm run seed:lineas-activas -- BASARILI                   # deja activa solo Basarili
+npm run seed:lineas-activas -- BASARILI AGRO ALTA FEROZ   # reabre todas
+```
+
+Todo lo que ofrece líneas para elegir lee `GET /catalog/lineas`, que solo devuelve activas, así
+que con eso basta. `seed:basarili` ya **no** pone `activo: true` al recargar el catálogo (antes
+sí, y habría revertido el interruptor). ⚠️ El ABM de líneas del front no puede ver ni reactivar
+inactivas (el endpoint no acepta `?activo=`): reabrir es por seed.
 
 ### 📱 Ensayo desde el celular (el celular como lector de códigos)
 
