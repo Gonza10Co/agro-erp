@@ -736,6 +736,31 @@ npm start
 
 Más comandos y convenciones en `agro-erp/CLAUDE.md`. Planes por demo en `agro-erp/docs/plans/`.
 
+### 🧹 Limpiar los datos demo de prod (paso previo al uso real, 2026-09-07)
+
+Prod nunca ha tenido transacciones reales: **no existe ni un `ProductoConfigurado` real** (los 3
+son `PC-101-PODEROSA-*` del seed), así que todas las OC/OP/OF, pares, despachos, facturas y kardex
+son de demo o de ensayo. Los maestros sí son reales (clientes, catálogo, BOM, inventario MP,
+operarios, máquinas, tipos de daño, metas, bodegas, servicios, calendario, usuarios).
+
+```bash
+npm run limpiar:demo                                  # DRY-RUN: cuenta y lista, no borra
+npm run limpiar:demo -- --ejecutar                    # borra, en UNA transacción
+npm run limpiar:demo -- --ejecutar --prod-confirmado  # en Railway exige además este flag
+```
+
+Clasifica por marcadores (productos `PC-*`, los 5 clientes y 3 proveedores ficticios por NIT,
+6 materiales inventados, ejes COLOR/SUELA, movimientos `D14-*`, OCs 9000–9999, órdenes de corte
+AGR-862/863/880/881) y **una OC de cliente real con algún producto real no se toca y se lista**.
+Las secuencias de consecutivos vuelven a 1 solo en las tablas que quedan vacías. Probado contra
+la copia local de prod (04-ago): 12.533 registros fuera, maestros intactos (BOM de la 101 con
+sus 47 líneas, 166 clientes, 301 inventarios de MP), segundo dry-run en cero.
+
+**Guardia anti-prod** (`src/prisma/base-url.ts`, con tests): `seed:demo` y `seed:catalogo`
+abortan si `DATABASE_URL` apunta a Railway o `NODE_ENV=production`. Antes no había ninguna:
+`seed:demo` borra TODO el kardex de MP, TODAS las compras a proveedor y TODAS las facturas de
+servicio sin distinguir demo de real, y `seed:catalogo` re-ejecutado pisa el BOM real de la 101.
+
 ### 🚦 Arranque en uso real por UNA línea (decisión 2026-09-07)
 
 El cliente empieza a usar la aplicación **solo con Basarili**; Agro, Alta y Feroz entran cuando

@@ -1,11 +1,16 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { describirBase, exigirNoProd } from '../src/prisma/base-url';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+  // Catálogo ficticio de arranque: re-ejecutado sobre el catálogo real BORRA el BOM de la
+  // referencia 101 (misma fila) y lo deja con 2 líneas inventadas. Jamás contra producción.
+  exigirNoProd('seed:catalogo');
+  console.log(`Seed catálogo — base: ${describirBase()}`);
   // Tallas 38..46
   const tallas: Record<number, number> = {};
   for (let v = 38; v <= 46; v++) {
