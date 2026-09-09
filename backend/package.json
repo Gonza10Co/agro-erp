@@ -30,6 +30,7 @@
     "seed:servicios": "tsx prisma/seed-servicios.ts",
     "seed:corte": "tsx prisma/seed-corte.ts",
     "seed:lineas-activas": "tsx prisma/seed-lineas-activas.ts",
+    "seed:piloto": "tsx prisma/seed-piloto.ts",
     "limpiar:demo": "tsx prisma/limpiar-demo.ts"
   },
   "prisma": {
