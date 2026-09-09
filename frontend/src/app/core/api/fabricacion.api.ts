@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -20,11 +20,35 @@ export class FabricacionApi {
   obtenerOF(id: number) {
     return this.http.get<OFDetalle>(`${this.base}/fabricacion/of/${id}`);
   }
-  avanzar(codigo: string, operarioId: number, maquinaId: number) {
-    return this.http.post<unknown>(
+  /**
+   * Un pistolazo. La máquina es opcional (en Bodega o PT no hay) y la estación,
+   * si se manda, hace que el backend rechace el escaneo si el par se saltó una.
+   */
+  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string) {
+    return this.http.post<AvanceResultado>(
       `${this.base}/fabricacion/par/${codigo}/avanzar`,
-      { operarioId, maquinaId },
+      {
+        operarioId,
+        ...(maquinaId != null ? { maquinaId } : {}),
+        ...(estacion ? { estacion } : {}),
+      },
     );
+  }
+  /** Nacen pares de la OF en su estación inicial: una etiqueta por lengua. */
+  nacer(ofId: number, dto: { productoConfiguradoId: number; tallaId: number; cantidad: number; operarioId: number; maquinaId?: number }) {
+    return this.http.post<NacerResultado>(`${this.base}/fabricacion/of/${ofId}/nacer`, dto);
+  }
+  estaciones() {
+    return this.http.get<Estacion[]>(`${this.base}/fabricacion/estaciones`);
+  }
+  activarEstacion(codigo: string, activa: boolean) {
+    return this.http.patch<Estacion>(`${this.base}/fabricacion/estaciones/${codigo}`, { activa });
+  }
+  hoy() {
+    return this.http.get<HoyPlanta>(`${this.base}/fabricacion/hoy`);
+  }
+  tableroOrdenes() {
+    return this.http.get<TableroOrdenes>(`${this.base}/fabricacion/tablero-ordenes`);
   }
   par(codigo: string) {
     return this.http.get<ParDetalle>(`${this.base}/fabricacion/par/${codigo}`);

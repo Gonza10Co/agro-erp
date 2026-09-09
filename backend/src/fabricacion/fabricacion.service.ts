@@ -514,7 +514,17 @@ export class FabricacionService {
       include: {
         of: { select: { consecutivo: true } },
         talla: { select: { valor: true } },
-        productoConfigurado: { select: { id: true } },
+        // Nombres para la pantalla de estación y el sticker de la caja en PT.
+        productoConfigurado: {
+          select: {
+            id: true,
+            codigo: true,
+            nombreComercial: true,
+            referencia: { select: { codigo: true, nombreInterno: true } },
+            marca: { select: { nombre: true } },
+          },
+        },
+        linea: { select: { codigo: true, nombre: true } },
         eventos: {
           orderBy: { timestamp: 'asc' },
           include: {
