@@ -3,6 +3,7 @@ import {
   columnaDeCelula,
   pctCumplimiento,
   construirReporte,
+  cuentaComoProduccion,
   COLUMNAS_PENDIENTES,
   InputReporte,
 } from './reporte-diario-core';
@@ -346,5 +347,48 @@ describe('reporte-diario-core', () => {
         expect(r.filas.find((d) => d.fecha === '2026-06-06')!.inyeccion).toBe(2);
       });
     });
+  });
+});
+
+// ───────────── Eventos del piloto: el escaneo dice a dónde ENTRÓ el par ─────────────
+
+describe('cuentaComoProduccion', () => {
+  const t = new Date('2026-09-09T13:00:00Z');
+  it('piloto: cuenta solo el evento con el que el par SALE de su célula', () => {
+    // Nacimiento en Preparación: entra a la misma célula → no es producción.
+    expect(cuentaComoProduccion({ celula: 'GUARNICION', subPaso: 'PREPARACION', celulaDestino: 'GUARNICION', timestamp: t })).toBe(false);
+    // Preparación → Bodega de corte: guarnición entregó.
+    expect(cuentaComoProduccion({ celula: 'GUARNICION', subPaso: 'PREPARACION', celulaDestino: 'ALMACEN', timestamp: t })).toBe(true);
+    // Montaje → Finizaje: sigue dentro de inyección.
+    expect(cuentaComoProduccion({ celula: 'INYECCION', subPasoInyeccion: 'MONTAJE', celulaDestino: 'INYECCION', timestamp: t })).toBe(false);
+    // Finizaje → PT: inyección entregó.
+    expect(cuentaComoProduccion({ celula: 'INYECCION', subPasoInyeccion: 'FINIZAJE', celulaDestino: 'PT', timestamp: t })).toBe(true);
+  });
+  it('sin destino (eventos viejos) sigue la regla AMARRE / IMPACTO', () => {
+    expect(cuentaComoProduccion({ celula: 'GUARNICION', subPaso: 'STROBEL', timestamp: t })).toBe(false);
+    expect(cuentaComoProduccion({ celula: 'GUARNICION', subPaso: 'AMARRE', timestamp: t })).toBe(true);
+    expect(cuentaComoProduccion({ celula: 'INYECCION', subPasoInyeccion: 'FINIZAJE', timestamp: t })).toBe(false);
+    expect(cuentaComoProduccion({ celula: 'INYECCION', subPasoInyeccion: 'IMPACTO', timestamp: t })).toBe(true);
+    expect(cuentaComoProduccion({ celula: 'INYECCION', timestamp: t })).toBe(true);
+    expect(cuentaComoProduccion({ celula: 'CORTE', timestamp: t })).toBe(true);
+  });
+});
+
+describe('construirReporte con eventos del piloto', () => {
+  it('el pistolazo Finizaje → PT cuenta como inyección Y como bodega; el de segunda va a Segundas', () => {
+    const base = { anio: 2026, mes: 9, saldoInicialPT: 0, metas: [], ventas: [], movimientosPT: [] } as unknown as InputReporte;
+    const r = construirReporte({
+      ...base,
+      eventos: [
+        { celula: 'GUARNICION', subPaso: 'PREPARACION', celulaDestino: 'GUARNICION', timestamp: new Date('2026-09-09T13:00:00Z') },
+        { celula: 'GUARNICION', subPaso: 'PREPARACION', celulaDestino: 'ALMACEN', timestamp: new Date('2026-09-09T14:00:00Z') },
+        { celula: 'ALMACEN', celulaDestino: 'INYECCION', timestamp: new Date('2026-09-09T15:00:00Z') },
+        { celula: 'INYECCION', subPasoInyeccion: 'MONTAJE', celulaDestino: 'INYECCION', timestamp: new Date('2026-09-09T16:00:00Z') },
+        { celula: 'INYECCION', subPasoInyeccion: 'FINIZAJE', celulaDestino: 'PT', timestamp: new Date('2026-09-09T17:00:00Z') },
+        { celula: 'INYECCION', subPasoInyeccion: 'FINIZAJE', celulaDestino: 'PT', timestamp: new Date('2026-09-09T17:30:00Z'), esSegunda: true },
+      ],
+    } as InputReporte);
+    const dia = r.filas.find((f) => f.fecha === '2026-09-09')!;
+    expect(dia).toMatchObject({ troquelado: 0, guarnicion: 1, almacen: 1, inyeccion: 2, bodega: 1, segundas: 1 });
   });
 });

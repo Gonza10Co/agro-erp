@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { FabricacionService } from './fabricacion.service';
+import { ESTACIONES_PILOTO } from './fabricacion-core';
 
 const BODEGA_ID = 7;
 
@@ -28,6 +29,13 @@ function makePrisma(overrides: any = {}) {
     par: { findUnique: jest.fn() },
     // La bodega destino se resuelve fuera de la transacción (config global).
     bodega: { findFirst: jest.fn().mockResolvedValue({ id: BODEGA_ID }) },
+    // Las estaciones del piloto tal como nacen en la migración (Cierre apagada).
+    estacion: {
+      findMany: jest.fn().mockResolvedValue(ESTACIONES_PILOTO.map((e) => ({ ...e }))),
+      findUnique: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    eventoTrazabilidad: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(async (cb: any) => cb(tx)),
     ...overrides.root,
   };
@@ -35,7 +43,7 @@ function makePrisma(overrides: any = {}) {
 }
 
 describe('FabricacionService.generarOF', () => {
-  it('crea OF con consecutivo max+1 y N pares en CORTE', async () => {
+  it('crea la OF con el consecutivo de la secuencia y SIN pares (nacen en Preparación)', async () => {
     const { prisma, tx } = makePrisma();
     prisma.ordenProduccion.findUnique.mockResolvedValue({
       id: 100,
@@ -57,10 +65,10 @@ describe('FabricacionService.generarOF', () => {
     expect(tx.ordenFabricacion.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ consecutivo: 5, opId: 100 }) }),
     );
-    const createManyArg = tx.par.createMany.mock.calls[0][0];
-    expect(createManyArg.data).toHaveLength(3);
-    expect(createManyArg.data[0]).toMatchObject({ ofId: 1, codigo: 'OF5-0001' });
-    expect(res).toEqual({ id: 1, consecutivo: 5, opId: 100, totalPares: 3 });
+    // Desde el 2026-09-09 la OF no pare pares: cada uno nace cuando se le imprime
+    // la etiqueta en Preparación. Lo programado (3) viaja para el tablero.
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+    expect(res).toEqual({ id: 1, consecutivo: 5, opId: 100, totalPares: 0, programados: 3 });
   });
 
   it('consecutivo = 1 cuando no hay OFs previas', async () => {
@@ -99,88 +107,131 @@ describe('FabricacionService.generarOF', () => {
     await expect(new FabricacionService(prisma).generarOF(1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('los pares de una línea Feroz arrancan en INYECCION (capellada de Bogotá)', async () => {
-    const { prisma, tx } = makePrisma();
-    prisma.ordenProduccion.findUnique.mockResolvedValue({
-      id: 100, ordenesFabricacion: [],
+});
+
+// ─────────────── Nacimiento del par en la estación inicial (piloto) ───────────────
+function ofParaNacer(extra: any = {}) {
+  return {
+    id: 1,
+    consecutivo: 5,
+    estado: 'ABIERTA',
+    op: {
+      lineaId: 3,
+      linea: { id: 3, celulaInicial: 'CORTE', subPasoInicial: null },
       lineas: [
         {
           productoConfiguradoId: 10,
-          productoConfigurado: { marca: { lineaId: 4, linea: { celulaInicial: 'INYECCION' } } },
-          tallas: [{ tallaId: 1, cantAProducir: 2 }],
+          productoConfigurado: { marca: { lineaId: null, linea: null } },
+          tallas: [
+            { tallaId: 1, cantAProducir: 20, talla: { valor: 40 } },
+            { tallaId: 2, cantAProducir: 0, talla: { valor: 41 } },
+          ],
         },
       ],
-    });
-    await new FabricacionService(prisma).generarOF(100);
-    const data = tx.par.createMany.mock.calls[0][0].data;
-    expect(data).toHaveLength(2);
-    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.subPasoActual === null && p.lineaId === 4)).toBe(true);
-  });
+    },
+    ...extra,
+  };
+}
 
-  it('la línea de la OP (línea por pedido) manda sobre la de la marca', async () => {
-    const { prisma, tx } = makePrisma();
-    prisma.ordenProduccion.findUnique.mockResolvedValue({
-      id: 100, ordenesFabricacion: [],
-      lineaId: 4, linea: { celulaInicial: 'INYECCION' },
-      lineas: [
-        {
-          productoConfiguradoId: 10,
-          // La marca apunta a otra línea: debe perder contra la del pedido.
-          productoConfigurado: { marca: { lineaId: 1, linea: { celulaInicial: 'CORTE' } } },
-          tallas: [{ tallaId: 1, cantAProducir: 2 }],
-        },
+function makeNacer(of: any = ofParaNacer(), nacidos = 0, seqBase = 0) {
+  const { prisma, tx } = makePrisma();
+  prisma.ordenFabricacion = { findUnique: jest.fn().mockResolvedValue(of) };
+  tx.$queryRaw = jest.fn().mockResolvedValue([]);
+  tx.par.count = jest.fn().mockResolvedValueOnce(nacidos).mockResolvedValueOnce(seqBase);
+  tx.par.findMany = jest.fn().mockImplementation(async ({ where }: any) =>
+    where.codigo.in.map((codigo: string, i: number) => ({
+      id: 100 + i,
+      codigo,
+      talla: { valor: 40 },
+      productoConfigurado: { codigo: 'BOT-40', nombreComercial: 'Bota Fortia', referencia: { codigo: '107' }, marca: { nombre: 'Fortia' } },
+      linea: { codigo: 'BASARILI', nombre: 'Basarili' },
+    })),
+  );
+  tx.eventoTrazabilidad.createMany = jest.fn().mockResolvedValue({ count: 1 });
+  return { prisma, tx, service: new FabricacionService(prisma) };
+}
+
+describe('FabricacionService.nacer', () => {
+  const dto = { productoConfiguradoId: 10, tallaId: 1, cantidad: 2, operarioId: 3 };
+
+  it('crea los pares en Preparación con numeración continua y un evento de entrada por par', async () => {
+    const { tx, service } = makeNacer(ofParaNacer(), 5, 7);
+    const res = await service.nacer(1, dto);
+
+    expect(tx.$queryRaw).toHaveBeenCalled(); // lock de la OF: dos celulares no se pisan
+    expect(tx.par.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ codigo: 'OF5-0008', celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', subPasoInyeccion: null, lineaId: 3, tallaId: 1 }),
+        expect.objectContaining({ codigo: 'OF5-0009' }),
       ],
     });
-    await new FabricacionService(prisma).generarOF(100);
-    const data = tx.par.createMany.mock.calls[0][0].data;
-    expect(data.every((p: any) => p.celulaActual === 'INYECCION' && p.lineaId === 4)).toBe(true);
-  });
-
-  it('sin línea asignada los pares siguen arrancando en CORTE (cero regresión)', async () => {
-    const { prisma, tx } = makePrisma();
-    prisma.ordenProduccion.findUnique.mockResolvedValue({
-      id: 100, ordenesFabricacion: [],
-      lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 1, cantAProducir: 1 }] }],
-    });
-    await new FabricacionService(prisma).generarOF(100);
-    expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ celulaActual: 'CORTE', subPasoActual: null });
-  });
-
-  it('la línea puede fijar el sub-paso donde nace el par (punto de conversión lote→par)', async () => {
-    const { prisma, tx } = makePrisma();
-    prisma.ordenProduccion.findUnique.mockResolvedValue({
-      id: 100, ordenesFabricacion: [],
-      lineaId: 2, linea: { celulaInicial: 'GUARNICION', subPasoInicial: 'AMARRE' },
-      lineas: [
-        {
-          productoConfiguradoId: 10,
-          productoConfigurado: { marca: { lineaId: 2, linea: { celulaInicial: 'CORTE' } } },
-          tallas: [{ tallaId: 1, cantAProducir: 3 }],
-        },
+    expect(tx.eventoTrazabilidad.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ parId: 100, celula: 'GUARNICION', subPaso: 'PREPARACION', estacionDestino: 'PREPARACION', celulaDestino: 'GUARNICION', operarioId: 3, maquinaId: null }),
+        expect.objectContaining({ parId: 101 }),
       ],
     });
-    await new FabricacionService(prisma).generarOF(100);
-    const data = tx.par.createMany.mock.calls[0][0].data;
-    expect(data.every((p: any) => p.celulaActual === 'GUARNICION' && p.subPasoActual === 'AMARRE')).toBe(true);
+    expect(res.estacion.codigo).toBe('PREPARACION');
+    expect(res.pares).toEqual([
+      expect.objectContaining({ codigo: 'OF5-0008', talla: '40', producto: 'Bota Fortia', referencia: '107', marca: 'Fortia', linea: 'Basarili', of: 5 }),
+      expect.objectContaining({ codigo: 'OF5-0009' }),
+    ]);
   });
 
-  it('hoy ninguna línea lo tiene puesto, así que nada cambia para el cliente', async () => {
-    // El campo nace vacío en toda la base: es capacidad instalada, no un cambio
-    // de comportamiento. El corte del cordón es la Quincena 2.
-    const { prisma, tx } = makePrisma();
-    prisma.ordenProduccion.findUnique.mockResolvedValue({
-      id: 100, ordenesFabricacion: [],
-      lineaId: 1, linea: { celulaInicial: 'GUARNICION', subPasoInicial: null },
-      lineas: [
-        {
-          productoConfiguradoId: 10,
-          productoConfigurado: { marca: { lineaId: 1, linea: { celulaInicial: 'GUARNICION' } } },
-          tallas: [{ tallaId: 1, cantAProducir: 1 }],
-        },
-      ],
+  it('el primer nacimiento pone la OF EN_PROCESO', async () => {
+    const { tx, service } = makeNacer();
+    await service.nacer(1, dto);
+    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'EN_PROCESO' } }),
+    );
+  });
+
+  it('no deja nacer más pares que los programados para la talla', async () => {
+    const { tx, service } = makeNacer(ofParaNacer(), 19, 19);
+    await expect(service.nacer(1, dto)).rejects.toMatchObject({
+      message: expect.stringContaining('ya tiene 19 de 20'),
     });
-    await new FabricacionService(prisma).generarOF(100);
-    expect(tx.par.createMany.mock.calls[0][0].data[0]).toMatchObject({ subPasoActual: 'AREA' });
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+  });
+
+  it('una línea Feroz (arranca en INYECCION) nace en Montaje', async () => {
+    const of = ofParaNacer({ op: { ...ofParaNacer().op, lineaId: 4, linea: { id: 4, celulaInicial: 'INYECCION', subPasoInicial: null } } });
+    const { tx, service } = makeNacer(of);
+    const res = await service.nacer(1, dto);
+    expect(res.estacion.codigo).toBe('MONTAJE');
+    expect(tx.par.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null, subPasoInyeccion: 'MONTAJE', lineaId: 4 }),
+      ]),
+    });
+  });
+
+  it('400 si la OF no fabrica ese producto o no programa esa talla', async () => {
+    const { service } = makeNacer();
+    await expect(service.nacer(1, { ...dto, productoConfiguradoId: 99 })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.nacer(1, { ...dto, tallaId: 2 })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('409 si la OF está anulada o terminada; 404 si no existe', async () => {
+    const anulada = makeNacer(ofParaNacer({ estado: 'ANULADA' }));
+    await expect(anulada.service.nacer(1, dto)).rejects.toBeInstanceOf(ConflictException);
+    const { service, prisma } = makeNacer();
+    prisma.ordenFabricacion.findUnique.mockResolvedValue(null);
+    await expect(service.nacer(1, dto)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('FabricacionService.activarEstacion', () => {
+  it('apaga y prende una estación; PT no se puede apagar', async () => {
+    const { prisma } = makePrisma();
+    prisma.estacion.findUnique.mockResolvedValue({ codigo: 'CIERRE', celula: 'GUARNICION' });
+    await new FabricacionService(prisma).activarEstacion('CIERRE', true);
+    expect(prisma.estacion.update).toHaveBeenCalledWith({ where: { codigo: 'CIERRE' }, data: { activa: true } });
+
+    prisma.estacion.findUnique.mockResolvedValue({ codigo: 'PT', celula: 'PT' });
+    await expect(new FabricacionService(prisma).activarEstacion('PT', false)).rejects.toBeInstanceOf(BadRequestException);
+    prisma.estacion.findUnique.mockResolvedValue(null);
+    await expect(new FabricacionService(prisma).activarEstacion('XXX', true)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
@@ -213,18 +264,93 @@ describe('FabricacionService.avanzar', () => {
       productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
     });
     tx.par.update.mockResolvedValue({ id: 50, celulaActual: 'GUARNICION' });
+    prisma.eventoTrazabilidad.count.mockResolvedValue(41);
     const service = new FabricacionService(prisma);
 
-    await service.avanzar('OF1-0001', dto);
+    const res = await service.avanzar('OF1-0001', dto);
 
+    // El evento dice de dónde sale Y a dónde entra (el pistolazo es de entrada).
     expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ parId: 50, celula: 'CORTE', operarioId: 3, maquinaId: 4 }),
+        data: expect.objectContaining({
+          parId: 50, celula: 'CORTE', operarioId: 3, maquinaId: 4,
+          estacionDestino: 'PREPARACION', celulaDestino: 'GUARNICION',
+        }),
       }),
     );
     expect(tx.par.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION' }) }),
     );
+    // Lo que ve el operario: a dónde entró y cuántos van hoy ahí.
+    expect(res.avance).toEqual({ estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 41 });
+  });
+
+  it('la máquina es opcional (en Bodega o PT no hay máquina)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', { operarioId: 3 });
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ maquinaId: null, estacionDestino: 'BODEGA_CORTE' }) }),
+    );
+  });
+
+  it('con la estación declarada, rechaza el pistolazo si el par no viene de la anterior', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await expect(
+      new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'MONTAJE' }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('le toca Bodega de corte') });
+    expect(tx.eventoTrazabilidad.create).not.toHaveBeenCalled();
+  });
+
+  it('con la estación declarada correcta, avanza normal', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'BODEGA_CORTE' });
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'ALMACEN', subPasoActual: null }) }),
+    );
+  });
+
+  it('si Cierre se prende, el par pasa por ahí antes de Bodega', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.estacion.findMany.mockResolvedValue(
+      ESTACIONES_PILOTO.map((e) => (e.codigo === 'CIERRE' ? { ...e, activa: true } : { ...e })),
+    );
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'CIERRE' }) }),
+    );
+  });
+
+  it('desde Finizaje, entrar a PT termina el par en un solo pistolazo (5º)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'INYECCION', subPasoActual: null, subPasoInyeccion: 'FINIZAJE',
+      estado: 'EN_PROCESO', calidad: 'PRIMERA', productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    const res = await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'PT' });
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'TERMINADO', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null } }),
+    );
+    expect(tx.inventarioPT.upsert).toHaveBeenCalled();
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celula: 'INYECCION', subPasoInyeccion: 'FINIZAJE', estacionDestino: 'PT', celulaDestino: 'PT' }) }),
+    );
+    expect(res.avance).toMatchObject({ estacion: 'PT', terminado: true });
   });
 
   it('al salir de CORTE pasa la OF de ABIERTA a EN_PROCESO', async () => {
@@ -265,7 +391,7 @@ describe('FabricacionService.avanzar', () => {
     await new FabricacionService(prisma).avanzar('OF1-0001', dto);
 
     expect(tx.par.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { estado: 'TERMINADO' } }),
+      expect.objectContaining({ data: expect.objectContaining({ estado: 'TERMINADO', celulaActual: 'PT' }) }),
     );
     // La llave del stock incluye el grado: un par de primera no puede caer en el
     // saldo de segundas ni al revés.
@@ -407,22 +533,22 @@ describe('FabricacionService.avanzar', () => {
       .rejects.toMatchObject({ message: 'El par fue dado de baja' });
   });
 
-  it('entrar a Guarnición desde CORTE setea AREA y registra evento con subPaso null', async () => {
+  it('un par viejo en CORTE entra a Guarnición por PREPARACION y registra evento con subPaso null', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({ id: 50, ofId: 1, celulaActual: 'CORTE', subPasoActual: null, estado: 'EN_PROCESO', productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' } });
     tx.par.update.mockResolvedValue({ id: 50 });
     await new FabricacionService(prisma).avanzar('OF1-0001', dto);
     expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celula: 'CORTE', subPaso: null }) }));
-    expect(tx.par.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'AREA' }) }));
+    expect(tx.par.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION' }) }));
   });
 
-  it('avanza sub-paso dentro de Guarnición y registra el subPaso completado', async () => {
+  it('un par viejo en un sub-paso intermedio de Guarnición cae en la siguiente estación activa (Bodega)', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({ id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'ARMADO', estado: 'EN_PROCESO', productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' } });
     tx.par.update.mockResolvedValue({ id: 50 });
     await new FabricacionService(prisma).avanzar('OF1-0001', dto);
-    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celula: 'GUARNICION', subPaso: 'ARMADO' }) }));
-    expect(tx.par.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'VISTAS' }) }));
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celula: 'GUARNICION', subPaso: 'ARMADO', celulaDestino: 'ALMACEN' }) }));
+    expect(tx.par.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'ALMACEN', subPasoActual: null }) }));
   });
 
   it('desde AMARRE sale a Almacén con subPasoActual null', async () => {

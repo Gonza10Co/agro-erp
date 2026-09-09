@@ -253,13 +253,35 @@ describe('FabricacionService.consumoDeOf', () => {
     ]);
   });
 
-  it('los pares cancelados no suman al teórico', async () => {
+  it('solo las reposiciones (no canceladas) suman pares por encima de lo programado', async () => {
     const { service, prisma } = makeLectura();
 
     await service.consumoDeOf(5);
 
+    // Desde el piloto los pares nacen de a pocos: el teórico sale de lo programado
+    // en la OP, y del kardex de pares solo se toman las reposiciones (-R1), que
+    // sí gastaron material extra.
     expect(prisma.par.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ofId: 5, estado: { not: 'CANCELADO' } } }),
+      expect.objectContaining({
+        where: { ofId: 5, reponeAParId: { not: null }, estado: { not: 'CANCELADO' } },
+      }),
     );
+  });
+
+  it('el teórico sale de lo PROGRAMADO en la OP aunque todavía no haya nacido ningún par', async () => {
+    const { service, prisma } = makeLectura();
+    prisma.ordenFabricacion.findUnique.mockResolvedValue({
+      id: 5,
+      consecutivo: 31,
+      op: { lineas: [{ productoConfiguradoId: 10, tallas: [{ tallaId: 2, cantAProducir: 12 }] }] },
+    });
+    prisma.par.groupBy.mockResolvedValue([]); // ni un par nacido, ni reposiciones
+
+    const r = await service.consumoDeOf(5);
+
+    // 12 programados × 2 por par = 24 teóricos, contra 30 entregados.
+    expect(r.lineas).toEqual([
+      expect.objectContaining({ materialId: 1, teorico: 24, entregado: 30 }),
+    ]);
   });
 });
