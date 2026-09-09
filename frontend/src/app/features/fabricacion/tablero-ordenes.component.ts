@@ -83,7 +83,7 @@ export const ORDENES_REFRESCO_MS = 60_000;
     .page-header{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
     .page-header .ph-title{flex:1}
     .buscador{display:flex;gap:var(--sp-2)}
-    .buscador input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);min-width:200px}
+    .buscador input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);min-width:200px}
     .mono{font-family:var(--font-mono)}
     .scroll{overflow-x:auto}
     .ordenes{width:100%;min-width:720px}

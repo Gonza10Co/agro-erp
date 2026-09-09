@@ -56,7 +56,7 @@ export function pctMeta(hoy: number, meta: number): number {
     .tv-meta{flex:1;color:var(--text-subtle)}
     .tv-err{color:var(--error)}
     .grid{flex:1;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:var(--sp-4)}
-    .tarjeta{display:flex;flex-direction:column;justify-content:center;gap:var(--sp-2);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);text-align:center;min-height:42vh}
+    .tarjeta{display:flex;flex-direction:column;justify-content:center;gap:var(--sp-2);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);text-align:center;min-height:42vh}
     .tarjeta.cumplida{border-color:var(--success);background:var(--success-subtle)}
     .nombre{font-size:clamp(16px,2vw,28px);font-weight:var(--fw-semibold);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
     .num{font-size:clamp(64px,11vw,200px);line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--text)}

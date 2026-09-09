@@ -435,18 +435,32 @@ export class FabricacionService {
     };
   }
 
-  listarOF() {
-    return this.prisma.ordenFabricacion.findMany({
+  async listarOF() {
+    const ofs = await this.prisma.ordenFabricacion.findMany({
       orderBy: { consecutivo: 'desc' },
       select: {
         id: true,
         consecutivo: true,
         estado: true,
         fecha: true,
-        op: { select: { consecutivo: true } },
+        op: {
+          select: {
+            consecutivo: true,
+            // Lo programado vive en la OP: la OF nace vacía y solo acumula los pares nacidos.
+            lineas: { select: { tallas: { select: { cantAProducir: true } } } },
+          },
+        },
         _count: { select: { pares: true } },
       },
     });
+    return ofs.map(({ op, ...of }) => ({
+      ...of,
+      op: { consecutivo: op.consecutivo },
+      programados: op.lineas.reduce(
+        (acc, l) => acc + l.tallas.reduce((a, t) => a + t.cantAProducir, 0),
+        0,
+      ),
+    }));
   }
 
   async obtenerOF(id: number) {

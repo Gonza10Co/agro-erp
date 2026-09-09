@@ -7,6 +7,7 @@ import {
 } from '../../core/api/models/fabricacion.models';
 import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
 import { descargarEtiquetasLengua, descargarStickerCaja, datosCajaDePar } from './etiqueta-par-pdf';
+import { agruparPrograma } from './programa-of';
 
 /** Lo que el dispositivo recuerda entre turnos (se configura una vez). */
 export interface ConfigEstacion {
@@ -86,7 +87,7 @@ export function guardarConfig(c: ConfigEstacion | null): void {
             <div class="hoy-num">{{ hoy() }}</div>
             <div class="hoy-lbl">hoy</div>
           </div>
-          <button class="btn btn-sm" type="button" title="Cambiar estación u operario" (click)="abrirConfig()">⚙</button>
+          <button class="btn btn-cfg" type="button" title="Cambiar estación u operario" aria-label="Cambiar estación u operario" (click)="abrirConfig()">⚙</button>
         </div>
 
         @if (esNacimiento()) {
@@ -99,24 +100,36 @@ export function guardarConfig(c: ConfigEstacion | null): void {
               </select>
             </label>
             @if (of(); as d) {
-              <table class="tabla programa">
-                <thead><tr><th>Producto</th><th>Talla</th><th class="num">Nacidos / programados</th><th class="num">Tanda</th><th></th></tr></thead>
-                <tbody>
-                  @for (l of d.programa ?? []; track l.productoConfiguradoId + '-' + l.tallaId) {
-                    <tr [class.completa]="l.nacidos >= l.programado">
-                      <td>{{ l.producto }}<div class="cell-sub">{{ l.productoCodigo }}</div></td>
-                      <td class="talla">{{ l.talla }}</td>
-                      <td class="num"><b>{{ l.nacidos }}</b> / {{ l.programado }}
-                        <div class="barra"><div class="barra-fill" [style.width.%]="pct(l)"></div></div>
-                      </td>
-                      <td class="num"><input class="tanda" type="number" min="1" [max]="l.programado - l.nacidos" [(ngModel)]="tanda[clave(l)]" [disabled]="l.nacidos >= l.programado" /></td>
-                      <td><button class="btn btn-primary btn-sm" type="button" [disabled]="l.nacidos >= l.programado || naciendo()" (click)="nacer(d, l)">Nacer + etiquetas 🏷️</button></td>
-                    </tr>
-                  } @empty {
-                    <tr><td colspan="5" class="cell-sub">Esta OF no tiene producción programada.</td></tr>
-                  }
-                </tbody>
-              </table>
+              @for (g of grupos(); track g.productoConfiguradoId) {
+                <div class="grupo">
+                  <div class="grupo-id">
+                    <div class="grupo-nombre">{{ g.producto }}</div>
+                    <div class="cell-sub mono">{{ g.productoCodigo }}</div>
+                  </div>
+                  <div class="grupo-total"><b>{{ g.nacidos }}</b> / {{ g.programado }}</div>
+                </div>
+                <table class="tabla programa">
+                  <thead><tr><th>Talla</th><th class="num">Nacidos / programados</th><th class="acc">Tanda</th></tr></thead>
+                  <tbody>
+                    @for (l of g.lineas; track l.tallaId) {
+                      <tr [class.completa]="l.nacidos >= l.programado">
+                        <td class="talla">{{ l.talla }}</td>
+                        <td class="num"><b>{{ l.nacidos }}</b> / {{ l.programado }}
+                          <div class="barra"><div class="barra-fill" [style.width.%]="pct(l)"></div></div>
+                        </td>
+                        <td class="acc">
+                          <div class="lote">
+                            <input class="tanda" type="number" min="1" [max]="l.programado - l.nacidos" [(ngModel)]="tanda[clave(l)]" [disabled]="l.nacidos >= l.programado" aria-label="Cuántos pares nacen en esta tanda" />
+                            <button class="btn btn-primary btn-nacer" type="button" [disabled]="l.nacidos >= l.programado || naciendo()" (click)="nacer(d, l)">Nacer + etiquetas 🏷️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @empty {
+                <p class="cell-sub">Esta OF no tiene producción programada.</p>
+              }
             }
           </div></div>
         } @else {
@@ -156,28 +169,40 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .est{max-width:720px}
     .config{display:flex;flex-direction:column;gap:var(--sp-3)}
     .config label,.scan-label,.of-sel{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
-    select,.scan-input,.tanda{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-body)}
-    .cabecera{display:flex;align-items:center;gap:var(--sp-4);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-3);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius-sm)}
+    select,.scan-input,.tanda{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
+    .cabecera{display:flex;align-items:center;gap:var(--sp-4);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-3);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg)}
     .cabecera > div:first-child{flex:1;min-width:0}
     .est-nombre{font-size:var(--text-h2);font-weight:var(--fw-bold);letter-spacing:var(--ls-h2)}
     .hoy{text-align:center;padding:0 var(--sp-3)}
     .hoy-num{font-size:40px;line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--primary)}
     .hoy-lbl{font-size:var(--text-micro);text-transform:uppercase;letter-spacing:.08em;color:var(--text-subtle)}
+    .btn-cfg{width:56px;height:56px;padding:0;font-size:40px;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
     .scan-fila{display:flex;gap:var(--sp-3);align-items:flex-end;flex-wrap:wrap}
     .scan-input{font-size:var(--text-lg);min-height:52px;max-width:280px}
     .btn-camara,.btn-primary{min-height:48px}
-    .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--radius-sm);overflow:hidden}
+    .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--r-lg);overflow:hidden}
     .mono{font-family:var(--font-mono)}
     .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap;justify-content:flex-end;margin-top:var(--sp-2)}
     .acciones .btn{min-height:48px;padding-left:var(--sp-5);padding-right:var(--sp-5)}
-    .programa{margin-top:var(--sp-3);width:100%}
-    .programa .num{text-align:right;white-space:nowrap}
+    .grupo{display:flex;align-items:baseline;gap:var(--sp-3);margin-top:var(--sp-4);padding-bottom:var(--sp-2);border-bottom:var(--bw) solid var(--border)}
+    .grupo-id{flex:1;min-width:0}
+    .grupo-nombre{font-size:var(--text-h3);font-weight:var(--fw-bold)}
+    .grupo-total{font-variant-numeric:tabular-nums;color:var(--text-muted);white-space:nowrap}
+    .programa{margin-top:var(--sp-2);width:100%}
+    .programa .num{text-align:right;white-space:nowrap;padding-right:var(--sp-4)}
     .programa .talla{font-size:var(--text-h3);font-weight:var(--fw-bold)}
     .programa tr.completa td{color:var(--text-subtle)}
-    .tanda{width:64px;text-align:right}
-    .barra{height:4px;background:var(--inset);border-radius:2px;margin-top:var(--sp-1);overflow:hidden}
+    .programa .acc{white-space:nowrap;width:1%}
+    .programa th.acc{text-align:left}
+    .lote{display:flex;align-items:stretch;gap:var(--sp-2);justify-content:flex-end}
+    .tanda{width:66px;text-align:center;font-size:var(--text-lg);font-weight:var(--fw-medium);font-variant-numeric:tabular-nums;padding:0 var(--sp-2)}
+    .lote .tanda,.btn-nacer{height:48px}
+    .btn-nacer{border-radius:var(--r-md);padding:0 var(--sp-4);font-weight:var(--fw-medium);white-space:nowrap}
+    .lote .tanda:disabled{background:var(--inset);color:var(--text-subtle)}
+    .programa tbody tr td{padding-top:var(--sp-2);padding-bottom:var(--sp-2)}
+    .barra{height:4px;max-width:200px;margin:var(--sp-1) 0 0 auto;background:var(--inset);border-radius:2px;overflow:hidden}
     .barra-fill{height:100%;background:var(--primary)}
-    .resultado{display:flex;gap:var(--sp-4);align-items:center;margin-top:var(--sp-3);padding:var(--sp-4);border-radius:var(--radius-sm);border:2px solid transparent}
+    .resultado{display:flex;gap:var(--sp-4);align-items:center;margin-top:var(--sp-3);padding:var(--sp-4);border-radius:var(--r-lg);border:2px solid transparent}
     .resultado.ok{background:var(--success-subtle);border-color:var(--success)}
     .resultado.err{background:var(--error-subtle);border-color:var(--error)}
     .res-icono{font-size:44px;line-height:1}
@@ -342,6 +367,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
 
   clave = (l: ProgramaOfLinea) => `${l.productoConfiguradoId}-${l.tallaId}`;
   pct = (l: ProgramaOfLinea) => (l.programado ? Math.min(100, Math.round((l.nacidos / l.programado) * 100)) : 0);
+
+  grupos = computed(() => agruparPrograma(this.of()?.programa));
 
   nacer(d: OFDetalle, l: ProgramaOfLinea): void {
     const c = this.config();

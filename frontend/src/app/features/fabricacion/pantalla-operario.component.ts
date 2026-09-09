@@ -110,7 +110,7 @@ import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
   styles: [`
     .puesto{display:flex;gap:var(--sp-4);flex-wrap:wrap}
     .puesto label,.scan-label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
-    select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-sm)}
+    select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-sm)}
     .scan-input{font-size:var(--text-lg);max-width:280px;min-height:48px}
     .msg{margin-top:var(--sp-3);color:var(--accent)}
     .msg.err{color:var(--danger)}
@@ -119,11 +119,11 @@ import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
     .mono{font-family:var(--font-mono)}
     .btn-primary{min-height:48px}
     .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap}
-    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
-    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font:inherit}
+    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-lg);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
+    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font:inherit}
     .scan-fila{display:flex;gap:var(--sp-3);align-items:flex-end;flex-wrap:wrap}
     .btn-camara{min-height:48px}
-    .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--radius-sm);overflow:hidden}
+    .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--r-lg);overflow:hidden}
     /* Celular en planta: todo a una columna y botones de dedo. */
     @media (max-width:640px){
       .puesto label,.scan-label,.scan-input,.btn-camara,.acciones .btn,.reporte{width:100%;max-width:none;min-width:0}

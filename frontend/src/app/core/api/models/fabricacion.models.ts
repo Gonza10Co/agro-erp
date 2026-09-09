@@ -22,6 +22,8 @@ export interface OFListItem {
   fecha: string;
   op: { consecutivo: number };
   _count: { pares: number };
+  /** Pares programados en la OP: la OF nace vacía y los pares van naciendo en Preparación. */
+  programados: number;
 }
 
 export interface OFDetallePar {
