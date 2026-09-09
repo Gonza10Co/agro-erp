@@ -168,7 +168,8 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .btn-camara,.btn-primary{min-height:48px}
     .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--radius-sm);overflow:hidden}
     .mono{font-family:var(--font-mono)}
-    .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap;justify-content:flex-end;margin-top:var(--sp-2)}
+    .acciones .btn{min-height:48px;padding-left:var(--sp-5);padding-right:var(--sp-5)}
     .programa{margin-top:var(--sp-3);width:100%}
     .programa .num{text-align:right;white-space:nowrap}
     .programa .talla{font-size:var(--text-h3);font-weight:var(--fw-bold)}
