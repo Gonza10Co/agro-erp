@@ -4,8 +4,45 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-08-26** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-09-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **🏭 PILOTO DE PLANTA (Ola 3) — construido el 2026-09-09, se muestra el viernes 2026-09-11.**
+> Lo acordado en la visita a planta con Mauricio Sierra (jefe de producción); detalle en
+> `agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md`. Está en `develop`, sección `piloto`
+> en **EN_STAGE** (se demuestra con el perfil `stage`; el día de la demo se voltea a ENTREGADO).
+>
+> - **Estaciones de control** (`Estacion`, 6 filas sembradas por la migración `piloto_estaciones`;
+>   **Cierre nace apagada**: la pidió JP, Mauricio no la ve necesaria). La transición es "la
+>   siguiente estación ACTIVA con rango mayor" (`siguienteEstacion` en `fabricacion-core.ts`):
+>   se prende/apaga con `PATCH /fabricacion/estaciones/:codigo` sin desplegar. PT no se apaga.
+> - **El par nace en Preparación** (enum `SubPasoGuarnicion.PREPARACION`): ahí queda lista la
+>   lengua y se pega el QR. `generarOF` ya NO pare pares — la OF nace vacía con lo programado
+>   de la OP — y `POST /fabricacion/of/:id/nacer` crea la tanda (una canasta = 20) contra lo
+>   programado por talla, con evento de entrada y los datos de la etiqueta.
+> - **El pistolazo es de ENTRADA** (`EventoTrazabilidad.estacionDestino/celulaDestino`), una
+>   sola lectura por movimiento, máquina opcional, y si el dispositivo declara su estación el
+>   backend **rechaza el escaneo si el par se saltó una** ("viene de X: le toca Y"). Entrar a
+>   PT termina el par (5º pistolazo). El reporte diario cuenta producción cuando el par SALE
+>   de la célula (regla vieja AMARRE/IMPACTO para los eventos sin destino). El teórico del
+>   consumo sale de lo PROGRAMADO + reposiciones (el material se corta antes de que el par exista).
+> - **Pantallas**: `/fabricacion/estacion` (el celular amarrado a UNA estación: config local
+>   estación + operario por turno; en Preparación nacen pares y sale la etiqueta de la lengua
+>   50×30 solo QR; en PT ofrece el sticker de la caja) · `/tv` (fuera del shell: un número
+>   gigante por estación, hoy contra 1.206, última hora, refresco 30 s; reemplaza el tablero
+>   manual HORA / N° PARES) · `/fabricacion/ordenes` (filas = OF vivas, columnas = estaciones,
+>   celda = pares que ya pasaron / programados, desglose por talla, buscador por par).
+> - **Datos**: `npm run seed:piloto` siembra OC→OP→OF (vacía) con la curva real del cuaderno
+>   del cortador (#061: 1.206 pares, tallas 36–43) sin tocar inventario ni amarres; `--limpiar`.
+> - **Verificado E2E en local** (base :5434) por API y en pantalla: nacer 3 → rechazo en Montaje
+>   → Bodega → Montaje → Finizaje → PT terminado; TV, tablero por órdenes y reporte diario
+>   cuadran. Tests: backend 682 · frontend 405, verdes.
+> - **Para el viernes**: merge `develop`→`master` + tag `piloto-1`, `migrate deploy` (2
+>   migraciones aditivas + 6 filas), `seed:piloto` contra prod, y voltear `piloto` a ENTREGADO
+>   en `modulos.ts` el día de la demo. Pendiente del cliente: impresoras (2, la de códigos con
+>   guillotina), lectores, cuántas TVs, tiempos estándar completos, referencia del piloto.
+>
+> **Anterior (2026-08-26):**
 >
 > **✂️ CONTROL DE CORTE DESPLEGADO A PROD — 2026-08-26** (merge `--no-ff` `790c536` + tag
 > `quincena-1-corte`). CI verde antes del merge (frontend 1m46s + backend 1m01s). **Los dos
