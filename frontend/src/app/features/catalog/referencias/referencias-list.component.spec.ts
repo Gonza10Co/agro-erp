@@ -64,6 +64,33 @@ describe('ReferenciasListComponent', () => {
     expect(cmp.drawerAbierto()).toBe(false);
   });
 
+  it('muestra las piezas por par del despiece, o un guion si la referencia no lo informa', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne(refsUrl).flush([
+      { id: 1, codigo: '101', nombreInterno: 'PODEROSA', activo: true, piezasPorPar: 28 },
+      { id: 2, codigo: '109', nombreInterno: 'NUEVA', activo: true, piezasPorPar: null },
+    ]);
+    http.expectOne(tallasUrl).flush([]);
+    fixture.detectChanges();
+    const celdas = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('td.num')).map((c) => c.textContent?.trim());
+    expect(celdas).toEqual(['28', '—']);
+  });
+
+  it('el alta manda piezasPorPar solo cuando se diligenció', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne(refsUrl).flush([]);
+    http.expectOne(tallasUrl).flush([{ id: 10, valor: 35, orden: 1 }, { id: 11, valor: 36, orden: 2 }]);
+    const cmp = fixture.componentInstance;
+    cmp.codigo = '107'; cmp.nombreInterno = 'Nueva'; cmp.tallaMinId = 10; cmp.tallaMaxId = 11; cmp.piezasPorPar = 28;
+    cmp.guardar();
+    const req = http.expectOne(refsUrl);
+    expect(req.request.body.piezasPorPar).toBe(28);
+    req.flush({ id: 3 });
+    http.expectOne(refsUrl).flush([]);
+  });
+
   it('abrir() y cerrar() controlan el drawer', () => {
     const fixture = setup();
     fixture.detectChanges();

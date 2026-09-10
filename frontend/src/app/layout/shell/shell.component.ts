@@ -103,6 +103,22 @@ const SIDEBAR_KEY = 'agro-sidebar';
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l5 5v5h-2M3 7v10h2M9 7V4h4v3"/><circle cx="7" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg></span>
             <span class="nav-label">Puesto de operario</span>
           </a>
+          @if (puedeVerSec('piloto')) {
+          <!-- Piloto de planta (2026-09-09): el celular amarrado a una estación, el
+               tablero por órdenes y la TV (esta abre aparte, sin menú). -->
+          <a class="nav-item" routerLink="/fabricacion/estacion" routerLinkActive="is-active" title="Estación (piloto)">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/><path d="M9 7h6M9 10h6M9 13h3"/></svg></span>
+            <span class="nav-label">Estación</span>
+          </a>
+          <a class="nav-item" routerLink="/fabricacion/ordenes" routerLinkActive="is-active" title="Tablero por órdenes">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M7 5v14M13 5v14"/></svg></span>
+            <span class="nav-label">Tablero por órdenes</span>
+          </a>
+          <a class="nav-item" routerLink="/tv" target="_blank" title="TV de planta (abre aparte)">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+            <span class="nav-label">TV de planta</span>
+          </a>
+          }
           }
           @if (puedeVer('calidad')) {
           <a class="nav-item" routerLink="/calidad" routerLinkActive="is-active" title="Calidad">

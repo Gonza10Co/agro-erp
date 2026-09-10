@@ -4,11 +4,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Celula, Prisma } from '@prisma/client';
+import { Celula, EstadoPar, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
-import { generarPares, siguienteEstado, LineaProduccion } from './fabricacion-core';
+import {
+  ORDEN_CELULAS,
+  generarPares,
+  LineaProduccion,
+  EstacionDef,
+  siguienteEstacion,
+  esEstacionTerminal,
+  estacionNacimiento,
+  validarEstacion,
+  paresPorEstacion,
+  avanceHoyPorEstacion,
+  inicioDelDiaBogota,
+  OFFSET_BOGOTA_HORAS,
+} from './fabricacion-core';
+import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
+import { NacerDto } from './dto/nacer.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
 import {
   consolidarConsumo,
@@ -67,27 +82,190 @@ export class FabricacionService {
             op.linea?.celulaInicial ??
             l.productoConfigurado?.marca?.linea?.celulaInicial ??
             'CORTE',
+          // Punto de conversión lote→par. Hoy nadie lo tiene puesto, así que el
+          // par sigue entrando a guarnición por AREA; el día que la planta
+          // decida dónde se pega la etiqueta, se llena el campo y no el código.
+          subPasoInicial:
+            op.linea?.subPasoInicial ??
+            l.productoConfigurado?.marca?.linea?.subPasoInicial ??
+            null,
           lineaId: op.lineaId ?? l.productoConfigurado?.marca?.lineaId ?? null,
         })),
     );
     if (lineas.length === 0)
       throw new BadRequestException('La OP no tiene producción pendiente');
 
+    // La OF nace VACÍA. Hasta el 2026-09-09 acá se creaban todos los pares de
+    // una vez, naciendo en CORTE, donde el par no existe (Gabriel, 04-ago). Ahora
+    // cada par nace cuando se le imprime la etiqueta en Preparación (`nacer`),
+    // y la OF solo lleva lo programado (las tallas de la OP).
+    const programados = lineas.reduce((acc, l) => acc + l.cantAProducir, 0);
     return this.prisma.$transaction(async (tx) => {
       const consecutivo = await siguienteConsecutivo(tx, 'of');
       const of = await tx.ordenFabricacion.create({ data: { consecutivo, opId } });
-      const pares = generarPares(consecutivo, lineas).map((p) => ({
-        ofId: of.id,
-        codigo: p.codigo,
-        productoConfiguradoId: p.productoConfiguradoId,
-        tallaId: p.tallaId,
-        celulaActual: p.celulaInicial,
-        subPasoActual: p.subPasoInicial,
-        subPasoInyeccion: p.subPasoInyeccionInicial,
-        lineaId: p.lineaId,
-      }));
-      await tx.par.createMany({ data: pares });
-      return { id: of.id, consecutivo, opId, totalPares: pares.length };
+      return { id: of.id, consecutivo, opId, totalPares: 0, programados };
+    });
+  }
+
+  /** Las estaciones (puntos de control) en el orden del recorrido, activas o no. */
+  estaciones(): Promise<EstacionDef[]> {
+    return this.prisma.estacion.findMany({ orderBy: { orden: 'asc' } });
+  }
+
+  /** Prender o apagar una estación. PT no se apaga: es donde termina el par. */
+  async activarEstacion(codigo: string, activa: boolean) {
+    const est = await this.prisma.estacion.findUnique({ where: { codigo } });
+    if (!est) throw new NotFoundException(`Estación ${codigo} no existe`);
+    if (est.celula === 'PT' && !activa)
+      throw new BadRequestException('Producto terminado no se puede apagar: ahí termina el par');
+    return this.prisma.estacion.update({ where: { codigo }, data: { activa } });
+  }
+
+  /**
+   * Nace una tanda de pares de la OF en su estación inicial (Preparación para
+   * Basarili: se imprime la etiqueta y se pega en la lengua). Devuelve los pares
+   * con lo que va en la etiqueta. Es el primer pistolazo: "de no existir a existir".
+   */
+  async nacer(ofId: number, dto: NacerDto) {
+    const cantidad = dto.cantidad ?? 1;
+    const of = await this.prisma.ordenFabricacion.findUnique({
+      where: { id: ofId },
+      include: {
+        op: {
+          include: {
+            linea: true,
+            lineas: {
+              include: {
+                tallas: { include: { talla: true } },
+                productoConfigurado: { include: { marca: { include: { linea: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!of) throw new NotFoundException(`OF ${ofId} no existe`);
+    if (of.estado === 'ANULADA' || of.estado === 'TERMINADA')
+      throw new ConflictException(`La OF está ${of.estado.toLowerCase()}: no nacen más pares`);
+
+    const linea: any = of.op.lineas.find(
+      (l: any) => l.productoConfiguradoId === dto.productoConfiguradoId,
+    );
+    if (!linea) throw new BadRequestException('La OF no fabrica ese producto');
+    const talla: any = linea.tallas.find((t: any) => t.tallaId === dto.tallaId);
+    if (!talla || talla.cantAProducir <= 0)
+      throw new BadRequestException('La OF no programa esa talla');
+
+    const celulaInicial: Celula =
+      of.op.linea?.celulaInicial ??
+      linea.productoConfigurado?.marca?.linea?.celulaInicial ??
+      'CORTE';
+    const lineaId: number | null =
+      of.op.lineaId ?? linea.productoConfigurado?.marca?.lineaId ?? null;
+    const estaciones = await this.estaciones();
+    const nac = estacionNacimiento(celulaInicial, estaciones);
+    if (!nac) throw new BadRequestException('No hay ninguna estación activa donde nazca el par');
+
+    const creados = await this.prisma.$transaction(async (tx) => {
+      // Dos celulares imprimiendo a la vez sobre la misma OF no se pisan la numeración.
+      await tx.$queryRaw`SELECT id FROM "OrdenFabricacion" WHERE id = ${ofId} FOR UPDATE`;
+      const nacidos = await tx.par.count({
+        where: {
+          ofId,
+          productoConfiguradoId: dto.productoConfiguradoId,
+          tallaId: dto.tallaId,
+          reponeAParId: null,
+          estado: { not: 'CANCELADO' },
+        },
+      });
+      if (nacidos + cantidad > talla.cantAProducir)
+        throw new ConflictException(
+          `La talla ${talla.talla?.valor ?? dto.tallaId} ya tiene ${nacidos} de ${talla.cantAProducir} pares programados; caben ${Math.max(talla.cantAProducir - nacidos, 0)}`,
+        );
+      // Las reposiciones llevan sufijo (-R1), así que no ocupan número de la secuencia.
+      const seqBase = await tx.par.count({ where: { ofId, reponeAParId: null } });
+      const pares = generarPares(
+        of.consecutivo,
+        [{
+          productoConfiguradoId: dto.productoConfiguradoId,
+          tallaId: dto.tallaId,
+          cantAProducir: cantidad,
+          celulaInicial: nac.celula,
+          subPasoInicial: nac.subPaso,
+          lineaId,
+        }],
+        seqBase,
+      );
+      await tx.par.createMany({
+        data: pares.map((p) => ({
+          ofId,
+          codigo: p.codigo,
+          productoConfiguradoId: p.productoConfiguradoId,
+          tallaId: p.tallaId,
+          celulaActual: nac.celula,
+          subPasoActual: nac.subPaso,
+          subPasoInyeccion: nac.subPasoInyeccion,
+          lineaId: p.lineaId,
+        })),
+      });
+      const nuevos = await tx.par.findMany({
+        where: { codigo: { in: pares.map((p) => p.codigo) } },
+        orderBy: { codigo: 'asc' },
+        select: {
+          id: true,
+          codigo: true,
+          talla: { select: { valor: true } },
+          productoConfigurado: {
+            select: {
+              codigo: true,
+              nombreComercial: true,
+              referencia: { select: { codigo: true, nombreInterno: true } },
+              marca: { select: { nombre: true } },
+            },
+          },
+          linea: { select: { codigo: true, nombre: true } },
+        },
+      });
+      // El nacimiento es un evento de entrada a la estación inicial: la TV lo cuenta.
+      await tx.eventoTrazabilidad.createMany({
+        data: nuevos.map((n) => ({
+          parId: n.id,
+          celula: nac.celula,
+          subPaso: nac.subPaso,
+          subPasoInyeccion: nac.subPasoInyeccion,
+          estacionDestino: nac.codigo,
+          celulaDestino: nac.celula,
+          operarioId: dto.operarioId,
+          maquinaId: dto.maquinaId ?? null,
+        })),
+      });
+      if (of.estado === 'ABIERTA')
+        await tx.ordenFabricacion.update({ where: { id: ofId }, data: { estado: 'EN_PROCESO' } });
+      return nuevos;
+    });
+
+    const hoy = await this.hoyEnEstacion(nac.codigo);
+    return {
+      estacion: nac,
+      hoy,
+      pares: creados.map((n: any) => ({
+        id: n.id,
+        codigo: n.codigo,
+        talla: String(n.talla.valor),
+        producto: n.productoConfigurado?.nombreComercial ?? '',
+        productoCodigo: n.productoConfigurado?.codigo ?? '',
+        referencia: n.productoConfigurado?.referencia?.codigo ?? '',
+        marca: n.productoConfigurado?.marca?.nombre ?? '',
+        linea: n.linea?.nombre ?? '',
+        of: of.consecutivo,
+      })),
+    };
+  }
+
+  /** Cuántos pares entraron hoy (día de Bogotá) a una estación. */
+  private hoyEnEstacion(codigo: string): Promise<number> {
+    return this.prisma.eventoTrazabilidad.count({
+      where: { estacionDestino: codigo, timestamp: { gte: inicioDelDiaBogota(new Date()) } },
     });
   }
 
@@ -107,16 +285,31 @@ export class FabricacionService {
       );
 
     const celulaActual = par.celulaActual;
-    const next = siguienteEstado({
+    const estado = {
       celula: par.celulaActual,
       subPaso: par.subPasoActual,
       subPasoInyeccion: par.subPasoInyeccion,
-    });
+    };
+    // La siguiente estación ACTIVA decide a dónde va el par; el operario no elige
+    // nada. Si el dispositivo declara su estación, se valida que el par venga de
+    // la anterior (es el control que pedía Mauricio: nada "en un limbo").
+    const estaciones = await this.estaciones();
+    if (dto.estacion) {
+      const rechazo = validarEstacion(estado, dto.estacion, estaciones);
+      if (rechazo) throw new ConflictException(rechazo);
+    }
+    const next = siguienteEstacion(estado, estaciones);
+    // Entrar a Producto terminado ES terminar (5º pistolazo: carga la bodega).
+    const terminar = esEstacionTerminal(next);
+    const destino = {
+      estacionDestino: next?.codigo ?? 'PT',
+      celulaDestino: (next?.celula ?? 'PT') as Celula,
+    };
 
     // La bodega destino es configuración global (no cambia durante la tx):
     // se resuelve fuera de la transacción para no alargarla.
     let bodegaPT: { id: number } | null = null;
-    if (next === null) {
+    if (terminar) {
       bodegaPT = await this.prisma.bodega.findFirst({
         where: { tipo: 'PROPIA', activo: true },
         orderBy: { prioridad: 'asc' },
@@ -125,16 +318,18 @@ export class FabricacionService {
         throw new BadRequestException('No hay bodega PROPIA configurada');
     }
 
+    let resultado: any;
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      resultado = await this.prisma.$transaction(async (tx) => {
         await tx.eventoTrazabilidad.create({
           data: {
             parId: par.id,
             celula: celulaActual,
             subPaso: par.subPasoActual,
             subPasoInyeccion: par.subPasoInyeccion,
+            ...destino,
             operarioId: dto.operarioId,
-            maquinaId: dto.maquinaId,
+            maquinaId: dto.maquinaId ?? null,
           },
         });
 
@@ -147,11 +342,11 @@ export class FabricacionService {
           });
         }
 
-        if (next === null) {
-          // Última célula (PT): terminar el par y sumar a InventarioPT.
+        if (terminar) {
+          // Producto terminado: terminar el par y sumar a InventarioPT.
           const updated = await tx.par.update({
             where: { id: par.id },
-            data: { estado: 'TERMINADO' },
+            data: { estado: 'TERMINADO', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null },
           });
           // El grado viaja del par al stock: una segunda no engorda el saldo de
           // primeras (son saldos distintos bajo la misma llave + calidad).
@@ -200,14 +395,14 @@ export class FabricacionService {
           return updated;
         }
 
-        // Avance normal a la siguiente célula (la activación de la OF ya se
+        // Avance normal a la siguiente estación (la activación de la OF ya se
         // resolvió arriba, en el primer escaneo).
         return tx.par.update({
           where: { id: par.id },
           data: {
-            celulaActual: next.celula,
-            subPasoActual: next.subPaso,
-            subPasoInyeccion: next.subPasoInyeccion ?? null,
+            celulaActual: next!.celula,
+            subPasoActual: next!.subPaso,
+            subPasoInyeccion: next!.subPasoInyeccion ?? null,
           },
         });
       });
@@ -228,27 +423,66 @@ export class FabricacionService {
       }
       throw e;
     }
+    // Lo que ve el operario después del pistolazo: a dónde entró y cuántos van hoy.
+    const hoy = await this.hoyEnEstacion(destino.estacionDestino);
+    return {
+      ...resultado,
+      avance: {
+        estacion: destino.estacionDestino,
+        nombre: next?.nombre ?? 'Producto terminado',
+        terminado: terminar,
+        hoy,
+      },
+    };
   }
 
-  listarOF() {
-    return this.prisma.ordenFabricacion.findMany({
+  async listarOF() {
+    const ofs = await this.prisma.ordenFabricacion.findMany({
       orderBy: { consecutivo: 'desc' },
       select: {
         id: true,
         consecutivo: true,
         estado: true,
         fecha: true,
-        op: { select: { consecutivo: true } },
+        op: {
+          select: {
+            consecutivo: true,
+            // Lo programado vive en la OP: la OF nace vacía y solo acumula los pares nacidos.
+            lineas: { select: { tallas: { select: { cantAProducir: true } } } },
+          },
+        },
         _count: { select: { pares: true } },
       },
     });
+    return ofs.map(({ op, ...of }) => ({
+      ...of,
+      op: { consecutivo: op.consecutivo },
+      programados: op.lineas.reduce(
+        (acc, l) => acc + l.tallas.reduce((a, t) => a + t.cantAProducir, 0),
+        0,
+      ),
+    }));
   }
 
   async obtenerOF(id: number) {
     const of = await this.prisma.ordenFabricacion.findUnique({
       where: { id },
       include: {
-        op: { select: { consecutivo: true } },
+        op: {
+          select: {
+            consecutivo: true,
+            // Lo programado por producto × talla: contra eso nacen los pares.
+            lineas: {
+              select: {
+                productoConfiguradoId: true,
+                productoConfigurado: { select: { codigo: true, nombreComercial: true } },
+                tallas: {
+                  select: { tallaId: true, cantAProducir: true, talla: { select: { valor: true } } },
+                },
+              },
+            },
+          },
+        },
         pares: {
           orderBy: { codigo: 'asc' },
           select: {
@@ -260,19 +494,82 @@ export class FabricacionService {
             // Para las etiquetas físicas: qué es el par y por qué línea se fabrica.
             productoConfigurado: { select: { codigo: true, nombreComercial: true } },
             linea: { select: { codigo: true, nombre: true } },
+            tallaId: true,
+            productoConfiguradoId: true,
+            reponeAParId: true,
           },
         },
       },
     });
     if (!of) throw new NotFoundException(`OF ${id} no existe`);
-    return of;
+    return { ...of, programa: programaDeOf(of) };
   }
 
-  tablero(ofId?: number) {
+  /**
+   * Tablero en números: cuántos pares hay en cada célula y con qué tallas.
+   * Un día de planta son ~1.206 pares, así que la vista no puede pedir la lista
+   * entera (antes traía 500 y descartaba el resto en silencio): los pares se
+   * cuentan en la base y el detalle de una columna se pide aparte, si se abre.
+   */
+  async tableroResumen(ofId?: number) {
+    const where = ofId ? { ofId } : {};
+    const [porCelula, tallas] = await Promise.all([
+      this.prisma.par.groupBy({
+        by: ['celulaActual', 'estado', 'tallaId'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.talla.findMany({ select: { id: true, valor: true, orden: true } }),
+    ]);
+    const laTalla = new Map(tallas.map((t) => [t.id, t]));
+
+    const celulas = ORDEN_CELULAS.map((celula) => {
+      const filas = porCelula.filter((g) => g.celulaActual === celula && g.estado === 'EN_PROCESO');
+      return {
+        celula,
+        total: filas.reduce((acc, g) => acc + g._count._all, 0),
+        // Por talla, en el orden del catálogo: es lo que la planta pregunta
+        // ("¿cuántas 38 hay en guarnición?"), no el total pelado.
+        tallas: filas
+          .map((g) => ({
+            talla: laTalla.get(g.tallaId)?.valor ?? g.tallaId,
+            orden: laTalla.get(g.tallaId)?.orden ?? 0,
+            cantidad: g._count._all,
+          }))
+          .sort((a, b) => a.orden - b.orden)
+          .map(({ talla, cantidad }) => ({ talla, cantidad })),
+      };
+    });
+
+    const cuantos = (estados: EstadoPar[]) =>
+      porCelula.filter((g) => estados.includes(g.estado)).reduce((acc, g) => acc + g._count._all, 0);
+
+    return {
+      celulas,
+      terminados: cuantos(['TERMINADO']),
+      fueraDeFlujo: cuantos(['DADO_DE_BAJA', 'CANCELADO']),
+      total: porCelula.reduce((acc, g) => acc + g._count._all, 0),
+    };
+  }
+
+  /**
+   * El detalle de una columna del tablero: la lista de pares. Va paginado
+   * porque una célula puede tener cientos de pares en un día normal.
+   */
+  tablero(
+    ofId?: number,
+    filtro?: { celula?: Celula; estados?: EstadoPar[]; take?: number; skip?: number },
+  ) {
+    const { celula, estados, take = 100, skip = 0 } = filtro ?? {};
     return this.prisma.par.findMany({
-      where: ofId ? { ofId } : {},
-      // Cap defensivo: el tablero opera por OF; sin filtro, 500 pares es más que una corrida.
-      take: 500,
+      where: {
+        ...(ofId ? { ofId } : {}),
+        ...(celula ? { celulaActual: celula } : {}),
+        // "Fuera de flujo" son dos estados (baja y cancelado), por eso es una lista.
+        ...(estados?.length ? { estado: { in: estados } } : {}),
+      },
+      take: Math.min(take, 500),
+      skip,
       orderBy: { codigo: 'asc' },
       select: {
         id: true,
@@ -292,7 +589,17 @@ export class FabricacionService {
       include: {
         of: { select: { consecutivo: true } },
         talla: { select: { valor: true } },
-        productoConfigurado: { select: { id: true } },
+        // Nombres para la pantalla de estación y el sticker de la caja en PT.
+        productoConfigurado: {
+          select: {
+            id: true,
+            codigo: true,
+            nombreComercial: true,
+            referencia: { select: { codigo: true, nombreInterno: true } },
+            marca: { select: { nombre: true } },
+          },
+        },
+        linea: { select: { codigo: true, nombre: true } },
         eventos: {
           orderBy: { timestamp: 'asc' },
           include: {
@@ -336,15 +643,44 @@ export class FabricacionService {
   // 2026-07-29: no hay backflush contra el BOM). Hasta acá el material solo se
   // reservaba al confirmar el pedido; esto es lo que por fin lo descuenta.
 
-  /** Consumo teórico de la OF: BOM resuelto × pares, por material. */
+  /** Consumo teórico de la OF: BOM resuelto × pares programados (+ reposiciones), por material. */
   private async teoricoDeOf(ofId: number): Promise<Map<number, number>> {
-    // Un par DADO_DE_BAJA sí gastó material (por eso lleva acta); el CANCELADO
-    // nunca llegó a producirse, así que no suma al teórico.
-    const grupos = await this.prisma.par.groupBy({
+    // Desde el piloto los pares nacen de a pocos en Preparación, pero el material
+    // se corta ANTES de que exista el par: el teórico sale de lo programado en la
+    // OP. Las reposiciones (un par dado de baja que se vuelve a hacer) sí gastaron
+    // material extra, así que suman aparte; el CANCELADO nunca se produjo.
+    const of = await this.prisma.ordenFabricacion.findUnique({
+      where: { id: ofId },
+      select: {
+        op: {
+          select: {
+            lineas: {
+              select: {
+                productoConfiguradoId: true,
+                tallas: { select: { tallaId: true, cantAProducir: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const conteo = new Map<string, { productoConfiguradoId: number; tallaId: number; _count: number }>();
+    const sumar = (productoConfiguradoId: number, tallaId: number, n: number) => {
+      const k = `${productoConfiguradoId}:${tallaId}`;
+      const g = conteo.get(k) ?? { productoConfiguradoId, tallaId, _count: 0 };
+      g._count += n;
+      conteo.set(k, g);
+    };
+    for (const l of (of?.op?.lineas ?? []) as any[])
+      for (const t of l.tallas as any[])
+        if (t.cantAProducir > 0) sumar(l.productoConfiguradoId, t.tallaId, t.cantAProducir);
+    const reposiciones = await this.prisma.par.groupBy({
       by: ['productoConfiguradoId', 'tallaId'],
-      where: { ofId, estado: { not: 'CANCELADO' } },
+      where: { ofId, reponeAParId: { not: null }, estado: { not: 'CANCELADO' } },
       _count: true,
     });
+    for (const r of reposiciones as any[]) sumar(r.productoConfiguradoId, r.tallaId, r._count as number);
+    const grupos = [...conteo.values()];
     if (!grupos.length) return new Map();
 
     const pcs = await this.prisma.productoConfigurado.findMany({
@@ -550,4 +886,174 @@ export class FabricacionService {
 
     return this.consumoDeOf(ofId);
   }
+
+  // ─────────────────── TV de planta y tablero por órdenes (piloto) ───────────────────
+
+  /**
+   * Lo que ven los operarios en la pantalla grande: pares que entraron HOY a cada
+   * estación activa, los de la última hora y la meta del día. Reemplaza el tablero
+   * manual "HORA / N° PARES" que hoy llevan con marcador en guarnición e inyección.
+   */
+  async hoy() {
+    const ahora = new Date();
+    const inicio = inicioDelDiaBogota(ahora);
+    const [estaciones, eventos, metas] = await Promise.all([
+      this.estaciones(),
+      this.prisma.eventoTrazabilidad.findMany({
+        where: { timestamp: { gte: inicio }, estacionDestino: { not: null } },
+        select: { estacionDestino: true, timestamp: true },
+      }),
+      this.metaDiariaPorCelula(ahora),
+    ]);
+    const filas = avanceHoyPorEstacion(eventos, estaciones, inicio, ahora);
+    return {
+      fecha: inicio.toISOString().slice(0, 10),
+      actualizado: ahora.toISOString(),
+      estaciones: filas.map((f) => ({ ...f, meta: metas.get(f.celula) ?? META_DIARIA_DEFAULT })),
+    };
+  }
+
+  /**
+   * Meta diaria por célula del mes en curso: la meta mensual del reporte gerencial
+   * dividida en días hábiles. Sin meta cargada, el número mágico de la planta: 1.206.
+   */
+  private async metaDiariaPorCelula(ahora: Date): Promise<Map<Celula, number>> {
+    const local = new Date(ahora.getTime() - OFFSET_BOGOTA_HORAS * 3600 * 1000);
+    const anio = local.getUTCFullYear();
+    const mes = local.getUTCMonth() + 1;
+    const desde = new Date(Date.UTC(anio, mes - 1, 1));
+    const hasta = new Date(Date.UTC(anio, mes, 1));
+    const [metas, cal, noHabiles] = await Promise.all([
+      this.prisma.meta.findMany({ where: { anio, mes, lineaId: null } }),
+      this.prisma.calendarioLaboral.findUnique({ where: { id: 1 } }),
+      this.prisma.diaNoHabil.findMany({ where: { fecha: { gte: desde, lt: hasta } }, select: { fecha: true } }),
+    ]);
+    const habiles = cal
+      ? diasHabilesDelMes(anio, mes, {
+          diasSemana: [cal.domingo, cal.lunes, cal.martes, cal.miercoles, cal.jueves, cal.viernes, cal.sabado],
+          noHabiles: noHabiles.map((d) => d.fecha.toISOString().slice(0, 10)),
+        }).length
+      : HABILES_POR_DEFECTO;
+    const out = new Map<Celula, number>();
+    for (const m of metas as any[]) {
+      if (!CELULAS_META.includes(m.tipo)) continue;
+      out.set(m.tipo as Celula, metaDiaria(Number(m.valor), habiles));
+    }
+    return out;
+  }
+
+  /**
+   * Tablero por órdenes: una fila por OF viva, una columna por estación activa,
+   * y en cada celda cuántos pares ya pasaron por ahí sobre lo programado. Ver
+   * 1.206 pares uno por uno es imposible; la unidad de pantalla es la orden.
+   */
+  async tableroOrdenes() {
+    const estaciones = await this.estaciones();
+    const ofs = await this.prisma.ordenFabricacion.findMany({
+      where: { estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+      orderBy: { consecutivo: 'desc' },
+      select: {
+        id: true,
+        consecutivo: true,
+        estado: true,
+        fecha: true,
+        op: {
+          select: {
+            consecutivo: true,
+            linea: { select: { codigo: true, nombre: true } },
+            oc: { select: { consecutivo: true, cliente: { select: { nombre: true } } } },
+            lineas: {
+              select: {
+                productoConfiguradoId: true,
+                productoConfigurado: { select: { codigo: true, nombreComercial: true } },
+                tallas: { select: { tallaId: true, cantAProducir: true, talla: { select: { valor: true } } } },
+              },
+            },
+          },
+        },
+        pares: {
+          select: {
+            estado: true,
+            celulaActual: true,
+            subPasoActual: true,
+            subPasoInyeccion: true,
+            tallaId: true,
+            productoConfiguradoId: true,
+            reponeAParId: true,
+          },
+        },
+      },
+    });
+    return {
+      estaciones: estaciones.filter((e) => e.activa),
+      ordenes: ofs.map((of: any) => {
+        const programa = programaDeOf(of);
+        return {
+          id: of.id,
+          consecutivo: of.consecutivo,
+          estado: of.estado,
+          fecha: of.fecha,
+          op: of.op?.consecutivo ?? null,
+          oc: of.op?.oc?.consecutivo ?? null,
+          cliente: of.op?.oc?.cliente?.nombre ?? null,
+          linea: of.op?.linea?.nombre ?? null,
+          productos: [...new Set(programa.map((p) => p.producto))],
+          programado: programa.reduce((a, p) => a + p.programado, 0),
+          nacidos: programa.reduce((a, p) => a + p.nacidos, 0),
+          terminados: programa.reduce((a, p) => a + p.terminados, 0),
+          porEstacion: paresPorEstacion(
+            of.pares.map((p: any) => ({
+              estado: p.estado,
+              celula: p.celulaActual,
+              subPaso: p.subPasoActual,
+              subPasoInyeccion: p.subPasoInyeccion,
+            })),
+            estaciones,
+          ),
+          programa,
+        };
+      }),
+    };
+  }
+}
+
+/** Número mágico de la planta: lo que mueve cada proceso por día (Mauricio Sierra). */
+export const META_DIARIA_DEFAULT = 1206;
+/** Divisor de la meta mensual cuando nadie configuró el calendario (trabajan sábados). */
+const HABILES_POR_DEFECTO = 24;
+const CELULAS_META: string[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
+
+/** Programado vs nacidos vs terminados por producto × talla, a partir de la OF cargada con OP y pares. */
+function programaDeOf(of: any): {
+  productoConfiguradoId: number;
+  producto: string;
+  productoCodigo: string;
+  tallaId: number;
+  talla: string;
+  programado: number;
+  nacidos: number;
+  terminados: number;
+}[] {
+  const pares: any[] = of.pares ?? [];
+  const cuenta = (pcId: number, tallaId: number, pred: (p: any) => boolean) =>
+    pares.filter(
+      (p) => p.productoConfiguradoId === pcId && p.tallaId === tallaId && !p.reponeAParId && pred(p),
+    ).length;
+  const out: ReturnType<typeof programaDeOf> = [];
+  for (const l of (of.op?.lineas ?? []) as any[]) {
+    for (const t of (l.tallas ?? []) as any[]) {
+      if (!(t.cantAProducir > 0)) continue;
+      out.push({
+        productoConfiguradoId: l.productoConfiguradoId,
+        producto: l.productoConfigurado?.nombreComercial ?? '',
+        productoCodigo: l.productoConfigurado?.codigo ?? '',
+        tallaId: t.tallaId,
+        talla: String(t.talla?.valor ?? t.tallaId),
+        programado: t.cantAProducir,
+        nacidos: cuenta(l.productoConfiguradoId, t.tallaId, (p) => p.estado !== 'CANCELADO'),
+        terminados: cuenta(l.productoConfiguradoId, t.tallaId, (p) => p.estado === 'TERMINADO'),
+      });
+    }
+  }
+  return out;
 }

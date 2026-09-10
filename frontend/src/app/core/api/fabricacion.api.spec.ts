@@ -35,6 +35,36 @@ describe('FabricacionApi', () => {
     req.flush({});
   });
 
+  it('avanzar manda la estación del dispositivo y omite la máquina si no hay', () => {
+    api.avanzar('OF5-0001', 3, undefined, 'BODEGA_CORTE').subscribe();
+    const req = httpMock.expectOne(`${base}/fabricacion/par/OF5-0001/avanzar`);
+    expect(req.request.body).toEqual({ operarioId: 3, estacion: 'BODEGA_CORTE' });
+    req.flush({});
+  });
+
+  it('nacer hace POST a /fabricacion/of/:id/nacer con la tanda', () => {
+    const dto = { productoConfiguradoId: 10, tallaId: 1, cantidad: 20, operarioId: 3 };
+    api.nacer(7, dto).subscribe();
+    const req = httpMock.expectOne(`${base}/fabricacion/of/7/nacer`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(dto);
+    req.flush({ estacion: { codigo: 'PREPARACION' }, hoy: 1, pares: [] });
+  });
+
+  it('estaciones, hoy y tablero-ordenes son GET; activarEstacion es PATCH', () => {
+    api.estaciones().subscribe();
+    httpMock.expectOne(`${base}/fabricacion/estaciones`).flush([]);
+    api.hoy().subscribe();
+    httpMock.expectOne(`${base}/fabricacion/hoy`).flush({ fecha: '2026-09-09', actualizado: '', estaciones: [] });
+    api.tableroOrdenes().subscribe();
+    httpMock.expectOne(`${base}/fabricacion/tablero-ordenes`).flush({ estaciones: [], ordenes: [] });
+    api.activarEstacion('CIERRE', true).subscribe();
+    const req = httpMock.expectOne(`${base}/fabricacion/estaciones/CIERRE`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ activa: true });
+    req.flush({});
+  });
+
   it('tablero filtra por ofId', () => {
     api.tablero(1).subscribe();
     const req = httpMock.expectOne(`${base}/fabricacion/tablero?ofId=1`);

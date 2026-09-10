@@ -46,8 +46,29 @@ export interface EventoMin {
   celula: Celula;
   subPaso?: string | null; // poblado solo en eventos de Guarnición
   subPasoInyeccion?: string | null; // ídem en los de Inyección
+  // A dónde ENTRÓ el par con este escaneo (piloto 2026-09-09). Con esto, la
+  // "producción" de una célula es el evento que la abandona, sin importar en qué
+  // sub-paso estaba. NULL/undefined = evento anterior al piloto: regla vieja.
+  celulaDestino?: Celula | null;
   timestamp: Date;
   esSegunda?: boolean; // el par viene marcado con grado SEGUNDA
+}
+
+/**
+ * ¿Este evento cuenta como producción de su célula? Piloto: solo si el par SALIÓ
+ * de la célula (entró a otra). Antes del piloto: el último sub-paso (AMARRE /
+ * IMPACTO) o el escaneo único de las células sin sub-pasos.
+ */
+export function cuentaComoProduccion(ev: EventoMin): boolean {
+  if (ev.celulaDestino != null) return ev.celulaDestino !== ev.celula;
+  if (ev.celula === 'GUARNICION' && ev.subPaso !== 'AMARRE') return false;
+  if (
+    ev.celula === 'INYECCION' &&
+    ev.subPasoInyeccion != null &&
+    ev.subPasoInyeccion !== 'IMPACTO'
+  )
+    return false;
+  return true;
 }
 export interface VentaMin {
   fecha: Date;
@@ -207,21 +228,19 @@ export function construirReporte(input: InputReporte): ReporteDiario {
   // si se descartaran, la producción de inyección de meses ya mostrados al cliente
   // se caería a cero.
   for (const ev of input.eventos) {
-    if (ev.celula === 'GUARNICION' && ev.subPaso !== 'AMARRE') continue;
-    if (
-      ev.celula === 'INYECCION' &&
-      ev.subPasoInyeccion != null &&
-      ev.subPasoInyeccion !== 'IMPACTO'
-    )
-      continue;
+    if (!cuentaComoProduccion(ev)) continue;
     const fila = porDia.get(claveDia(ev.timestamp));
     if (!fila) continue;
     // Al llegar a PT el grado separa las columnas: Bodega es producto de primera
     // y Segundas va aparte (no se suman entre sí, así el total no se duplica).
     // En las células previas el trabajo se hizo igual, marcado o no: cuenta normal.
-    if (ev.celula === 'PT' && ev.esSegunda) {
-      fila.segundas += 1;
-      continue;
+    // Piloto: entrar a PT ES terminar (un solo pistolazo desde Finizaje), así que
+    // ese evento cuenta como salida de Inyección Y como entrada a Bodega.
+    const entraAPT = ev.celulaDestino === 'PT' && ev.celula !== 'PT';
+    if (ev.celula === 'PT' || entraAPT) {
+      if (ev.esSegunda) fila.segundas += 1;
+      else fila.bodega += 1;
+      if (!entraAPT) continue;
     }
     fila[columnaDeCelula(ev.celula)] += 1;
   }

@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { siguienteConsecutivo } from '../src/prisma/consecutivo';
 import { diasHabilesDelMes } from '../src/reportes/calendario-habil';
+import { describirBase, exigirNoProd } from '../src/prisma/base-url';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -106,6 +107,10 @@ async function crearOPAmarrada(opts: {
 }
 
 async function main() {
+  // Este seed borra kardex de MP, compras a proveedor y facturas de servicio SIN filtrar
+  // demo de real: jamás contra producción.
+  exigirNoProd('seed:demo');
+  console.log(`Seed demo — base: ${describirBase()}`);
   // ── Clientes demo ────────────────────────────────────────────────────────────
   const clientes = [
     { nit: '900111222', nombre: 'Minera El Roble', ciudad: 'Medellín', tipoCredito: 'D60' as const },

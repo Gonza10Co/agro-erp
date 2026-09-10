@@ -156,6 +156,9 @@ model Referencia {
   tallaMaxId    Int
   tallaMax      Talla   @relation("TallaMax", fields: [tallaMaxId], references: [id])
   activo        Boolean @default(true)
+  /// Piezas que se cortan por par (forros, bullones, strobel y contrafuerte incluidos).
+  /// Sale del despiece del cliente (REFERENCIAS.xlsx, 07-sep-2026); NULL = no informado.
+  piezasPorPar  Int?
 
   boms                  Bom[]
   overrides             ReglaOverride[]
@@ -263,6 +266,11 @@ model Linea {
   codigo        String  @unique
   nombre        String
   celulaInicial Celula  @default(CORTE)
+  // Sub-paso de guarnición donde NACE el par: el punto de conversión lote→par.
+  // NULL = comportamiento histórico (el par entra a guarnición por AREA). Se
+  // llena el día que el par deje de nacer en corte; cuál sub-paso exacto es
+  // decisión de planta (Amarre vs. Alistamiento), por eso es dato y no código.
+  subPasoInicial SubPasoGuarnicion?
   activo        Boolean @default(true)
   // Datos de la empresa que emite cotizaciones/proformas a nombre de esta línea.
   // Nullable: una línea sin estos datos no puede emitir proforma (no aparece en el selector).
@@ -876,6 +884,7 @@ model OrdenCorte {
 
   lineas  OrdenCorteLinea[]
   avances AvanceCorte[]
+  pares   Par[]
 
   @@index([fecha, lineaId])
   @@index([estado])
@@ -951,7 +960,12 @@ enum Celula {
   PT
 }
 
+// PREPARACION va primero: ahí queda lista la lengua, se le pega el QR y NACE el
+// par (decisión de planta, Mauricio Sierra, 2026-09-09). Los 9 restantes son el
+// detalle físico de guarnición; el piloto solo escanea en Preparación (y Cierre,
+// si se activa).
 enum SubPasoGuarnicion {
+  PREPARACION
   AREA
   ARMADO
   VISTAS
@@ -1023,6 +1037,12 @@ model Par {
   codigo                String              @unique
   ofId                  Int
   of                    OrdenFabricacion    @relation(fields: [ofId], references: [id])
+  // De qué orden de corte salió este par. Es la trazabilidad hacia atrás sin
+  // código de barras en corte: de una bota defectuosa en PT se llega a la orden
+  // del día, al turno, al material y a su consumo. NULL en los pares nacidos
+  // antes del rediseño y en los de líneas que no pasan por corte (Feroz).
+  ordenCorteId          Int?
+  ordenCorte            OrdenCorte?         @relation(fields: [ordenCorteId], references: [id])
   productoConfiguradoId Int
   productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
   tallaId               Int
@@ -1053,6 +1073,7 @@ model Par {
 
   @@index([ofId])
   @@index([celulaActual])
+  @@index([ordenCorteId])
   @@index([subPasoActual])
   @@index([lineaId])
 }
@@ -1061,17 +1082,42 @@ model EventoTrazabilidad {
   id               Int                @id @default(autoincrement())
   parId            Int
   par              Par                @relation(fields: [parId], references: [id])
+  // De dónde SALE el par con este escaneo (célula y sub-paso donde estaba).
   celula           Celula
   subPaso          SubPasoGuarnicion? // poblado solo en eventos de sub-paso de Guarnición
   subPasoInyeccion SubPasoInyeccion? // ídem para Inyección
+  // A dónde ENTRA: el pistolazo es de entrada (Mauricio, 2026-09-09). Es lo que
+  // cuenta la TV de planta ("cuántos llevan hoy en Bodega") y lo que separa el
+  // avance interno de una célula de su salida real en el reporte diario. NULL en
+  // los eventos anteriores al piloto, que se siguen contando con la regla vieja
+  // (AMARRE/IMPACTO).
+  estacionDestino  String?
+  celulaDestino    Celula?
   operarioId       Int
   operario         Operario           @relation(fields: [operarioId], references: [id])
-  maquinaId        Int
-  maquina          Maquina            @relation(fields: [maquinaId], references: [id])
+  // Opcional desde el piloto: en Bodega o Producto terminado no hay máquina.
+  maquinaId        Int?
+  maquina          Maquina?           @relation(fields: [maquinaId], references: [id])
   timestamp        DateTime           @default(now())
 
   @@index([parId])
   @@index([celula])
+  @@index([estacionDestino, timestamp])
+}
+
+// Punto de control donde se hace un pistolazo. Un dispositivo (celular, tablet)
+// se amarra a UNA estación; el escaneo mueve el par a la siguiente estación
+// activa. Apagar una estación (activa=false) la saca del recorrido sin tocar
+// código: Cierre la pidió JP y Mauricio no la ve necesaria, así que nace apagada.
+// Las 6 filas del piloto se insertan en la migración `piloto_estaciones`.
+model Estacion {
+  codigo           String            @id
+  nombre           String
+  orden            Int               @unique
+  celula           Celula
+  subPaso          SubPasoGuarnicion?
+  subPasoInyeccion SubPasoInyeccion?
+  activa           Boolean           @default(true)
 }
 
 model Operario {

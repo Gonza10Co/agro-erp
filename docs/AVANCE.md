@@ -4,8 +4,45 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-08-26** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-09-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **🏭 PILOTO DE PLANTA (Ola 3) — construido el 2026-09-09, se muestra el viernes 2026-09-11.**
+> Lo acordado en la visita a planta con Mauricio Sierra (jefe de producción); detalle en
+> `agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md`. Está en `develop`, sección `piloto`
+> en **EN_STAGE** (se demuestra con el perfil `stage`; el día de la demo se voltea a ENTREGADO).
+>
+> - **Estaciones de control** (`Estacion`, 6 filas sembradas por la migración `piloto_estaciones`;
+>   **Cierre nace apagada**: la pidió JP, Mauricio no la ve necesaria). La transición es "la
+>   siguiente estación ACTIVA con rango mayor" (`siguienteEstacion` en `fabricacion-core.ts`):
+>   se prende/apaga con `PATCH /fabricacion/estaciones/:codigo` sin desplegar. PT no se apaga.
+> - **El par nace en Preparación** (enum `SubPasoGuarnicion.PREPARACION`): ahí queda lista la
+>   lengua y se pega el QR. `generarOF` ya NO pare pares — la OF nace vacía con lo programado
+>   de la OP — y `POST /fabricacion/of/:id/nacer` crea la tanda (una canasta = 20) contra lo
+>   programado por talla, con evento de entrada y los datos de la etiqueta.
+> - **El pistolazo es de ENTRADA** (`EventoTrazabilidad.estacionDestino/celulaDestino`), una
+>   sola lectura por movimiento, máquina opcional, y si el dispositivo declara su estación el
+>   backend **rechaza el escaneo si el par se saltó una** ("viene de X: le toca Y"). Entrar a
+>   PT termina el par (5º pistolazo). El reporte diario cuenta producción cuando el par SALE
+>   de la célula (regla vieja AMARRE/IMPACTO para los eventos sin destino). El teórico del
+>   consumo sale de lo PROGRAMADO + reposiciones (el material se corta antes de que el par exista).
+> - **Pantallas**: `/fabricacion/estacion` (el celular amarrado a UNA estación: config local
+>   estación + operario por turno; en Preparación nacen pares y sale la etiqueta de la lengua
+>   50×30 solo QR; en PT ofrece el sticker de la caja) · `/tv` (fuera del shell: un número
+>   gigante por estación, hoy contra 1.206, última hora, refresco 30 s; reemplaza el tablero
+>   manual HORA / N° PARES) · `/fabricacion/ordenes` (filas = OF vivas, columnas = estaciones,
+>   celda = pares que ya pasaron / programados, desglose por talla, buscador por par).
+> - **Datos**: `npm run seed:piloto` siembra OC→OP→OF (vacía) con la curva real del cuaderno
+>   del cortador (#061: 1.206 pares, tallas 36–43) sin tocar inventario ni amarres; `--limpiar`.
+> - **Verificado E2E en local** (base :5434) por API y en pantalla: nacer 3 → rechazo en Montaje
+>   → Bodega → Montaje → Finizaje → PT terminado; TV, tablero por órdenes y reporte diario
+>   cuadran. Tests: backend 682 · frontend 405, verdes.
+> - **Para el viernes**: merge `develop`→`master` + tag `piloto-1`, `migrate deploy` (2
+>   migraciones aditivas + 6 filas), `seed:piloto` contra prod, y voltear `piloto` a ENTREGADO
+>   en `modulos.ts` el día de la demo. Pendiente del cliente: impresoras (2, la de códigos con
+>   guillotina), lectores, cuántas TVs, tiempos estándar completos, referencia del piloto.
+>
+> **Anterior (2026-08-26):**
 >
 > **✂️ CONTROL DE CORTE DESPLEGADO A PROD — 2026-08-26** (merge `--no-ff` `790c536` + tag
 > `quincena-1-corte`). CI verde antes del merge (frontend 1m46s + backend 1m01s). **Los dos
@@ -14,7 +51,12 @@
 > la aplicó `migrate deploy` sola: verificado con **login real** del perfil `stage` contra prod
 > y `GET /corte/tablero` → **200** con el resumen en ceros.
 >
-> ⚠️ **El tablero de corte en prod está VACÍO y no hay `seed:corte`.** El E2E de la quincena se
+> ✅ **Tablero sembrado y verificado en prod (2026-08-26).** `seed:corte` corrido contra la
+> base pública: 5 órdenes, 1 sola alerta (la 862, la que sí se desvió). Verificado en pantalla
+> con el perfil `stage` contra prod — captura en `capturas-demos/corte-tablero-prod.png`.
+> Para revertir: `npm run seed:corte -- --limpiar` (borra solo esas 5 órdenes).
+>
+> ~~⚠️ **El tablero de corte en prod está VACÍO y no hay `seed:corte`.**~~ El E2E de la quincena se
 > hizo con datos creados al vuelo; `AGR-861` solo vive en los tests y en los docs. Antes de
 > mostrarlo hay que sembrar la programación de agosto o crear la orden en vivo en la pantalla.
 > A favor: el módulo **no toca inventario** (0 referencias a `MovimientoInventario` en
@@ -100,7 +142,7 @@
    GIT HIGIENE (merges + tags)   ▓▓▓▓▓░░░░░░░░░░░░░░░  ~25%
 ```
 
-**Tests:** 481 backend (53 suites) + 339 frontend, verdes 🟢 · ambos builds limpios.
+**Tests:** 642 backend (61 suites) + 395 frontend, verdes 🟢 · ambos builds limpios.
 
 ---
 
@@ -239,12 +281,64 @@ desde Amarre existe el PAR. Esta quincena construye **solo el tramo de la orden*
       (es `nombreInterno` — la columna salía vacía), y el pipe de fecha imprimía
       *"Saturday 1 de August"*: faltaba registrar el locale `es-CO`.
 
-**Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago):**
+- [x] **`seed:corte` + dos bugs que destapó** (2026-08-26). El tablero llegaba a prod en ceros:
+      el E2E de la quincena se hizo con datos creados al vuelo y `AGR-861` solo vivía en los
+      tests. El seed carga 5 órdenes de agosto de la línea Agro — **solo la 861 trae la
+      programación real** de JP (1.206 pares), las otras 4 van rotuladas como ejemplo en
+      `observaciones` — y arma un cierre sano, una desviación, WIP en piso y una orden en curso.
+      Idempotente, con `--limpiar`, y reversible: corte no escribe inventario ni pares.
+      Los dos bugs son el mismo criterio en dos capas: **lo cortado vale 0 hasta el toque de
+      entrega**, así que medirlo antes marcaba con 100% de desviación a toda orden apenas
+      programada — alerta en el backend y **"0%" en rojo** en la tabla. Con el mes cargado, las
+      22 órdenes futuras habrían salido "con alerta" y el contador del tablero no significaría
+      nada. Ahora la desviación y el semáforo esperan a `entregaCorte`. Captura en
+      `capturas-demos/corte-tablero-sembrado.png`; el tablero del front estrena spec.
+
+> ⚠️ **Decisión pendiente con el cliente — qué mide el KPI "Cumplimiento de corte".** Hoy es
+> `cortado / programado` de **todas** las órdenes del rango, así que las que aún no han
+> entregado lo empujan hacia abajo: con las 5 sembradas marca **57,9%** cuando lo entregado va
+> en 87,9%. El subtítulo ("2.817 de 4.866 pares") lo explica y filtrar por fechas lo corrige,
+> pero el número grande es el primero que va a leer Gabriel. Es la misma conversación de
+> calibración que los umbrales — **no se cambia la semántica del indicador sin él**.
+
+**Falta de esta quincena (bloqueado por datos de JP, pedidos el 20-ago y recordados el 26-ago):**
 - [ ] Importar el **Excel del jefe de corte** (programación + consumo teórico vs. real).
 - [ ] Formatos de programación de **Basarili** y **Línea Alta** (solo llegó el de Agro).
-- [ ] **Piezas por par por referencia** (24 / 22 / 18) para cuadrar piezas contra pares.
+- [x] Piezas por par por referencia — ✅ 2026-09-07: `Referencia.piezasPorPar` cargado desde el despiece de JP (`piezas-por-par.csv`: 101=28 · 102=28 · 103=28 · 104=32 · 105=30 · 106=34; la 107 y la variante 105 ECONÓMICA=34 quedan en el CSV a la espera). `seed-corte` lo lee de la referencia (respaldo 24). Ninguna referencia da los 24 del audio de agosto: JP contaba solo lo que pasa por cortadora.
+      El seed asume **24** (dato de planta de JP) para convertir pares a piezas.
 - [ ] Calibrar los **umbrales de alerta** (hoy 24 h corte / 96 h guarnición / 5% / 5%).
+- [ ] Decidir qué mide el KPI de cumplimiento (ver el recuadro de arriba).
 
+
+### 🔗 Quincena 2 — EL PUENTE (2026-08-26) · en `develop`, sin desplegar
+
+Plan completo en `docs/superpowers/PLAN-QUINCENA-2.md`. Se hizo **solo la mitad que no
+depende de la planta**, y toda aditiva: el comportamiento del cliente no cambia en nada.
+
+- [x] **`Par.ordenCorteId`** (nullable + índice + FK) — el par ya puede decir de qué orden
+      de corte salió. Es la trazabilidad hacia atrás que reemplaza al código en corte: de
+      una bota defectuosa en PT se llega a la orden del día, el turno, el material y su
+      consumo real.
+- [x] **`Linea.subPasoInicial`** — el **punto de conversión lote→par es un dato, no código**.
+      `subPasoInicial(celula, nacimiento)` y `generarPares` lo respetan, y `generarOF` lo lee
+      con la misma cascada que la célula (línea de la OP > línea de la marca > histórico).
+      Así la decisión de planta (¿Amarre o Alistamiento?) deja de ser un rediseño y pasa a
+      ser un `UPDATE`, igual que `celulaInicial` ya hace que Feroz arranque en Inyección.
+- [x] Migración aditiva `20260826161102_par_conoce_su_orden_de_corte`.
+
+**El campo nace vacío en toda la base**, así que el par sigue entrando a guarnición por
+`AREA` como siempre. Es capacidad instalada, no un cambio de conducta — hay spec que lo
+fija (`hoy ninguna línea lo tiene puesto, así que nada cambia para el cliente`).
+
+**Falta el corte del cordón** (`generarOF` deja de parir pares · nacimiento en el punto de
+conversión · `avanzar()` desde ahí · reporte diario desde `AvanceCorte` · adiós botón de
+etiquetas). Eso **sí** rompe el flujo que el cliente usa a diario: 12+ archivos y 27 specs.
+Va después de la demo y con respuesta de la planta.
+
+> ⚠️ **Hallazgo que el diseño original no contemplaba:** `calidad.service.ts:180` **también
+> crea pares** (los de reposición). Hay que decidir de qué orden de corte nacen — heredar la
+> del par que reemplazan (recomendado) o la del día en que se repusieron — o nacerán
+> huérfanos el día que se toque `generarOF`. No depende de la planta; se resuelve interno.
 
 ### 📦 Entrega 6 (quincena 2026-07-30 → ~08-13) — plan en `docs/superpowers/PLAN-ENTREGA-6.md`
 
@@ -678,3 +772,60 @@ npm start
 ```
 
 Más comandos y convenciones en `agro-erp/CLAUDE.md`. Planes por demo en `agro-erp/docs/plans/`.
+
+### 🧹 Limpiar los datos demo de prod (paso previo al uso real, 2026-09-07)
+
+Prod nunca ha tenido transacciones reales: **no existe ni un `ProductoConfigurado` real** (los 3
+son `PC-101-PODEROSA-*` del seed), así que todas las OC/OP/OF, pares, despachos, facturas y kardex
+son de demo o de ensayo. Los maestros sí son reales (clientes, catálogo, BOM, inventario MP,
+operarios, máquinas, tipos de daño, metas, bodegas, servicios, calendario, usuarios).
+
+```bash
+npm run limpiar:demo                                  # DRY-RUN: cuenta y lista, no borra
+npm run limpiar:demo -- --ejecutar                    # borra, en UNA transacción
+npm run limpiar:demo -- --ejecutar --prod-confirmado  # en Railway exige además este flag
+```
+
+Clasifica por marcadores (productos `PC-*`, los 5 clientes y 3 proveedores ficticios por NIT,
+6 materiales inventados, ejes COLOR/SUELA, movimientos `D14-*`, OCs 9000–9999, órdenes de corte
+AGR-862/863/880/881) y **una OC de cliente real con algún producto real no se toca y se lista**.
+Las secuencias de consecutivos vuelven a 1 solo en las tablas que quedan vacías. Probado contra
+la copia local de prod (04-ago): 12.533 registros fuera, maestros intactos (BOM de la 101 con
+sus 47 líneas, 166 clientes, 301 inventarios de MP), segundo dry-run en cero.
+
+**Guardia anti-prod** (`src/prisma/base-url.ts`, con tests): `seed:demo` y `seed:catalogo`
+abortan si `DATABASE_URL` apunta a Railway o `NODE_ENV=production`. Antes no había ninguna:
+`seed:demo` borra TODO el kardex de MP, TODAS las compras a proveedor y TODAS las facturas de
+servicio sin distinguir demo de real, y `seed:catalogo` re-ejecutado pisa el BOM real de la 101.
+
+### 🚦 Arranque en uso real por UNA línea (decisión 2026-09-07)
+
+El cliente empieza a usar la aplicación **solo con Basarili**; Agro, Alta y Feroz entran cuando
+el flujo esté probado de punta a punta con datos reales. Interruptor:
+
+```bash
+npm run seed:lineas-activas -- BASARILI                   # deja activa solo Basarili
+npm run seed:lineas-activas -- BASARILI AGRO ALTA FEROZ   # reabre todas
+```
+
+Todo lo que ofrece líneas para elegir lee `GET /catalog/lineas`, que solo devuelve activas, así
+que con eso basta. `seed:basarili` ya **no** pone `activo: true` al recargar el catálogo (antes
+sí, y habría revertido el interruptor). ⚠️ El ABM de líneas del front no puede ver ni reactivar
+inactivas (el endpoint no acepta `?activo=`): reabrir es por seed.
+
+### 📱 Ensayo desde el celular (el celular como lector de códigos)
+
+La pantalla del operario (`/fabricacion/operario`) lee QR/Code128 con la cámara del
+celular (`lector-camara.ts`, html5-qrcode cargado bajo demanda) y las etiquetas de OF
+llevan QR + Code128. La cámara exige **HTTPS**, y un front HTTPS contra un API HTTP es
+contenido mixto (bloqueado), así que el modo `movil` sirve el front por HTTPS y manda
+el API por el proxy de `ng serve` (`proxy.conf.json`: `/api` → `localhost:3001`).
+
+```bash
+npm run dev:front:movil        # = ng serve --configuration movil  (ssl · host 0.0.0.0 · proxy)
+# En el celular, misma wifi:  https://<IP-del-Mac>:4200   (aceptar el certificado autofirmado)
+# El backend se levanta igual que siempre (:3001); el proxy lo alcanza por localhost.
+```
+
+`environment.movil.ts` pone `apiUrl: '/api'`; los demás environments no cambian.
+Verificado 2026-09-07 en la Mac: build prod y movil limpios, 400 tests front en verde.

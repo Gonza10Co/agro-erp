@@ -35,12 +35,13 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
         <div class="card">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Código</th><th>Nombre interno</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Código</th><th>Nombre interno</th><th class="num">Piezas/par</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (r of referencias(); track r.id) {
                   <tr>
                     <td class="cell-mono">{{ r.codigo }}</td>
                     <td>{{ r.nombreInterno }}</td>
+                    <td class="num cell-mono">{{ r.piezasPorPar ?? '—' }}</td>
                     <td>
                       @if (r.activo) {
                         <span class="badge badge-success"><span class="dot"></span>Activa</span>
@@ -90,6 +91,11 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
             }
           </select>
         </div>
+        <div class="field">
+          <label class="label" for="piezasPorPar">Piezas por par</label>
+          <input class="input" id="piezasPorPar" name="piezasPorPar" type="number" min="1" step="1"
+                 [(ngModel)]="piezasPorPar" placeholder="Del despiece (p. ej. 28)" />
+        </div>
         @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin-bottom:var(--sp-3)">{{ error() }}</p> }
         <button class="btn btn-primary btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">Crear referencia</button>
       </form>
@@ -109,6 +115,7 @@ export class ReferenciasListComponent {
   nombreInterno = '';
   tallaMinId?: number;
   tallaMaxId?: number;
+  piezasPorPar?: number;
   loading = signal(false);
   error = signal('');
 
@@ -141,6 +148,7 @@ export class ReferenciasListComponent {
       nombreInterno: this.nombreInterno.trim(),
       tallaMinId: this.tallaMinId,
       tallaMaxId: this.tallaMaxId,
+      ...(this.piezasPorPar ? { piezasPorPar: this.piezasPorPar } : {}),
     };
     this.api.crear(dto).subscribe({
       next: () => { this.loading.set(false); this.resetForm(); this.cerrar(); this.cargar(); },
@@ -157,5 +165,6 @@ export class ReferenciasListComponent {
     this.nombreInterno = '';
     this.tallaMinId = undefined;
     this.tallaMaxId = undefined;
+    this.piezasPorPar = undefined;
   }
 }

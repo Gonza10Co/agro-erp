@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, DestroyRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, AfterViewInit, DestroyRef, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
@@ -9,6 +9,7 @@ import {
 import { CalidadApi } from '../../core/api/calidad.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { TipoDano } from '../../core/api/models/calidad.models';
+import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
 
 @Component({
   selector: 'app-pantalla-operario',
@@ -37,10 +38,19 @@ import { TipoDano } from '../../core/api/models/calidad.models';
       </div></div>
 
       <div class="card"><div class="card-body">
-        <label class="scan-label">Escanear código del par
-          <input #scan class="scan-input mono" [(ngModel)]="codigo"
-                 (keyup.enter)="buscar()" placeholder="OF5-0001" autofocus />
-        </label>
+        <div class="scan-fila">
+          <label class="scan-label">Escanear código del par
+            <input #scan class="scan-input mono" [(ngModel)]="codigo"
+                   (keyup.enter)="buscar()" placeholder="OF5-0001" autofocus />
+          </label>
+          @if (tieneCamara) {
+            <button class="btn btn-camara" type="button" (click)="camaraActiva() ? cerrarCamara() : abrirCamara()">
+              {{ camaraActiva() ? 'Cerrar cámara ✕' : 'Leer con la cámara 📷' }}
+            </button>
+          }
+        </div>
+        <!-- Siempre en el DOM: html5-qrcode lo busca por id y necesita verlo con tamaño al arrancar. -->
+        <div id="lector-camara" class="lector" [hidden]="!camaraActiva()"></div>
         @if (msg(); as m) { <div class="msg" [class.err]="esError()">{{ m }}</div> }
 
         @if (par(); as p) {
@@ -89,6 +99,9 @@ import { TipoDano } from '../../core/api/models/calidad.models';
                 </div>
               }
             }
+            @if (camaraActiva()) {
+              <button class="btn" type="button" (click)="leerOtro()">Leer otro par ↻</button>
+            }
           </div>
         }
       </div></div>
@@ -97,7 +110,7 @@ import { TipoDano } from '../../core/api/models/calidad.models';
   styles: [`
     .puesto{display:flex;gap:var(--sp-4);flex-wrap:wrap}
     .puesto label,.scan-label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
-    select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-sm)}
+    select,.scan-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-sm)}
     .scan-input{font-size:var(--text-lg);max-width:280px;min-height:48px}
     .msg{margin-top:var(--sp-3);color:var(--accent)}
     .msg.err{color:var(--danger)}
@@ -106,16 +119,31 @@ import { TipoDano } from '../../core/api/models/calidad.models';
     .mono{font-family:var(--font-mono)}
     .btn-primary{min-height:48px}
     .acciones{display:flex;gap:var(--sp-2);flex-wrap:wrap}
-    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
-    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font:inherit}
+    .reporte{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-lg);display:flex;flex-direction:column;gap:var(--sp-2);min-width:320px}
+    textarea{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font:inherit}
+    .scan-fila{display:flex;gap:var(--sp-3);align-items:flex-end;flex-wrap:wrap}
+    .btn-camara{min-height:48px}
+    .lector{margin-top:var(--sp-3);width:100%;max-width:360px;border-radius:var(--r-lg);overflow:hidden}
+    /* Celular en planta: todo a una columna y botones de dedo. */
+    @media (max-width:640px){
+      .puesto label,.scan-label,.scan-input,.btn-camara,.acciones .btn,.reporte{width:100%;max-width:none;min-width:0}
+    }
   `],
 })
-export class PantallaOperarioComponent implements OnInit, AfterViewInit {
+export class PantallaOperarioComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('scan') private scanInput!: ElementRef<HTMLInputElement>;
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly calidadApi = inject(CalidadApi);
   private readonly auth = inject(AuthService);
+  private readonly zone = inject(NgZone);
+
+  /** El celular como lector: solo se ofrece si el navegador expone cámara (contexto seguro). */
+  readonly tieneCamara = hayCamara();
+  camaraActiva = signal(false);
+  private lector: LectorCamara | null = null;
+  /** El mismo QR sigue en cuadro tras un fallo: sin esto la cámara lo relee 10 veces por segundo. */
+  private ultimaLectura = { codigo: '', en: 0 };
 
   readonly celulas: Celula[] = ORDEN_CELULAS;
   label = (c: Celula) => LABEL_CELULA[c];
@@ -170,6 +198,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
           this.codigo = '';
           this.descripcion = '';
           this.reportando.set(false);
+          this.reanudarCamaraConGracia();
           this.enfocarScan();
         },
         error: (e) => {
@@ -196,6 +225,59 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
 
   ngAfterViewInit(): void {
     this.enfocarScan();
+  }
+
+  ngOnDestroy(): void {
+    void this.cerrarCamara();
+  }
+
+  async abrirCamara(): Promise<void> {
+    this.msg.set(null);
+    this.camaraActiva.set(true); // el contenedor tiene que estar visible antes de arrancar el video
+    await new Promise((r) => setTimeout(r));
+    try {
+      this.lector = await abrirLectorCamara('lector-camara', (codigo) =>
+        this.zone.run(() => this.onLectura(codigo)),
+      );
+    } catch {
+      this.camaraActiva.set(false);
+      this.esError.set(true);
+      this.msg.set('No se pudo abrir la cámara: hace falta HTTPS y permiso de cámara en el navegador.');
+    }
+  }
+
+  async cerrarCamara(): Promise<void> {
+    const lector = this.lector;
+    this.lector = null;
+    this.camaraActiva.set(false);
+    await lector?.cerrar();
+    this.enfocarScan();
+  }
+
+  /** Una lectura por cámara equivale al lector físico tipeando el código + Enter. */
+  onLectura(codigo: string): void {
+    if (!codigo || this.par()) return; // hay un par en pantalla: se atiende ese primero
+    const ahora = Date.now();
+    if (codigo === this.ultimaLectura.codigo && ahora - this.ultimaLectura.en < 3000) return;
+    this.ultimaLectura = { codigo, en: ahora };
+    this.lector?.pausar();
+    this.codigo = codigo;
+    this.buscar();
+  }
+
+  /** Se leyó el par que no era: se descarta y la cámara vuelve a leer. */
+  leerOtro(): void {
+    this.par.set(null);
+    this.codigo = '';
+    this.msg.set(null);
+    this.lector?.reanudar();
+    this.enfocarScan();
+  }
+
+  /** Tras cerrar un par, la etiqueta sigue frente a la cámara un instante: no releerla de inmediato. */
+  private reanudarCamaraConGracia(): void {
+    if (!this.lector) return;
+    setTimeout(() => this.lector?.reanudar(), 1500);
   }
 
   /** El scanner físico escribe donde esté el foco: recuperarlo SIEMPRE tras cada acción. */
@@ -236,6 +318,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
       error: (e) => {
         this.esError.set(true);
         this.msg.set(this.msgError(e, `Par ${c} no encontrado`));
+        this.reanudarCamaraConGracia(); // y la cámara sigue leyendo, sin repetir el error en bucle
         this.enfocarScan(); // el código queda en el input para reintentar con Enter
       },
     });
@@ -254,6 +337,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit {
           this.msg.set(`Par ${p.codigo} avanzado ✓`);
           this.par.set(null);
           this.codigo = '';
+          this.reanudarCamaraConGracia();
           this.enfocarScan();
         },
         error: (e) => {

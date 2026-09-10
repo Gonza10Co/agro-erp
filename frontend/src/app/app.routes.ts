@@ -7,6 +7,14 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent),
   },
+  // La TV de planta va FUERA del shell: pantalla completa, sin menú, para el
+  // televisor de la célula. Mismos guards que las rutas hijas.
+  {
+    path: 'tv',
+    canActivate: [authGuard, moduloGuard],
+    data: { modulo: 'fabricacion', seccion: 'piloto' },
+    loadComponent: () => import('./features/fabricacion/tv.component').then(m => m.TvPlantaComponent),
+  },
   {
     path: '',
     canActivate: [authGuard],
@@ -43,6 +51,10 @@ export const routes: Routes = [
       { path: 'fabricacion/guarnicion', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/guarnicion-subtablero.component').then(m => m.GuarnicionSubtableroComponent) },
       { path: 'fabricacion/par/:codigo', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/par-detalle.component').then(m => m.ParDetalleComponent) },
       { path: 'fabricacion/of/:id/consumo', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/of-consumo.component').then(m => m.OfConsumoComponent) },
+      // Piloto de planta (2026-09-09): el dispositivo amarrado a una estación y el
+      // tablero por órdenes. `seccion` en data: el guard bloquea la URL tecleada.
+      { path: 'fabricacion/estacion', data: { modulo: 'fabricacion', seccion: 'piloto' }, loadComponent: () => import('./features/fabricacion/estacion.component').then(m => m.EstacionComponent) },
+      { path: 'fabricacion/ordenes', data: { modulo: 'fabricacion', seccion: 'piloto' }, loadComponent: () => import('./features/fabricacion/tablero-ordenes.component').then(m => m.TableroOrdenesComponent) },
       // Quincena 1 del rediseño lote↔par: el tramo previo a que el par exista.
       // La sección va en data para que modulo.guard bloquee la URL tecleada.
       { path: 'corte', data: { modulo: 'fabricacion', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-tablero.component').then(m => m.CorteTableroComponent) },

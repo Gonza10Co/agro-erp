@@ -44,7 +44,7 @@ import { ParTablero, SubPasoGuarnicion, ORDEN_SUBPASOS, LABEL_SUBPASO } from '..
     .col{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--radius);min-height:120px}
     .col-h{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-2) var(--sp-3);border-bottom:var(--bw) solid var(--border);font-weight:var(--fw-medium);font-size:var(--text-sm)}
     .col-body{padding:var(--sp-2);display:flex;flex-direction:column;gap:var(--sp-2)}
-    .par-chip{display:flex;justify-content:space-between;gap:var(--sp-2);padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-caption);text-decoration:none;color:inherit}
+    .par-chip{display:flex;justify-content:space-between;gap:var(--sp-2);padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-lg);font-size:var(--text-caption);text-decoration:none;color:inherit}
     .par-chip:hover{border-color:var(--accent)}
     .mono{font-family:var(--font-mono)}
     .empty-col{text-align:center;padding:var(--sp-2)}
@@ -77,9 +77,13 @@ export class GuarnicionSubtableroComponent implements OnInit {
 
   cargar(): void {
     this.error.set(null);
-    this.api.tablero(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => this.pares.set(p),
-      error: () => this.error.set('No se pudo cargar el sub-tablero. Intentá de nuevo.'),
-    });
+    // Solo los pares en guarnición: el tablero general ahora pagina el detalle.
+    this.api
+      .tablero(this.ofId, { celula: 'GUARNICION', estados: ['EN_PROCESO'], take: 500 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (p) => this.pares.set(p),
+        error: () => this.error.set('No se pudo cargar el sub-tablero. Intentá de nuevo.'),
+      });
   }
 }

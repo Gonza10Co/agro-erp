@@ -34,3 +34,13 @@ consumos reales se capturan en la app con el **editor de BOM** (módulo Maestros
 
 > Producción (Railway): el `Dockerfile` solo corre `migrate deploy`. El `seed:basarili`
 > se ejecuta **manualmente una vez** contra la base de producción, no en cada deploy.
+
+## `piezas-por-par.csv` — despiece de piezas por par (07-sep-2026)
+
+Sale del `REFERENCIAS.xlsx` que mandó el cliente (una tabla por referencia: material, pieza,
+piezas por par). Una fila por **referencia × material × pieza**; `seed:basarili` suma las piezas
+por referencia y guarda el **total** en `Referencia.piezasPorPar` (101=28 · 102=28 · 103=28 ·
+104=32 · 105=30 · 106=34). Las referencias del CSV que no existen en el catálogo se avisan y se
+saltan (hoy: la **107**, aún sin nombre ni tallas, y la variante **"105 ECONOMICA"**, que es un
+eje del configurador y no una referencia). Sin comas dentro de los valores (`1.2MM`, no `1,2MM`).
+

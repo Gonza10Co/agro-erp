@@ -27,6 +27,7 @@ export class ReferenciaAbmService {
         nombreInterno: dto.nombreInterno,
         tallaMinId: dto.tallaMinId,
         tallaMaxId: dto.tallaMaxId,
+        piezasPorPar: dto.piezasPorPar,
       },
     });
   }
@@ -35,7 +36,7 @@ export class ReferenciaAbmService {
     return this.prisma.referencia.findMany({
       where: { activo: true },
       orderBy: { codigo: 'asc' },
-      select: { id: true, codigo: true, nombreInterno: true, activo: true },
+      select: { id: true, codigo: true, nombreInterno: true, activo: true, piezasPorPar: true },
     });
   }
 
@@ -58,6 +59,7 @@ export class ReferenciaAbmService {
         nombreInterno: dto.nombreInterno,
         tallaMinId: dto.tallaMinId,
         tallaMaxId: dto.tallaMaxId,
+        piezasPorPar: dto.piezasPorPar,
       },
     });
   }

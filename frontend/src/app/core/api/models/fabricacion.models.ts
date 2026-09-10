@@ -2,7 +2,7 @@ import { IncidenciaPar } from './calidad.models';
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
 export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO' | 'DADO_DE_BAJA';
-export type SubPasoGuarnicion = 'AREA' | 'ARMADO' | 'VISTAS' | 'CIERRE' | 'PREFORMADO' | 'PERFORADO' | 'REVISION' | 'STROBEL' | 'AMARRE';
+export type SubPasoGuarnicion = 'PREPARACION' | 'AREA' | 'ARMADO' | 'VISTAS' | 'CIERRE' | 'PREFORMADO' | 'PERFORADO' | 'REVISION' | 'STROBEL' | 'AMARRE';
 export type SubPasoInyeccion = 'MONTAJE' | 'INYECCION' | 'FINIZAJE' | 'IMPACTO';
 export type EstadoOF = 'ABIERTA' | 'EN_PROCESO' | 'TERMINADA' | 'ANULADA';
 
@@ -11,6 +11,8 @@ export interface OFGenerada {
   consecutivo: number;
   opId: number;
   totalPares: number;
+  /** Pares programados en la OP: contra eso nacen los pares en Preparación. */
+  programados?: number;
 }
 
 export interface OFListItem {
@@ -20,6 +22,8 @@ export interface OFListItem {
   fecha: string;
   op: { consecutivo: number };
   _count: { pares: number };
+  /** Pares programados en la OP: la OF nace vacía y los pares van naciendo en Preparación. */
+  programados: number;
 }
 
 export interface OFDetallePar {
@@ -32,6 +36,18 @@ export interface OFDetallePar {
   linea: { codigo: string; nombre: string } | null;
 }
 
+/** Lo programado por producto × talla contra lo que va naciendo y terminando. */
+export interface ProgramaOfLinea {
+  productoConfiguradoId: number;
+  producto: string;
+  productoCodigo: string;
+  tallaId: number;
+  talla: string;
+  programado: number;
+  nacidos: number;
+  terminados: number;
+}
+
 export interface OFDetalle {
   id: number;
   consecutivo: number;
@@ -39,6 +55,15 @@ export interface OFDetalle {
   fecha: string;
   op: { consecutivo: number };
   pares: OFDetallePar[];
+  programa?: ProgramaOfLinea[];
+}
+
+/** El tablero en números: la planta mueve ~1.206 pares al día, no caben en una lista. */
+export interface TableroResumen {
+  celulas: { celula: Celula; total: number; tallas: { talla: number; cantidad: number }[] }[];
+  terminados: number;
+  fueraDeFlujo: number;
+  total: number;
 }
 
 export interface ParTablero {
@@ -71,6 +96,14 @@ export interface ParDetalle {
   estado: EstadoPar;
   of: { consecutivo: number };
   talla: { valor: string };
+  productoConfigurado?: {
+    id: number;
+    codigo?: string;
+    nombreComercial?: string;
+    referencia?: { codigo: string; nombreInterno: string } | null;
+    marca?: { nombre: string } | null;
+  } | null;
+  linea?: { codigo: string; nombre: string } | null;
   eventos: EventoTrazabilidad[];
   incidencias: IncidenciaPar[];
   reponeA: { codigo: string } | null;
@@ -92,10 +125,12 @@ export interface Maquina {
 
 export const ORDEN_CELULAS: Celula[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
 
+/** PREPARACION va primero: ahí queda lista la lengua, se pega el QR y nace el par. */
 export const ORDEN_SUBPASOS: SubPasoGuarnicion[] =
-  ['AREA', 'ARMADO', 'VISTAS', 'CIERRE', 'PREFORMADO', 'PERFORADO', 'REVISION', 'STROBEL', 'AMARRE'];
+  ['PREPARACION', 'AREA', 'ARMADO', 'VISTAS', 'CIERRE', 'PREFORMADO', 'PERFORADO', 'REVISION', 'STROBEL', 'AMARRE'];
 
 export const LABEL_SUBPASO: Record<SubPasoGuarnicion, string> = {
+  PREPARACION: 'Preparación',
   AREA: 'Área',
   ARMADO: 'Armado',
   VISTAS: 'Vistas',
@@ -196,4 +231,83 @@ export interface ConsumoOf {
   ofId: number;
   consecutivo: number;
   lineas: ConsumoOfLinea[];
+}
+
+// ───────────────────────── Estaciones del piloto (2026-09-09) ─────────────────────────
+
+/** Punto de control donde se hace un pistolazo. Un dispositivo se amarra a una. */
+export interface Estacion {
+  codigo: string;
+  nombre: string;
+  orden: number;
+  celula: Celula;
+  subPaso: SubPasoGuarnicion | null;
+  subPasoInyeccion: SubPasoInyeccion | null;
+  activa: boolean;
+}
+
+/** Lo que devuelve un pistolazo: el par actualizado + a dónde entró y cuántos van hoy. */
+export interface AvanceResultado {
+  id: number;
+  codigo: string;
+  celulaActual: Celula;
+  estado: EstadoPar;
+  avance: { estacion: string; nombre: string; terminado: boolean; hoy: number };
+}
+
+/** Lo que va impreso en la etiqueta de la lengua. */
+export interface ParNacido {
+  id: number;
+  codigo: string;
+  talla: string;
+  producto: string;
+  productoCodigo: string;
+  referencia: string;
+  marca: string;
+  linea: string;
+  of: number;
+}
+
+export interface NacerResultado {
+  estacion: Estacion;
+  hoy: number;
+  pares: ParNacido[];
+}
+
+/** TV de planta: entradas de hoy por estación contra la meta del día. */
+export interface HoyEstacion {
+  codigo: string;
+  nombre: string;
+  celula: Celula;
+  hoy: number;
+  ultimaHora: number;
+  meta: number;
+}
+export interface HoyPlanta {
+  fecha: string;
+  actualizado: string;
+  estaciones: HoyEstacion[];
+}
+
+/** Tablero por órdenes: una fila por OF viva, una columna por estación activa. */
+export interface OrdenTablero {
+  id: number;
+  consecutivo: number;
+  estado: EstadoOF;
+  fecha: string;
+  op: number | null;
+  oc: number | null;
+  cliente: string | null;
+  linea: string | null;
+  productos: string[];
+  programado: number;
+  nacidos: number;
+  terminados: number;
+  /** Pares que ya pasaron por cada estación activa (código → cantidad). */
+  porEstacion: Record<string, number | undefined>;
+  programa: ProgramaOfLinea[];
+}
+export interface TableroOrdenes {
+  estaciones: Estacion[];
+  ordenes: OrdenTablero[];
 }

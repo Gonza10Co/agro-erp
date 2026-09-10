@@ -103,8 +103,8 @@ import { ConsumoOf, ConsumoOfLinea } from '../../core/api/models/fabricacion.mod
     th.num{text-align:right}
     .dif-alta{color:var(--danger);font-weight:var(--fw-medium)}
     .dif-baja{color:var(--text-subtle)}
-    .inp-num{width:9ch;text-align:right;padding:var(--sp-1) var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:var(--text-sm)}
-    .inp-obs{flex:1;padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--radius-sm);font-size:var(--text-sm)}
+    .inp-num{width:9ch;text-align:right;padding:var(--sp-1) var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-family:var(--font-mono);font-size:var(--text-sm)}
+    .inp-obs{flex:1;padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-sm)}
     .acciones{display:flex;gap:var(--sp-3);align-items:center;margin-top:var(--sp-4)}
     .msg-error{color:var(--danger);font-size:var(--text-sm);margin-top:var(--sp-3)}
     .msg-ok{color:var(--text-subtle);font-size:var(--text-sm);margin-top:var(--sp-3)}

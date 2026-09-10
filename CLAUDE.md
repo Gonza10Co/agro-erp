@@ -23,6 +23,15 @@ ERP + MES para fábrica de botas de seguridad (make-to-order). Monorepo npm work
 
 OC (pedido del cliente) → OP (producción, amarra stock PT **y dispara el requerimiento de insumos automático**: amarra MP disponible vía `InventarioMaterial.cantReservada` y calcula qué comprar; la reserva se libera al anular/despachar la OP o al recalcular) → OF (corrida de fabricación) → pares con código `OF{n}-{seq}` escaneados por célula (CORTE→GUARNICION→ALMACEN→INYECCION→PT) → InventarioPT → Despacho (regla de cartera: cliente vencido bloquea, autoriza solo GERENTE/ADMIN).
 
+**Piloto de planta (2026-09-09):** la OF nace VACÍA; cada par nace en la estación inicial
+(`POST /fabricacion/of/:id/nacer`, Preparación: se pega el QR en la lengua) contra lo programado
+por talla. Los puntos de control son la tabla `Estacion` (6 filas, Cierre apagada): la
+transición es la siguiente estación ACTIVA con rango mayor (`siguienteEstacion`), el pistolazo
+es de ENTRADA (`EventoTrazabilidad.estacionDestino`), la máquina es opcional y entrar a PT
+termina el par. Si `AvanzarDto.estacion` viene, se rechaza el escaneo fuera de orden. Pantallas:
+`/fabricacion/estacion`, `/tv`, `/fabricacion/ordenes` (sección `piloto`). `seed:piloto` siembra
+la orden de prueba sin tocar inventario.
+
 **Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea **Feroz** (capellada de Bogotá; hoy solo servicio de inyección) arranca en INYECCIÓN, no en CORTE. La línea EXTERNA del kickoff quedó **desactivada** (cliente 2026-07-06: esos cortes no vuelven; Feroz la reemplaza). `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). **El mapeo marca→línea NO es fijo** (cliente 2026-07-06): la línea se decide **por pedido** — implementado 2026-07-12: la OC captura `lineaId` (selector EN_STAGE en el wizard), la OP lo hereda y cada par nace con la línea del pedido; `Marca.lineaId` es solo fallback histórico. El reporte diario acepta `?lineaId` y las metas se segmentan con `Meta.lineaId` (NULL = global). El kardex de bodega PT también se corta por línea: cada movimiento PT sella `MovimientoInventario.lineaId` al escribirse (producción/despacho); los históricos con NULL suman solo en "Todas las líneas".
 
 ## Workflow
