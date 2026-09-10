@@ -211,9 +211,21 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .res-detalle{color:var(--text-muted);margin-top:var(--sp-1)}
     @media (max-width:640px){
       .config label,.scan-label,.scan-input,.btn-camara,.acciones .btn,.of-sel{width:100%;max-width:none;min-width:0}
+      /* En el celular cada talla es una TARJETA, no una fila: la talla y su avance
+         arriba, y el botón a todo el ancho abajo — es el que se toca con guantes. */
       .programa thead{display:none}
-      .programa td{display:block;text-align:left}
-      .programa .num{text-align:left}
+      .programa,.programa tbody{display:block}
+      .programa tr{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-1) var(--sp-3);align-items:center;
+        padding:var(--sp-3);margin-bottom:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-lg)}
+      .programa tr.completa{background:var(--inset)}
+      .programa td{display:block;border:0;padding:0}
+      .programa .talla{font-size:var(--text-h2)}
+      .programa .num{text-align:right;padding-right:0}
+      .barra{max-width:none}
+      .programa .acc{grid-column:1 / -1;width:auto}
+      .lote{justify-content:stretch}
+      .lote .btn-nacer{flex:1}
+      .lote .tanda{width:76px;flex:0 0 auto}
     }
   `],
 })
