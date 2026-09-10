@@ -582,11 +582,68 @@ describe('FabricacionService lecturas', () => {
     );
   });
 
-  it('tablero limita la consulta a 500 pares', async () => {
+  it('tableroResumen cuenta en la base y desglosa por talla, sin traer pares', async () => {
+    const { prisma } = makePrisma({
+      root: {
+        par: {
+          findUnique: jest.fn(),
+          findMany: jest.fn(),
+          groupBy: jest.fn().mockResolvedValue([
+            { celulaActual: 'GUARNICION', estado: 'EN_PROCESO', tallaId: 2, _count: { _all: 200 } },
+            { celulaActual: 'GUARNICION', estado: 'EN_PROCESO', tallaId: 1, _count: { _all: 140 } },
+            { celulaActual: 'PT', estado: 'TERMINADO', tallaId: 1, _count: { _all: 146 } },
+            { celulaActual: 'INYECCION', estado: 'DADO_DE_BAJA', tallaId: 1, _count: { _all: 3 } },
+          ]),
+        },
+        talla: {
+          findMany: jest.fn().mockResolvedValue([
+            { id: 1, valor: 36, orden: 1 },
+            { id: 2, valor: 38, orden: 2 },
+          ]),
+        },
+      },
+    });
+
+    const r = await new FabricacionService(prisma).tableroResumen();
+
+    // Un día de planta son ~1.206 pares: la lista no se pide nunca.
+    expect(prisma.par.findMany).not.toHaveBeenCalled();
+    const guarnicion = r.celulas.find((c) => c.celula === 'GUARNICION')!;
+    expect(guarnicion.total).toBe(340);
+    // Las tallas salen en el orden del catálogo, no en el que respondió la base.
+    expect(guarnicion.tallas).toEqual([
+      { talla: 36, cantidad: 140 },
+      { talla: 38, cantidad: 200 },
+    ]);
+    expect(r.terminados).toBe(146);
+    expect(r.fueraDeFlujo).toBe(3);
+    expect(r.total).toBe(489);
+    // Las células sin pares siguen apareciendo: el tablero muestra el flujo completo.
+    expect(r.celulas.map((c) => c.celula)).toEqual(['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT']);
+  });
+
+  it('tablero trae una página de 100 pares y nunca más de 500', async () => {
     const { prisma } = makePrisma({ root: { par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } } });
-    await new FabricacionService(prisma).tablero();
+    const service = new FabricacionService(prisma);
+
+    await service.tablero();
+    expect(prisma.par.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 100, skip: 0 }));
+
+    // El detalle es de una columna: pedir "todo" no puede volver a traer la planta entera.
+    await service.tablero(undefined, { take: 5000 });
+    expect(prisma.par.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ take: 500 }));
+  });
+
+  it('tablero filtra por célula y por varios estados a la vez', async () => {
+    const { prisma } = makePrisma({ root: { par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } } });
+    await new FabricacionService(prisma).tablero(7, {
+      celula: 'GUARNICION',
+      estados: ['DADO_DE_BAJA', 'CANCELADO'],
+    });
     expect(prisma.par.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 500 }),
+      expect.objectContaining({
+        where: { ofId: 7, celulaActual: 'GUARNICION', estado: { in: ['DADO_DE_BAJA', 'CANCELADO'] } },
+      }),
     );
   });
 });

@@ -4,87 +4,101 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { FabricacionTableroComponent } from './tablero.component';
 
+const RESUMEN = {
+  celulas: [
+    { celula: 'CORTE', total: 0, tallas: [] },
+    { celula: 'GUARNICION', total: 340, tallas: [{ talla: 38, cantidad: 200 }, { talla: 40, cantidad: 140 }] },
+    { celula: 'ALMACEN', total: 0, tallas: [] },
+    { celula: 'INYECCION', total: 420, tallas: [{ talla: 38, cantidad: 420 }] },
+    { celula: 'PT', total: 0, tallas: [] },
+  ],
+  terminados: 146,
+  fueraDeFlujo: 2,
+  total: 908,
+};
+
+function montar() {
+  TestBed.configureTestingModule({
+    imports: [FabricacionTableroComponent],
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+  });
+  const fixture = TestBed.createComponent(FabricacionTableroComponent);
+  const http = TestBed.inject(HttpTestingController);
+  fixture.detectChanges();
+  return { fixture, http, el: fixture.nativeElement as HTMLElement };
+}
+
 describe('FabricacionTableroComponent', () => {
-  it('agrupa pares por célula y separa terminados', () => {
-    TestBed.configureTestingModule({
-      imports: [FabricacionTableroComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const fixture = TestBed.createComponent(FabricacionTableroComponent);
-    const http = TestBed.inject(HttpTestingController);
+  it('muestra el conteo por célula y el desglose por talla, sin pedir la lista de pares', () => {
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
     fixture.detectChanges();
-    http.expectOne('http://localhost:3001/fabricacion/tablero').flush([
-      { id: 1, codigo: 'OF5-0001', celulaActual: 'CORTE', estado: 'EN_PROCESO', talla: { valor: 38 }, of: { consecutivo: 5 } },
-      { id: 2, codigo: 'OF5-0002', celulaActual: 'GUARNICION', estado: 'EN_PROCESO', talla: { valor: 39 }, of: { consecutivo: 5 } },
-      { id: 3, codigo: 'OF5-0003', celulaActual: 'PT', estado: 'TERMINADO', talla: { valor: 40 }, of: { consecutivo: 5 } },
-    ]);
-    fixture.detectChanges();
-    const comp = fixture.componentInstance;
-    expect(comp.porCelula()['CORTE'].length).toBe(1);
-    expect(comp.porCelula()['GUARNICION'].length).toBe(1);
-    expect(comp.terminados().length).toBe(1);
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('OF5-0001');
-    expect(text).toContain('Terminados');
+
+    expect(el.textContent).toContain('340');
+    expect(el.textContent).toContain('420');
+    expect(el.textContent).toContain('146'); // terminados
+    expect(el.textContent).toContain('908 pares en la orden');
+    // El desglose por talla es lo que la planta pregunta.
+    expect(el.textContent).toContain('38');
+    // Nadie abrió una columna: el detalle no se pide.
     http.verify();
   });
 
-  it('muestra los pares DADO_DE_BAJA y CANCELADO en la franja "Fuera de flujo"', () => {
-    TestBed.configureTestingModule({
-      imports: [FabricacionTableroComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const fixture = TestBed.createComponent(FabricacionTableroComponent);
-    const http = TestBed.inject(HttpTestingController);
+  it('pide el detalle de una célula solo al abrirla', () => {
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
     fixture.detectChanges();
-    http.expectOne('http://localhost:3001/fabricacion/tablero').flush([
-      { id: 1, codigo: 'OF1-0001', celulaActual: 'CORTE', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
+
+    fixture.componentInstance.abrir('GUARNICION');
+    const req = http.expectOne(
+      (r) => r.url === 'http://localhost:3001/fabricacion/tablero' && r.params.get('celula') === 'GUARNICION',
+    );
+    expect(req.request.params.get('estados')).toBe('EN_PROCESO');
+    req.flush([
+      { id: 1, codigo: 'OF1-0001', celulaActual: 'GUARNICION', subPasoActual: 'STROBEL', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
+    ]);
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('OF1-0001');
+    expect(el.textContent).toContain('Strobel');
+    http.verify();
+  });
+
+  it('la franja de fuera de flujo pide bajas y cancelados juntos', () => {
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('2 fuera de flujo');
+
+    fixture.componentInstance.abrir('FUERA');
+    const req = http.expectOne(
+      (r) => r.url === 'http://localhost:3001/fabricacion/tablero' && r.params.get('estados') === 'DADO_DE_BAJA,CANCELADO',
+    );
+    req.flush([
       { id: 2, codigo: 'OF1-0002', celulaActual: 'INYECCION', estado: 'DADO_DE_BAJA', talla: { valor: '38' }, of: { consecutivo: 1 } },
       { id: 3, codigo: 'OF1-0003', celulaActual: 'CORTE', estado: 'CANCELADO', talla: { valor: '40' }, of: { consecutivo: 1 } },
     ]);
     fixture.detectChanges();
-    const el: HTMLElement = fixture.nativeElement;
-    expect(el.textContent).toContain('Fuera de flujo');
-    expect(el.textContent).toContain('OF1-0002');
+
     expect(el.textContent).toContain('baja');
-    expect(el.textContent).toContain('OF1-0003');
     expect(el.textContent).toContain('cancelado');
     http.verify();
   });
 
   it('muestra error si el tablero no carga', () => {
-    TestBed.configureTestingModule({
-      imports: [FabricacionTableroComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const fixture = TestBed.createComponent(FabricacionTableroComponent);
-    const http = TestBed.inject(HttpTestingController);
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').error(new ProgressEvent('error'));
     fixture.detectChanges();
-    http.expectOne('http://localhost:3001/fabricacion/tablero').error(new ProgressEvent('error'));
-    fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No se pudo cargar el tablero');
+    expect(el.textContent).toContain('No se pudo cargar el tablero');
     http.verify();
   });
 
-  it('muestra el sub-paso en el chip de Guarnición y enlace al sub-tablero', () => {
-    TestBed.configureTestingModule({
-      imports: [FabricacionTableroComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-    });
-    const fixture = TestBed.createComponent(FabricacionTableroComponent);
-    const http = TestBed.inject(HttpTestingController);
+  it('mantiene el enlace al sub-tablero de Guarnición', () => {
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
     fixture.detectChanges();
-    http.expectOne('http://localhost:3001/fabricacion/tablero').flush([
-      { id: 1, codigo: 'OF1-0001', celulaActual: 'GUARNICION', subPasoActual: 'STROBEL', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
-    ]);
-    fixture.detectChanges();
-    const el: HTMLElement = fixture.nativeElement;
-    // El chip debe mostrar la etiqueta del sub-paso
-    expect(el.textContent).toContain('Strobel');
-    // El header de Guarnición debe tener un enlace al sub-tablero
     const link = el.querySelector('a[href*="/fabricacion/guarnicion"]');
     expect(link).not.toBeNull();
-    expect(link?.textContent).toContain('ver sub-pasos');
     http.verify();
   });
 });

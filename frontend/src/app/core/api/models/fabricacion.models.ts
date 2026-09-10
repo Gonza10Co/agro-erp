@@ -58,6 +58,14 @@ export interface OFDetalle {
   programa?: ProgramaOfLinea[];
 }
 
+/** El tablero en números: la planta mueve ~1.206 pares al día, no caben en una lista. */
+export interface TableroResumen {
+  celulas: { celula: Celula; total: number; tallas: { talla: number; cantidad: number }[] }[];
+  terminados: number;
+  fueraDeFlujo: number;
+  total: number;
+}
+
 export interface ParTablero {
   id: number;
   codigo: string;

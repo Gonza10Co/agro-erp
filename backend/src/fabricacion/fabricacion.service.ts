@@ -4,10 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Celula, Prisma } from '@prisma/client';
+import { Celula, EstadoPar, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
+  ORDEN_CELULAS,
   generarPares,
   LineaProduccion,
   EstacionDef,
@@ -504,11 +505,71 @@ export class FabricacionService {
     return { ...of, programa: programaDeOf(of) };
   }
 
-  tablero(ofId?: number) {
+  /**
+   * Tablero en números: cuántos pares hay en cada célula y con qué tallas.
+   * Un día de planta son ~1.206 pares, así que la vista no puede pedir la lista
+   * entera (antes traía 500 y descartaba el resto en silencio): los pares se
+   * cuentan en la base y el detalle de una columna se pide aparte, si se abre.
+   */
+  async tableroResumen(ofId?: number) {
+    const where = ofId ? { ofId } : {};
+    const [porCelula, tallas] = await Promise.all([
+      this.prisma.par.groupBy({
+        by: ['celulaActual', 'estado', 'tallaId'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.talla.findMany({ select: { id: true, valor: true, orden: true } }),
+    ]);
+    const laTalla = new Map(tallas.map((t) => [t.id, t]));
+
+    const celulas = ORDEN_CELULAS.map((celula) => {
+      const filas = porCelula.filter((g) => g.celulaActual === celula && g.estado === 'EN_PROCESO');
+      return {
+        celula,
+        total: filas.reduce((acc, g) => acc + g._count._all, 0),
+        // Por talla, en el orden del catálogo: es lo que la planta pregunta
+        // ("¿cuántas 38 hay en guarnición?"), no el total pelado.
+        tallas: filas
+          .map((g) => ({
+            talla: laTalla.get(g.tallaId)?.valor ?? g.tallaId,
+            orden: laTalla.get(g.tallaId)?.orden ?? 0,
+            cantidad: g._count._all,
+          }))
+          .sort((a, b) => a.orden - b.orden)
+          .map(({ talla, cantidad }) => ({ talla, cantidad })),
+      };
+    });
+
+    const cuantos = (estados: EstadoPar[]) =>
+      porCelula.filter((g) => estados.includes(g.estado)).reduce((acc, g) => acc + g._count._all, 0);
+
+    return {
+      celulas,
+      terminados: cuantos(['TERMINADO']),
+      fueraDeFlujo: cuantos(['DADO_DE_BAJA', 'CANCELADO']),
+      total: porCelula.reduce((acc, g) => acc + g._count._all, 0),
+    };
+  }
+
+  /**
+   * El detalle de una columna del tablero: la lista de pares. Va paginado
+   * porque una célula puede tener cientos de pares en un día normal.
+   */
+  tablero(
+    ofId?: number,
+    filtro?: { celula?: Celula; estados?: EstadoPar[]; take?: number; skip?: number },
+  ) {
+    const { celula, estados, take = 100, skip = 0 } = filtro ?? {};
     return this.prisma.par.findMany({
-      where: ofId ? { ofId } : {},
-      // Cap defensivo: el tablero opera por OF; sin filtro, 500 pares es más que una corrida.
-      take: 500,
+      where: {
+        ...(ofId ? { ofId } : {}),
+        ...(celula ? { celulaActual: celula } : {}),
+        // "Fuera de flujo" son dos estados (baja y cancelado), por eso es una lista.
+        ...(estados?.length ? { estado: { in: estados } } : {}),
+      },
+      take: Math.min(take, 500),
+      skip,
       orderBy: { codigo: 'asc' },
       select: {
         id: true,

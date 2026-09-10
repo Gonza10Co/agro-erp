@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes, TableroResumen,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -53,9 +53,17 @@ export class FabricacionApi {
   par(codigo: string) {
     return this.http.get<ParDetalle>(`${this.base}/fabricacion/par/${codigo}`);
   }
-  tablero(ofId?: number) {
+  tableroResumen(ofId?: number) {
     let params = new HttpParams();
     if (ofId != null) params = params.set('ofId', ofId);
+    return this.http.get<TableroResumen>(`${this.base}/fabricacion/tablero-resumen`, { params });
+  }
+  tablero(ofId?: number, filtro?: { celula?: string; estados?: string[]; take?: number }) {
+    let params = new HttpParams();
+    if (ofId != null) params = params.set('ofId', ofId);
+    if (filtro?.celula) params = params.set('celula', filtro.celula);
+    if (filtro?.estados?.length) params = params.set('estados', filtro.estados.join(','));
+    if (filtro?.take != null) params = params.set('take', filtro.take);
     return this.http.get<ParTablero[]>(`${this.base}/fabricacion/tablero`, { params });
   }
   operarios(celula?: string) {

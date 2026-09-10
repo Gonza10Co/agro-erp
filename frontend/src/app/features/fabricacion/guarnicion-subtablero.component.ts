@@ -77,9 +77,13 @@ export class GuarnicionSubtableroComponent implements OnInit {
 
   cargar(): void {
     this.error.set(null);
-    this.api.tablero(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => this.pares.set(p),
-      error: () => this.error.set('No se pudo cargar el sub-tablero. Intentá de nuevo.'),
-    });
+    // Solo los pares en guarnición: el tablero general ahora pagina el detalle.
+    this.api
+      .tablero(this.ofId, { celula: 'GUARNICION', estados: ['EN_PROCESO'], take: 500 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (p) => this.pares.set(p),
+        error: () => this.error.set('No se pudo cargar el sub-tablero. Intentá de nuevo.'),
+      });
   }
 }

@@ -11,7 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Celula } from '@prisma/client';
+import { Celula, EstadoPar } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -99,9 +99,22 @@ export class FabricacionController {
     return this.service.obtenerPar(codigo);
   }
 
+  /** El tablero en números: la planta mueve ~1.206 pares al día, no caben en una lista. */
+  @Get('tablero-resumen')
+  tableroResumen(@Query('ofId', new ParseIntPipe({ optional: true })) ofId?: number) {
+    return this.service.tableroResumen(ofId);
+  }
+
+  /** El detalle de una columna del tablero, paginado (se pide al abrir la célula). */
   @Get('tablero')
-  tablero(@Query('ofId', new ParseIntPipe({ optional: true })) ofId?: number) {
-    return this.service.tablero(ofId);
+  tablero(
+    @Query('ofId', new ParseIntPipe({ optional: true })) ofId?: number,
+    @Query('celula', new ParseEnumPipe(Celula, { optional: true })) celula?: Celula,
+    @Query('estados') estados?: string,
+    @Query('take', new ParseIntPipe({ optional: true })) take?: number,
+    @Query('skip', new ParseIntPipe({ optional: true })) skip?: number,
+  ) {
+    return this.service.tablero(ofId, { celula, estados: parsearEstados(estados), take, skip });
   }
 
   @Get('operarios')
@@ -113,4 +126,14 @@ export class FabricacionController {
   maquinas(@Query('celula', new ParseEnumPipe(Celula, { optional: true })) celula?: Celula) {
     return this.service.listarMaquinas(celula);
   }
+}
+
+/** `?estados=TERMINADO,CANCELADO` → enum validado; lo desconocido se ignora. */
+function parsearEstados(crudo?: string): EstadoPar[] | undefined {
+  if (!crudo) return undefined;
+  const validos = crudo
+    .split(',')
+    .map((e) => e.trim().toUpperCase())
+    .filter((e): e is EstadoPar => e in EstadoPar);
+  return validos.length ? validos : undefined;
 }
