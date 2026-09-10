@@ -63,6 +63,25 @@ export async function descargarEtiquetasLengua(pares: ParNacido[]): Promise<void
   doc.save(nombre);
 }
 
+/**
+ * Un par ya existente con la forma que espera la etiqueta de la lengua: es la
+ * REIMPRESIÓN (la etiqueta se despegó o se dañó), no un nacimiento — por eso
+ * sale de un par que se busca por código, de a uno.
+ */
+export function datosLenguaDePar(p: ParDetalle): ParNacido {
+  return {
+    id: p.id,
+    codigo: p.codigo,
+    talla: String(p.talla?.valor ?? ''),
+    producto: p.productoConfigurado?.nombreComercial ?? '',
+    productoCodigo: p.productoConfigurado?.codigo ?? '',
+    referencia: p.productoConfigurado?.referencia?.codigo ?? '',
+    marca: p.productoConfigurado?.marca?.nombre ?? '',
+    linea: p.linea?.nombre ?? '',
+    of: p.of?.consecutivo ?? 0,
+  };
+}
+
 /** Lo que va en el sticker de la caja. */
 export interface DatosCaja {
   codigo: string;

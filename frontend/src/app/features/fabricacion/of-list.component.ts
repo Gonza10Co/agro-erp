@@ -1,16 +1,17 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
-import { OFDetalle, OFListItem } from '../../core/api/models/fabricacion.models';
-import { descargarEtiquetasPdf } from './of-etiquetas-pdf';
+import { OFDetalle, OFListItem, ParDetalle, LABEL_CELULA } from '../../core/api/models/fabricacion.models';
+import { descargarEtiquetasLengua, datosLenguaDePar } from './etiqueta-par-pdf';
 import { agruparPrograma } from './programa-of';
 
 @Component({
   selector: 'app-of-list',
   standalone: true,
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, FormsModule],
   template: `
     <div class="page">
       <div class="page-header"><div class="ph-title">Órdenes de Fabricación</div></div>
@@ -18,6 +19,36 @@ import { agruparPrograma } from './programa-of';
         @if (error()) {
           <div class="empty"><h4>No se pudo cargar las órdenes de fabricación</h4><p class="cell-sub">{{ error() }}</p></div>
         } @else if (ofs().length) {
+          <!-- Las etiquetas NACEN en Preparación, de a tandas. Acá solo se REIMPRIME una,
+               buscando el par por su código: reimprimir una OF entera pondría dos botas
+               con el mismo código en la planta. -->
+          <div class="reimpresion">
+            <label class="rp-label">Reimprimir la etiqueta de un par
+              <input class="rp-input mono" [(ngModel)]="codigoBuscado" (keyup.enter)="buscarPar()"
+                     placeholder="OF1-0007" aria-label="Código del par" />
+            </label>
+            <button class="btn btn-sm" type="button" [disabled]="buscando() || !codigoBuscado.trim()" (click)="buscarPar()">
+              {{ buscando() ? 'Buscando…' : 'Buscar' }}
+            </button>
+            @if (noEncontrado()) { <span class="rp-error">No existe un par con ese código.</span> }
+          </div>
+
+          @if (par(); as p) {
+            <div class="rp-hallado" [class.rp-baja]="fueraDeFlujo(p)">
+              <div class="rp-datos">
+                <span class="rp-codigo mono">{{ p.codigo }}</span>
+                <span class="rp-talla">Talla {{ p.talla.valor }}</span>
+                <span class="cell-sub">{{ p.productoConfigurado?.nombreComercial }} · OF-{{ p.of.consecutivo }}</span>
+                <span class="cell-sub">{{ ubicacion(p) }}</span>
+              </div>
+              @if (fueraDeFlujo(p)) {
+                <span class="rp-aviso">Este par está {{ p.estado === 'DADO_DE_BAJA' ? 'dado de baja' : 'cancelado' }}: no debería volver a la línea.</span>
+              }
+              <button class="btn btn-primary btn-sm" type="button" (click)="reimprimir(p)">Imprimir esta etiqueta 🏷️</button>
+              <button class="btn btn-sm" type="button" aria-label="Cerrar" (click)="limpiarBusqueda()">✕</button>
+            </div>
+          }
+
           <div class="split">
             <table class="tbl">
               <thead><tr><th>OF</th><th>OP</th><th class="num">Pares</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
@@ -32,9 +63,7 @@ import { agruparPrograma } from './programa-of';
                     <td class="acciones" (click)="$event.stopPropagation()">
                       <a class="btn btn-sm" [routerLink]="['/fabricacion/tablero']" [queryParams]="{ ofId: o.id }">Ver tablero</a>
                       <a class="btn btn-sm" [routerLink]="['/fabricacion/of', o.id, 'consumo']">Materiales</a>
-                      <button class="btn btn-sm" type="button" [disabled]="descargando() === o.id" (click)="imprimirEtiquetas(o)">
-                        {{ descargando() === o.id ? 'Generando…' : 'Etiquetas' }}
-                      </button>
+
                     </td>
                   </tr>
                 }
@@ -86,6 +115,16 @@ import { agruparPrograma } from './programa-of';
     </div>
   `,
   styles: [`
+    .reimpresion{display:flex;align-items:flex-end;gap:var(--sp-3);flex-wrap:wrap;margin-bottom:var(--sp-3);padding-bottom:var(--sp-3);border-bottom:var(--bw) solid var(--border)}
+    .rp-label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
+    .rp-input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body);width:180px}
+    .rp-error{color:var(--error);font-size:var(--text-sm)}
+    .rp-hallado{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin-bottom:var(--sp-3);padding:var(--sp-3);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg)}
+    .rp-hallado.rp-baja{border-color:var(--error)}
+    .rp-datos{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap;flex:1;min-width:0}
+    .rp-codigo{font-size:var(--text-h3);font-weight:var(--fw-bold)}
+    .rp-talla{font-weight:var(--fw-bold)}
+    .rp-aviso{color:var(--error);font-size:var(--text-sm)}
     .split{display:flex;align-items:flex-start;gap:var(--sp-5)}
     .split .tbl{flex:1;min-width:0}
     .tbl{width:100%;border-collapse:collapse}
@@ -123,6 +162,11 @@ export class OfListComponent implements OnInit {
   error = signal<string | null>(null);
   // id de la OF cuyas etiquetas se están generando (deshabilita solo ese botón).
   descargando = signal<number | null>(null);
+  // Reimpresión: un par que se busca por código, nunca la OF entera.
+  codigoBuscado = '';
+  par = signal<ParDetalle | null>(null);
+  buscando = signal(false);
+  noEncontrado = signal(false);
   // OF abierta en el aside: se pide el detalle porque la composición vive en la OP.
   abierta = signal<number | null>(null);
   detalle = signal<OFDetalle | null>(null);
@@ -156,15 +200,40 @@ export class OfListComponent implements OnInit {
     this.detalle.set(null);
   }
 
-  /** PDF de etiquetas adhesivas (Code128 por par) para pegar en la canastilla/lote. */
-  imprimirEtiquetas(o: OFListItem): void {
-    if (this.descargando() !== null) return;
-    this.descargando.set(o.id);
-    this.api.obtenerOF(o.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (of) => {
-        void descargarEtiquetasPdf(of).finally(() => this.descargando.set(null));
+  buscarPar(): void {
+    const codigo = this.codigoBuscado.trim().toUpperCase();
+    if (!codigo || this.buscando()) return;
+    this.buscando.set(true);
+    this.par.set(null);
+    this.noEncontrado.set(false);
+    this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (p) => {
+        this.buscando.set(false);
+        this.par.set(p);
       },
-      error: () => this.descargando.set(null), // el toast global ya avisa del HTTP
+      error: () => {
+        this.buscando.set(false);
+        this.noEncontrado.set(true);
+      },
     });
+  }
+
+  limpiarBusqueda(): void {
+    this.codigoBuscado = '';
+    this.par.set(null);
+    this.noEncontrado.set(false);
+  }
+
+  /** Una sola etiqueta de lengua (50×30, solo QR), la misma que nace en Preparación. */
+  reimprimir(p: ParDetalle): void {
+    void descargarEtiquetasLengua([datosLenguaDePar(p)]);
+  }
+
+  fueraDeFlujo = (p: ParDetalle) => p.estado === 'DADO_DE_BAJA' || p.estado === 'CANCELADO';
+
+  ubicacion(p: ParDetalle): string {
+    if (p.estado === 'TERMINADO') return 'Terminado';
+    if (this.fueraDeFlujo(p)) return p.estado === 'DADO_DE_BAJA' ? 'Dado de baja' : 'Cancelado';
+    return LABEL_CELULA[p.celulaActual];
   }
 }
