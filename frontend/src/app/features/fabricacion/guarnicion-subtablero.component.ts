@@ -77,9 +77,10 @@ export class GuarnicionSubtableroComponent implements OnInit {
 
   cargar(): void {
     this.error.set(null);
-    // Solo los pares en guarnición: el tablero general ahora pagina el detalle.
+    // Todos los pares de la OF: esta vista agrupa por sub-paso, que ya no es una
+    // estación del piloto, así que no puede pedirle una columna al tablero.
     this.api
-      .tablero(this.ofId, { celula: 'GUARNICION', estados: ['EN_PROCESO'], take: 500 })
+      .tablero(this.ofId, { estados: ['EN_PROCESO'], take: 500 })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (p) => this.pares.set(p),

@@ -582,44 +582,93 @@ describe('FabricacionService lecturas', () => {
     );
   });
 
-  it('tableroResumen cuenta en la base y desglosa por talla, sin traer pares', async () => {
-    const { prisma } = makePrisma({
+  /** Las 6 estaciones acordadas en planta, con Cierre apagada (como nacen en la tabla). */
+  function estacionesDePrueba() {
+    return [
+      { codigo: 'PREPARACION', nombre: 'Preparación', orden: 1, celula: 'GUARNICION', subPaso: 'PREPARACION', subPasoInyeccion: null, activa: true },
+      { codigo: 'CIERRE', nombre: 'Cierre', orden: 2, celula: 'GUARNICION', subPaso: 'CIERRE', subPasoInyeccion: null, activa: false },
+      { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', orden: 3, celula: 'ALMACEN', subPaso: null, subPasoInyeccion: null, activa: true },
+      { codigo: 'MONTAJE', nombre: 'Inyección · Montaje', orden: 4, celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'MONTAJE', activa: true },
+      { codigo: 'PT', nombre: 'Producto terminado', orden: 6, celula: 'PT', subPaso: null, subPasoInyeccion: null, activa: true },
+    ];
+  }
+
+  function prismaDeTablero(grupos: unknown[]) {
+    return makePrisma({
       root: {
-        par: {
-          findUnique: jest.fn(),
-          findMany: jest.fn(),
-          groupBy: jest.fn().mockResolvedValue([
-            { celulaActual: 'GUARNICION', estado: 'EN_PROCESO', tallaId: 2, _count: { _all: 200 } },
-            { celulaActual: 'GUARNICION', estado: 'EN_PROCESO', tallaId: 1, _count: { _all: 140 } },
-            { celulaActual: 'PT', estado: 'TERMINADO', tallaId: 1, _count: { _all: 146 } },
-            { celulaActual: 'INYECCION', estado: 'DADO_DE_BAJA', tallaId: 1, _count: { _all: 3 } },
-          ]),
-        },
+        par: { findUnique: jest.fn(), findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue(grupos) },
         talla: {
           findMany: jest.fn().mockResolvedValue([
             { id: 1, valor: 36, orden: 1 },
             { id: 2, valor: 38, orden: 2 },
           ]),
         },
+        estacion: { findMany: jest.fn().mockResolvedValue(estacionesDePrueba()) },
+        ordenFabricacion: {
+          findMany: jest.fn().mockResolvedValue([
+            { op: { lineas: [{ tallas: [{ tallaId: 1, cantAProducir: 200 }, { tallaId: 2, cantAProducir: 400 }] }] } },
+          ]),
+        },
       },
     });
+  }
+
+  it('tableroResumen cuenta por ESTACIÓN y desglosa por talla, sin traer pares', async () => {
+    const { prisma } = prismaDeTablero([
+      { celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', subPasoInyeccion: null, estado: 'EN_PROCESO', tallaId: 2, _count: { _all: 200 } },
+      { celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', subPasoInyeccion: null, estado: 'EN_PROCESO', tallaId: 1, _count: { _all: 140 } },
+      { celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null, estado: 'TERMINADO', tallaId: 1, _count: { _all: 146 } },
+      { celulaActual: 'INYECCION', subPasoActual: null, subPasoInyeccion: 'MONTAJE', estado: 'DADO_DE_BAJA', tallaId: 1, _count: { _all: 3 } },
+    ]);
 
     const r = await new FabricacionService(prisma).tableroResumen();
 
     // Un día de planta son ~1.206 pares: la lista no se pide nunca.
     expect(prisma.par.findMany).not.toHaveBeenCalled();
-    const guarnicion = r.celulas.find((c) => c.celula === 'GUARNICION')!;
-    expect(guarnicion.total).toBe(340);
+    const preparacion = r.estaciones.find((c) => c.codigo === 'PREPARACION')!;
+    expect(preparacion.total).toBe(340);
     // Las tallas salen en el orden del catálogo, no en el que respondió la base.
-    expect(guarnicion.tallas).toEqual([
+    expect(preparacion.tallas).toEqual([
       { talla: 36, cantidad: 140 },
       { talla: 38, cantidad: 200 },
     ]);
     expect(r.terminados).toBe(146);
     expect(r.fueraDeFlujo).toBe(3);
     expect(r.total).toBe(489);
-    // Las células sin pares siguen apareciendo: el tablero muestra el flujo completo.
-    expect(r.celulas.map((c) => c.celula)).toEqual(['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT']);
+    // Solo las estaciones ACTIVAS son columnas: Cierre está apagada y no aparece.
+    expect(r.estaciones.map((c) => c.codigo)).toEqual([
+      'CORTE_PENDIENTE', 'PREPARACION', 'BODEGA_CORTE', 'MONTAJE', 'PT',
+    ]);
+  });
+
+  it('la columna Corte es lo programado que todavía no nació, por talla', async () => {
+    const { prisma } = prismaDeTablero([
+      { celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', subPasoInyeccion: null, estado: 'EN_PROCESO', tallaId: 1, _count: { _all: 50 } },
+    ]);
+
+    const r = await new FabricacionService(prisma).tableroResumen();
+
+    // Programado 200 + 400; nació 50 de la talla 36 ⇒ faltan 150 y 400.
+    const corte = r.estaciones.find((c) => c.codigo === 'CORTE_PENDIENTE')!;
+    expect(corte.nombre).toBe('Corte');
+    expect(corte.total).toBe(550);
+    expect(corte.tallas).toEqual([
+      { talla: 36, cantidad: 150 },
+      { talla: 38, cantidad: 400 },
+    ]);
+    expect(r.programado).toBe(600);
+  });
+
+  it('un par que no cae en ninguna estación activa va a la columna Otros', async () => {
+    const { prisma } = prismaDeTablero([
+      // Nacido antes del piloto: sigue en CORTE, que ya no es una estación.
+      { celulaActual: 'CORTE', subPasoActual: null, subPasoInyeccion: null, estado: 'EN_PROCESO', tallaId: 1, _count: { _all: 7 } },
+    ]);
+
+    const r = await new FabricacionService(prisma).tableroResumen();
+
+    const otros = r.estaciones.find((c) => c.codigo === 'OTROS')!;
+    expect(otros.total).toBe(7);
   });
 
   it('tablero trae una página de 100 pares y nunca más de 500', async () => {
@@ -634,15 +683,26 @@ describe('FabricacionService lecturas', () => {
     expect(prisma.par.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ take: 500 }));
   });
 
-  it('tablero filtra por célula y por varios estados a la vez', async () => {
-    const { prisma } = makePrisma({ root: { par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } } });
+  it('tablero filtra por la posición de una estación y por varios estados a la vez', async () => {
+    const { prisma } = makePrisma({
+      root: {
+        par: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+        estacion: { findMany: jest.fn().mockResolvedValue(estacionesDePrueba()) },
+      },
+    });
     await new FabricacionService(prisma).tablero(7, {
-      celula: 'GUARNICION',
+      estacion: 'PREPARACION',
       estados: ['DADO_DE_BAJA', 'CANCELADO'],
     });
     expect(prisma.par.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { ofId: 7, celulaActual: 'GUARNICION', estado: { in: ['DADO_DE_BAJA', 'CANCELADO'] } },
+        where: {
+          ofId: 7,
+          celulaActual: 'GUARNICION',
+          subPasoActual: 'PREPARACION',
+          subPasoInyeccion: null,
+          estado: { in: ['DADO_DE_BAJA', 'CANCELADO'] },
+        },
       }),
     );
   });

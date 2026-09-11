@@ -109,12 +109,12 @@ export class FabricacionController {
   @Get('tablero')
   tablero(
     @Query('ofId', new ParseIntPipe({ optional: true })) ofId?: number,
-    @Query('celula', new ParseEnumPipe(Celula, { optional: true })) celula?: Celula,
+    @Query('estacion') estacion?: string,
     @Query('estados') estados?: string,
     @Query('take', new ParseIntPipe({ optional: true })) take?: number,
     @Query('skip', new ParseIntPipe({ optional: true })) skip?: number,
   ) {
-    return this.service.tablero(ofId, { celula, estados: parsearEstados(estados), take, skip });
+    return this.service.tablero(ofId, { estacion, estados: parsearEstados(estados), take, skip });
   }
 
   @Get('operarios')

@@ -8,7 +8,7 @@ import { Celula, EstadoPar, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
-  ORDEN_CELULAS,
+  estacionDeEstado,
   generarPares,
   LineaProduccion,
   EstacionDef,
@@ -37,6 +37,11 @@ import { EntradaResolucion } from '../catalog/bom/bom-resolver.types';
 type DecimalLike = { toNumber(): number } | number | null | undefined;
 const num = (d: DecimalLike): number =>
   d == null ? 0 : typeof d === 'number' ? d : d.toNumber();
+
+/** Columna del tablero para los pares que no están en ninguna estación activa. */
+export const OTRAS_ESTACIONES = 'OTROS';
+/** Columna del tablero para lo programado que todavía no nació: sus piezas están en corte. */
+export const CORTE_PENDIENTE = 'CORTE_PENDIENTE';
 
 @Injectable()
 export class FabricacionService {
@@ -506,65 +511,123 @@ export class FabricacionService {
   }
 
   /**
-   * Tablero en números: cuántos pares hay en cada célula y con qué tallas.
-   * Un día de planta son ~1.206 pares, así que la vista no puede pedir la lista
-   * entera (antes traía 500 y descartaba el resto en silencio): los pares se
-   * cuentan en la base y el detalle de una columna se pide aparte, si se abre.
+   * Tablero en números: cuántos pares hay parados en cada ESTACIÓN y con qué tallas.
+   * Se cuenta por estación y no por célula porque es lo que la planta reconoce: un
+   * operario está en "Bodega de corte", no en "Almacén", y Montaje y Finizaje son
+   * dos puestos distintos aunque compartan célula. Un día son ~1.206 pares, así que
+   * la vista no pide la lista: se cuenta en la base y el detalle se pide al abrir.
    */
   async tableroResumen(ofId?: number) {
     const where = ofId ? { ofId } : {};
-    const [porCelula, tallas] = await Promise.all([
+    const [grupos, tallas, estaciones, ofs] = await Promise.all([
       this.prisma.par.groupBy({
-        by: ['celulaActual', 'estado', 'tallaId'],
+        by: ['celulaActual', 'subPasoActual', 'subPasoInyeccion', 'estado', 'tallaId'],
         where,
         _count: { _all: true },
       }),
       this.prisma.talla.findMany({ select: { id: true, valor: true, orden: true } }),
+      this.estaciones(),
+      // Lo programado vive en la OP: contra eso se mide lo que falta por nacer.
+      this.prisma.ordenFabricacion.findMany({
+        where: ofId ? { id: ofId } : { estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+        select: {
+          op: { select: { lineas: { select: { tallas: { select: { tallaId: true, cantAProducir: true } } } } } },
+        },
+      }),
     ]);
     const laTalla = new Map(tallas.map((t) => [t.id, t]));
+    const activas = estaciones.filter((e) => e.activa).sort((a, b) => a.orden - b.orden);
 
-    const celulas = ORDEN_CELULAS.map((celula) => {
-      const filas = porCelula.filter((g) => g.celulaActual === celula && g.estado === 'EN_PROCESO');
-      return {
-        celula,
-        total: filas.reduce((acc, g) => acc + g._count._all, 0),
+    // Una columna por estación activa, más "Otros" para los pares que no están en
+    // ninguna (los que nacieron en CORTE antes del piloto, o en una estación apagada).
+    const columnas = new Map<string, { codigo: string; nombre: string; total: number; porTalla: Map<number, number> }>();
+    // Corte va primero: el par todavía no existe (no hay lengua a la cual pegarle el QR),
+    // pero sus piezas sí se están cortando. Es lo programado menos lo ya nacido, no una
+    // fila en la base — inventar 1.206 pares que nadie puede tocar fue el modelo anterior.
+    columnas.set(CORTE_PENDIENTE, { codigo: CORTE_PENDIENTE, nombre: 'Corte', total: 0, porTalla: new Map() });
+    for (const e of activas) columnas.set(e.codigo, { codigo: e.codigo, nombre: e.nombre, total: 0, porTalla: new Map() });
+    columnas.set(OTRAS_ESTACIONES, { codigo: OTRAS_ESTACIONES, nombre: 'Otros', total: 0, porTalla: new Map() });
+
+    let terminados = 0;
+    let fueraDeFlujo = 0;
+    let total = 0;
+    for (const g of grupos) {
+      const cuantos = g._count._all;
+      total += cuantos;
+      if (g.estado === 'TERMINADO') {
+        terminados += cuantos;
+        continue;
+      }
+      if (g.estado === 'DADO_DE_BAJA' || g.estado === 'CANCELADO') {
+        fueraDeFlujo += cuantos;
+        continue;
+      }
+      const estacion = estacionDeEstado(
+        { celula: g.celulaActual, subPaso: g.subPasoActual, subPasoInyeccion: g.subPasoInyeccion },
+        activas,
+      );
+      const col = columnas.get(estacion?.codigo ?? OTRAS_ESTACIONES)!;
+      col.total += cuantos;
+      col.porTalla.set(g.tallaId, (col.porTalla.get(g.tallaId) ?? 0) + cuantos);
+    }
+
+    // Nacidos por talla (en cualquier estado: el par ya existe) contra lo programado.
+    const nacidosPorTalla = new Map<number, number>();
+    for (const g of grupos) nacidosPorTalla.set(g.tallaId, (nacidosPorTalla.get(g.tallaId) ?? 0) + g._count._all);
+    const corte = columnas.get(CORTE_PENDIENTE)!;
+    for (const of of ofs) {
+      for (const linea of of.op.lineas) {
+        for (const t of linea.tallas) {
+          corte.porTalla.set(t.tallaId, (corte.porTalla.get(t.tallaId) ?? 0) + t.cantAProducir);
+        }
+      }
+    }
+    for (const [tallaId, programado] of corte.porTalla) {
+      const faltan = Math.max(programado - (nacidosPorTalla.get(tallaId) ?? 0), 0);
+      if (faltan) corte.porTalla.set(tallaId, faltan);
+      else corte.porTalla.delete(tallaId);
+    }
+    corte.total = [...corte.porTalla.values()].reduce((a, b) => a + b, 0);
+    const programado = ofs.reduce(
+      (acc, of) => acc + of.op.lineas.reduce((a, l) => a + l.tallas.reduce((x, t) => x + t.cantAProducir, 0), 0),
+      0,
+    );
+
+    const salida = [...columnas.values()]
+      // "Otros" solo estorba cuando está vacío: es la excepción, no una etapa del flujo.
+      .filter((c) => (c.codigo !== OTRAS_ESTACIONES && c.codigo !== CORTE_PENDIENTE) || c.total > 0)
+      .map((c) => ({
+        codigo: c.codigo,
+        nombre: c.nombre,
+        total: c.total,
         // Por talla, en el orden del catálogo: es lo que la planta pregunta
         // ("¿cuántas 38 hay en guarnición?"), no el total pelado.
-        tallas: filas
-          .map((g) => ({
-            talla: laTalla.get(g.tallaId)?.valor ?? g.tallaId,
-            orden: laTalla.get(g.tallaId)?.orden ?? 0,
-            cantidad: g._count._all,
+        tallas: [...c.porTalla.entries()]
+          .map(([tallaId, cantidad]) => ({
+            talla: laTalla.get(tallaId)?.valor ?? tallaId,
+            orden: laTalla.get(tallaId)?.orden ?? 0,
+            cantidad,
           }))
           .sort((a, b) => a.orden - b.orden)
           .map(({ talla, cantidad }) => ({ talla, cantidad })),
-      };
-    });
+      }));
 
-    const cuantos = (estados: EstadoPar[]) =>
-      porCelula.filter((g) => estados.includes(g.estado)).reduce((acc, g) => acc + g._count._all, 0);
-
-    return {
-      celulas,
-      terminados: cuantos(['TERMINADO']),
-      fueraDeFlujo: cuantos(['DADO_DE_BAJA', 'CANCELADO']),
-      total: porCelula.reduce((acc, g) => acc + g._count._all, 0),
-    };
+    return { estaciones: salida, terminados, fueraDeFlujo, total, programado };
   }
 
   /**
    * El detalle de una columna del tablero: la lista de pares. Va paginado
    * porque una célula puede tener cientos de pares en un día normal.
    */
-  tablero(
+  async tablero(
     ofId?: number,
-    filtro?: { celula?: Celula; estados?: EstadoPar[]; take?: number; skip?: number },
+    filtro?: { estacion?: string; estados?: EstadoPar[]; take?: number; skip?: number },
   ) {
-    const { celula, estados, take = 100, skip = 0 } = filtro ?? {};
+    const { estacion, estados, take = 100, skip = 0 } = filtro ?? {};
     return this.prisma.par.findMany({
       where: {
         ...(ofId ? { ofId } : {}),
-        ...(celula ? { celulaActual: celula } : {}),
+        ...(estacion ? await this.dondeEstaLaEstacion(estacion) : {}),
         // "Fuera de flujo" son dos estados (baja y cancelado), por eso es una lista.
         ...(estados?.length ? { estado: { in: estados } } : {}),
       },
@@ -581,6 +644,23 @@ export class FabricacionService {
         of: { select: { consecutivo: true } },
       },
     });
+  }
+
+  /**
+   * Dónde está parado un par de esa estación. "Otros" es el complemento: todo lo que
+   * no cae en ninguna estación activa (pares de antes del piloto, o de una apagada).
+   */
+  private async dondeEstaLaEstacion(codigo: string): Promise<Prisma.ParWhereInput> {
+    const activas = (await this.estaciones()).filter((e) => e.activa);
+    const posicion = (e: EstacionDef): Prisma.ParWhereInput => ({
+      celulaActual: e.celula,
+      subPasoActual: e.subPaso,
+      subPasoInyeccion: e.subPasoInyeccion,
+    });
+    if (codigo === OTRAS_ESTACIONES) return { NOT: { OR: activas.map(posicion) } };
+    const est = activas.find((e) => e.codigo === codigo);
+    if (!est) throw new NotFoundException(`Estación ${codigo} no existe o está apagada`);
+    return posicion(est);
   }
 
   async obtenerPar(codigo: string) {

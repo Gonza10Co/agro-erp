@@ -4,13 +4,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DashboardApi } from '../../core/api/dashboard.api';
 import { DashboardResumen } from '../../core/api/models/dashboard.models';
 
-const CELULAS: { key: string; label: string }[] = [
-  { key: 'CORTE', label: 'Corte' },
-  { key: 'GUARNICION', label: 'Guarnición' },
-  { key: 'ALMACEN', label: 'Almacén' },
-  { key: 'INYECCION', label: 'Inyección' },
-  { key: 'PT', label: 'P. Terminado' },
-];
 
 @Component({
   selector: 'app-dashboard',
@@ -49,14 +42,14 @@ const CELULAS: { key: string; label: string }[] = [
           <!-- Producción en planta -->
           <div class="card"><div class="card-body">
             <div class="sec-h">Producción en planta <span class="cell-sub">· {{ d.produccion.ofActivas }} OF activas · {{ d.produccion.paresEnProceso }} pares en proceso</span></div>
-            @if (d.produccion.paresEnProceso === 0) {
-              <p class="cell-sub">No hay pares en proceso ahora mismo.</p>
+            @if (!estaciones().length) {
+              <p class="cell-sub">No hay órdenes de fabricación abiertas.</p>
             } @else {
-              @for (c of celulas(); track c.key) {
-                <div class="bar-row">
-                  <span class="bar-l">{{ c.label }}</span>
-                  <div class="bar-track"><div class="bar-fill" [style.width.%]="pct(c.pares)"></div></div>
-                  <span class="bar-v">{{ c.pares }}</span>
+              @for (e of estaciones(); track e.codigo) {
+                <div class="bar-row" [class.pendiente]="esCorte(e.codigo)">
+                  <span class="bar-l">{{ e.nombre }}</span>
+                  <div class="bar-track"><div class="bar-fill" [style.width.%]="pct(e.pares)"></div></div>
+                  <span class="bar-v">{{ e.pares }}</span>
                 </div>
               }
             }
@@ -92,10 +85,11 @@ const CELULAS: { key: string; label: string }[] = [
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
     .sec-h{font-weight:var(--fw-semibold);margin-bottom:var(--sp-4)}
     .bar-row{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-2)}
-    .bar-l{width:96px;font-size:var(--text-sm);color:var(--text-muted)}
+    .bar-l{width:150px;font-size:var(--text-sm);color:var(--text-muted)}
+    .bar-row.pendiente .bar-l,.bar-row.pendiente .bar-v{color:var(--text-subtle)}
     .bar-track{flex:1;height:10px;background:var(--surface-2,var(--border));border-radius:99px;overflow:hidden}
     .bar-fill{height:100%;background:var(--primary);border-radius:99px;min-width:2px}
-    .bar-v{width:32px;text-align:right;font-family:var(--font-mono);font-size:var(--text-sm)}
+    .bar-v{width:48px;text-align:right;font-family:var(--font-mono);font-size:var(--text-sm)}
     .estado-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-3)}
     .estado{background:var(--surface-2,transparent);border:var(--bw) solid var(--border);border-radius:var(--r-sm);padding:var(--sp-3);text-align:center}
     .estado-v{display:block;font-size:var(--text-h3);font-weight:var(--fw-semibold);font-family:var(--font-mono)}
@@ -110,12 +104,14 @@ export class DashboardComponent implements OnInit {
   r = signal<DashboardResumen | null>(null);
   cargando = signal(true);
 
-  celulas = computed(() => {
-    const d = this.r();
-    const mapa = new Map((d?.produccion.porCelula ?? []).map((c) => [c.celula, c.pares]));
-    return CELULAS.map((c) => ({ ...c, pares: mapa.get(c.key) ?? 0 }));
-  });
-  private maxCelula = computed(() => Math.max(1, ...this.celulas().map((c) => c.pares)));
+  // Las mismas columnas del tablero: si el panel las inventara por su cuenta, las dos
+  // pantallas se contradirían (pasó con "Corte").
+  estaciones = computed(() => this.r()?.produccion.porEstacion ?? []);
+  // Corte queda fuera de la escala: siempre es el más grande (todo lo que falta) y
+  // aplastaría las barras de lo que de verdad está en la línea.
+  private mayor = computed(() =>
+    Math.max(1, ...this.estaciones().filter((e) => !this.esCorte(e.codigo)).map((e) => e.pares)),
+  );
 
   ngOnInit(): void {
     this.api.resumen().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -124,6 +120,8 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  pct(pares: number): number { return Math.round((pares / this.maxCelula()) * 100); }
+  pct(pares: number): number { return Math.round((pares / this.mayor()) * 100); }
+  /** En Corte el par todavía no existe: la fila se muestra en tono menor. */
+  esCorte = (codigo: string) => codigo === 'CORTE_PENDIENTE';
   moneda(n: number): string { return '$' + Math.round(n).toLocaleString('es-CO'); }
 }
