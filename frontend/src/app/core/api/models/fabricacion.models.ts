@@ -1,4 +1,5 @@
-import { IncidenciaPar } from './calidad.models';
+import { ClaseDano, IncidenciaPar } from './calidad.models';
+import { CalidadPT } from './inventario.models';
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
 export type EstadoPar = 'EN_PROCESO' | 'TERMINADO' | 'CANCELADO' | 'DADO_DE_BAJA';
@@ -46,6 +47,8 @@ export interface ProgramaOfLinea {
   programado: number;
   nacidos: number;
   terminados: number;
+  /** Avance acumulado por estación (código → cantidad); solo lo trae el tablero por órdenes. */
+  porEstacion?: Record<string, number | undefined>;
 }
 
 export interface OFDetalle {
@@ -104,7 +107,10 @@ export interface ParDetalle {
   subPasoActual: SubPasoGuarnicion | null;
   subPasoInyeccion: SubPasoInyeccion | null;
   estado: EstadoPar;
-  of: { consecutivo: number };
+  /** Grado con el que entra (o entró) a bodega; una segunda no lleva cliente en el sticker. */
+  calidad: CalidadPT;
+  /** El cliente viaja por la OC: va en el sticker de la caja. */
+  of: { consecutivo: number; op?: { oc?: { cliente?: { nombre: string } | null } | null } | null };
   talla: { valor: string };
   productoConfigurado?: {
     id: number;
@@ -112,6 +118,8 @@ export interface ParDetalle {
     nombreComercial?: string;
     referencia?: { codigo: string; nombreInterno: string } | null;
     marca?: { nombre: string } | null;
+    /** Opciones del configurador; de ahí sale el COLOR del sticker. */
+    opciones?: { opcion: { nombre: string; grupoOpcion: { codigo: string } } }[];
   } | null;
   linea?: { codigo: string; nombre: string } | null;
   eventos: EventoTrazabilidad[];
@@ -262,7 +270,24 @@ export interface AvanceResultado {
   codigo: string;
   celulaActual: Celula;
   estado: EstadoPar;
-  avance: { estacion: string; nombre: string; terminado: boolean; hoy: number };
+  avance: {
+    estacion: string;
+    nombre: string;
+    terminado: boolean;
+    hoy: number;
+    /** Grado con el que entró (SEGUNDA si este mismo escaneo la marcó). */
+    calidad: CalidadPT;
+    /** Solo cuando el escaneo trajo un daño ("algo pasó con este par"). */
+    incidencia: { tipoDano: { codigo: string; nombre: string; clase: ClaseDano } } | null;
+    /** Solo en una BAJA: el par que nace en Preparación para reponerlo. */
+    parReposicion: { codigo: string; celulaActual: Celula } | null;
+  };
+}
+
+/** El daño que viaja con el pistolazo. */
+export interface DanoEscaneo {
+  tipoDanoId: number;
+  descripcion?: string;
 }
 
 /** Lo que va impreso en la etiqueta de la lengua. */

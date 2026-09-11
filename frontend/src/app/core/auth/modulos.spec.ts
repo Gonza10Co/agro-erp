@@ -126,8 +126,10 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     // Centinela: cuando algo nuevo nazca en EN_STAGE hay que sumarlo acá a
     // conciencia. El 2026-08-12 la lista quedó vacía (se liberó todo); el
     // 2026-08-20 entra `programacion-corte`, la Quincena 1 del rediseño lote↔par.
-    // El 2026-09-09 entra `piloto` (estaciones, TV y tablero por órdenes).
-    const RESERVADAS: Seccion[] = ['programacion-corte'];
+    // El 2026-09-09 entra `piloto` (estaciones, TV y tablero por órdenes); se
+    // liberó el 2026-09-11 y ese mismo día entra `calidad-en-planta` ("algo pasó
+    // con este par" desde la estación), la quincena siguiente.
+    const RESERVADAS: Seccion[] = ['programacion-corte', 'calidad-en-planta'];
 
     const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
     for (const s of secciones) {

@@ -89,6 +89,10 @@ export interface DatosCaja {
   referencia: string;
   producto: string;
   marca: string;
+  color: string;
+  cliente: string;
+  /** Una SEGUNDA se imprime marcada y sin cliente: ya no va al pedido, va a saldos. */
+  calidad: 'PRIMERA' | 'SEGUNDA';
   fecha: Date;
 }
 
@@ -99,40 +103,86 @@ export function datosCajaDePar(p: ParDetalle, fecha = new Date()): DatosCaja {
     referencia: p.productoConfigurado?.referencia?.codigo ?? '',
     producto: p.productoConfigurado?.nombreComercial ?? '',
     marca: p.productoConfigurado?.marca?.nombre ?? '',
+    // El color es una opción del configurador, no un campo del producto.
+    color:
+      p.productoConfigurado?.opciones?.find((o) => o.opcion.grupoOpcion.codigo === 'COLOR')?.opcion
+        .nombre ?? '',
+    // ⚠️ Asunción hasta que JP/Mauricio respondan (plan 2026-09-11, pregunta 2):
+    // una segunda no lleva marquilla ni va al cliente del pedido, así que el
+    // sticker sale sin cliente y con la marca SEGUNDA bien visible.
+    cliente: p.calidad === 'SEGUNDA' ? '' : (p.of?.op?.oc?.cliente?.nombre ?? ''),
+    calidad: p.calidad === 'SEGUNDA' ? 'SEGUNDA' : 'PRIMERA',
     fecha,
   };
 }
 
-/** Sticker de la caja: reemplaza los sellos a mano de talla / referencia / color. */
+/**
+ * Sticker de la caja: reemplaza los sellos a mano de talla / referencia / color.
+ * El orden lo pidió Mauricio (2026-09-11): lo que el almacenista busca primero es
+ * la TALLA y el COLOR, y el nombre del cliente es lo que le dice a quién despachar.
+ */
 export async function descargarStickerCaja(d: DatosCaja): Promise<void> {
   const { jsPDF, toDataURL } = await libs();
   const { ancho, alto } = STICKER_CAJA;
   const doc = new jsPDF({ unit: 'mm', format: [ancho, alto], orientation: 'landscape' });
   const qr = await toDataURL(d.codigo, { margin: 0, width: 300, errorCorrectionLevel: 'M' });
+  const centroDatos = 40; // a la derecha del QR
 
-  doc.addImage(qr, 'PNG', 2, 2, 20, 20);
+  doc.addImage(qr, 'PNG', 2.5, 3, 19, 19);
   doc.setTextColor(...TINTA);
 
+  // Talla y color, lo que se lee a un metro en la estantería.
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(34);
-  doc.text(d.talla, 42, 16, { align: 'center' });
+  doc.setFontSize(30);
+  doc.text(d.talla, centroDatos, 14, { align: 'center' });
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.text('TALLA', 42, 20, { align: 'center' });
+  doc.setFontSize(5.5);
+  doc.text('TALLA', centroDatos, 17.5, { align: 'center' });
 
+  if (d.color) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.splitTextToSize(d.color.toUpperCase(), 34).slice(0, 1)
+      .forEach((linea: string) => doc.text(linea, centroDatos, 22.5, { align: 'center' }));
+  }
+
+  // Referencia, producto y marca, a lo ancho del sticker.
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.splitTextToSize([d.referencia, d.producto].filter(Boolean).join(' · '), 56).slice(0, 1)
-    .forEach((linea: string) => doc.text(linea, ancho / 2, 27, { align: 'center' }));
+    .forEach((linea: string) => doc.text(linea, ancho / 2, 27.5, { align: 'center' }));
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  if (d.marca) doc.text(d.marca, ancho / 2, 31, { align: 'center' });
+  doc.setFontSize(6.5);
+  if (d.marca) doc.text(d.marca, ancho / 2, 30.8, { align: 'center' });
+
+  // Una SEGUNDA lleva la marca donde iría el cliente: es lo que el almacenista
+  // tiene que ver antes de ponerla en la estantería de primeras.
+  if (d.calidad === 'SEGUNDA') {
+    doc.setFillColor(...TINTA);
+    doc.rect(4, 32.4, ancho - 8, 4.4, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('SEGUNDA', ancho / 2, 35.6, { align: 'center' });
+    doc.setTextColor(...TINTA);
+  }
+
+  // El cliente, separado por una línea: es el dato del despacho, no del producto.
+  if (d.cliente) {
+    doc.setDrawColor(170, 170, 170);
+    doc.setLineWidth(0.2);
+    doc.line(4, 32.6, ancho - 4, 32.6);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.splitTextToSize(d.cliente, 54).slice(0, 1)
+      .forEach((linea: string) => doc.text(linea, ancho / 2, 35.6, { align: 'center' }));
+  }
 
   doc.setFont('courier', 'normal');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   const f = d.fecha;
   const fecha = `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${f.getFullYear()}`;
-  doc.text(`${d.codigo}  ·  empacado ${fecha}`, ancho / 2, 36.5, { align: 'center' });
+  doc.text(`${d.codigo}  ·  empacado ${fecha}`, ancho / 2, 38.5, { align: 'center' });
 
   doc.save(`caja-${d.codigo}.pdf`);
 }

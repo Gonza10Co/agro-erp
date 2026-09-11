@@ -64,8 +64,10 @@ export class FabricacionController {
   }
 
   @Post('par/:codigo/avanzar')
-  avanzar(@Param('codigo') codigo: string, @Body() dto: AvanzarDto) {
-    return this.service.avanzar(codigo, dto);
+  avanzar(@Param('codigo') codigo: string, @Body() dto: AvanzarDto, @Req() req: any) {
+    // La sesión solo importa cuando el pistolazo trae un daño (una BAJA la
+    // autoriza el gerente y queda firmada con su usuario).
+    return this.service.avanzar(codigo, dto, req.user);
   }
 
   /** Puntos de control del recorrido (activos e inactivos). */

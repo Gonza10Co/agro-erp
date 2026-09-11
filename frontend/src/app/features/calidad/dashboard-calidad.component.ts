@@ -46,7 +46,7 @@ import { Celula, LABEL_CELULA } from '../../core/api/models/fabricacion.models';
                   <tr>
                     <td>{{ t.nombre }}</td>
                     <td>{{ label(t.celulaCausante) }}</td>
-                    <td><span class="badge" [class.b-baja]="t.clase === 'BAJA'">{{ t.clase === 'BAJA' ? 'baja' : 'reproceso' }}</span></td>
+                    <td><span class="badge" [class.b-baja]="t.clase === 'BAJA'">{{ t.clase === 'BAJA' ? 'baja' : t.clase === 'SEGUNDA' ? 'segunda' : 'reproceso' }}</span></td>
                     <td class="num">{{ t.total }}</td>
                   </tr>
                 }

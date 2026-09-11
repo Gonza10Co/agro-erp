@@ -88,6 +88,9 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
  * (pedidos, compras) y quedaría a la vista apenas se despliega.
  */
 export type Seccion =
+  // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
+  // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
+  | 'calidad-en-planta'
   // Entrega 2 — ya liberadas al cliente (se dejan acá como tablero histórico).
   | 'costo-utilidad-oc'
   | 'proforma-oc'
@@ -114,6 +117,11 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // Quincena de calidad en planta (2026-09-11). Nace EN_STAGE: la puerta desde
+  // la pantalla de estación para marcar un par como segunda, darlo de baja o
+  // registrar un reproceso sin salir de la línea. Ver
+  // docs/specs/2026-09-11-quincena-calidad-en-planta.md
+  'calidad-en-planta': 'EN_STAGE',
   // Quincena 1 del rediseño lote↔par (2026-08-20). Nace EN_STAGE: es la próxima
   // entrega. Controla la orden de corte del día — programado vs. cortado, piezas
   // repuestas y consumo real. Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md

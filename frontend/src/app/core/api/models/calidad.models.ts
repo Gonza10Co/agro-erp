@@ -1,6 +1,14 @@
 import { Celula } from './fabricacion.models';
 
-export type ClaseDano = 'BAJA' | 'REPROCESO';
+/** BAJA: acta + reposición · REPROCESO: solo registro · SEGUNDA: el par sigue, baja de grado. */
+export type ClaseDano = 'BAJA' | 'REPROCESO' | 'SEGUNDA';
+
+/** Qué le pasa al par según la clase del daño (texto para el operario). */
+export const DESTINO_CLASE: Record<ClaseDano, string> = {
+  SEGUNDA: 'Sigue, pero como SEGUNDA',
+  REPROCESO: 'Se repara y sigue',
+  BAJA: 'Se da de baja y se repone',
+};
 
 export interface TipoDano {
   id: number;
@@ -31,6 +39,7 @@ export interface CentroIndicador {
   total: number;
   bajas: number;
   reprocesos: number;
+  segundas: number;
   paresProcesados: number;
   pctDano: number | null;
 }

@@ -20,4 +20,21 @@ export class AvanzarDto {
   @IsString()
   @MaxLength(40)
   estacion?: string;
+
+  /**
+   * "Algo pasó con este par": el pistolazo lleva el daño tipificado y la clase
+   * del tipo decide el destino (baja + reposición, segunda, o reproceso). Va en
+   * el mismo escaneo porque en PT el par se termina en la misma transacción y
+   * un reporte aparte llegaría tarde: el par ya estaría en bodega como primera.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  tipoDanoId?: number;
+
+  /** Nota del operario; obligatoria solo en una BAJA (es el acta). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  descripcion?: string;
 }

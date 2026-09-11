@@ -38,12 +38,13 @@ describe('validarReporte', () => {
 
   describe('SEGUNDA', () => {
     // Bajar un par de grado no destruye producto (a diferencia de BAJA), así que no
-    // exige gerente: lo marca quien revisa en planta. Pero sí exige decir por qué,
-    // que es lo que después explica el % de segundas por célula.
-    it('exige descripción pero no rol de gerente', () => {
+    // exige gerente: lo marca quien revisa en planta. Tampoco exige nota: el "por
+    // qué" ya viaja en el tipo de daño, y desde el celular de la estación una nota
+    // obligatoria era captura manual (2026-09-11).
+    it('no exige ni descripción ni rol de gerente', () => {
       expect(validarReporte('SEGUNDA', 'mancha en la caña', 'OPERARIO')).toBeNull();
-      expect(validarReporte('SEGUNDA', undefined, 'GERENTE')).toBe('SIN_DESCRIPCION');
-      expect(validarReporte('SEGUNDA', '  ', 'ADMIN')).toBe('SIN_DESCRIPCION');
+      expect(validarReporte('SEGUNDA', undefined, 'GERENTE')).toBeNull();
+      expect(validarReporte('SEGUNDA', '  ', 'ADMIN')).toBeNull();
     });
   });
 });
