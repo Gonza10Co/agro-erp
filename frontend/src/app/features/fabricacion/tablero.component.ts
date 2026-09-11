@@ -3,13 +3,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import {
-  ParTablero, TableroResumen, Celula, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO,
+  ParTablero, TableroResumen, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO,
   SubPasoInyeccion, LABEL_SUBPASO_INYECCION,
 } from '../../core/api/models/fabricacion.models';
 
-/** Columnas que no son una célula del flujo pero sí una pila de pares que mirar. */
+/** Columnas que no son una estación del flujo pero sí una pila de pares que mirar. */
 type ColumnaExtra = 'TERMINADOS' | 'FUERA';
-type Columna = Celula | ColumnaExtra;
+/** El código de una estación, o una de las dos columnas extra. */
+type Columna = string | ColumnaExtra;
 
 @Component({
   selector: 'app-fabricacion-tablero',
@@ -25,17 +26,12 @@ type Columna = Celula | ColumnaExtra;
         <div class="empty"><h4>No se pudo cargar el tablero</h4><p class="cell-sub">{{ error() }}</p></div>
       }
       <div class="kanban">
-        @for (c of resumen()?.celulas ?? []; track c.celula) {
-          <div class="col" [class.abierta]="abierta() === c.celula">
-            <div class="col-h">
-              <span>{{ label(c.celula) }}</span>
-              @if (c.celula === 'GUARNICION') {
-                <a class="sub-link" [routerLink]="['/fabricacion/guarnicion']" [queryParams]="ofId ? { ofId } : {}">sub-pasos →</a>
-              }
-            </div>
-            <button class="col-num" type="button" [disabled]="!c.total" (click)="abrir(c.celula)">
-              <span class="num">{{ c.total }}</span>
-              <span class="barra"><span class="barra-fill" [style.width.%]="pct(c.total)"></span></span>
+        @for (c of resumen()?.estaciones ?? []; track c.codigo) {
+          <div class="col" [class.abierta]="abierta() === c.codigo">
+            <div class="col-h"><span>{{ c.nombre }}</span></div>
+            <button class="col-num" type="button" [disabled]="!c.total || esCorte(c.codigo)" (click)="abrir(c.codigo)">
+              <span class="num" [class.tenue]="esCorte(c.codigo)">{{ c.total }}</span>
+              <span class="barra"><span class="barra-fill" [class.tenue-bg]="esCorte(c.codigo)" [style.width.%]="esCorte(c.codigo) ? 100 : pct(c.total)"></span></span>
             </button>
             @if (c.tallas.length) {
               <div class="tallas">
@@ -58,7 +54,7 @@ type Columna = Celula | ColumnaExtra;
 
       @if (resumen(); as r) {
         <div class="pie">
-          <span>{{ r.total }} pares en la orden</span>
+          <span><b>{{ r.total }}</b> de {{ r.programado }} pares nacidos</span>
           @if (r.fueraDeFlujo) {
             <button class="fuera-link" type="button" (click)="abrir('FUERA')">
               {{ r.fueraDeFlujo }} fuera de flujo (bajas y cancelados)
@@ -84,11 +80,8 @@ type Columna = Celula | ColumnaExtra;
                    [routerLink]="['/fabricacion/par', p.codigo]">
                   <span class="mono">{{ p.codigo }}</span>
                   <span class="cell-sub">T{{ p.talla.valor }}</span>
-                  @if (p.celulaActual === 'GUARNICION' && p.subPasoActual) {
-                    <span class="cell-sub">{{ subPasoLabel(p.subPasoActual) }}</span>
-                  }
-                  @if (p.celulaActual === 'INYECCION' && p.subPasoInyeccion) {
-                    <span class="cell-sub">{{ subPasoInyeccionLabel(p.subPasoInyeccion) }}</span>
+                  @if (col === 'FUERA' || col === 'TERMINADOS') {
+                    <span class="cell-sub">{{ ubicacion(p) }}</span>
                   }
                   @if (col === 'FUERA') {
                     <span class="estado">{{ p.estado === 'DADO_DE_BAJA' ? 'baja ✖' : 'cancelado' }}</span>
@@ -104,7 +97,8 @@ type Columna = Celula | ColumnaExtra;
     </div>
   `,
   styles: [`
-    .kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--sp-3);align-items:start}
+    /* Las columnas dependen de las estaciones activas (+ Corte, Terminados y a veces Otros). */
+    .kanban{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--sp-3);align-items:start}
     .col{background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);overflow:hidden}
     .col.abierta{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
     .col-h{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);border-bottom:var(--bw) solid var(--border);font-weight:var(--fw-medium);font-size:var(--text-sm)}
@@ -113,6 +107,9 @@ type Columna = Celula | ColumnaExtra;
     .col-num:not(:disabled):hover{background:var(--inset)}
     .num{display:block;font-size:38px;line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--primary)}
     .num.acento{color:var(--accent)}
+    /* Corte es lo que todavía no existe: se muestra, pero no compite con lo real. */
+    .num.tenue{color:var(--text-muted)}
+    .barra-fill.tenue-bg{background:var(--border)}
     .barra{display:block;height:4px;margin-top:var(--sp-2);background:var(--inset);border-radius:2px;overflow:hidden}
     .barra-fill{display:block;height:100%;background:var(--primary)}
     .barra-fill.acento-bg{background:var(--accent)}
@@ -135,7 +132,7 @@ type Columna = Celula | ColumnaExtra;
     .chip-baja{border-color:var(--danger)}
     .chip-baja .estado{color:var(--danger)}
     .mono{font-family:var(--font-mono)}
-    @media (max-width:900px){ .kanban{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:640px){ .kanban{grid-template-columns:repeat(2,1fr)} }
   `],
 })
 export class FabricacionTableroComponent implements OnInit {
@@ -145,9 +142,6 @@ export class FabricacionTableroComponent implements OnInit {
 
   /** Tope del detalle: una columna puede tener cientos de pares en un día normal. */
   readonly tope = 200;
-  label = (c: Celula) => LABEL_CELULA[c];
-  subPasoLabel = (s: SubPasoGuarnicion) => LABEL_SUBPASO[s];
-  subPasoInyeccionLabel = (s: SubPasoInyeccion) => LABEL_SUBPASO_INYECCION[s];
 
   resumen = signal<TableroResumen | null>(null);
   error = signal<string | null>(null);
@@ -157,12 +151,18 @@ export class FabricacionTableroComponent implements OnInit {
   protected ofId?: number;
 
   hayMas = computed(() => this.pares().length >= this.tope);
+  /** En Corte todavía no hay pares: el número es lo programado que falta por nacer. */
+  esCorte = (codigo: string) => codigo === 'CORTE_PENDIENTE';
 
-  /** La barra de cada columna se lee contra la columna más cargada del tablero. */
+  /**
+   * La barra se lee contra la columna más cargada, sin contar Corte: ahí está todo
+   * lo que falta por nacer, así que al principio aplasta a las demás.
+   */
   private mayor = computed(() => {
     const r = this.resumen();
     if (!r) return 0;
-    return Math.max(...r.celulas.map((c) => c.total), r.terminados, 1);
+    const enLinea = r.estaciones.filter((c) => !this.esCorte(c.codigo)).map((c) => c.total);
+    return Math.max(...enLinea, r.terminados, 1);
   });
   pct = (n: number) => Math.round((n / this.mayor()) * 100);
 
@@ -198,7 +198,18 @@ export class FabricacionTableroComponent implements OnInit {
   tituloColumna(col: Columna): string {
     if (col === 'TERMINADOS') return 'Terminados';
     if (col === 'FUERA') return 'Fuera de flujo';
-    return LABEL_CELULA[col];
+    return this.resumen()?.estaciones.find((e) => e.codigo === col)?.nombre ?? col;
+  }
+
+  /** Dónde quedó un par, para los chips de Terminados y Fuera de flujo. */
+  ubicacion(p: ParTablero): string {
+    const sub =
+      p.celulaActual === 'GUARNICION' && p.subPasoActual
+        ? LABEL_SUBPASO[p.subPasoActual as SubPasoGuarnicion]
+        : p.celulaActual === 'INYECCION' && p.subPasoInyeccion
+          ? LABEL_SUBPASO_INYECCION[p.subPasoInyeccion as SubPasoInyeccion]
+          : null;
+    return sub ? `${LABEL_CELULA[p.celulaActual]} · ${sub}` : LABEL_CELULA[p.celulaActual];
   }
 
   private pedirDetalle(col: Columna): void {
@@ -209,7 +220,7 @@ export class FabricacionTableroComponent implements OnInit {
         ? { estados: ['TERMINADO'], take: this.tope }
         : col === 'FUERA'
           ? { estados: ['DADO_DE_BAJA', 'CANCELADO'], take: this.tope }
-          : { celula: col, estados: ['EN_PROCESO'], take: this.tope };
+          : { estacion: col, estados: ['EN_PROCESO'], take: this.tope };
     this.api.tablero(this.ofId, filtro).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (p) => {
         this.cargandoDetalle.set(false);

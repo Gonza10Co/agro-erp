@@ -2,12 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { rangoMes } from './dashboard-core';
 import { saldoFactura, resumenCartera } from '../cartera/cartera-core';
+import { FabricacionService } from '../fabricacion/fabricacion.service';
 
 const ESTADOS_OC = ['BORRADOR', 'CONFIRMADA', 'EN_PRODUCCION', 'CERRADA', 'ANULADA'] as const;
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fabricacion: FabricacionService,
+  ) {}
 
   async resumen() {
     const hoy = new Date();
@@ -16,7 +20,7 @@ export class DashboardService {
     const [
       ocPorEstado,
       ofActivas,
-      paresPorCelula,
+      planta,
       despachosMes,
       facAgg,
       facturas,
@@ -24,7 +28,8 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.ordenCompra.groupBy({ by: ['estado'], _count: { _all: true } }),
       this.prisma.ordenFabricacion.count({ where: { estado: { in: ['ABIERTA', 'EN_PROCESO'] } } }),
-      this.prisma.par.groupBy({ by: ['celulaActual'], where: { estado: 'EN_PROCESO' }, _count: { _all: true } }),
+      // El mismo resumen del tablero: columnas por ESTACIÓN, que es lo que la planta reconoce.
+      this.fabricacion.tableroResumen(),
       this.prisma.despacho.count({ where: { fecha: { gte: desde, lt: hasta } } }),
       this.prisma.factura.aggregate({
         where: { fecha: { gte: desde, lt: hasta }, estado: 'EMITIDA' },
@@ -44,12 +49,13 @@ export class DashboardService {
     for (const g of ocPorEstado as any[]) porEstado[g.estado] = g._count._all;
     const enCurso = porEstado['CONFIRMADA'] + porEstado['EN_PRODUCCION'];
 
-    // Pares en proceso por célula.
-    const porCelula = (paresPorCelula as any[]).map((g) => ({
-      celula: g.celulaActual as string,
-      pares: g._count._all as number,
+    // Pares en proceso por estación (Corte es lo que falta por nacer, no pares reales).
+    const porEstacion = planta.estaciones.map((e) => ({
+      codigo: e.codigo,
+      nombre: e.nombre,
+      pares: e.total,
     }));
-    const paresEnProceso = porCelula.reduce((acc, c) => acc + c.pares, 0);
+    const paresEnProceso = planta.total - planta.terminados - planta.fueraDeFlujo;
 
     // Cartera: saldos a partir de las facturas con sus pagos.
     const facturasSaldo = facturas.map((f) => ({
@@ -62,7 +68,7 @@ export class DashboardService {
 
     return {
       pedidos: { porEstado, enCurso },
-      produccion: { ofActivas, paresEnProceso, porCelula },
+      produccion: { ofActivas, paresEnProceso, porEstacion, programado: planta.programado },
       despachosMes,
       facturacionMes: {
         total: Number(facAgg._sum.total ?? 0),

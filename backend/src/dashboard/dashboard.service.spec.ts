@@ -9,7 +9,9 @@ describe('DashboardService', () => {
     factura: { aggregate: jest.fn(), findMany: jest.fn() },
     cliente: { count: jest.fn() },
   };
-  const service = new DashboardService(prisma);
+  // El panel no cuenta la planta por su cuenta: le pide el resumen al tablero.
+  const fabricacion: any = { tableroResumen: jest.fn() };
+  const service = new DashboardService(prisma, fabricacion);
   beforeEach(() => jest.clearAllMocks());
 
   it('arma el resumen de KPIs', async () => {
@@ -20,10 +22,17 @@ describe('DashboardService', () => {
       { estado: 'CERRADA', _count: { _all: 4 } },
     ]);
     prisma.ordenFabricacion.count.mockResolvedValue(2);
-    prisma.par.groupBy.mockResolvedValue([
-      { celulaActual: 'CORTE', _count: { _all: 4 } },
-      { celulaActual: 'GUARNICION', _count: { _all: 6 } },
-    ]);
+    fabricacion.tableroResumen.mockResolvedValue({
+      estaciones: [
+        { codigo: 'CORTE_PENDIENTE', nombre: 'Corte', total: 90, tallas: [] },
+        { codigo: 'PREPARACION', nombre: 'Preparación', total: 6, tallas: [] },
+        { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', total: 4, tallas: [] },
+      ],
+      terminados: 2,
+      fueraDeFlujo: 1,
+      total: 13,
+      programado: 100,
+    });
     prisma.despacho.count.mockResolvedValue(3);
     prisma.factura.aggregate.mockResolvedValue({ _sum: { total: 1000000 }, _count: { _all: 2 } });
     prisma.factura.findMany.mockResolvedValue([
@@ -37,10 +46,14 @@ describe('DashboardService', () => {
     expect(r.pedidos.porEstado).toEqual({ BORRADOR: 1, CONFIRMADA: 2, EN_PRODUCCION: 3, CERRADA: 4, ANULADA: 0 });
     expect(r.pedidos.enCurso).toBe(5); // CONFIRMADA + EN_PRODUCCION
     expect(r.produccion.ofActivas).toBe(2);
+    // En proceso = lo que existe menos lo terminado y lo dado de baja.
     expect(r.produccion.paresEnProceso).toBe(10);
-    expect(r.produccion.porCelula).toEqual([
-      { celula: 'CORTE', pares: 4 },
-      { celula: 'GUARNICION', pares: 6 },
+    expect(r.produccion.programado).toBe(100);
+    // Las mismas columnas del tablero, para que las dos pantallas no se contradigan.
+    expect(r.produccion.porEstacion).toEqual([
+      { codigo: 'CORTE_PENDIENTE', nombre: 'Corte', pares: 90 },
+      { codigo: 'PREPARACION', nombre: 'Preparación', pares: 6 },
+      { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', pares: 4 },
     ]);
     expect(r.despachosMes).toBe(3);
     expect(r.facturacionMes).toEqual({ total: 1000000, count: 2 });
@@ -52,7 +65,9 @@ describe('DashboardService', () => {
   it('facturación del mes en 0 cuando no hay facturas', async () => {
     prisma.ordenCompra.groupBy.mockResolvedValue([]);
     prisma.ordenFabricacion.count.mockResolvedValue(0);
-    prisma.par.groupBy.mockResolvedValue([]);
+    fabricacion.tableroResumen.mockResolvedValue({
+      estaciones: [], terminados: 0, fueraDeFlujo: 0, total: 0, programado: 0,
+    });
     prisma.despacho.count.mockResolvedValue(0);
     prisma.factura.aggregate.mockResolvedValue({ _sum: { total: null }, _count: { _all: 0 } });
     prisma.factura.findMany.mockResolvedValue([]);

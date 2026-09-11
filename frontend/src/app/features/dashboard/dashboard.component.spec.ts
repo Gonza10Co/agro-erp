@@ -6,7 +6,17 @@ import { DashboardComponent } from './dashboard.component';
 
 const RESUMEN = {
   pedidos: { porEstado: { BORRADOR: 1, CONFIRMADA: 2, EN_PRODUCCION: 3, CERRADA: 4, ANULADA: 0 }, enCurso: 5 },
-  produccion: { ofActivas: 2, paresEnProceso: 10, porCelula: [{ celula: 'CORTE', pares: 4 }, { celula: 'GUARNICION', pares: 6 }] },
+  produccion: {
+    ofActivas: 2,
+    paresEnProceso: 10,
+    programado: 100,
+    // Las mismas columnas del tablero: Corte es lo que falta por nacer.
+    porEstacion: [
+      { codigo: 'CORTE_PENDIENTE', nombre: 'Corte', pares: 90 },
+      { codigo: 'PREPARACION', nombre: 'Preparación', pares: 6 },
+      { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', pares: 4 },
+    ],
+  },
   despachosMes: 3,
   facturacionMes: { total: 1000000, count: 2 },
   cartera: { saldoTotal: 800000, saldoVencido: 500000, clientesVencidos: 1 },
@@ -31,8 +41,11 @@ describe('DashboardComponent', () => {
     http.expectOne('http://localhost:3001/dashboard').flush(RESUMEN);
     const c = fixture.componentInstance;
     expect(c.r()?.despachosMes).toBe(3);
-    expect(c.celulas().map((x) => x.pares)).toEqual([4, 6, 0, 0, 0]); // CORTE, GUARNICION, ALMACEN, INYECCION, PT
-    expect(c.pct(6)).toBe(100); // 6 es el máximo
+    // El panel pinta lo que manda el backend, sin inventar columnas propias.
+    expect(c.estaciones().map((x) => x.nombre)).toEqual(['Corte', 'Preparación', 'Bodega de corte']);
+    expect(c.estaciones().map((x) => x.pares)).toEqual([90, 6, 4]);
+    // La escala la marcan las estaciones de la línea (6), no Corte (90).
+    expect(c.pct(6)).toBe(100);
     expect(c.pct(4)).toBe(67);
   });
 });

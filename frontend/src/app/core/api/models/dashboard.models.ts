@@ -6,7 +6,9 @@ export interface DashboardResumen {
   produccion: {
     ofActivas: number;
     paresEnProceso: number;
-    porCelula: { celula: string; pares: number }[];
+    /** Columnas por ESTACIÓN, las mismas del tablero (Corte = lo que falta por nacer). */
+    porEstacion: { codigo: string; nombre: string; pares: number }[];
+    programado: number;
   };
   despachosMes: number;
   facturacionMes: { total: number; count: number };

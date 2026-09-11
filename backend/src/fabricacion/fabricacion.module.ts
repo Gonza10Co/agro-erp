@@ -9,5 +9,8 @@ import { FabricacionService } from './fabricacion.service';
   imports: [CatalogModule],
   controllers: [FabricacionController],
   providers: [FabricacionService],
+  // El panel gerencial lee el mismo resumen que el tablero: una sola fuente para
+  // los números de planta, o las dos pantallas terminan contradiciéndose.
+  exports: [FabricacionService],
 })
 export class FabricacionModule {}

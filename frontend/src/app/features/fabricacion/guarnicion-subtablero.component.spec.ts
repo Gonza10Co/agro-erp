@@ -11,7 +11,7 @@ function pedidoDeGuarnicion(http: HttpTestingController) {
     (r) =>
       r.url === 'http://localhost:3001/fabricacion/tablero' &&
       r.params.get('ofId') === '7' &&
-      r.params.get('celula') === 'GUARNICION',
+      r.params.get('estados') === 'EN_PROCESO',
   );
 }
 

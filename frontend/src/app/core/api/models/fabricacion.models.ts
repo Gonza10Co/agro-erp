@@ -58,12 +58,22 @@ export interface OFDetalle {
   programa?: ProgramaOfLinea[];
 }
 
-/** El tablero en números: la planta mueve ~1.206 pares al día, no caben en una lista. */
+/**
+ * El tablero en números: la planta mueve ~1.206 pares al día, no caben en una lista.
+ * Las columnas son ESTACIONES (lo que la planta reconoce), no células.
+ */
 export interface TableroResumen {
-  celulas: { celula: Celula; total: number; tallas: { talla: number; cantidad: number }[] }[];
+  estaciones: {
+    codigo: string;
+    nombre: string;
+    total: number;
+    tallas: { talla: number; cantidad: number }[];
+  }[];
   terminados: number;
   fueraDeFlujo: number;
   total: number;
+  /** Pares programados en la OP: contra eso se mide lo que falta por nacer. */
+  programado: number;
 }
 
 export interface ParTablero {

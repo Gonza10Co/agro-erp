@@ -5,16 +5,18 @@ import { provideRouter } from '@angular/router';
 import { FabricacionTableroComponent } from './tablero.component';
 
 const RESUMEN = {
-  celulas: [
-    { celula: 'CORTE', total: 0, tallas: [] },
-    { celula: 'GUARNICION', total: 340, tallas: [{ talla: 38, cantidad: 200 }, { talla: 40, cantidad: 140 }] },
-    { celula: 'ALMACEN', total: 0, tallas: [] },
-    { celula: 'INYECCION', total: 420, tallas: [{ talla: 38, cantidad: 420 }] },
-    { celula: 'PT', total: 0, tallas: [] },
+  // Columnas por ESTACIÓN: Montaje y Finizaje se ven aparte aunque compartan célula.
+  estaciones: [
+    { codigo: 'PREPARACION', nombre: 'Preparación', total: 340, tallas: [{ talla: 38, cantidad: 200 }, { talla: 40, cantidad: 140 }] },
+    { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', total: 0, tallas: [] },
+    { codigo: 'MONTAJE', nombre: 'Inyección · Montaje', total: 420, tallas: [{ talla: 38, cantidad: 420 }] },
+    { codigo: 'FINIZAJE', nombre: 'Inyección · Finizaje', total: 12, tallas: [{ talla: 38, cantidad: 12 }] },
+    { codigo: 'PT', nombre: 'Producto terminado', total: 0, tallas: [] },
   ],
   terminados: 146,
   fueraDeFlujo: 2,
-  total: 908,
+  total: 920,
+  programado: 1206,
 };
 
 function montar() {
@@ -29,38 +31,43 @@ function montar() {
 }
 
 describe('FabricacionTableroComponent', () => {
-  it('muestra el conteo por célula y el desglose por talla, sin pedir la lista de pares', () => {
+  it('muestra una columna por estación con su desglose, sin pedir la lista de pares', () => {
     const { fixture, http, el } = montar();
     http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
     fixture.detectChanges();
 
+    expect(el.textContent).toContain('Preparación');
     expect(el.textContent).toContain('340');
-    expect(el.textContent).toContain('420');
+    // Montaje y Finizaje son puestos distintos: no se suman en una columna "Inyección".
+    expect(el.textContent).toContain('Inyección · Montaje');
+    expect(el.textContent).toContain('Inyección · Finizaje');
+    expect(el.textContent).toContain('12');
+    // Y no queda rastro del vocabulario de células (la columna "Corte" que nunca se llenaba).
+    expect(el.textContent).not.toContain('Corte │');
     expect(el.textContent).toContain('146'); // terminados
-    expect(el.textContent).toContain('908 pares en la orden');
-    // El desglose por talla es lo que la planta pregunta.
-    expect(el.textContent).toContain('38');
+    // El pie mide lo nacido contra lo programado, no solo lo que existe.
+    expect(el.textContent).toContain('920');
+    expect(el.textContent).toContain('de 1206 pares nacidos');
     // Nadie abrió una columna: el detalle no se pide.
     http.verify();
   });
 
-  it('pide el detalle de una célula solo al abrirla', () => {
+  it('pide el detalle de una estación solo al abrirla', () => {
     const { fixture, http, el } = montar();
     http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
     fixture.detectChanges();
 
-    fixture.componentInstance.abrir('GUARNICION');
+    fixture.componentInstance.abrir('PREPARACION');
     const req = http.expectOne(
-      (r) => r.url === 'http://localhost:3001/fabricacion/tablero' && r.params.get('celula') === 'GUARNICION',
+      (r) => r.url === 'http://localhost:3001/fabricacion/tablero' && r.params.get('estacion') === 'PREPARACION',
     );
     expect(req.request.params.get('estados')).toBe('EN_PROCESO');
     req.flush([
-      { id: 1, codigo: 'OF1-0001', celulaActual: 'GUARNICION', subPasoActual: 'STROBEL', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
+      { id: 1, codigo: 'OF1-0001', celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO', talla: { valor: '38' }, of: { consecutivo: 1 } },
     ]);
     fixture.detectChanges();
 
     expect(el.textContent).toContain('OF1-0001');
-    expect(el.textContent).toContain('Strobel');
     http.verify();
   });
 
@@ -93,12 +100,31 @@ describe('FabricacionTableroComponent', () => {
     http.verify();
   });
 
-  it('mantiene el enlace al sub-tablero de Guarnición', () => {
+  it('la columna Corte muestra lo que falta por nacer y no se puede abrir', () => {
     const { fixture, http, el } = montar();
-    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush(RESUMEN);
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush({
+      ...RESUMEN,
+      estaciones: [{ codigo: 'CORTE_PENDIENTE', nombre: 'Corte', total: 286, tallas: [] }, ...RESUMEN.estaciones],
+    });
     fixture.detectChanges();
-    const link = el.querySelector('a[href*="/fabricacion/guarnicion"]');
-    expect(link).not.toBeNull();
+
+    expect(el.textContent).toContain('Corte');
+    expect(el.textContent).toContain('286');
+    // No hay pares que listar: ahí el par todavía no existe.
+    const boton = el.querySelector('.col-num') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    http.verify();
+  });
+
+  it('muestra la columna "Otros" solo cuando hay pares fuera de las estaciones activas', () => {
+    const { fixture, http, el } = montar();
+    http.expectOne('http://localhost:3001/fabricacion/tablero-resumen').flush({
+      ...RESUMEN,
+      estaciones: [...RESUMEN.estaciones, { codigo: 'OTROS', nombre: 'Otros', total: 7, tallas: [] }],
+    });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Otros');
+    expect(el.textContent).toContain('7');
     http.verify();
   });
 });

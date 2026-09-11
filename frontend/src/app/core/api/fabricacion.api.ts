@@ -58,10 +58,10 @@ export class FabricacionApi {
     if (ofId != null) params = params.set('ofId', ofId);
     return this.http.get<TableroResumen>(`${this.base}/fabricacion/tablero-resumen`, { params });
   }
-  tablero(ofId?: number, filtro?: { celula?: string; estados?: string[]; take?: number }) {
+  tablero(ofId?: number, filtro?: { estacion?: string; estados?: string[]; take?: number }) {
     let params = new HttpParams();
     if (ofId != null) params = params.set('ofId', ofId);
-    if (filtro?.celula) params = params.set('celula', filtro.celula);
+    if (filtro?.estacion) params = params.set('estacion', filtro.estacion);
     if (filtro?.estados?.length) params = params.set('estados', filtro.estados.join(','));
     if (filtro?.take != null) params = params.set('take', filtro.take);
     return this.http.get<ParTablero[]>(`${this.base}/fabricacion/tablero`, { params });
