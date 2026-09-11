@@ -32,8 +32,11 @@
 >   Bodega → Montaje → Finizaje → PT termina como SEGUNDA con su incidencia en ALMACEN; OF1-0003
 >   dada de baja en Bodega → `OF1-0003-R1` nace en Preparación (GUARNICION/PREPARACION, evento de
 >   entrada, `hoy` de Preparación sube a 21); reproceso en OF1-0004; 400 sin acta, 404 tipo
->   inexistente, 403 como CLIENTE, 409 fuera de orden sin tocar el par.
->   Tests: backend 694 · frontend 425, verdes.
+>   inexistente, 403 como CLIENTE, 409 fuera de orden sin tocar el par. Segunda tanda E2E
+>   (tras las respuestas de JP): operaria sola → 403 "la autoriza calidad"; clave mala → 401;
+>   con la clave de `calidad` → 201, acta firmada por `calidad` y `OF1-0010-R1` nace en
+>   Preparación; la clave de calidad NO alcanza para una baja (403). Tests: backend 703 ·
+>   frontend 426, verdes.
 > - **JP respondió las 5 preguntas el mismo 11-sep** (detalle en el plan): la segunda **se
 >   repone** (hoy programan 1-2 pares de más por talla por si acaso; con el sistema la orden
 >   sale exacta) → `7507a70`: marcar SEGUNDA pare la reposición y **el tablero cuenta por cupo**
