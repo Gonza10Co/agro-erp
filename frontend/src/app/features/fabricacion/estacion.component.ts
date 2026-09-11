@@ -176,14 +176,24 @@ export function guardarConfig(c: ConfigEstacion | null): void {
                     <button class="btn btn-sm" type="button" (click)="cerrarCalidad()">Cancelar ✕</button>
                   </div>
                   @if (!tipos().length) { <p class="cell-sub">Cargando el catálogo de daños…</p> }
-                  <div class="tipos">
-                    @for (t of tipos(); track t.id) {
-                      <button type="button" class="tipo" [class.sel]="t.id === tipoSel()" [class.baja]="t.clase === 'BAJA'" (click)="tipoSel.set(t.id)">
+                  <!-- Elegido el tipo, la lista se recoge: en el celular el lector queda a la vista. -->
+                  @if (tipoActual(); as t) {
+                    <div class="elegido">
+                      <button type="button" class="tipo sel" [class.baja]="t.clase === 'BAJA'" (click)="tipoSel.set(undefined)">
                         <span class="tipo-nombre">{{ t.nombre }}</span>
-                        <span class="tipo-destino">{{ destino(t) }}</span>
+                        <span class="tipo-destino">{{ destino(t) }} · tocar para cambiar</span>
                       </button>
-                    }
-                  </div>
+                    </div>
+                  } @else {
+                    <div class="tipos">
+                      @for (t of tipos(); track t.id) {
+                        <button type="button" class="tipo" [class.baja]="t.clase === 'BAJA'" (click)="tipoSel.set(t.id)">
+                          <span class="tipo-nombre">{{ t.nombre }}</span>
+                          <span class="tipo-destino">{{ destino(t) }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
                   @if (tipoActual(); as t) {
                     @if (t.clase === 'BAJA' && !puedeBaja) {
                       <div class="msg err">Solo un gerente puede autorizar una baja.</div>
@@ -281,6 +291,7 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--sp-2)}
     .tipo{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:56px;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-md);background:var(--surface);color:inherit;font:inherit;text-align:left;cursor:pointer}
     .tipo.sel{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)}
+    .elegido .tipo{width:100%}
     .tipo-nombre{font-weight:var(--fw-medium)}
     .tipo-destino{font-size:var(--text-micro);text-transform:uppercase;letter-spacing:.06em;color:var(--text-subtle)}
     .tipo.baja .tipo-destino{color:var(--error)}
