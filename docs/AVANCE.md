@@ -34,9 +34,17 @@
 >   entrada, `hoy` de Preparación sube a 21); reproceso en OF1-0004; 400 sin acta, 404 tipo
 >   inexistente, 403 como CLIENTE, 409 fuera de orden sin tocar el par.
 >   Tests: backend 694 · frontend 425, verdes.
-> - **Falta de la quincena**: las 5 preguntas del plan a JP/Mauricio (la más urgente: ¿de dónde
->   sale el COLOR del sticker?), impresora térmica probada, y **un día completo en una estación
->   con la gente real**. Para liberar: voltear `calidad-en-planta` a ENTREGADO en `modulos.ts`.
+> - **Falta de la quincena**: las 5 preguntas del plan a JP/Mauricio (enviadas por WhatsApp el
+>   11-sep; la más urgente: ¿de dónde sale el COLOR del sticker?), impresora térmica probada, y
+>   **un día completo en una estación con la gente real**.
+> - **🔓 TODO ENTREGADO desde el 2026-09-11** (decisión de Gonza: "no hay necesidad de seguir
+>   escondiendo el avance"): `administracion`, `programacion-corte` y `calidad-en-planta` pasan a
+>   ENTREGADO; la lista `RESERVADAS` del centinela queda vacía. Antes de desplegar se borraron de
+>   prod las **5 órdenes demo de corte** (`seed:corte -- --limpiar` contra `DATABASE_PUBLIC_URL`
+>   del servicio Postgres: `/corte/ordenes` → 0). ⚠️ Con el rol CLIENTE, Administración se ve
+>   pero no escribe (usuarios = ADMIN; operarios = ADMIN/GERENTE): los operarios reales se
+>   cargan entrando como `gerente`. ⚠️ El `DATABASE_URL` de Railway comentado en `backend/.env`
+>   tiene credenciales viejas: la URL buena sale de `railway variables -s Postgres --json`.
 >
 > **Anterior (2026-09-09):**
 >
