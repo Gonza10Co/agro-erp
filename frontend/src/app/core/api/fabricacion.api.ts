@@ -33,7 +33,13 @@ export class FabricacionApi {
         ...(maquinaId != null ? { maquinaId } : {}),
         ...(estacion ? { estacion } : {}),
         // "Algo pasó con este par": el daño viaja en el mismo escaneo.
-        ...(dano ? { tipoDanoId: dano.tipoDanoId, ...(nota ? { descripcion: nota } : {}) } : {}),
+        ...(dano
+          ? {
+              tipoDanoId: dano.tipoDanoId,
+              ...(nota ? { descripcion: nota } : {}),
+              ...(dano.autorizacion ? { autorizacion: dano.autorizacion } : {}),
+            }
+          : {}),
       },
     );
   }

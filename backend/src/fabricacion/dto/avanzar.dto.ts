@@ -1,4 +1,6 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { AutorizacionDto } from '../../calidad/dto/autorizacion.dto';
 
 export class AvanzarDto {
   @IsInt()
@@ -37,4 +39,13 @@ export class AvanzarDto {
   @IsString()
   @MaxLength(500)
   descripcion?: string;
+
+  /**
+   * Quién autoriza, si la sesión del dispositivo no puede sola: una SEGUNDA la
+   * firma calidad (CALIDAD/GERENTE/ADMIN) y una BAJA el gerente (GERENTE/ADMIN).
+   */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AutorizacionDto)
+  autorizacion?: AutorizacionDto;
 }

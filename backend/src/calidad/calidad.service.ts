@@ -4,10 +4,18 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Celula, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { agruparIndicadores, codigoReposicion, validarReporte } from './calidad-core';
+import { HashingService } from '../common/hashing.service';
+import {
+  agruparIndicadores,
+  codigoReposicion,
+  mensajeRolInsuficiente,
+  validarReporte,
+} from './calidad-core';
+import { AutorizacionDto } from './dto/autorizacion.dto';
 import { EstacionDef, estacionNacimiento, subPasoInicial } from '../fabricacion/fabricacion-core';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 
@@ -46,7 +54,34 @@ const MSG_RACE = 'El par cambió de estado durante el reporte — recárgalo e i
 
 @Injectable()
 export class CalidadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly hashing: HashingService,
+  ) {}
+
+  /**
+   * Quién firma el reporte: la sesión, o el usuario que puso su clave en
+   * `autorizacion` (la persona de calidad que se acerca a la estación). Se
+   * valida como un login, pero sin emitir tokens: la sesión del celular sigue
+   * siendo la de la operaria.
+   */
+  async resolverAutorizador(user: Usuario, autorizacion?: AutorizacionDto): Promise<Usuario> {
+    if (!autorizacion) return user;
+    const u = await this.prisma.user.findUnique({
+      where: { username: autorizacion.username },
+      include: { role: true },
+    });
+    const valido = !!u && u.isActive && (await this.hashing.verify(u.passwordHash, autorizacion.password));
+    if (!valido) throw new UnauthorizedException('Usuario o clave de quien autoriza inválidos');
+    return { sub: u!.id, role: u!.role.name };
+  }
+
+  /** Reglas de firma por clase, con el mensaje que ve el operario. */
+  exigirFirma(clase: 'BAJA' | 'REPROCESO' | 'SEGUNDA', descripcion: string | undefined, rol: string): void {
+    const err = validarReporte(clase, descripcion, rol);
+    if (err === 'ROL_INSUFICIENTE') throw new ForbiddenException(mensajeRolInsuficiente(clase));
+    if (err === 'SIN_DESCRIPCION') throw new BadRequestException('La baja requiere descripción (acta)');
+  }
 
   listarTiposDano() {
     return this.prisma.tipoDano.findMany({
@@ -177,11 +212,8 @@ export class CalidadService {
     if (par.estado !== 'EN_PROCESO')
       throw new ConflictException(MSG_ESTADO[par.estado] ?? 'El par no está en proceso');
 
-    const err = validarReporte(tipo.clase, dto.descripcion, user.role);
-    if (err === 'ROL_INSUFICIENTE')
-      throw new ForbiddenException('Solo un gerente puede autorizar una baja');
-    if (err === 'SIN_DESCRIPCION')
-      throw new BadRequestException('La baja requiere descripción (acta)');
+    const autorizador = await this.resolverAutorizador(user, dto.autorizacion);
+    this.exigirFirma(tipo.clase, dto.descripcion, autorizador.role);
 
     try {
       // REPROCESO no muta estado: la incidencia es un registro append-only.
@@ -204,8 +236,8 @@ export class CalidadService {
       // SEGUNDA: el par NO muere — sigue su curso y entra a bodega con grado SEGUNDA —
       // pero SÍ se repone: el pedido se completa con primeras (JP, 2026-09-11).
       if (tipo.clase === 'SEGUNDA')
-        return await this.marcarSegunda(par, tipo.id, dto, user, celulaInicial, lineaId);
-      return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial, lineaId);
+        return await this.marcarSegunda(par, tipo.id, dto, autorizador, celulaInicial, lineaId);
+      return await this.darDeBaja(par, tipo.id, dto, autorizador, celulaInicial, lineaId);
     } catch (e: unknown) {
       // FK inválida del reporte: solo el operario (input del usuario) → 400.
       // Cualquier otra FK (productoConfigurado, talla, autorizadoPor, par…) es

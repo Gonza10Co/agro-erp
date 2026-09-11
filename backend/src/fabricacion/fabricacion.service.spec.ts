@@ -738,6 +738,8 @@ describe('FabricacionService.avanzar (hardening)', () => {
 describe('FabricacionService.avanzar — con daño tipificado', () => {
   const gerente = { sub: 3, role: 'GERENTE' };
   const operario = { sub: 8, role: 'OPERARIO' };
+  // La segunda la firma calidad (JP, 2026-09-11): la sesión de calidad la puede sola.
+  const calidad = { sub: 8, role: 'CALIDAD' };
   const tipoSegunda = { id: 11, codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', celulaCausante: 'INYECCION', clase: 'SEGUNDA', activo: true };
   const tipoReproceso = { id: 7, codigo: 'ECONOMIZADOR-RASGADO', nombre: 'Economizador rasgado', celulaCausante: 'INYECCION', clase: 'REPROCESO', activo: true };
   const tipoBaja = { id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada', celulaCausante: 'INYECCION', clase: 'BAJA', activo: true };
@@ -759,14 +761,17 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
       productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' }, ...par,
     });
     prisma.tipoDano = { findUnique: jest.fn().mockResolvedValue(tipo) };
+    // Quien autoriza con clave: la persona de calidad (la clave siempre verifica en este mock).
+    prisma.user = { findUnique: jest.fn().mockResolvedValue({ id: 21, isActive: true, passwordHash: 'h', role: { name: 'CALIDAD' } }) };
     prisma.eventoTrazabilidad.count.mockResolvedValue(12);
-    const service = new FabricacionService(prisma, undefined as any, new CalidadService(prisma));
-    return { prisma, tx, service };
+    const hashing = { verify: jest.fn().mockResolvedValue(true) } as any;
+    const service = new FabricacionService(prisma, undefined as any, new CalidadService(prisma, hashing));
+    return { prisma, tx, service, hashing };
   }
 
   it('SEGUNDA en una estación intermedia: sella el grado, pare la reposición, deja la incidencia en la estación de ENTRADA y el par sigue', async () => {
     const { tx, service } = armar({ celulaActual: 'ALMACEN', linea: { celulaInicial: 'CORTE' }, lineaId: 2 }, tipoSegunda);
-    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario);
+    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, calidad);
 
     // Todo dentro de la misma transacción del pistolazo.
     expect(tx.par.updateMany).toHaveBeenCalledWith({ where: { id: 50, estado: 'EN_PROCESO' }, data: { calidad: 'SEGUNDA' } });
@@ -800,7 +805,7 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
 
   it('SEGUNDA al entrar a PT: el par termina en el saldo de SEGUNDAS aunque venía como primera', async () => {
     const { tx, service } = armar({ celulaActual: 'INYECCION', subPasoInyeccion: 'FINIZAJE' }, tipoSegunda);
-    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'PT' }, operario);
+    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'PT' }, calidad);
 
     expect(tx.par.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { calidad: 'SEGUNDA' } }));
     expect(tx.par.update).toHaveBeenCalledWith(
@@ -879,6 +884,27 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
       b.service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 8 }, gerente),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(b.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('SEGUNDA desde la sesión de la operaria: sin la clave de calidad → 403; con ella, firma calidad', async () => {
+    const a = armar({ celulaActual: 'ALMACEN' }, tipoSegunda);
+    await expect(
+      a.service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11 }, operario),
+    ).rejects.toMatchObject({ status: 403, message: 'Una segunda la autoriza calidad: pide su usuario y clave' });
+    expect(a.prisma.$transaction).not.toHaveBeenCalled();
+
+    const b = armar({ celulaActual: 'ALMACEN', linea: { celulaInicial: 'CORTE' } }, tipoSegunda);
+    const res = await b.service.avanzar(
+      'OF1-0001',
+      { operarioId: 3, tipoDanoId: 11, autorizacion: { username: 'rosa', password: 'secreta' } },
+      operario,
+    );
+    expect(b.hashing.verify).toHaveBeenCalledWith('h', 'secreta');
+    // El acta queda firmada por quien puso la clave, no por la sesión del celular.
+    expect(b.tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ autorizadoPorId: 21, operarioId: 3 }) }),
+    );
+    expect(res.avance).toMatchObject({ calidad: 'SEGUNDA', parReposicion: { codigo: 'OF1-0001-R1' } });
   });
 
   it('un tipo de daño inexistente o inactivo → 404, y el par no se mueve', async () => {

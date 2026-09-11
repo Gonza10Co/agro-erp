@@ -3,12 +3,16 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CalidadService } from './calidad.service';
 import { ESTACIONES_PILOTO } from '../fabricacion/fabricacion-core';
 
 const ventas = { sub: 7, role: 'VENTAS' };
 const gerente = { sub: 3, role: 'GERENTE' };
+const calidad = { sub: 11, role: 'CALIDAD' };
+/** La clave de quien autoriza se verifica como un login; acá siempre es válida salvo que se diga. */
+const hashingOk = { verify: jest.fn().mockResolvedValue(true) } as any;
 const tipoBaja = {
   id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada',
   celulaCausante: 'INYECCION', clase: 'BAJA', activo: true,
@@ -27,6 +31,7 @@ function makePrisma(overrides: any = {}) {
   };
   const prisma: any = {
     par: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn() },
     // Las estaciones del piloto: la reposición nace en la primera activa de su línea.
     estacion: { findMany: jest.fn().mockResolvedValue(ESTACIONES_PILOTO.map((e) => ({ ...e }))) },
     tipoDano: {
@@ -290,12 +295,12 @@ describe('CalidadService.reportar — SEGUNDA', () => {
     celulaCausante: 'INYECCION', clase: 'SEGUNDA', activo: true,
   };
 
-  it('sella el grado, pare la reposición en Preparación y deja el acta; no exige nota ni gerente', async () => {
+  it('sella el grado, pare la reposición en Preparación y deja el acta firmada por calidad; no exige nota', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({ ...parEnProceso, lineaId: 2, linea: { celulaInicial: 'CORTE' } });
     prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
 
-    const res = await new CalidadService(prisma).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, ventas);
+    const res = await new CalidadService(prisma, hashingOk).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, calidad);
 
     expect(tx.par.updateMany).toHaveBeenCalledWith({
       where: { id: 50, estado: 'EN_PROCESO' },
@@ -314,7 +319,7 @@ describe('CalidadService.reportar — SEGUNDA', () => {
     });
     expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ parId: 50, tipoDanoId: 19, celulaDeteccion: 'INYECCION', autorizadoPorId: 7, parReposicionId: 99 }),
+        data: expect.objectContaining({ parId: 50, tipoDanoId: 19, celulaDeteccion: 'INYECCION', autorizadoPorId: 11, parReposicionId: 99 }),
       }),
     );
     expect(res.parReposicion).toMatchObject({ codigo: 'OF1-0001-R1' });
@@ -325,8 +330,72 @@ describe('CalidadService.reportar — SEGUNDA', () => {
     prisma.par.findUnique.mockResolvedValue(parEnProceso);
     prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
     tx.par.updateMany.mockResolvedValue({ count: 0 });
-    await expect(new CalidadService(prisma).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, gerente))
+    await expect(new CalidadService(prisma, hashingOk).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, gerente))
       .rejects.toBeInstanceOf(ConflictException);
     expect(tx.par.create).not.toHaveBeenCalled();
+  });
+
+  it('403 si la sesión no es de calidad y nadie más firma', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+    await expect(new CalidadService(prisma, hashingOk).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, ventas))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('con la clave de calidad en el reporte, firma quien la puso aunque la sesión sea otra', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+    prisma.user.findUnique.mockResolvedValue({ id: 21, isActive: true, passwordHash: 'h', role: { name: 'CALIDAD' } });
+    const hashing = { verify: jest.fn().mockResolvedValue(true) } as any;
+
+    await new CalidadService(prisma, hashing).reportar(
+      'OF1-0001',
+      { tipoDanoId: 19, operarioId: 9, autorizacion: { username: 'rosa', password: 'secreta' } },
+      ventas,
+    );
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { username: 'rosa' } }));
+    expect(hashing.verify).toHaveBeenCalledWith('h', 'secreta');
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ autorizadoPorId: 21 }) }),
+    );
+  });
+
+  it('401 si la clave de quien autoriza es inválida, el usuario no existe o está inactivo', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+    const dto = { tipoDanoId: 19, operarioId: 9, autorizacion: { username: 'rosa', password: 'mala' } };
+
+    prisma.user.findUnique.mockResolvedValue({ id: 21, isActive: true, passwordHash: 'h', role: { name: 'CALIDAD' } });
+    const hashingMal = { verify: jest.fn().mockResolvedValue(false) } as any;
+    await expect(new CalidadService(prisma, hashingMal).reportar('OF1-0001', dto, ventas))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    prisma.user.findUnique.mockResolvedValue(null);
+    await expect(new CalidadService(prisma, hashingOk).reportar('OF1-0001', dto, ventas))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+
+    prisma.user.findUnique.mockResolvedValue({ id: 21, isActive: false, passwordHash: 'h', role: { name: 'CALIDAD' } });
+    await expect(new CalidadService(prisma, hashingOk).reportar('OF1-0001', dto, ventas))
+      .rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('quien autoriza con clave también tiene que tener el rol: un operario con clave no firma', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+    prisma.user.findUnique.mockResolvedValue({ id: 22, isActive: true, passwordHash: 'h', role: { name: 'OPERARIO' } });
+    await expect(
+      new CalidadService(prisma, hashingOk).reportar(
+        'OF1-0001',
+        { tipoDanoId: 19, operarioId: 9, autorizacion: { username: 'pepe', password: 'x' } },
+        ventas,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

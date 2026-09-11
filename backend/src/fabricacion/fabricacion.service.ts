@@ -1,13 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Celula, EstadoPar, Prisma } from '@prisma/client';
 import { CalidadService, Usuario } from '../calidad/calidad.service';
-import { validarReporte } from '../calidad/calidad-core';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
@@ -325,12 +323,11 @@ export class FabricacionService {
     // reposición. SEGUNDA: entra con el grado sellado (en PT carga el saldo de
     // segundas, no el de primeras). REPROCESO: entra y queda el registro.
     const tipo = dto.tipoDanoId != null ? await this.calidad.obtenerTipo(dto.tipoDanoId) : null;
+    // Quién firma: la sesión del celular o quien puso su clave (calidad / gerente).
+    let autorizador: Usuario | null = null;
     if (tipo) {
-      const err = validarReporte(tipo.clase, dto.descripcion, user?.role ?? '');
-      if (err === 'ROL_INSUFICIENTE')
-        throw new ForbiddenException('Solo un gerente puede autorizar una baja');
-      if (err === 'SIN_DESCRIPCION')
-        throw new BadRequestException('La baja requiere descripción (acta)');
+      autorizador = await this.calidad.resolverAutorizador(user ?? { sub: 0, role: '' }, dto.autorizacion);
+      this.calidad.exigirFirma(tipo.clase, dto.descripcion, autorizador.role);
       if (tipo.clase === 'BAJA') return this.darDeBajaEnEstacion(par, dto, user!, destino);
     }
     const calidad = tipo?.clase === 'SEGUNDA' ? 'SEGUNDA' : par.calidad;
@@ -380,7 +377,7 @@ export class FabricacionService {
               celulaDeteccion: destino.celulaDestino,
               operarioId: dto.operarioId,
               descripcion: dto.descripcion,
-              autorizadoPorId: user?.sub ?? null,
+              autorizadoPorId: autorizador!.sub,
             },
             celulaInicial,
             par.lineaId ?? marca?.lineaId ?? null,
@@ -518,7 +515,12 @@ export class FabricacionService {
   ) {
     const r = await this.calidad.reportar(
       par.codigo,
-      { tipoDanoId: dto.tipoDanoId!, operarioId: dto.operarioId, descripcion: dto.descripcion },
+      {
+        tipoDanoId: dto.tipoDanoId!,
+        operarioId: dto.operarioId,
+        descripcion: dto.descripcion,
+        autorizacion: dto.autorizacion,
+      },
       user,
     );
     const hoy = await this.hoyEnEstacion(destino.estacionDestino);
