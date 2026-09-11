@@ -1067,7 +1067,7 @@ export class FabricacionService {
     return {
       estaciones: estaciones.filter((e) => e.activa),
       ordenes: ofs.map((of: any) => {
-        const programa = programaDeOf(of);
+        const programa = programaDeOf(of, estaciones);
         return {
           id: of.id,
           consecutivo: of.consecutivo,
@@ -1104,7 +1104,10 @@ const HABILES_POR_DEFECTO = 24;
 const CELULAS_META: string[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
 
 /** Programado vs nacidos vs terminados por producto × talla, a partir de la OF cargada con OP y pares. */
-function programaDeOf(of: any): {
+function programaDeOf(
+  of: any,
+  estaciones: readonly EstacionDef[] = [],
+): {
   productoConfiguradoId: number;
   producto: string;
   productoCodigo: string;
@@ -1113,16 +1116,17 @@ function programaDeOf(of: any): {
   programado: number;
   nacidos: number;
   terminados: number;
+  /** Avance acumulado por estación, igual que la cabecera de la orden. */
+  porEstacion: Record<string, number>;
 }[] {
   const pares: any[] = of.pares ?? [];
-  const cuenta = (pcId: number, tallaId: number, pred: (p: any) => boolean) =>
-    pares.filter(
-      (p) => p.productoConfiguradoId === pcId && p.tallaId === tallaId && !p.reponeAParId && pred(p),
-    ).length;
+  const deLinea = (pcId: number, tallaId: number) =>
+    pares.filter((p) => p.productoConfiguradoId === pcId && p.tallaId === tallaId && !p.reponeAParId);
   const out: ReturnType<typeof programaDeOf> = [];
   for (const l of (of.op?.lineas ?? []) as any[]) {
     for (const t of (l.tallas ?? []) as any[]) {
       if (!(t.cantAProducir > 0)) continue;
+      const suyos = deLinea(l.productoConfiguradoId, t.tallaId);
       out.push({
         productoConfiguradoId: l.productoConfiguradoId,
         producto: l.productoConfigurado?.nombreComercial ?? '',
@@ -1130,8 +1134,17 @@ function programaDeOf(of: any): {
         tallaId: t.tallaId,
         talla: String(t.talla?.valor ?? t.tallaId),
         programado: t.cantAProducir,
-        nacidos: cuenta(l.productoConfiguradoId, t.tallaId, (p) => p.estado !== 'CANCELADO'),
-        terminados: cuenta(l.productoConfiguradoId, t.tallaId, (p) => p.estado === 'TERMINADO'),
+        nacidos: suyos.filter((p) => p.estado !== 'CANCELADO').length,
+        terminados: suyos.filter((p) => p.estado === 'TERMINADO').length,
+        porEstacion: paresPorEstacion(
+          suyos.map((p) => ({
+            estado: p.estado,
+            celula: p.celulaActual,
+            subPaso: p.subPasoActual,
+            subPasoInyeccion: p.subPasoInyeccion,
+          })),
+          estaciones,
+        ),
       });
     }
   }

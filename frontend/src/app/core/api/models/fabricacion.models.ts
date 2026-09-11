@@ -46,6 +46,8 @@ export interface ProgramaOfLinea {
   programado: number;
   nacidos: number;
   terminados: number;
+  /** Avance acumulado por estación (código → cantidad); solo lo trae el tablero por órdenes. */
+  porEstacion?: Record<string, number | undefined>;
 }
 
 export interface OFDetalle {
