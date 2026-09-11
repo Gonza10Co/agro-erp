@@ -21,10 +21,10 @@ describe('puedeVerModulo', () => {
     expect(puedeVerModulo('CLIENTE', 'reportes')).toBeTrue();
   });
 
-  it('CLIENTE NO ve administracion: es la proxima entrega (EN_STAGE)', () => {
-    // El escalafón vuelve a tener uso tras la liberación total del 2026-08-12.
-    // Sube a ENTREGADO el día que se muestre la demo, no antes.
-    expect(puedeVerModulo('CLIENTE', 'administracion')).toBeFalse();
+  it('CLIENTE ve administracion desde el 2026-09-11 (carga sus operarios reales)', () => {
+    // Vivió en EN_STAGE del 2026-08-13 al 2026-09-11. El gate es de UI: crear
+    // usuarios sigue siendo solo ADMIN y operarios ADMIN/GERENTE en el backend.
+    expect(puedeVerModulo('CLIENTE', 'administracion')).toBeTrue();
     expect(puedeVerModulo('STAGE', 'administracion')).toBeTrue();
     expect(puedeVerModulo('ADMIN', 'administracion')).toBeTrue();
   });
@@ -89,7 +89,8 @@ describe('puedeVerModulo', () => {
       expect(puedeVerNivel('STAGE', 'INTERNO')).toBeFalse();
       expect(puedeVerModulo('STAGE', 'inicio')).toBeTrue();
       expect(puedeVerModulo('STAGE', 'despachos')).toBeTrue();
-      // Y eso es exactamente lo que le deja ver la próxima entrega en la demo.
+      // Y eso es exactamente lo que le dejará ver la próxima entrega en la demo
+      // (hoy no hay ninguna oculta: todo está ENTREGADO desde el 2026-09-11).
       expect(puedeVerModulo('STAGE', 'administracion')).toBeTrue();
     });
   });
@@ -127,9 +128,10 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     // conciencia. El 2026-08-12 la lista quedó vacía (se liberó todo); el
     // 2026-08-20 entra `programacion-corte`, la Quincena 1 del rediseño lote↔par.
     // El 2026-09-09 entra `piloto` (estaciones, TV y tablero por órdenes); se
-    // liberó el 2026-09-11 y ese mismo día entra `calidad-en-planta` ("algo pasó
-    // con este par" desde la estación), la quincena siguiente.
-    const RESERVADAS: Seccion[] = ['programacion-corte', 'calidad-en-planta'];
+    // liberó el 2026-09-11 y ese mismo día entró y SALIÓ `calidad-en-planta`.
+    // El 2026-09-11 Gonza decidió liberar todo ("no hay necesidad de seguir
+    // escondiendo el avance"): la lista vuelve a quedar vacía.
+    const RESERVADAS: Seccion[] = [];
 
     const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
     for (const s of secciones) {
@@ -138,9 +140,10 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     }
   });
 
-  it('el perfil STAGE sí ve la Quincena 1 (control de corte) antes de la demo', () => {
+  it('el control de corte y la calidad en planta ya los ve el CLIENTE (2026-09-11)', () => {
     expect(puedeVerSeccion('STAGE', 'programacion-corte')).toBeTrue();
-    expect(puedeVerSeccion('CLIENTE', 'programacion-corte')).toBeFalse();
+    expect(puedeVerSeccion('CLIENTE', 'programacion-corte')).toBeTrue();
+    expect(puedeVerSeccion('CLIENTE', 'calidad-en-planta')).toBeTrue();
   });
 
   it('el CLIENTE ve la factura de servicio, liberada el 2026-08-08', () => {

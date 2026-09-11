@@ -41,8 +41,9 @@ const RANK: Record<NivelLiberacion, number> = { ENTREGADO: 0, EN_STAGE: 1, INTER
  * subir un módulo de EN_STAGE a ENTREGADO lo "mergea a cliente" tras aprobar la demo.
  *
  * El 2026-08-12 el mapa quedó TODO en ENTREGADO — el cliente ve el sistema completo.
- * Desde el 2026-08-13 vuelve a haber un módulo en EN_STAGE (`administracion`): es la
- * próxima entrega, que como siempre nace oculta al cliente.
+ * Del 2026-08-13 al 2026-09-11 `administracion` vivió en EN_STAGE; desde el
+ * 2026-09-11 vuelve a estar TODO en ENTREGADO (módulos y secciones): el cliente
+ * ya usa el sistema en planta y no hay razón para esconderle el avance.
  */
 export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // ENTREGADO — visible al cliente (demos 1-2: pedidos + clientes + catálogo/BOM).
@@ -76,10 +77,12 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   calidad: 'ENTREGADO',
   indicadores: 'ENTREGADO',
   inicio: 'ENTREGADO',
-  // EN_STAGE — la próxima entrega, aún oculta al cliente. Administración de
-  // usuarios (accesos al sistema) y operarios (gente de planta). Nace acá por
-  // la regla de siempre: solo sube a ENTREGADO el día que se muestra.
-  administracion: 'EN_STAGE',
+  // Liberado el 2026-09-11 (decisión de Gonza: "a esta altura no hay necesidad de
+  // seguir escondiendo el avance"): usuarios (accesos) y operarios (gente de
+  // planta). El cliente necesita cargar sus operarios reales para el piloto.
+  // ⚠️ El backend sigue mandando: crear usuarios es solo ADMIN y operarios
+  // ADMIN/GERENTE; el rol CLIENTE ve las pantallas pero sus escrituras dan 403.
+  administracion: 'ENTREGADO',
 };
 
 /**
@@ -117,15 +120,18 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
-  // Quincena de calidad en planta (2026-09-11). Nace EN_STAGE: la puerta desde
-  // la pantalla de estación para marcar un par como segunda, darlo de baja o
-  // registrar un reproceso sin salir de la línea. Ver
-  // docs/specs/2026-09-11-quincena-calidad-en-planta.md
-  'calidad-en-planta': 'EN_STAGE',
-  // Quincena 1 del rediseño lote↔par (2026-08-20). Nace EN_STAGE: es la próxima
-  // entrega. Controla la orden de corte del día — programado vs. cortado, piezas
-  // repuestas y consumo real. Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md
-  'programacion-corte': 'EN_STAGE',
+  // Quincena de calidad en planta (2026-09-11): la puerta desde la pantalla de
+  // estación para marcar un par como segunda, darlo de baja o registrar un
+  // reproceso sin salir de la línea. Liberada el mismo día que se construyó:
+  // sin ella un par malo entra a bodega como bueno, y el cliente ya usa el
+  // piloto. Ver docs/specs/2026-09-11-quincena-calidad-en-planta.md
+  'calidad-en-planta': 'ENTREGADO',
+  // Quincena 1 del rediseño lote↔par (2026-08-20). Controla la orden de corte del
+  // día — programado vs. cortado, piezas repuestas y consumo real. Liberada el
+  // 2026-09-11 junto con todo lo demás. ⚠️ Sigue siendo un control aparte: el
+  // puente lote↔par (`Par.ordenCorteId`) no está conectado y el consumo real no
+  // descuenta inventario. Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md
+  'programacion-corte': 'ENTREGADO',
   // Piloto de planta — liberado en la demo del 2026-09-11. La pantalla de estación
   // (nacimiento del par + pistolazo), la TV de planta y el tablero por órdenes.
   // Ver agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md
