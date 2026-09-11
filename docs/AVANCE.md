@@ -4,10 +4,43 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-09-09** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-09-11** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
-> **🏭 PILOTO DE PLANTA (Ola 3) — construido el 2026-09-09, se muestra el viernes 2026-09-11.**
+> **🩹 CALIDAD EN LA PANTALLA DE PLANTA — construido el 2026-09-11, en `develop`, sección
+> `calidad-en-planta` EN_STAGE.** Plan: `docs/specs/2026-09-11-quincena-calidad-en-planta.md`.
+> El piloto se entregó ese mismo día (tag `entrega-piloto`) y quedó claro el hueco: la estación
+> **solo sabía avanzar** — un par malo entraba a bodega como bueno. Lo que se hizo:
+>
+> - **El pistolazo lleva el daño** (`AvanzarDto.tipoDanoId` + nota opcional) y la clase del tipo
+>   decide el destino en la MISMA transacción del escaneo: **SEGUNDA** sella el grado y el par
+>   entra (en PT termina en el saldo de segundas); **REPROCESO** deja la incidencia y sigue;
+>   **BAJA** no entra — muere donde está y nace su reposición (gerente + acta, como siempre).
+>   La incidencia se detecta en la estación de ENTRADA (quien recibe el par es quien lo ve).
+>   Primero el control: un par fuera de orden se rechaza aunque traiga daño.
+> - **Una SEGUNDA ya no exige nota escrita** (`validarReporte`): el tipo dice el porqué; desde el
+>   celular con guantes la nota era captura manual. La BAJA sí sigue exigiendo rol + acta.
+> - **La reposición de una baja nace en la estación de nacimiento de su línea** (Preparación /
+>   Montaje) con evento de entrada, no en la célula a secas: en el piloto quedaba en un limbo
+>   (Preparación no escanea, imprime). La TV la cuenta y la estación ofrece imprimirle la lengua.
+> - **Pantalla de estación**: botón ámbar "⚠ Algo pasó con este par" (en PT: "✋ No aprobó la
+>   inspección", el flujo que describió Mauricio) → catálogo de daños (segundas primero, baja al
+>   final, cada uno dice qué le pasa al par) → escanear. Una lectura por reporte. El resultado de
+>   una segunda/baja sale en ámbar. **El sticker de la caja de una SEGUNDA sale sin cliente y con
+>   banda SEGUNDA** (asunción: va a saldos, no al pedido — pregunta 2 del plan, pendiente de JP).
+> - **Verificado E2E en local** (base :5434, copia de prod) por API: OF1-0002 marcada SEGUNDA en
+>   Bodega → Montaje → Finizaje → PT termina como SEGUNDA con su incidencia en ALMACEN; OF1-0003
+>   dada de baja en Bodega → `OF1-0003-R1` nace en Preparación (GUARNICION/PREPARACION, evento de
+>   entrada, `hoy` de Preparación sube a 21); reproceso en OF1-0004; 400 sin acta, 404 tipo
+>   inexistente, 403 como CLIENTE, 409 fuera de orden sin tocar el par.
+>   Tests: backend 694 · frontend 425, verdes.
+> - **Falta de la quincena**: las 5 preguntas del plan a JP/Mauricio (la más urgente: ¿de dónde
+>   sale el COLOR del sticker?), impresora térmica probada, y **un día completo en una estación
+>   con la gente real**. Para liberar: voltear `calidad-en-planta` a ENTREGADO en `modulos.ts`.
+>
+> **Anterior (2026-09-09):**
+>
+> **🏭 PILOTO DE PLANTA (Ola 3) — construido el 2026-09-09, se mostró el viernes 2026-09-11 ✅.**
 > Lo acordado en la visita a planta con Mauricio Sierra (jefe de producción); detalle en
 > `agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md`. Está en `develop`, sección `piloto`
 > en **EN_STAGE** (se demuestra con el perfil `stage`; el día de la demo se voltea a ENTREGADO).

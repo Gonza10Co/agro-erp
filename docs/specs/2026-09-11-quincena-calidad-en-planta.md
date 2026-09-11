@@ -1,6 +1,7 @@
 # Quincena: lo que le falta al piloto para usarse de verdad
 
-**Fecha:** 2026-09-11 · **Estado:** plan, sin empezar
+**Fecha:** 2026-09-11 · **Estado:** puntos 1–3 construidos el mismo día (en `develop`, gate
+`calidad-en-planta` EN_STAGE); faltan las preguntas al cliente y la prueba con la gente real
 **Antecedente:** el piloto de planta se entregó hoy al cliente (tag `entrega-piloto`,
 `master` 2fce838). Funcionó con QR reales leídos desde el celular.
 
@@ -95,9 +96,14 @@ reales. `programacion-corte` se queda en `EN_STAGE`.
 
 ## Criterio de "listo para implementar"
 
-- [ ] Un par se puede marcar como segunda o dar de baja **desde la pantalla de estación**,
-      con su tipo de daño, sin salir de la línea.
-- [ ] Lo rechazado en PT **no entra** al inventario de primera.
+- [x] Un par se puede marcar como segunda o dar de baja **desde la pantalla de estación**,
+      con su tipo de daño, sin salir de la línea. ✅ 2026-09-11 (`b5fc4d8` + `8d676dc`):
+      el daño viaja en el pistolazo; una lectura por reporte; la reposición de una baja nace en
+      Preparación con evento y la estación ofrece imprimirle la lengua.
+- [x] Lo rechazado en PT **no entra** al inventario de primera. ✅ verificado E2E en local
+      (OF1-0002 terminó en el saldo de SEGUNDAS con su incidencia en la estación de entrada).
+      Decisiones tomadas mientras el cliente responde: una segunda **no exige nota** (el tipo
+      dice el porqué) y su sticker sale **sin cliente y con banda SEGUNDA**.
 - [ ] Las cinco preguntas de arriba, respondidas por el cliente.
 - [ ] Impresora térmica probada con las dos etiquetas reales.
 - [ ] **Un día completo, una sola estación, con la gente real.** Probamos con 20 pares y
