@@ -91,6 +91,8 @@ export interface DatosCaja {
   marca: string;
   color: string;
   cliente: string;
+  /** Una SEGUNDA se imprime marcada y sin cliente: ya no va al pedido, va a saldos. */
+  calidad: 'PRIMERA' | 'SEGUNDA';
   fecha: Date;
 }
 
@@ -105,7 +107,11 @@ export function datosCajaDePar(p: ParDetalle, fecha = new Date()): DatosCaja {
     color:
       p.productoConfigurado?.opciones?.find((o) => o.opcion.grupoOpcion.codigo === 'COLOR')?.opcion
         .nombre ?? '',
-    cliente: p.of?.op?.oc?.cliente?.nombre ?? '',
+    // ⚠️ Asunción hasta que JP/Mauricio respondan (plan 2026-09-11, pregunta 2):
+    // una segunda no lleva marquilla ni va al cliente del pedido, así que el
+    // sticker sale sin cliente y con la marca SEGUNDA bien visible.
+    cliente: p.calidad === 'SEGUNDA' ? '' : (p.of?.op?.oc?.cliente?.nombre ?? ''),
+    calidad: p.calidad === 'SEGUNDA' ? 'SEGUNDA' : 'PRIMERA',
     fecha,
   };
 }
@@ -148,6 +154,18 @@ export async function descargarStickerCaja(d: DatosCaja): Promise<void> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   if (d.marca) doc.text(d.marca, ancho / 2, 30.8, { align: 'center' });
+
+  // Una SEGUNDA lleva la marca donde iría el cliente: es lo que el almacenista
+  // tiene que ver antes de ponerla en la estantería de primeras.
+  if (d.calidad === 'SEGUNDA') {
+    doc.setFillColor(...TINTA);
+    doc.rect(4, 32.4, ancho - 8, 4.4, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('SEGUNDA', ancho / 2, 35.6, { align: 'center' });
+    doc.setTextColor(...TINTA);
+  }
 
   // El cliente, separado por una línea: es el dato del despacho, no del producto.
   if (d.cliente) {

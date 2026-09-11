@@ -2,12 +2,35 @@ import { Component, DestroyRef, NgZone, OnDestroy, OnInit, computed, inject, sig
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
+import { CalidadApi } from '../../core/api/calidad.api';
 import {
   Estacion, Operario, Maquina, OFListItem, OFDetalle, ProgramaOfLinea, LABEL_CELULA,
+  AvanceResultado, DanoEscaneo,
 } from '../../core/api/models/fabricacion.models';
+import { DESTINO_CLASE, TipoDano } from '../../core/api/models/calidad.models';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
-import { descargarEtiquetasLengua, descargarStickerCaja, datosCajaDePar } from './etiqueta-par-pdf';
+import {
+  descargarEtiquetasLengua, descargarStickerCaja, datosCajaDePar, datosLenguaDePar,
+} from './etiqueta-par-pdf';
 import { agruparPrograma } from './programa-of';
+
+/** Lo que ve el operario después de un pistolazo o un nacimiento: grande, de reojo. */
+interface Resultado {
+  ok: boolean;
+  /** Salió bien pero hay que mirarlo (segunda, baja, reproceso): ámbar, no verde. */
+  alerta?: boolean;
+  titulo: string;
+  detalle?: string;
+  /** Código del par para reimprimir el sticker de la caja (solo al terminar en PT). */
+  sticker?: string;
+  /** Código de la reposición que acaba de nacer: hay que imprimirle la lengua. */
+  lengua?: string;
+}
+
+/** Orden del catálogo en la estación: lo que más pasa primero, la baja al final. */
+const ORDEN_CLASE: Record<TipoDano['clase'], number> = { SEGUNDA: 0, REPROCESO: 1, BAJA: 2 };
 
 /** Lo que el dispositivo recuerda entre turnos (se configura una vez). */
 export interface ConfigEstacion {
@@ -40,6 +63,12 @@ export function guardarConfig(c: ConfigEstacion | null): void {
  * fijan una vez por turno, la máquina es opcional, el destino lo decide el
  * sistema. En Preparación no se escanea: ahí NACEN los pares (se imprime la
  * etiqueta de la lengua contra lo programado en la OF).
+ *
+ * "Algo pasó con este par" (quincena de calidad, 2026-09-11): un botón secundario
+ * arma el SIGUIENTE escaneo con un daño tipificado; la clase del tipo decide el
+ * destino (segunda / reproceso / baja + reposición) en el mismo pistolazo. En PT
+ * es la inspección que pidió Mauricio: si no aprueba, se marca y luego se lee.
+ * Una lectura por reporte: después del escaneo la pantalla vuelve a lo normal.
  */
 @Component({
   selector: 'app-estacion',
@@ -135,6 +164,39 @@ export function guardarConfig(c: ConfigEstacion | null): void {
         } @else {
           <!-- ── Cualquier otra estación: el pistolazo ── -->
           <div class="card"><div class="card-body">
+            @if (puedeReportar) {
+              @if (!modoCalidad()) {
+                <button class="btn btn-calidad" type="button" (click)="abrirCalidad()">
+                  {{ esPT() ? '✋ No aprobó la inspección' : '⚠ Algo pasó con este par' }}
+                </button>
+              } @else {
+                <div class="calidad" role="group" aria-label="Qué tiene el par">
+                  <div class="calidad-cab">
+                    <div class="ph-title">{{ esPT() ? 'No aprobó: ¿qué tiene el par?' : '¿Qué tiene el par?' }}</div>
+                    <button class="btn btn-sm" type="button" (click)="cerrarCalidad()">Cancelar ✕</button>
+                  </div>
+                  @if (!tipos().length) { <p class="cell-sub">Cargando el catálogo de daños…</p> }
+                  <div class="tipos">
+                    @for (t of tipos(); track t.id) {
+                      <button type="button" class="tipo" [class.sel]="t.id === tipoSel()" [class.baja]="t.clase === 'BAJA'" (click)="tipoSel.set(t.id)">
+                        <span class="tipo-nombre">{{ t.nombre }}</span>
+                        <span class="tipo-destino">{{ destino(t) }}</span>
+                      </button>
+                    }
+                  </div>
+                  @if (tipoActual(); as t) {
+                    @if (t.clase === 'BAJA' && !puedeBaja) {
+                      <div class="msg err">Solo un gerente puede autorizar una baja.</div>
+                    } @else {
+                      <label class="nota">Nota {{ t.clase === 'BAJA' ? '(acta, obligatoria)' : '(opcional)' }}
+                        <input [(ngModel)]="nota" maxlength="500" [placeholder]="t.clase === 'BAJA' ? 'Qué pasó: queda en el acta' : ''" />
+                      </label>
+                      <div class="armado">Ahora escanea el par → {{ destino(t) }}</div>
+                    }
+                  }
+                </div>
+              }
+            }
             <div class="scan-fila">
               <label class="scan-label">Escanear el par
                 <input #scan class="scan-input mono" [(ngModel)]="codigo" (keyup.enter)="escanear()" placeholder="OF5-0001" autofocus />
@@ -151,13 +213,16 @@ export function guardarConfig(c: ConfigEstacion | null): void {
 
         <!-- ── Resultado del último pistolazo / nacimiento: grande, para verlo de reojo ── -->
         @if (resultado(); as r) {
-          <div class="resultado" [class.ok]="r.ok" [class.err]="!r.ok">
-            <div class="res-icono">{{ r.ok ? '✔' : '✖' }}</div>
+          <div class="resultado" [class.ok]="r.ok && !r.alerta" [class.warn]="r.ok && r.alerta" [class.err]="!r.ok">
+            <div class="res-icono">{{ !r.ok ? '✖' : r.alerta ? '⚠' : '✔' }}</div>
             <div>
               <div class="res-titulo">{{ r.titulo }}</div>
               @if (r.detalle) { <div class="res-detalle">{{ r.detalle }}</div> }
               @if (r.sticker) {
                 <button class="btn btn-sm" type="button" (click)="imprimirSticker(r.sticker)">Imprimir sticker de la caja 🏷️</button>
+              }
+              @if (r.lengua) {
+                <button class="btn btn-sm" type="button" (click)="imprimirLengua(r.lengua)">Imprimir etiqueta de la lengua de {{ r.lengua }} 🏷️</button>
               }
             </div>
           </div>
@@ -204,13 +269,30 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .barra-fill{height:100%;background:var(--primary)}
     .resultado{display:flex;gap:var(--sp-4);align-items:center;margin-top:var(--sp-3);padding:var(--sp-4);border-radius:var(--r-lg);border:2px solid transparent}
     .resultado.ok{background:var(--success-subtle);border-color:var(--success)}
+    .resultado.warn{background:var(--warning-subtle);border-color:var(--warning)}
     .resultado.err{background:var(--error-subtle);border-color:var(--error)}
     .res-icono{font-size:44px;line-height:1}
-    .resultado.ok .res-icono{color:var(--success)} .resultado.err .res-icono{color:var(--error)}
+    .resultado.ok .res-icono{color:var(--success)} .resultado.warn .res-icono{color:var(--warning)} .resultado.err .res-icono{color:var(--error)}
+    .resultado .btn{margin-top:var(--sp-2);margin-right:var(--sp-2)}
+    /* "Algo pasó con este par": ámbar, secundario, pero con el tamaño de un dedo con guante. */
+    .btn-calidad{min-height:48px;margin-bottom:var(--sp-3);border-color:var(--warning);background:var(--warning-subtle);color:var(--text)}
+    .calidad{margin-bottom:var(--sp-3);padding:var(--sp-3);border:2px solid var(--warning);border-radius:var(--r-lg);background:var(--warning-subtle)}
+    .calidad-cab{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);margin-bottom:var(--sp-2)}
+    .tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--sp-2)}
+    .tipo{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:56px;padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-md);background:var(--surface);color:inherit;font:inherit;text-align:left;cursor:pointer}
+    .tipo.sel{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)}
+    .tipo-nombre{font-weight:var(--fw-medium)}
+    .tipo-destino{font-size:var(--text-micro);text-transform:uppercase;letter-spacing:.06em;color:var(--text-subtle)}
+    .tipo.baja .tipo-destino{color:var(--error)}
+    .nota{display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-3);font-size:var(--text-caption);color:var(--text-subtle)}
+    .nota input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
+    .armado{margin-top:var(--sp-2);font-weight:var(--fw-bold)}
+    .msg.err{margin-top:var(--sp-2);color:var(--error);font-weight:var(--fw-medium)}
     .res-titulo{font-size:var(--text-h2);font-weight:var(--fw-bold)}
     .res-detalle{color:var(--text-muted);margin-top:var(--sp-1)}
     @media (max-width:640px){
-      .config label,.scan-label,.scan-input,.btn-camara,.acciones .btn,.of-sel{width:100%;max-width:none;min-width:0}
+      .config label,.scan-label,.scan-input,.btn-camara,.acciones .btn,.of-sel,.btn-calidad{width:100%;max-width:none;min-width:0}
+      .tipos{grid-template-columns:1fr}
       /* En el celular cada talla es una TARJETA, no una fila: la talla y su avance
          arriba, y el botón a todo el ancho abajo — es el que se toca con guantes. */
       .programa thead{display:none}
@@ -231,8 +313,21 @@ export function guardarConfig(c: ConfigEstacion | null): void {
 })
 export class EstacionComponent implements OnInit, OnDestroy {
   private readonly api = inject(FabricacionApi);
+  private readonly calidadApi = inject(CalidadApi);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
+
+  // "Algo pasó con este par" — gate EN_STAGE hasta la demo de la quincena.
+  readonly puedeReportar = puedeVerSeccion(this.auth.rol(), 'calidad-en-planta');
+  /** Una baja destruye producto: la firma el gerente (misma regla que el backend). */
+  readonly puedeBaja = ['GERENTE', 'ADMIN'].includes(this.auth.rol() ?? '');
+  modoCalidad = signal(false);
+  tipos = signal<TipoDano[]>([]);
+  tipoSel = signal<number | undefined>(undefined);
+  nota = '';
+  tipoActual = computed(() => this.tipos().find((t) => t.id === this.tipoSel()));
+  destino = (t: TipoDano) => DESTINO_CLASE[t.clase];
 
   readonly tieneCamara = hayCamara();
   camaraActiva = signal(false);
@@ -247,7 +342,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   operarios = signal<Operario[]>([]);
   maquinas = signal<Maquina[]>([]);
   hoy = signal(0);
-  resultado = signal<{ ok: boolean; titulo: string; detalle?: string; sticker?: string } | null>(null);
+  resultado = signal<Resultado | null>(null);
 
   // Preparación
   ofs = signal<OFListItem[]>([]);
@@ -263,6 +358,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
   codigo = '';
 
   estacionActual = computed(() => this.estaciones().find((e) => e.codigo === this.config()?.estacion));
+  /** En PT el botón de calidad es la inspección: "no aprobó" en vez de "algo pasó". */
+  esPT = computed(() => this.estacionActual()?.celula === 'PT');
   /** La primera estación activa es donde nacen los pares: ahí no se escanea, se imprime. */
   esNacimiento = computed(() => {
     const c = this.config();
@@ -419,15 +516,23 @@ export class EstacionComponent implements OnInit, OnDestroy {
     const cod = this.codigo.trim();
     if (!c || !cod) return;
     this.codigo = '';
-    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    let dano: DanoEscaneo | undefined;
+    if (this.modoCalidad()) {
+      const t = this.tipoActual();
+      const falta = this.faltaParaReportar(t);
+      if (falta) {
+        this.resultado.set({ ok: false, titulo: cod, detalle: falta });
+        this.reanudarCamaraConGracia();
+        return;
+      }
+      dano = { tipoDanoId: t!.id, descripcion: this.nota };
+    }
+    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, dano).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => {
         this.hoy.set(r.avance.hoy);
-        this.resultado.set({
-          ok: true,
-          titulo: r.avance.terminado ? `${r.codigo} terminado ✓` : `${r.codigo} → ${r.avance.nombre}`,
-          detalle: r.avance.terminado ? 'Cargado a producto terminado' : `van ${r.avance.hoy} hoy`,
-          sticker: r.avance.terminado ? r.codigo : undefined,
-        });
+        this.resultado.set(this.resumen(r));
+        // Una lectura por reporte: el siguiente escaneo vuelve a ser normal.
+        if (dano) this.cerrarCalidad();
         this.reanudarCamaraConGracia();
       },
       error: (e) => {
@@ -437,10 +542,80 @@ export class EstacionComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Lo que ve el operario después del pistolazo. Una segunda o una baja van en ámbar. */
+  private resumen(r: AvanceResultado): Resultado {
+    const a = r.avance;
+    const inc = a.incidencia?.tipoDano;
+    if (inc?.clase === 'BAJA') {
+      const rep = a.parReposicion;
+      return {
+        ok: true,
+        alerta: true,
+        titulo: `${r.codigo} dado de baja ✖`,
+        detalle: rep ? `${inc.nombre} · lo repone ${rep.codigo}, que nace en Preparación` : inc.nombre,
+        lengua: rep?.codigo,
+      };
+    }
+    const segunda = a.calidad === 'SEGUNDA';
+    const grado = segunda ? ' · SEGUNDA' : '';
+    const titulo = a.terminado ? `${r.codigo} terminado${segunda ? grado : ' ✓'}` : `${r.codigo} → ${a.nombre}${grado}`;
+    const partes: string[] = [];
+    if (inc) partes.push(inc.clase === 'REPROCESO' ? `Reproceso: ${inc.nombre}` : inc.nombre);
+    if (a.terminado) partes.push(segunda ? 'Cargado a bodega como segunda: va a saldos' : 'Cargado a producto terminado');
+    else partes.push(`van ${a.hoy} hoy`);
+    return {
+      ok: true,
+      alerta: !!inc || segunda,
+      titulo,
+      detalle: partes.join(' · '),
+      sticker: a.terminado ? r.codigo : undefined,
+    };
+  }
+
+  // ─────────────── "Algo pasó con este par" ───────────────
+
+  abrirCalidad(): void {
+    this.modoCalidad.set(true);
+    this.tipoSel.set(undefined);
+    this.nota = '';
+    this.resultado.set(null);
+    if (this.tipos().length) return;
+    this.calidadApi.tiposDano().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (t) => this.tipos.set([...t].sort((a, b) => ORDEN_CLASE[a.clase] - ORDEN_CLASE[b.clase] || a.nombre.localeCompare(b.nombre))),
+      error: () => {
+        this.modoCalidad.set(false);
+        this.resultado.set({ ok: false, titulo: 'No se pudo cargar el catálogo de daños', detalle: 'Revisa la conexión con el servidor.' });
+      },
+    });
+  }
+
+  cerrarCalidad(): void {
+    this.modoCalidad.set(false);
+    this.tipoSel.set(undefined);
+    this.nota = '';
+  }
+
+  /** Por qué todavía no se puede escanear en modo calidad (null = listo). */
+  private faltaParaReportar(t: TipoDano | undefined): string | null {
+    if (!t) return 'Primero elige qué tiene el par';
+    if (t.clase !== 'BAJA') return null;
+    if (!this.puedeBaja) return 'Solo un gerente puede autorizar una baja';
+    if (!this.nota.trim()) return 'La baja necesita una nota: es el acta';
+    return null;
+  }
+
   imprimirSticker(codigo: string): void {
     this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (p) => void descargarStickerCaja(datosCajaDePar(p)),
       error: () => this.resultado.set({ ok: false, titulo: 'No se pudo armar el sticker', detalle: codigo }),
+    });
+  }
+
+  /** La reposición nace en Preparación, pero la etiqueta se imprime desde donde se dio la baja. */
+  imprimirLengua(codigo: string): void {
+    this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (p) => void descargarEtiquetasLengua([datosLenguaDePar(p)]),
+      error: () => this.resultado.set({ ok: false, titulo: 'No se pudo armar la etiqueta', detalle: codigo }),
     });
   }
 

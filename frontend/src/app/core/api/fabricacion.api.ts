@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes, TableroResumen,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -24,13 +24,16 @@ export class FabricacionApi {
    * Un pistolazo. La máquina es opcional (en Bodega o PT no hay) y la estación,
    * si se manda, hace que el backend rechace el escaneo si el par se saltó una.
    */
-  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string) {
+  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string, dano?: DanoEscaneo) {
+    const nota = dano?.descripcion?.trim();
     return this.http.post<AvanceResultado>(
       `${this.base}/fabricacion/par/${codigo}/avanzar`,
       {
         operarioId,
         ...(maquinaId != null ? { maquinaId } : {}),
         ...(estacion ? { estacion } : {}),
+        // "Algo pasó con este par": el daño viaja en el mismo escaneo.
+        ...(dano ? { tipoDanoId: dano.tipoDanoId, ...(nota ? { descripcion: nota } : {}) } : {}),
       },
     );
   }

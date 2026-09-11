@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { EstacionComponent, CLAVE_CONFIG, guardarConfig, leerConfig } from './estacion.component';
+import { AuthService } from '../../core/auth/auth.service';
 import { environment } from '../../../environments/environment';
 
 const BASE = `${environment.apiUrl}/fabricacion`;
@@ -12,10 +13,14 @@ const ESTACIONES = [
   { codigo: 'PT', nombre: 'Producto terminado', orden: 6, celula: 'PT', subPaso: null, subPasoInyeccion: null, activa: true },
 ];
 
-function crear() {
+/** `puedeBaja` se calcula al construir el componente: el rol se fija ANTES de crearlo. */
+function crear(rol: string | null = null) {
   TestBed.configureTestingModule({
     imports: [EstacionComponent],
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [
+      provideHttpClient(), provideHttpClientTesting(),
+      { provide: AuthService, useValue: { rol: () => rol } },
+    ],
   });
   const fixture = TestBed.createComponent(EstacionComponent);
   const http = TestBed.inject(HttpTestingController);
@@ -118,5 +123,146 @@ describe('EstacionComponent', () => {
     expect(comp.hoy()).toBe(5);
     expect(comp.resultado()).toEqual(jasmine.objectContaining({ ok: true, titulo: '2 pares de talla 40 nacieron' }));
     http.verify();
+  });
+});
+
+/**
+ * "Algo pasó con este par": el botón arma el SIGUIENTE escaneo con un daño
+ * tipificado; la clase decide el destino y la pantalla lo muestra en ámbar.
+ */
+describe('EstacionComponent — algo pasó con este par', () => {
+  afterEach(() => localStorage.removeItem(CLAVE_CONFIG));
+
+  const TIPOS = [
+    { id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada', celulaCausante: 'INYECCION', clase: 'BAJA' },
+    { id: 11, codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', celulaCausante: 'INYECCION', clase: 'SEGUNDA' },
+    { id: 7, codigo: 'ECONOMIZADOR-RASGADO', nombre: 'Economizador rasgado', celulaCausante: 'INYECCION', clase: 'REPROCESO' },
+  ];
+
+  function enBodega(rol: string | null = null) {
+    guardarConfig({ estacion: 'BODEGA_CORTE', operarioId: 4 });
+    const ctx = crear(rol);
+    ctx.http.expectOne(`${BASE}/operarios?celula=ALMACEN`).flush([{ id: 4, nombre: 'Aldo', celula: 'ALMACEN' }]);
+    ctx.http.expectOne(`${BASE}/maquinas?celula=ALMACEN`).flush([]);
+    ctx.http.expectOne(`${BASE}/hoy`).flush({ fecha: '2026-09-11', actualizado: '', estaciones: [] });
+    ctx.fixture.detectChanges();
+    return ctx;
+  }
+
+  function abrirPanel(ctx: ReturnType<typeof enBodega>) {
+    ctx.comp.abrirCalidad();
+    ctx.http.expectOne(`${environment.apiUrl}/calidad/tipos-dano`).flush(TIPOS);
+    ctx.fixture.detectChanges();
+  }
+
+  it('el botón carga el catálogo (segundas primero, la baja al final) y el escaneo lleva el tipo de daño', () => {
+    const ctx = enBodega();
+    const texto = () => (ctx.fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texto()).toContain('Algo pasó con este par');
+    abrirPanel(ctx);
+    expect(ctx.comp.tipos().map((t) => t.clase)).toEqual(['SEGUNDA', 'REPROCESO', 'BAJA']);
+    expect(texto()).toContain('Sigue, pero como SEGUNDA');
+
+    ctx.comp.tipoSel.set(11);
+    ctx.comp.codigo = 'OF1-0004';
+    ctx.comp.escanear();
+    const req = ctx.http.expectOne(`${BASE}/par/OF1-0004/avanzar`);
+    // Sin nota: el tipo ya dice por qué.
+    expect(req.request.body).toEqual({ operarioId: 4, estacion: 'BODEGA_CORTE', tipoDanoId: 11 });
+    req.flush({
+      id: 1, codigo: 'OF1-0004', celulaActual: 'ALMACEN', estado: 'EN_PROCESO',
+      avance: {
+        estacion: 'BODEGA_CORTE', nombre: 'Bodega de corte', terminado: false, hoy: 3, calidad: 'SEGUNDA',
+        incidencia: { tipoDano: { codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', clase: 'SEGUNDA' } },
+        parReposicion: null,
+      },
+    });
+    ctx.fixture.detectChanges();
+    expect(ctx.comp.resultado()).toEqual(jasmine.objectContaining({ ok: true, alerta: true, titulo: 'OF1-0004 → Bodega de corte · SEGUNDA' }));
+    expect(texto()).toContain('Rebaba en la suela');
+    // Una lectura por reporte: el panel se cierra y el siguiente escaneo es normal.
+    expect(ctx.comp.modoCalidad()).toBeFalse();
+    ctx.http.verify();
+  });
+
+  it('sin elegir el tipo no manda nada y lo dice', () => {
+    const ctx = enBodega();
+    abrirPanel(ctx);
+    ctx.comp.codigo = 'OF1-0004';
+    ctx.comp.escanear();
+    ctx.http.expectNone(`${BASE}/par/OF1-0004/avanzar`);
+    expect(ctx.comp.resultado()?.detalle).toBe('Primero elige qué tiene el par');
+    expect(ctx.comp.modoCalidad()).toBeTrue();
+  });
+
+  it('una BAJA la firma el gerente: sin rol no se manda; con rol exige la nota (acta)', () => {
+    const sinRol = enBodega('OPERARIO');
+    abrirPanel(sinRol);
+    sinRol.comp.tipoSel.set(8);
+    sinRol.comp.nota = 'acta';
+    sinRol.comp.codigo = 'OF1-0004';
+    sinRol.comp.escanear();
+    sinRol.http.expectNone(`${BASE}/par/OF1-0004/avanzar`);
+    expect(sinRol.comp.resultado()?.detalle).toBe('Solo un gerente puede autorizar una baja');
+    TestBed.resetTestingModule();
+
+    const gerente = enBodega('GERENTE');
+    abrirPanel(gerente);
+    gerente.comp.tipoSel.set(8);
+    gerente.comp.codigo = 'OF1-0004';
+    gerente.comp.escanear();
+    gerente.http.expectNone(`${BASE}/par/OF1-0004/avanzar`);
+    expect(gerente.comp.resultado()?.detalle).toBe('La baja necesita una nota: es el acta');
+
+    gerente.comp.nota = ' El robot rasgó la capellada ';
+    gerente.comp.codigo = 'OF1-0004';
+    gerente.comp.escanear();
+    const req = gerente.http.expectOne(`${BASE}/par/OF1-0004/avanzar`);
+    expect(req.request.body).toEqual({ operarioId: 4, estacion: 'BODEGA_CORTE', tipoDanoId: 8, descripcion: 'El robot rasgó la capellada' });
+    req.flush({
+      id: 1, codigo: 'OF1-0004', celulaActual: 'ALMACEN', estado: 'DADO_DE_BAJA',
+      avance: {
+        estacion: 'MONTAJE', nombre: 'Dado de baja', terminado: false, hoy: 3, calidad: 'PRIMERA',
+        incidencia: { tipoDano: { codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada', clase: 'BAJA' } },
+        parReposicion: { codigo: 'OF1-0004-R1', celulaActual: 'GUARNICION' },
+      },
+    });
+    gerente.fixture.detectChanges();
+    const texto = (gerente.fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texto).toContain('OF1-0004 dado de baja');
+    expect(texto).toContain('lo repone OF1-0004-R1');
+    // La reposición nace en Preparación sin etiqueta: se ofrece imprimirla desde acá.
+    expect(texto).toContain('Imprimir etiqueta de la lengua de OF1-0004-R1');
+    expect(gerente.comp.modoCalidad()).toBeFalse();
+  });
+
+  it('en PT el botón es la inspección y una segunda terminada dice que va a saldos', () => {
+    guardarConfig({ estacion: 'PT', operarioId: 6 });
+    const ctx = crear();
+    ctx.http.expectOne(`${BASE}/operarios?celula=PT`).flush([{ id: 6, nombre: 'Rosa', celula: 'PT' }]);
+    ctx.http.expectOne(`${BASE}/maquinas?celula=PT`).flush([]);
+    ctx.http.expectOne(`${BASE}/hoy`).flush({ fecha: '2026-09-11', actualizado: '', estaciones: [] });
+    ctx.fixture.detectChanges();
+    const texto = () => (ctx.fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texto()).toContain('No aprobó la inspección');
+
+    abrirPanel(ctx);
+    expect(texto()).toContain('No aprobó: ¿qué tiene el par?');
+    ctx.comp.tipoSel.set(11);
+    ctx.comp.codigo = 'OF1-0009';
+    ctx.comp.escanear();
+    ctx.http.expectOne(`${BASE}/par/OF1-0009/avanzar`).flush({
+      id: 9, codigo: 'OF1-0009', celulaActual: 'PT', estado: 'TERMINADO',
+      avance: {
+        estacion: 'PT', nombre: 'Producto terminado', terminado: true, hoy: 1, calidad: 'SEGUNDA',
+        incidencia: { tipoDano: { codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', clase: 'SEGUNDA' } },
+        parReposicion: null,
+      },
+    });
+    ctx.fixture.detectChanges();
+    expect(ctx.comp.resultado()).toEqual(jasmine.objectContaining({
+      titulo: 'OF1-0009 terminado · SEGUNDA', sticker: 'OF1-0009',
+      detalle: 'Rebaba en la suela · Cargado a bodega como segunda: va a saldos',
+    }));
   });
 });
