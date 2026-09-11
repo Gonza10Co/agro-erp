@@ -64,7 +64,26 @@ reales. `programacion-corte` se queda en `EN_STAGE`.
 
 ---
 
-## Preguntas que bloquean el diseño (para Mauricio y Juan Pablo)
+## Respuestas de Juan Pablo (2026-09-11, WhatsApp + audio) y qué se hizo con cada una
+
+1. **Se debe reponer.** Hoy programan 1-2 pares de más por talla por si sale una segunda;
+   con el sistema la orden sale exacta y cada par que sale de segunda pide su reposición.
+   → Hecho: marcar SEGUNDA pare la reposición en Preparación (igual que la BAJA) y el
+   tablero cuenta por cupo (`7507a70`).
+2. **Sticker: no es necesario, pero como lo que se empaca pasa por lector, mejor que lleve.**
+   → Se queda como estaba: sticker sin cliente y con banda SEGUNDA.
+3. **Lo autoriza la persona de calidad.** → Hecho: rol `CALIDAD`; la firma viaja en el mismo
+   escaneo (usuario y clave de quien autoriza) porque el celular queda logueado con la
+   operaria. Usuario `calidad` creado en prod (ver memoria `credenciales-demo-prod`).
+4. **Sí, catalogar la segunda** (indicadores y mejoras). → Ya era así: tipo obligatorio, nota
+   opcional.
+5. **El color se elige por pedido** ("cuando la bota es café la marca suele ser Alpaca Café, o
+   Alpaca Suela Azul"). → Es una opción del configurador (el grupo `COLOR` existe en prod con
+   solo "Café"); faltan las opciones reales. Los nombres de marca en prod traen CAFÉ, AZUL,
+   NEGRO, NARANJA, BLANCO, GRIS y AMARILLO, y a veces es color de la bota y a veces de la
+   suela: hay que confirmar la lista con JP antes de cargarla.
+
+## Preguntas que bloqueaban el diseño (para Mauricio y Juan Pablo) — respondidas arriba
 
 1. **¿La segunda sale del pedido?** Si la OF tenía 20 pares de talla 36 y uno se va a
    segundas quedan 19: ¿se repone automáticamente o el pedido se despacha corto?
@@ -104,7 +123,8 @@ reales. `programacion-corte` se queda en `EN_STAGE`.
       (OF1-0002 terminó en el saldo de SEGUNDAS con su incidencia en la estación de entrada).
       Decisiones tomadas mientras el cliente responde: una segunda **no exige nota** (el tipo
       dice el porqué) y su sticker sale **sin cliente y con banda SEGUNDA**.
-- [ ] Las cinco preguntas de arriba, respondidas por el cliente.
+- [x] Las cinco preguntas de arriba, respondidas por el cliente. ✅ JP, 2026-09-11 (ver arriba);
+      falta solo la lista de colores.
 - [ ] Impresora térmica probada con las dos etiquetas reales.
 - [ ] **Un día completo, una sola estación, con la gente real.** Probamos con 20 pares y
       una persona; un día son 1.206 pares y ~8 operarios. Lo que se rompe a esa escala no

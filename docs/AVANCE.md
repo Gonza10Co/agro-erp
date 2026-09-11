@@ -34,9 +34,20 @@
 >   entrada, `hoy` de Preparación sube a 21); reproceso en OF1-0004; 400 sin acta, 404 tipo
 >   inexistente, 403 como CLIENTE, 409 fuera de orden sin tocar el par.
 >   Tests: backend 694 · frontend 425, verdes.
-> - **Falta de la quincena**: las 5 preguntas del plan a JP/Mauricio (enviadas por WhatsApp el
->   11-sep; la más urgente: ¿de dónde sale el COLOR del sticker?), impresora térmica probada, y
->   **un día completo en una estación con la gente real**.
+> - **JP respondió las 5 preguntas el mismo 11-sep** (detalle en el plan): la segunda **se
+>   repone** (hoy programan 1-2 pares de más por talla por si acaso; con el sistema la orden
+>   sale exacta) → `7507a70`: marcar SEGUNDA pare la reposición y **el tablero cuenta por cupo**
+>   (la cadena par → -R1 → -R2 es un cupo; antes una orden con una baja se quedaba en 19/20
+>   para siempre; `segundas` va aparte). **La firma calidad** → rol `CALIDAD` + `autorizacion`
+>   (usuario y clave de quien firma) en el mismo escaneo; usuario `calidad` creado en prod.
+>   Sticker de segunda sí (pasa por lector). Tipificar sí. **COLOR es por pedido** = opción
+>   del configurador: el grupo existe en prod con solo "Café", falta la lista real (los
+>   nombres de marca traen CAFÉ/AZUL/NEGRO/NARANJA/BLANCO/GRIS/AMARILLO, a veces de bota y a
+>   veces de suela; confirmar con JP).
+> - **Falta de la quincena**: la lista de colores, impresora térmica probada, y **un día
+>   completo en una estación con la gente real**. Pendiente chico: que Preparación vea las
+>   reposiciones que nacieron sin etiqueta (hoy la lengua se imprime desde la estación que
+>   reportó).
 > - **🔓 TODO ENTREGADO desde el 2026-09-11** (decisión de Gonza: "no hay necesidad de seguir
 >   escondiendo el avance"): `administracion`, `programacion-corte` y `calidad-en-planta` pasan a
 >   ENTREGADO; la lista `RESERVADAS` del centinela queda vacía. Antes de desplegar se borraron de
