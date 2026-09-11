@@ -667,7 +667,14 @@ export class FabricacionService {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       include: {
-        of: { select: { consecutivo: true } },
+        // El cliente sale de la cadena Par → OF → OP → OC: va en el sticker de la caja,
+        // que es lo que el almacenista lee para saber a quién despachar.
+        of: {
+          select: {
+            consecutivo: true,
+            op: { select: { oc: { select: { cliente: { select: { nombre: true } } } } } },
+          },
+        },
         talla: { select: { valor: true } },
         // Nombres para la pantalla de estación y el sticker de la caja en PT.
         productoConfigurado: {
@@ -677,6 +684,10 @@ export class FabricacionService {
             nombreComercial: true,
             referencia: { select: { codigo: true, nombreInterno: true } },
             marca: { select: { nombre: true } },
+            // El color es una opción del configurador; el sticker reemplaza el sello a mano.
+            opciones: {
+              select: { opcion: { select: { nombre: true, grupoOpcion: { select: { codigo: true } } } } },
+            },
           },
         },
         linea: { select: { codigo: true, nombre: true } },

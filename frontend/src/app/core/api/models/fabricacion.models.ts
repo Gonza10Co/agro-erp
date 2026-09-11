@@ -106,7 +106,8 @@ export interface ParDetalle {
   subPasoActual: SubPasoGuarnicion | null;
   subPasoInyeccion: SubPasoInyeccion | null;
   estado: EstadoPar;
-  of: { consecutivo: number };
+  /** El cliente viaja por la OC: va en el sticker de la caja. */
+  of: { consecutivo: number; op?: { oc?: { cliente?: { nombre: string } | null } | null } | null };
   talla: { valor: string };
   productoConfigurado?: {
     id: number;
@@ -114,6 +115,8 @@ export interface ParDetalle {
     nombreComercial?: string;
     referencia?: { codigo: string; nombreInterno: string } | null;
     marca?: { nombre: string } | null;
+    /** Opciones del configurador; de ahí sale el COLOR del sticker. */
+    opciones?: { opcion: { nombre: string; grupoOpcion: { codigo: string } } }[];
   } | null;
   linea?: { codigo: string; nombre: string } | null;
   eventos: EventoTrazabilidad[];
