@@ -5,7 +5,7 @@ import { FabricacionApi } from '../../core/api/fabricacion.api';
 import { CalidadApi } from '../../core/api/calidad.api';
 import {
   Estacion, Operario, Maquina, OFListItem, OFDetalle, ProgramaOfLinea, LABEL_CELULA,
-  AvanceResultado, DanoEscaneo,
+  AvanceResultado, DanoEscaneo, ROLES_BAJA, ROLES_SEGUNDA,
 } from '../../core/api/models/fabricacion.models';
 import { DESTINO_CLASE, TipoDano } from '../../core/api/models/calidad.models';
 import { AuthService } from '../../core/auth/auth.service';
@@ -195,14 +195,20 @@ export function guardarConfig(c: ConfigEstacion | null): void {
                     </div>
                   }
                   @if (tipoActual(); as t) {
-                    @if (t.clase === 'BAJA' && !puedeBaja) {
-                      <div class="msg err">Solo un gerente puede autorizar una baja.</div>
-                    } @else {
-                      <label class="nota">Nota {{ t.clase === 'BAJA' ? '(acta, obligatoria)' : '(opcional)' }}
-                        <input [(ngModel)]="nota" maxlength="500" [placeholder]="t.clase === 'BAJA' ? 'Qué pasó: queda en el acta' : ''" />
-                      </label>
-                      <div class="armado">Ahora escanea el par → {{ destino(t) }}</div>
+                    <label class="nota">Nota {{ t.clase === 'BAJA' ? '(acta, obligatoria)' : '(opcional)' }}
+                      <input [(ngModel)]="nota" maxlength="500" [placeholder]="t.clase === 'BAJA' ? 'Qué pasó: queda en el acta' : ''" />
+                    </label>
+                    <!-- La sesión del celular es la de la operaria: quien firma pone su clave acá. -->
+                    @if (necesitaFirma(t)) {
+                      <div class="firma" role="group" [attr.aria-label]="tituloFirma(t)">
+                        <div class="firma-titulo">{{ tituloFirma(t) }}</div>
+                        <div class="firma-campos">
+                          <input [(ngModel)]="autUsuario" placeholder="Usuario" autocomplete="off" autocapitalize="none" aria-label="Usuario de quien autoriza" />
+                          <input [(ngModel)]="autClave" type="password" placeholder="Clave" autocomplete="off" aria-label="Clave de quien autoriza" />
+                        </div>
+                      </div>
                     }
+                    <div class="armado">Ahora escanea el par → {{ destino(t) }}</div>
                   }
                 </div>
               }
@@ -298,7 +304,10 @@ export function guardarConfig(c: ConfigEstacion | null): void {
     .nota{display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-3);font-size:var(--text-caption);color:var(--text-subtle)}
     .nota input{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
     .armado{margin-top:var(--sp-2);font-weight:var(--fw-bold)}
-    .msg.err{margin-top:var(--sp-2);color:var(--error);font-weight:var(--fw-medium)}
+    .firma{margin-top:var(--sp-3);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-md);background:var(--surface)}
+    .firma-titulo{font-weight:var(--fw-bold);margin-bottom:var(--sp-2)}
+    .firma-campos{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .firma-campos input{flex:1;min-width:120px;min-height:44px;padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
     .res-titulo{font-size:var(--text-h2);font-weight:var(--fw-bold)}
     .res-detalle{color:var(--text-muted);margin-top:var(--sp-1)}
     @media (max-width:640px){
@@ -332,11 +341,16 @@ export class EstacionComponent implements OnInit, OnDestroy {
   // "Algo pasó con este par" — gate EN_STAGE hasta la demo de la quincena.
   readonly puedeReportar = puedeVerSeccion(this.auth.rol(), 'calidad-en-planta');
   /** Una baja destruye producto: la firma el gerente (misma regla que el backend). */
-  readonly puedeBaja = ['GERENTE', 'ADMIN'].includes(this.auth.rol() ?? '');
+  readonly puedeBaja = ROLES_BAJA.includes(this.auth.rol() ?? '');
+  /** Una segunda mueve inventario y plata: la firma calidad (JP, 2026-09-11). */
+  readonly puedeSegunda = ROLES_SEGUNDA.includes(this.auth.rol() ?? '');
   modoCalidad = signal(false);
   tipos = signal<TipoDano[]>([]);
   tipoSel = signal<number | undefined>(undefined);
   nota = '';
+  /** Quien firma cuando la sesión del celular no puede sola: se pide en el momento. */
+  autUsuario = '';
+  autClave = '';
   tipoActual = computed(() => this.tipos().find((t) => t.id === this.tipoSel()));
   destino = (t: TipoDano) => DESTINO_CLASE[t.clase];
 
@@ -536,7 +550,11 @@ export class EstacionComponent implements OnInit, OnDestroy {
         this.reanudarCamaraConGracia();
         return;
       }
-      dano = { tipoDanoId: t!.id, descripcion: this.nota };
+      dano = {
+        tipoDanoId: t!.id,
+        descripcion: this.nota,
+        ...(this.necesitaFirma(t!) ? { autorizacion: { username: this.autUsuario.trim(), password: this.autClave } } : {}),
+      };
     }
     this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, dano).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => {
@@ -574,12 +592,15 @@ export class EstacionComponent implements OnInit, OnDestroy {
     if (inc) partes.push(inc.clase === 'REPROCESO' ? `Reproceso: ${inc.nombre}` : inc.nombre);
     if (a.terminado) partes.push(segunda ? 'Cargado a bodega como segunda: va a saldos' : 'Cargado a producto terminado');
     else partes.push(`van ${a.hoy} hoy`);
+    // Una segunda se repone (JP, 2026-09-11): la reposición nace en Preparación sin etiqueta.
+    if (a.parReposicion) partes.push(`lo repone ${a.parReposicion.codigo}, que nace en Preparación`);
     return {
       ok: true,
       alerta: !!inc || segunda,
       titulo,
       detalle: partes.join(' · '),
       sticker: a.terminado ? r.codigo : undefined,
+      lengua: a.parReposicion?.codigo,
     };
   }
 
@@ -604,14 +625,30 @@ export class EstacionComponent implements OnInit, OnDestroy {
     this.modoCalidad.set(false);
     this.tipoSel.set(undefined);
     this.nota = '';
+    this.autUsuario = '';
+    this.autClave = '';
+  }
+
+  /** ¿La sesión del celular no puede firmar sola este tipo de daño? */
+  necesitaFirma(t: TipoDano): boolean {
+    if (t.clase === 'SEGUNDA') return !this.puedeSegunda;
+    if (t.clase === 'BAJA') return !this.puedeBaja;
+    return false;
+  }
+
+  tituloFirma(t: TipoDano): string {
+    return t.clase === 'SEGUNDA' ? 'Autoriza calidad' : 'Autoriza el gerente';
   }
 
   /** Por qué todavía no se puede escanear en modo calidad (null = listo). */
   private faltaParaReportar(t: TipoDano | undefined): string | null {
     if (!t) return 'Primero elige qué tiene el par';
-    if (t.clase !== 'BAJA') return null;
-    if (!this.puedeBaja) return 'Solo un gerente puede autorizar una baja';
-    if (!this.nota.trim()) return 'La baja necesita una nota: es el acta';
+    if (t.clase === 'BAJA' && !this.nota.trim()) return 'La baja necesita una nota: es el acta';
+    if (this.necesitaFirma(t) && (!this.autUsuario.trim() || !this.autClave)) {
+      return t.clase === 'SEGUNDA'
+        ? 'Una segunda la autoriza calidad: falta su usuario y clave'
+        : 'Una baja la autoriza el gerente: falta su usuario y clave';
+    }
     return null;
   }
 

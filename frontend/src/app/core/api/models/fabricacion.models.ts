@@ -288,7 +288,13 @@ export interface AvanceResultado {
 export interface DanoEscaneo {
   tipoDanoId: number;
   descripcion?: string;
+  /** Usuario y clave de quien firma (calidad para una segunda, gerente para una baja). */
+  autorizacion?: { username: string; password: string };
 }
+
+/** Roles que firman una segunda (calidad) y una baja (gerente). Espejo del backend. */
+export const ROLES_SEGUNDA = ['CALIDAD', 'GERENTE', 'ADMIN'];
+export const ROLES_BAJA = ['GERENTE', 'ADMIN'];
 
 /** Lo que va impreso en la etiqueta de la lengua. */
 export interface ParNacido {

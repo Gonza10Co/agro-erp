@@ -37,14 +37,17 @@ describe('validarReporte', () => {
   });
 
   describe('SEGUNDA', () => {
-    // Bajar un par de grado no destruye producto (a diferencia de BAJA), así que no
-    // exige gerente: lo marca quien revisa en planta. Tampoco exige nota: el "por
-    // qué" ya viaja en el tipo de daño, y desde el celular de la estación una nota
-    // obligatoria era captura manual (2026-09-11).
-    it('no exige ni descripción ni rol de gerente', () => {
-      expect(validarReporte('SEGUNDA', 'mancha en la caña', 'OPERARIO')).toBeNull();
+    // Mueve inventario y plata: la firma la persona de calidad (JP, 2026-09-11),
+    // o el gerente/admin. No exige nota: el "por qué" ya viaja en el tipo de daño,
+    // y desde el celular de la estación una nota obligatoria era captura manual.
+    it('la firma CALIDAD/GERENTE/ADMIN, sin descripción', () => {
+      expect(validarReporte('SEGUNDA', undefined, 'CALIDAD')).toBeNull();
       expect(validarReporte('SEGUNDA', undefined, 'GERENTE')).toBeNull();
       expect(validarReporte('SEGUNDA', '  ', 'ADMIN')).toBeNull();
+    });
+    it('la operaria sola no puede, ni con nota', () => {
+      expect(validarReporte('SEGUNDA', 'mancha en la caña', 'OPERARIO')).toBe('ROL_INSUFICIENTE');
+      expect(validarReporte('SEGUNDA', undefined, 'CLIENTE')).toBe('ROL_INSUFICIENTE');
     });
   });
 });

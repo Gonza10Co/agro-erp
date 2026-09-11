@@ -156,7 +156,8 @@ describe('EstacionComponent — algo pasó con este par', () => {
   }
 
   it('el botón carga el catálogo (segundas primero, la baja al final) y el escaneo lleva el tipo de daño', () => {
-    const ctx = enBodega();
+    // Sesión de calidad: firma la segunda sin pedir clave.
+    const ctx = enBodega('CALIDAD');
     const texto = () => (ctx.fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(texto()).toContain('Algo pasó con este par');
     abrirPanel(ctx);
@@ -195,7 +196,47 @@ describe('EstacionComponent — algo pasó con este par', () => {
     expect(ctx.comp.modoCalidad()).toBeTrue();
   });
 
-  it('una BAJA la firma el gerente: sin rol no se manda; con rol exige la nota (acta)', () => {
+  it('una SEGUNDA desde la sesión de la operaria pide la clave de calidad y la manda en el escaneo', () => {
+    const ctx = enBodega('OPERARIO');
+    abrirPanel(ctx);
+    ctx.comp.tipoSel.set(11);
+    ctx.fixture.detectChanges();
+    expect((ctx.fixture.nativeElement as HTMLElement).textContent).toContain('Autoriza calidad');
+
+    // Sin usuario y clave no sale nada.
+    ctx.comp.codigo = 'OF1-0004';
+    ctx.comp.escanear();
+    ctx.http.expectNone(`${BASE}/par/OF1-0004/avanzar`);
+    expect(ctx.comp.resultado()?.detalle).toBe('Una segunda la autoriza calidad: falta su usuario y clave');
+
+    ctx.comp.autUsuario = ' rosa ';
+    ctx.comp.autClave = 'secreta';
+    ctx.comp.codigo = 'OF1-0004';
+    ctx.comp.escanear();
+    const req = ctx.http.expectOne(`${BASE}/par/OF1-0004/avanzar`);
+    expect(req.request.body).toEqual({
+      operarioId: 4, estacion: 'BODEGA_CORTE', tipoDanoId: 11,
+      autorizacion: { username: 'rosa', password: 'secreta' },
+    });
+    req.flush({
+      id: 1, codigo: 'OF1-0004', celulaActual: 'ALMACEN', estado: 'EN_PROCESO',
+      avance: {
+        estacion: 'BODEGA_CORTE', nombre: 'Bodega de corte', terminado: false, hoy: 3, calidad: 'SEGUNDA',
+        incidencia: { tipoDano: { codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', clase: 'SEGUNDA' } },
+        parReposicion: { codigo: 'OF1-0004-R1', celulaActual: 'GUARNICION' },
+      },
+    });
+    ctx.fixture.detectChanges();
+    const texto = (ctx.fixture.nativeElement as HTMLElement).textContent ?? '';
+    // La segunda se repone: se ofrece imprimir la lengua de la reposición.
+    expect(texto).toContain('lo repone OF1-0004-R1');
+    expect(texto).toContain('Imprimir etiqueta de la lengua de OF1-0004-R1');
+    // La clave no se queda en la pantalla.
+    expect(ctx.comp.autClave).toBe('');
+    expect(ctx.comp.modoCalidad()).toBeFalse();
+  });
+
+  it('una BAJA la firma el gerente: sin rol pide su clave; con rol exige la nota (acta)', () => {
     const sinRol = enBodega('OPERARIO');
     abrirPanel(sinRol);
     sinRol.comp.tipoSel.set(8);
@@ -203,7 +244,7 @@ describe('EstacionComponent — algo pasó con este par', () => {
     sinRol.comp.codigo = 'OF1-0004';
     sinRol.comp.escanear();
     sinRol.http.expectNone(`${BASE}/par/OF1-0004/avanzar`);
-    expect(sinRol.comp.resultado()?.detalle).toBe('Solo un gerente puede autorizar una baja');
+    expect(sinRol.comp.resultado()?.detalle).toBe('Una baja la autoriza el gerente: falta su usuario y clave');
     TestBed.resetTestingModule();
 
     const gerente = enBodega('GERENTE');
@@ -238,7 +279,7 @@ describe('EstacionComponent — algo pasó con este par', () => {
 
   it('en PT el botón es la inspección y una segunda terminada dice que va a saldos', () => {
     guardarConfig({ estacion: 'PT', operarioId: 6 });
-    const ctx = crear();
+    const ctx = crear('CALIDAD');
     ctx.http.expectOne(`${BASE}/operarios?celula=PT`).flush([{ id: 6, nombre: 'Rosa', celula: 'PT' }]);
     ctx.http.expectOne(`${BASE}/maquinas?celula=PT`).flush([]);
     ctx.http.expectOne(`${BASE}/hoy`).flush({ fecha: '2026-09-11', actualizado: '', estaciones: [] });

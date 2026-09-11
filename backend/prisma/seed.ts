@@ -25,6 +25,12 @@ async function main() {
   });
   // Rol de PREPARACIÓN de demo: ve lo del cliente + la próxima entrega (módulos EN_STAGE).
   // Sirve para ensayar/mostrar la próxima demo en el mismo despliegue sin exponerla al cliente.
+  // CALIDAD: firma las segundas desde la estación (JP, 2026-09-11).
+  await prisma.role.upsert({
+    where: { name: 'CALIDAD' },
+    update: {},
+    create: { name: 'CALIDAD' },
+  });
   const stage = await prisma.role.upsert({
     where: { name: 'STAGE' },
     update: {},

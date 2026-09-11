@@ -11,26 +11,39 @@ export function codigoReposicion(codigo: string): string {
 
 export type ErrorReporte = 'SIN_DESCRIPCION' | 'ROL_INSUFICIENTE';
 
+/** Quién puede firmar una BAJA: se destruye producto, es un acta del gerente. */
+export const ROLES_BAJA: readonly string[] = ['GERENTE', 'ADMIN'];
+/** Quién puede firmar una SEGUNDA: la persona de calidad (JP, 2026-09-11). */
+export const ROLES_SEGUNDA: readonly string[] = ['CALIDAD', 'GERENTE', 'ADMIN'];
+
 /**
  * Reglas por clase de daño:
  *  - BAJA: rol GERENTE/ADMIN + descripción (es un acta: se destruye producto).
- *  - SEGUNDA: no exige nada. No destruye nada, la marca quien revisa en planta, y
- *    el "por qué" ya viaja en el tipo de daño (eso es lo que explica el % de
- *    segundas por célula). Desde el celular, con guantes, una nota obligatoria
- *    era captura manual que el cliente no quiere (2026-09-11).
+ *  - SEGUNDA: la autoriza calidad (CALIDAD/GERENTE/ADMIN), sin nota obligatoria:
+ *    el "por qué" ya viaja en el tipo de daño, que es lo que explica el % de
+ *    segundas por célula. Mueve inventario y plata, por eso no la decide la
+ *    operaria sola (respuesta de JP del 2026-09-11).
  *  - REPROCESO: no exige nada.
- * ⚠️ Asunción a confirmar con el cliente: si marcar segunda también debe exigir
- * autorización del gerente, basta sumar la clase a la guarda de rol.
+ * El rol que se valida es el de quien AUTORIZA: la sesión del dispositivo o, si
+ * viene `autorizacion` en el reporte, el usuario que puso su clave.
  */
 export function validarReporte(
   clase: ClaseDano,
   descripcion: string | undefined,
   rol: string,
 ): ErrorReporte | null {
-  if (clase !== 'BAJA') return null;
-  if (rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
+  if (clase === 'REPROCESO') return null;
+  if (clase === 'SEGUNDA') return ROLES_SEGUNDA.includes(rol) ? null : 'ROL_INSUFICIENTE';
+  if (!ROLES_BAJA.includes(rol)) return 'ROL_INSUFICIENTE';
   if (!descripcion?.trim()) return 'SIN_DESCRIPCION';
   return null;
+}
+
+/** El mensaje que ve el operario cuando falta quien firme. */
+export function mensajeRolInsuficiente(clase: ClaseDano): string {
+  return clase === 'SEGUNDA'
+    ? 'Una segunda la autoriza calidad: pide su usuario y clave'
+    : 'Solo un gerente puede autorizar una baja';
 }
 
 /** Células que son centro de costo imputable (PT no causa daños en el catálogo). */

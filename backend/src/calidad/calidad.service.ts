@@ -4,16 +4,33 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Celula, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { agruparIndicadores, codigoReposicion, validarReporte } from './calidad-core';
-import { estacionNacimiento, subPasoInicial } from '../fabricacion/fabricacion-core';
+import { HashingService } from '../common/hashing.service';
+import {
+  agruparIndicadores,
+  codigoReposicion,
+  mensajeRolInsuficiente,
+  validarReporte,
+} from './calidad-core';
+import { AutorizacionDto } from './dto/autorizacion.dto';
+import { EstacionDef, estacionNacimiento, subPasoInicial } from '../fabricacion/fabricacion-core';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 
 export interface Usuario {
   sub: number;
   role: string;
+}
+
+/** Lo mínimo de un par para parir su reposición. */
+export interface ParARepondr {
+  id: number;
+  codigo: string;
+  ofId: number;
+  productoConfiguradoId: number;
+  tallaId: number;
 }
 
 /** Lo que necesita una incidencia para quedar escrita (append-only). */
@@ -37,7 +54,34 @@ const MSG_RACE = 'El par cambió de estado durante el reporte — recárgalo e i
 
 @Injectable()
 export class CalidadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly hashing: HashingService,
+  ) {}
+
+  /**
+   * Quién firma el reporte: la sesión, o el usuario que puso su clave en
+   * `autorizacion` (la persona de calidad que se acerca a la estación). Se
+   * valida como un login, pero sin emitir tokens: la sesión del celular sigue
+   * siendo la de la operaria.
+   */
+  async resolverAutorizador(user: Usuario, autorizacion?: AutorizacionDto): Promise<Usuario> {
+    if (!autorizacion) return user;
+    const u = await this.prisma.user.findUnique({
+      where: { username: autorizacion.username },
+      include: { role: true },
+    });
+    const valido = !!u && u.isActive && (await this.hashing.verify(u.passwordHash, autorizacion.password));
+    if (!valido) throw new UnauthorizedException('Usuario o clave de quien autoriza inválidos');
+    return { sub: u!.id, role: u!.role.name };
+  }
+
+  /** Reglas de firma por clase, con el mensaje que ve el operario. */
+  exigirFirma(clase: 'BAJA' | 'REPROCESO' | 'SEGUNDA', descripcion: string | undefined, rol: string): void {
+    const err = validarReporte(clase, descripcion, rol);
+    if (err === 'ROL_INSUFICIENTE') throw new ForbiddenException(mensajeRolInsuficiente(clase));
+    if (err === 'SIN_DESCRIPCION') throw new BadRequestException('La baja requiere descripción (acta)');
+  }
 
   listarTiposDano() {
     return this.prisma.tipoDano.findMany({
@@ -66,6 +110,75 @@ export class CalidadService {
       data: { calidad: 'SEGUNDA' },
     });
     if (res.count === 0) throw new ConflictException(MSG_RACE);
+  }
+
+  /**
+   * Nace la reposición de un par que salió del pedido (baja o segunda): donde nace
+   * cualquier par de su línea (Preparación / Montaje), con evento de entrada para que
+   * la TV y el tablero la cuenten desde ya. Sin estaciones (base vieja) cae en la
+   * célula inicial a secas. El cliente confirmó el 2026-09-11 que una segunda
+   * también se repone: el pedido se completa con primeras, no se despacha corto.
+   */
+  async crearReposicion(
+    tx: Prisma.TransactionClient,
+    par: ParARepondr,
+    operarioId: number,
+    celulaInicial: Celula,
+    lineaId: number | null,
+    estaciones: readonly EstacionDef[],
+  ) {
+    const nac = estacionNacimiento(celulaInicial, estaciones);
+    const parReposicion = await tx.par.create({
+      data: {
+        codigo: codigoReposicion(par.codigo),
+        ofId: par.ofId,
+        productoConfiguradoId: par.productoConfiguradoId,
+        tallaId: par.tallaId,
+        celulaActual: nac?.celula ?? celulaInicial,
+        subPasoActual: nac ? nac.subPaso : subPasoInicial(celulaInicial),
+        subPasoInyeccion: nac?.subPasoInyeccion ?? null,
+        lineaId,
+        reponeAParId: par.id,
+      },
+    });
+    if (nac) {
+      await tx.eventoTrazabilidad.create({
+        data: {
+          parId: parReposicion.id,
+          celula: nac.celula,
+          subPaso: nac.subPaso,
+          subPasoInyeccion: nac.subPasoInyeccion,
+          estacionDestino: nac.codigo,
+          celulaDestino: nac.celula,
+          operarioId,
+        },
+      });
+    }
+    return parReposicion;
+  }
+
+  /**
+   * SEGUNDA dentro de una transacción ajena (el pistolazo): sella el grado, pare la
+   * reposición y deja el acta. El par sigue su curso (se vende como segunda) y el
+   * pedido se completa con la reposición.
+   */
+  async marcarSegundaEn(
+    tx: Prisma.TransactionClient,
+    par: ParARepondr,
+    d: Omit<DatosIncidencia, 'parId' | 'parReposicionId'>,
+    celulaInicial: Celula,
+    lineaId: number | null,
+    estaciones: readonly EstacionDef[],
+  ) {
+    await this.sellarSegunda(tx, par.id);
+    const parReposicion = await this.crearReposicion(tx, par, d.operarioId, celulaInicial, lineaId, estaciones);
+    const incidencia = await this.registrarIncidencia(tx, { ...d, parId: par.id, parReposicionId: parReposicion.id });
+    return { incidencia, parReposicion };
+  }
+
+  /** Estaciones del recorrido, en orden (la reposición nace en la primera activa de su línea). */
+  estaciones() {
+    return this.prisma.estacion.findMany({ orderBy: { orden: 'asc' } });
   }
 
   /** La incidencia es un registro append-only; la célula causante viaja en el tipo. */
@@ -99,11 +212,8 @@ export class CalidadService {
     if (par.estado !== 'EN_PROCESO')
       throw new ConflictException(MSG_ESTADO[par.estado] ?? 'El par no está en proceso');
 
-    const err = validarReporte(tipo.clase, dto.descripcion, user.role);
-    if (err === 'ROL_INSUFICIENTE')
-      throw new ForbiddenException('Solo un gerente puede autorizar una baja');
-    if (err === 'SIN_DESCRIPCION')
-      throw new BadRequestException('La baja requiere descripción (acta)');
+    const autorizador = await this.resolverAutorizador(user, dto.autorizacion);
+    this.exigirFirma(tipo.clase, dto.descripcion, autorizador.role);
 
     try {
       // REPROCESO no muta estado: la incidencia es un registro append-only.
@@ -119,15 +229,15 @@ export class CalidadService {
         });
         return { incidencia, parReposicion: null };
       }
-      // SEGUNDA: el par NO muere ni se repone — sigue su curso por las células y
-      // entra a bodega con grado SEGUNDA. Solo se sella el grado y se deja el acta.
-      if (tipo.clase === 'SEGUNDA') return await this.marcarSegunda(par, tipo.id, dto, user);
-
       const marca = (par as any).productoConfigurado?.marca;
       const celulaInicial =
         (par as any).linea?.celulaInicial ?? marca?.linea?.celulaInicial ?? 'CORTE';
       const lineaId = par.lineaId ?? marca?.lineaId ?? null;
-      return await this.darDeBaja(par, tipo.id, dto, user, celulaInicial, lineaId);
+      // SEGUNDA: el par NO muere — sigue su curso y entra a bodega con grado SEGUNDA —
+      // pero SÍ se repone: el pedido se completa con primeras (JP, 2026-09-11).
+      if (tipo.clase === 'SEGUNDA')
+        return await this.marcarSegunda(par, tipo.id, dto, autorizador, celulaInicial, lineaId);
+      return await this.darDeBaja(par, tipo.id, dto, autorizador, celulaInicial, lineaId);
     } catch (e: unknown) {
       // FK inválida del reporte: solo el operario (input del usuario) → 400.
       // Cualquier otra FK (productoConfigurado, talla, autorizadoPor, par…) es
@@ -157,54 +267,46 @@ export class CalidadService {
   }
 
   /**
-   * Baja de grado: el par queda marcado como SEGUNDA y sigue produciéndose.
-   * Sin par de reposición a propósito — el producto existe, solo vale menos.
-   * ⚠️ Asunción a confirmar: si el cliente espera que el pedido se complete igual
-   * (100 primeras pedidas → reponer la que salió de segunda), acá va la reposición.
+   * Baja de grado: el par queda marcado como SEGUNDA, sigue produciéndose y se
+   * vende como segunda. Desde el 2026-09-11 (respuesta de JP) también nace su
+   * reposición: 100 primeras pedidas son 100 primeras entregadas.
    */
-  private marcarSegunda(
-    par: { id: number; celulaActual: Celula },
-    tipoDanoId: number,
-    dto: ReportarIncidenciaDto,
-    user: Usuario,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      await this.sellarSegunda(tx, par.id);
-      const incidencia = await this.registrarIncidencia(tx, {
-        parId: par.id,
-        tipoDanoId,
-        celulaDeteccion: par.celulaActual,
-        operarioId: dto.operarioId,
-        descripcion: dto.descripcion,
-        autorizadoPorId: user.sub,
-      });
-      return { incidencia, parReposicion: null };
-    });
-  }
-
-  private async darDeBaja(
-    par: {
-      id: number;
-      codigo: string;
-      ofId: number;
-      productoConfiguradoId: number;
-      tallaId: number;
-      celulaActual: Celula;
-    },
+  private async marcarSegunda(
+    par: ParARepondr & { celulaActual: Celula },
     tipoDanoId: number,
     dto: ReportarIncidenciaDto,
     user: Usuario,
     celulaInicial: Celula,
     lineaId: number | null,
   ) {
-    // La reposición nace donde nace cualquier par de su línea: la primera estación
-    // activa desde la célula inicial (Preparación para Basarili, Montaje para
-    // Feroz). Antes caía en la célula a secas y en el piloto quedaba en un limbo:
-    // Preparación no escanea, imprime. Sin estaciones (base vieja) se conserva
-    // la célula inicial.
-    const estaciones = await this.prisma.estacion.findMany({ orderBy: { orden: 'asc' } });
-    const nac = estacionNacimiento(celulaInicial, estaciones);
+    const estaciones = await this.estaciones();
+    return this.prisma.$transaction((tx) =>
+      this.marcarSegundaEn(
+        tx,
+        par,
+        {
+          tipoDanoId,
+          celulaDeteccion: par.celulaActual,
+          operarioId: dto.operarioId,
+          descripcion: dto.descripcion,
+          autorizadoPorId: user.sub,
+        },
+        celulaInicial,
+        lineaId,
+        estaciones,
+      ),
+    );
+  }
 
+  private async darDeBaja(
+    par: ParARepondr & { celulaActual: Celula },
+    tipoDanoId: number,
+    dto: ReportarIncidenciaDto,
+    user: Usuario,
+    celulaInicial: Celula,
+    lineaId: number | null,
+  ) {
+    const estaciones = await this.estaciones();
     return this.prisma.$transaction(async (tx) => {
       // Condición sobre el estado para no pisar un par que otra tx acaba de
       // terminar/cancelar (mismo patrón que el cierre de OF en fabricacion).
@@ -214,34 +316,9 @@ export class CalidadService {
       });
       if (res.count === 0) throw new ConflictException(MSG_RACE);
 
-      const parReposicion = await tx.par.create({
-        data: {
-          codigo: codigoReposicion(par.codigo),
-          ofId: par.ofId,
-          productoConfiguradoId: par.productoConfiguradoId,
-          tallaId: par.tallaId,
-          celulaActual: nac?.celula ?? celulaInicial,
-          subPasoActual: nac ? nac.subPaso : subPasoInicial(celulaInicial),
-          subPasoInyeccion: nac?.subPasoInyeccion ?? null,
-          lineaId,
-          reponeAParId: par.id,
-        },
-      });
-      // Entra a su estación de nacimiento como cualquier par nuevo: la TV y el
-      // tablero por órdenes la cuentan desde ya, y hay que imprimirle su etiqueta.
-      if (nac) {
-        await tx.eventoTrazabilidad.create({
-          data: {
-            parId: parReposicion.id,
-            celula: nac.celula,
-            subPaso: nac.subPaso,
-            subPasoInyeccion: nac.subPasoInyeccion,
-            estacionDestino: nac.codigo,
-            celulaDestino: nac.celula,
-            operarioId: dto.operarioId,
-          },
-        });
-      }
+      const parReposicion = await this.crearReposicion(
+        tx, par, dto.operarioId, celulaInicial, lineaId, estaciones,
+      );
 
       const incidencia = await this.registrarIncidencia(tx, {
         parId: par.id,
