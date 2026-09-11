@@ -118,10 +118,10 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // entrega. Controla la orden de corte del día — programado vs. cortado, piezas
   // repuestas y consumo real. Ver docs/specs/2026-08-20-trazabilidad-lote-par-design.md
   'programacion-corte': 'EN_STAGE',
-  // Piloto de planta (2026-09-09). Nace EN_STAGE: se muestra el 2026-09-11. Cubre
-  // la pantalla de estación (nacimiento + pistolazo), la TV de planta y el
-  // tablero por órdenes. Ver agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md
-  'piloto': 'EN_STAGE',
+  // Piloto de planta — liberado en la demo del 2026-09-11. La pantalla de estación
+  // (nacimiento del par + pistolazo), la TV de planta y el tablero por órdenes.
+  // Ver agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md
+  'piloto': 'ENTREGADO',
   // Liberadas en la demo de la Entrega 2 (2026-07-17).
   'costo-utilidad-oc': 'ENTREGADO',
   'proforma-oc': 'ENTREGADO',

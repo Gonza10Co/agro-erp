@@ -127,7 +127,7 @@ describe('puedeVerSeccion (tablero de la demo)', () => {
     // conciencia. El 2026-08-12 la lista quedó vacía (se liberó todo); el
     // 2026-08-20 entra `programacion-corte`, la Quincena 1 del rediseño lote↔par.
     // El 2026-09-09 entra `piloto` (estaciones, TV y tablero por órdenes).
-    const RESERVADAS: Seccion[] = ['programacion-corte', 'piloto'];
+    const RESERVADAS: Seccion[] = ['programacion-corte'];
 
     const secciones = Object.keys(NIVEL_SECCION) as Seccion[];
     for (const s of secciones) {
