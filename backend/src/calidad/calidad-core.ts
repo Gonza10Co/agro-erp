@@ -14,8 +14,10 @@ export type ErrorReporte = 'SIN_DESCRIPCION' | 'ROL_INSUFICIENTE';
 /**
  * Reglas por clase de daño:
  *  - BAJA: rol GERENTE/ADMIN + descripción (es un acta: se destruye producto).
- *  - SEGUNDA: solo descripción. No destruye nada, la marca quien revisa en planta,
- *    pero el motivo es lo que después explica el % de segundas por célula.
+ *  - SEGUNDA: no exige nada. No destruye nada, la marca quien revisa en planta, y
+ *    el "por qué" ya viaja en el tipo de daño (eso es lo que explica el % de
+ *    segundas por célula). Desde el celular, con guantes, una nota obligatoria
+ *    era captura manual que el cliente no quiere (2026-09-11).
  *  - REPROCESO: no exige nada.
  * ⚠️ Asunción a confirmar con el cliente: si marcar segunda también debe exigir
  * autorización del gerente, basta sumar la clase a la guarda de rol.
@@ -25,8 +27,8 @@ export function validarReporte(
   descripcion: string | undefined,
   rol: string,
 ): ErrorReporte | null {
-  if (clase === 'REPROCESO') return null;
-  if (clase === 'BAJA' && rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
+  if (clase !== 'BAJA') return null;
+  if (rol !== 'GERENTE' && rol !== 'ADMIN') return 'ROL_INSUFICIENTE';
   if (!descripcion?.trim()) return 'SIN_DESCRIPCION';
   return null;
 }

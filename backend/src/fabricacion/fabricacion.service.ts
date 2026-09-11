@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Celula, EstadoPar, Prisma } from '@prisma/client';
+import { CalidadService, Usuario } from '../calidad/calidad.service';
+import { validarReporte } from '../calidad/calidad-core';
 import { PrismaService } from '../prisma/prisma.service';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
 import {
@@ -48,6 +51,7 @@ export class FabricacionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bomLoader: BomLoaderService,
+    private readonly calidad: CalidadService,
   ) {}
 
   /** Envoltorio espiable del resolver puro de Demo 2 (igual que en compras). */
@@ -274,7 +278,7 @@ export class FabricacionService {
     });
   }
 
-  async avanzar(codigo: string, dto: AvanzarDto) {
+  async avanzar(codigo: string, dto: AvanzarDto, user?: Usuario) {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       include: { of: true },
@@ -311,6 +315,21 @@ export class FabricacionService {
       celulaDestino: (next?.celula ?? 'PT') as Celula,
     };
 
+    // "Algo pasó con este par": el escaneo trae el daño tipificado y la clase del
+    // tipo decide el destino. BAJA: el par no entra, muere acá y nace su
+    // reposición. SEGUNDA: entra con el grado sellado (en PT carga el saldo de
+    // segundas, no el de primeras). REPROCESO: entra y queda el registro.
+    const tipo = dto.tipoDanoId != null ? await this.calidad.obtenerTipo(dto.tipoDanoId) : null;
+    if (tipo) {
+      const err = validarReporte(tipo.clase, dto.descripcion, user?.role ?? '');
+      if (err === 'ROL_INSUFICIENTE')
+        throw new ForbiddenException('Solo un gerente puede autorizar una baja');
+      if (err === 'SIN_DESCRIPCION')
+        throw new BadRequestException('La baja requiere descripción (acta)');
+      if (tipo.clase === 'BAJA') return this.darDeBajaEnEstacion(par, dto, user!, destino);
+    }
+    const calidad = tipo?.clase === 'SEGUNDA' ? 'SEGUNDA' : par.calidad;
+
     // La bodega destino es configuración global (no cambia durante la tx):
     // se resuelve fuera de la transacción para no alargarla.
     let bodegaPT: { id: number } | null = null;
@@ -324,6 +343,7 @@ export class FabricacionService {
     }
 
     let resultado: any;
+    let incidencia: { tipoDano: { codigo: string; nombre: string; clase: string } } | null = null;
     try {
       resultado = await this.prisma.$transaction(async (tx) => {
         await tx.eventoTrazabilidad.create({
@@ -337,6 +357,20 @@ export class FabricacionService {
             maquinaId: dto.maquinaId ?? null,
           },
         });
+
+        // El daño se detecta en la estación a la que ENTRA el par (es su operario
+        // quien lo ve); la célula causante viaja en el tipo, puede ser otra.
+        if (tipo) {
+          if (tipo.clase === 'SEGUNDA') await this.calidad.sellarSegunda(tx, par.id);
+          incidencia = await this.calidad.registrarIncidencia(tx, {
+            parId: par.id,
+            tipoDanoId: tipo.id,
+            celulaDeteccion: destino.celulaDestino,
+            operarioId: dto.operarioId,
+            descripcion: dto.descripcion,
+            autorizadoPorId: tipo.clase === 'SEGUNDA' ? user?.sub : null,
+          });
+        }
 
         // El primer escaneo de cualquier par activa la OF, sin importar en qué
         // célula arranque (la línea Feroz entra en INYECCION, no en CORTE).
@@ -361,14 +395,14 @@ export class FabricacionService {
                 productoConfiguradoId: par.productoConfiguradoId,
                 tallaId: par.tallaId,
                 bodegaId: bodegaPT!.id,
-                calidad: par.calidad,
+                calidad,
               },
             },
             create: {
               productoConfiguradoId: par.productoConfiguradoId,
               tallaId: par.tallaId,
               bodegaId: bodegaPT!.id,
-              calidad: par.calidad,
+              calidad,
               cantDisponible: 1,
             },
             update: { cantDisponible: { increment: 1 } },
@@ -437,8 +471,56 @@ export class FabricacionService {
         nombre: next?.nombre ?? 'Producto terminado',
         terminado: terminar,
         hoy,
+        calidad,
+        incidencia: this.resumenIncidencia(incidencia),
+        parReposicion: null,
       },
     };
+  }
+
+  /**
+   * BAJA desde la estación: el par no entra (muere donde está) y nace su
+   * reposición en Preparación. Delegado a calidad para no duplicar el acta ni
+   * la cadena -R1/-R2. Se responde con la misma forma que un pistolazo para que
+   * la pantalla lo muestre igual de grande.
+   */
+  private async darDeBajaEnEstacion(
+    par: { id: number; codigo: string; celulaActual: Celula; calidad: 'PRIMERA' | 'SEGUNDA' },
+    dto: AvanzarDto,
+    user: Usuario,
+    destino: { estacionDestino: string; celulaDestino: Celula },
+  ) {
+    const r = await this.calidad.reportar(
+      par.codigo,
+      { tipoDanoId: dto.tipoDanoId!, operarioId: dto.operarioId, descripcion: dto.descripcion },
+      user,
+    );
+    const hoy = await this.hoyEnEstacion(destino.estacionDestino);
+    return {
+      id: par.id,
+      codigo: par.codigo,
+      celulaActual: par.celulaActual,
+      estado: 'DADO_DE_BAJA' as const,
+      avance: {
+        estacion: destino.estacionDestino,
+        nombre: 'Dado de baja',
+        terminado: false,
+        hoy,
+        calidad: par.calidad,
+        incidencia: this.resumenIncidencia(r.incidencia),
+        parReposicion: r.parReposicion
+          ? { codigo: r.parReposicion.codigo, celulaActual: r.parReposicion.celulaActual }
+          : null,
+      },
+    };
+  }
+
+  private resumenIncidencia(
+    i: { tipoDano: { codigo: string; nombre: string; clase: string } } | null,
+  ) {
+    if (!i) return null;
+    const { codigo, nombre, clase } = i.tipoDano;
+    return { tipoDano: { codigo, nombre, clase } };
   }
 
   async listarOF() {

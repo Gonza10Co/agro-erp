@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { FabricacionService } from './fabricacion.service';
 import { ESTACIONES_PILOTO } from './fabricacion-core';
+import { CalidadService } from '../calidad/calidad.service';
 
 const BODEGA_ID = 7;
 
@@ -260,7 +262,7 @@ describe('FabricacionService.avanzar', () => {
   it('registra evento en la célula actual y mueve a la siguiente', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
-      id: 50, ofId: 1, celulaActual: 'CORTE', estado: 'EN_PROCESO',
+      id: 50, ofId: 1, celulaActual: 'CORTE', estado: 'EN_PROCESO', calidad: 'PRIMERA',
       productoConfiguradoId: 10, tallaId: 1, of: { estado: 'ABIERTA' },
     });
     tx.par.update.mockResolvedValue({ id: 50, celulaActual: 'GUARNICION' });
@@ -282,7 +284,10 @@ describe('FabricacionService.avanzar', () => {
       expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION' }) }),
     );
     // Lo que ve el operario: a dónde entró y cuántos van hoy ahí.
-    expect(res.avance).toEqual({ estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 41 });
+    expect(res.avance).toEqual({
+      estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 41,
+      calidad: 'PRIMERA', incidencia: null, parReposicion: null,
+    });
   });
 
   it('la máquina es opcional (en Bodega o PT no hay máquina)', async () => {
@@ -721,5 +726,161 @@ describe('FabricacionService.avanzar (hardening)', () => {
     await expect(
       new FabricacionService(prisma).avanzar('OF5-0001', { operarioId: 999, maquinaId: 999 }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+/**
+ * "Algo pasó con este par": el pistolazo trae `tipoDanoId` y la clase del tipo
+ * decide el destino. Se usa el CalidadService real sobre el mismo prisma falso:
+ * lo que se prueba es la integración (sellar segunda dentro de la tx del
+ * pistolazo), no un mock de calidad.
+ */
+describe('FabricacionService.avanzar — con daño tipificado', () => {
+  const gerente = { sub: 3, role: 'GERENTE' };
+  const operario = { sub: 8, role: 'OPERARIO' };
+  const tipoSegunda = { id: 11, codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', celulaCausante: 'INYECCION', clase: 'SEGUNDA', activo: true };
+  const tipoReproceso = { id: 7, codigo: 'ECONOMIZADOR-RASGADO', nombre: 'Economizador rasgado', celulaCausante: 'INYECCION', clase: 'REPROCESO', activo: true };
+  const tipoBaja = { id: 8, codigo: 'DANO-ROBOT', nombre: 'Daño de robot en capellada', celulaCausante: 'INYECCION', clase: 'BAJA', activo: true };
+
+  function armar(par: any, tipo: any) {
+    const { prisma, tx } = makePrisma({
+      tx: {
+        par: {
+          createMany: jest.fn(), count: jest.fn().mockResolvedValue(1),
+          update: jest.fn().mockResolvedValue({ id: 50, codigo: 'OF1-0001', ...par }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          create: jest.fn().mockResolvedValue({ id: 99, codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION' }),
+        },
+        incidenciaCalidad: { create: jest.fn().mockResolvedValue({ id: 5, tipoDano: tipo }) },
+      },
+    });
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, codigo: 'OF1-0001', ofId: 1, estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' }, ...par,
+    });
+    prisma.tipoDano = { findUnique: jest.fn().mockResolvedValue(tipo) };
+    prisma.eventoTrazabilidad.count.mockResolvedValue(12);
+    const service = new FabricacionService(prisma, undefined as any, new CalidadService(prisma));
+    return { prisma, tx, service };
+  }
+
+  it('SEGUNDA en una estación intermedia: sella el grado, deja la incidencia en la estación de ENTRADA y el par sigue', async () => {
+    const { tx, service } = armar({ celulaActual: 'ALMACEN' }, tipoSegunda);
+    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario);
+
+    // Todo dentro de la misma transacción del pistolazo.
+    expect(tx.par.updateMany).toHaveBeenCalledWith({ where: { id: 50, estado: 'EN_PROCESO' }, data: { calidad: 'SEGUNDA' } });
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ parId: 50, tipoDanoId: 11, celulaDeteccion: 'INYECCION', operarioId: 3, autorizadoPorId: 8 }),
+      }),
+    );
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoInyeccion: 'MONTAJE' }) }),
+    );
+    expect(res.avance).toMatchObject({
+      estacion: 'MONTAJE', terminado: false, calidad: 'SEGUNDA', parReposicion: null,
+      incidencia: { tipoDano: { codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', clase: 'SEGUNDA' } },
+    });
+    // No exige nota: el tipo ya dice por qué.
+  });
+
+  it('SEGUNDA al entrar a PT: el par termina en el saldo de SEGUNDAS aunque venía como primera', async () => {
+    const { tx, service } = armar({ celulaActual: 'INYECCION', subPasoInyeccion: 'FINIZAJE' }, tipoSegunda);
+    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'PT' }, operario);
+
+    expect(tx.par.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { calidad: 'SEGUNDA' } }));
+    expect(tx.par.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ estado: 'TERMINADO', celulaActual: 'PT' }) }),
+    );
+    expect(tx.inventarioPT.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { productoConfiguradoId_tallaId_bodegaId_calidad: expect.objectContaining({ calidad: 'SEGUNDA' }) },
+        create: expect.objectContaining({ calidad: 'SEGUNDA' }),
+      }),
+    );
+    // La operaria de PT es quien la rechaza: la detección queda en PT.
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ celulaDeteccion: 'PT' }) }),
+    );
+    expect(res.avance).toMatchObject({ terminado: true, calidad: 'SEGUNDA' });
+  });
+
+  it('REPROCESO: queda la incidencia, el par entra normal y sigue de primera', async () => {
+    const { tx, service } = armar({ celulaActual: 'ALMACEN' }, tipoReproceso);
+    const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 7, descripcion: 'se despegó' }, operario);
+
+    expect(tx.par.updateMany).not.toHaveBeenCalled();
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tipoDanoId: 7, celulaDeteccion: 'INYECCION', descripcion: 'se despegó', autorizadoPorId: null }),
+      }),
+    );
+    expect(tx.par.update).toHaveBeenCalled();
+    expect(res.avance).toMatchObject({ estacion: 'MONTAJE', calidad: 'PRIMERA', incidencia: { tipoDano: { clase: 'REPROCESO' } } });
+  });
+
+  it('BAJA: el par NO entra a la estación; muere donde está y su reposición nace en Preparación', async () => {
+    const { prisma, tx, service } = armar({ celulaActual: 'ALMACEN' }, tipoBaja);
+    // reportar() relee el par con sus relaciones de línea.
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, codigo: 'OF1-0001', ofId: 1, estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, celulaActual: 'ALMACEN', of: { estado: 'EN_PROCESO' },
+      linea: { celulaInicial: 'CORTE' }, lineaId: 2,
+    });
+    const res = await service.avanzar(
+      'OF1-0001',
+      { operarioId: 3, tipoDanoId: 8, descripcion: 'El robot rasgó la capellada', estacion: 'MONTAJE' },
+      gerente,
+    );
+
+    // Ni evento de entrada ni avance: el par no llegó a Montaje.
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledTimes(1); // solo el nacimiento de la reposición
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ parId: 99, estacionDestino: 'PREPARACION' }),
+    });
+    expect(tx.par.update).not.toHaveBeenCalled();
+    expect(tx.par.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { estado: 'DADO_DE_BAJA' } }));
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', reponeAParId: 50 }) }),
+    );
+    expect(res).toMatchObject({
+      codigo: 'OF1-0001', estado: 'DADO_DE_BAJA',
+      avance: {
+        estacion: 'MONTAJE', nombre: 'Dado de baja', terminado: false, hoy: 12,
+        incidencia: { tipoDano: { clase: 'BAJA' } },
+        parReposicion: { codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION' },
+      },
+    });
+  });
+
+  it('BAJA sin rol de gerente → 403 antes de tocar nada; sin nota → 400', async () => {
+    const a = armar({ celulaActual: 'ALMACEN' }, tipoBaja);
+    await expect(
+      a.service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 8, descripcion: 'acta' }, operario),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(a.prisma.$transaction).not.toHaveBeenCalled();
+
+    const b = armar({ celulaActual: 'ALMACEN' }, tipoBaja);
+    await expect(
+      b.service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 8 }, gerente),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(b.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('un tipo de daño inexistente o inactivo → 404, y el par no se mueve', async () => {
+    const { prisma, service } = armar({ celulaActual: 'ALMACEN' }, { ...tipoSegunda, activo: false });
+    await expect(
+      service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11 }, operario),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('con la estación declarada, un par fuera de orden se rechaza aunque traiga daño (primero el control)', async () => {
+    const { prisma, service } = armar({ celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION' }, tipoSegunda);
+    await expect(
+      service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

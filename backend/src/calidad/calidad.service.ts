@@ -5,15 +5,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Celula } from '@prisma/client';
+import { Celula, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { agruparIndicadores, codigoReposicion, validarReporte } from './calidad-core';
-import { subPasoInicial } from '../fabricacion/fabricacion-core';
+import { estacionNacimiento, subPasoInicial } from '../fabricacion/fabricacion-core';
 import { ReportarIncidenciaDto } from './dto/reportar-incidencia.dto';
 
-interface Usuario {
+export interface Usuario {
   sub: number;
   role: string;
+}
+
+/** Lo que necesita una incidencia para quedar escrita (append-only). */
+export interface DatosIncidencia {
+  parId: number;
+  tipoDanoId: number;
+  celulaDeteccion: Celula;
+  operarioId: number;
+  descripcion?: string | null;
+  autorizadoPorId?: number | null;
+  parReposicionId?: number | null;
 }
 
 const MSG_ESTADO: Record<string, string> = {
@@ -21,6 +32,8 @@ const MSG_ESTADO: Record<string, string> = {
   CANCELADO: 'El par está cancelado (OP anulada)',
   DADO_DE_BAJA: 'El par ya fue dado de baja',
 };
+
+const MSG_RACE = 'El par cambió de estado durante el reporte — recárgalo e intenta de nuevo';
 
 @Injectable()
 export class CalidadService {
@@ -30,6 +43,44 @@ export class CalidadService {
     return this.prisma.tipoDano.findMany({
       where: { activo: true },
       orderBy: { nombre: 'asc' },
+    });
+  }
+
+  /** Un tipo de daño vivo, o 404. Lo usa también el pistolazo con daño. */
+  async obtenerTipo(id: number) {
+    const tipo = await this.prisma.tipoDano.findUnique({ where: { id } });
+    if (!tipo || !tipo.activo)
+      throw new NotFoundException('Tipo de daño inexistente o inactivo');
+    return tipo;
+  }
+
+  /**
+   * Sella el grado SEGUNDA dentro de una transacción ajena (el pistolazo de la
+   * estación, que en PT termina el par en la misma tx). Condición sobre el estado
+   * por la misma razón que la baja: no pisar un par que otra tx acaba de terminar.
+   * Un par ya marcado no vuelve a primera.
+   */
+  async sellarSegunda(tx: Prisma.TransactionClient, parId: number): Promise<void> {
+    const res = await tx.par.updateMany({
+      where: { id: parId, estado: 'EN_PROCESO' },
+      data: { calidad: 'SEGUNDA' },
+    });
+    if (res.count === 0) throw new ConflictException(MSG_RACE);
+  }
+
+  /** La incidencia es un registro append-only; la célula causante viaja en el tipo. */
+  registrarIncidencia(tx: Prisma.TransactionClient, d: DatosIncidencia) {
+    return tx.incidenciaCalidad.create({
+      data: {
+        parId: d.parId,
+        tipoDanoId: d.tipoDanoId,
+        celulaDeteccion: d.celulaDeteccion,
+        operarioId: d.operarioId,
+        descripcion: d.descripcion ?? null,
+        autorizadoPorId: d.autorizadoPorId ?? null,
+        parReposicionId: d.parReposicionId ?? null,
+      },
+      include: { tipoDano: true },
     });
   }
 
@@ -44,9 +95,7 @@ export class CalidadService {
       },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
-    const tipo = await this.prisma.tipoDano.findUnique({ where: { id: dto.tipoDanoId } });
-    if (!tipo || !tipo.activo)
-      throw new NotFoundException('Tipo de daño inexistente o inactivo');
+    const tipo = await this.obtenerTipo(dto.tipoDanoId);
     if (par.estado !== 'EN_PROCESO')
       throw new ConflictException(MSG_ESTADO[par.estado] ?? 'El par no está en proceso');
 
@@ -61,15 +110,12 @@ export class CalidadService {
       // El race read-then-create (el par sale de EN_PROCESO entre la lectura y
       // este insert) se acepta: registra un daño real, no descuadra inventario.
       if (tipo.clase === 'REPROCESO') {
-        const incidencia = await this.prisma.incidenciaCalidad.create({
-          data: {
-            parId: par.id,
-            tipoDanoId: tipo.id,
-            celulaDeteccion: par.celulaActual,
-            operarioId: dto.operarioId,
-            descripcion: dto.descripcion ?? null,
-          },
-          include: { tipoDano: true },
+        const incidencia = await this.registrarIncidencia(this.prisma, {
+          parId: par.id,
+          tipoDanoId: tipo.id,
+          celulaDeteccion: par.celulaActual,
+          operarioId: dto.operarioId,
+          descripcion: dto.descripcion,
         });
         return { incidencia, parReposicion: null };
       }
@@ -123,34 +169,20 @@ export class CalidadService {
     user: Usuario,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // Condición sobre el estado por la misma razón que la baja: no pisar un par
-      // que otra tx acaba de terminar. Un par ya marcado no vuelve a primera.
-      const res = await tx.par.updateMany({
-        where: { id: par.id, estado: 'EN_PROCESO' },
-        data: { calidad: 'SEGUNDA' },
+      await this.sellarSegunda(tx, par.id);
+      const incidencia = await this.registrarIncidencia(tx, {
+        parId: par.id,
+        tipoDanoId,
+        celulaDeteccion: par.celulaActual,
+        operarioId: dto.operarioId,
+        descripcion: dto.descripcion,
+        autorizadoPorId: user.sub,
       });
-      if (res.count === 0)
-        throw new ConflictException(
-          'El par cambió de estado durante el reporte — recargalo e intentá de nuevo',
-        );
-
-      const incidencia = await tx.incidenciaCalidad.create({
-        data: {
-          parId: par.id,
-          tipoDanoId,
-          celulaDeteccion: par.celulaActual,
-          operarioId: dto.operarioId,
-          descripcion: dto.descripcion,
-          autorizadoPorId: user.sub,
-        },
-        include: { tipoDano: true },
-      });
-
       return { incidencia, parReposicion: null };
     });
   }
 
-  private darDeBaja(
+  private async darDeBaja(
     par: {
       id: number;
       codigo: string;
@@ -165,6 +197,14 @@ export class CalidadService {
     celulaInicial: Celula,
     lineaId: number | null,
   ) {
+    // La reposición nace donde nace cualquier par de su línea: la primera estación
+    // activa desde la célula inicial (Preparación para Basarili, Montaje para
+    // Feroz). Antes caía en la célula a secas y en el piloto quedaba en un limbo:
+    // Preparación no escanea, imprime. Sin estaciones (base vieja) se conserva
+    // la célula inicial.
+    const estaciones = await this.prisma.estacion.findMany({ orderBy: { orden: 'asc' } });
+    const nac = estacionNacimiento(celulaInicial, estaciones);
+
     return this.prisma.$transaction(async (tx) => {
       // Condición sobre el estado para no pisar un par que otra tx acaba de
       // terminar/cancelar (mismo patrón que el cierre de OF en fabricacion).
@@ -172,10 +212,7 @@ export class CalidadService {
         where: { id: par.id, estado: 'EN_PROCESO' },
         data: { estado: 'DADO_DE_BAJA' },
       });
-      if (res.count === 0)
-        throw new ConflictException(
-          'El par cambió de estado durante la baja — recargalo e intentá de nuevo',
-        );
+      if (res.count === 0) throw new ConflictException(MSG_RACE);
 
       const parReposicion = await tx.par.create({
         data: {
@@ -183,24 +220,37 @@ export class CalidadService {
           ofId: par.ofId,
           productoConfiguradoId: par.productoConfiguradoId,
           tallaId: par.tallaId,
-          celulaActual: celulaInicial,
-          subPasoActual: subPasoInicial(celulaInicial),
+          celulaActual: nac?.celula ?? celulaInicial,
+          subPasoActual: nac ? nac.subPaso : subPasoInicial(celulaInicial),
+          subPasoInyeccion: nac?.subPasoInyeccion ?? null,
           lineaId,
           reponeAParId: par.id,
         },
       });
+      // Entra a su estación de nacimiento como cualquier par nuevo: la TV y el
+      // tablero por órdenes la cuentan desde ya, y hay que imprimirle su etiqueta.
+      if (nac) {
+        await tx.eventoTrazabilidad.create({
+          data: {
+            parId: parReposicion.id,
+            celula: nac.celula,
+            subPaso: nac.subPaso,
+            subPasoInyeccion: nac.subPasoInyeccion,
+            estacionDestino: nac.codigo,
+            celulaDestino: nac.celula,
+            operarioId: dto.operarioId,
+          },
+        });
+      }
 
-      const incidencia = await tx.incidenciaCalidad.create({
-        data: {
-          parId: par.id,
-          tipoDanoId,
-          celulaDeteccion: par.celulaActual,
-          operarioId: dto.operarioId,
-          descripcion: dto.descripcion,
-          autorizadoPorId: user.sub,
-          parReposicionId: parReposicion.id,
-        },
-        include: { tipoDano: true },
+      const incidencia = await this.registrarIncidencia(tx, {
+        parId: par.id,
+        tipoDanoId,
+        celulaDeteccion: par.celulaActual,
+        operarioId: dto.operarioId,
+        descripcion: dto.descripcion,
+        autorizadoPorId: user.sub,
+        parReposicionId: parReposicion.id,
       });
 
       return { incidencia, parReposicion };

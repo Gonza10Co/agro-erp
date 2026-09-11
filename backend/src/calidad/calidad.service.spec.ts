@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CalidadService } from './calidad.service';
+import { ESTACIONES_PILOTO } from '../fabricacion/fabricacion-core';
 
 const ventas = { sub: 7, role: 'VENTAS' };
 const gerente = { sub: 3, role: 'GERENTE' };
@@ -21,10 +22,13 @@ function makePrisma(overrides: any = {}) {
       create: jest.fn().mockResolvedValue({ id: 99, codigo: 'OF1-0001-R1' }),
     },
     incidenciaCalidad: { create: jest.fn().mockResolvedValue({ id: 1 }) },
+    eventoTrazabilidad: { create: jest.fn().mockResolvedValue({}) },
     ...overrides.tx,
   };
   const prisma: any = {
     par: { findUnique: jest.fn() },
+    // Las estaciones del piloto: la reposición nace en la primera activa de su línea.
+    estacion: { findMany: jest.fn().mockResolvedValue(ESTACIONES_PILOTO.map((e) => ({ ...e }))) },
     tipoDano: {
       findUnique: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -129,14 +133,24 @@ describe('CalidadService.reportar — BAJA', () => {
       where: { id: 50, estado: 'EN_PROCESO' },
       data: { estado: 'DADO_DE_BAJA' },
     });
+    // La línea arranca en CORTE, pero el par no existe ahí: nace en Preparación,
+    // como cualquier par del piloto (antes caía en CORTE y quedaba en un limbo).
     expect(tx.par.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           codigo: 'OF1-0001-R1', ofId: 1, productoConfiguradoId: 10, tallaId: 2,
-          celulaActual: 'CORTE', reponeAParId: 50,
+          celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', subPasoInyeccion: null,
+          reponeAParId: 50,
         }),
       }),
     );
+    // Entra a Preparación como un par nuevo: la TV lo cuenta y hay que etiquetarlo.
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        parId: 99, celula: 'GUARNICION', subPaso: 'PREPARACION',
+        estacionDestino: 'PREPARACION', celulaDestino: 'GUARNICION', operarioId: 9,
+      }),
+    });
     expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -209,12 +223,12 @@ describe('CalidadService.reportar — BAJA', () => {
     await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
     expect(tx.par.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null, lineaId: 4 }),
+        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoInyeccion: 'MONTAJE', lineaId: 4 }),
       }),
     );
   });
 
-  it('la reposición de un par de línea Feroz re-arranca en INYECCION, no en CORTE', async () => {
+  it('la reposición de un par de línea Feroz re-arranca en Montaje (INYECCION), no en Preparación', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
       ...parEnProceso,
@@ -224,9 +238,28 @@ describe('CalidadService.reportar — BAJA', () => {
     await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
     expect(tx.par.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoActual: null, lineaId: 4 }),
+        data: expect.objectContaining({
+          celulaActual: 'INYECCION', subPasoActual: null, subPasoInyeccion: 'MONTAJE', lineaId: 4,
+        }),
       }),
     );
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ estacionDestino: 'MONTAJE', celulaDestino: 'INYECCION' }),
+    });
+  });
+
+  it('sin estaciones configuradas (base anterior al piloto) la reposición cae en la célula inicial, sin evento', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.estacion.findMany.mockResolvedValue([]);
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoBaja);
+    await new CalidadService(prisma).reportar('OF1-0001', dtoBaja, gerente);
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ celulaActual: 'CORTE', subPasoActual: null, subPasoInyeccion: null }),
+      }),
+    );
+    expect(tx.eventoTrazabilidad.create).not.toHaveBeenCalled();
   });
 });
 
