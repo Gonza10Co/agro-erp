@@ -283,3 +283,50 @@ describe('CalidadService.indicadores', () => {
     expect(res.topDanos[0]).toMatchObject({ codigo: 'X', total: 1 });
   });
 });
+
+describe('CalidadService.reportar — SEGUNDA', () => {
+  const tipoSegunda = {
+    id: 19, codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela',
+    celulaCausante: 'INYECCION', clase: 'SEGUNDA', activo: true,
+  };
+
+  it('sella el grado, pare la reposición en Preparación y deja el acta; no exige nota ni gerente', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({ ...parEnProceso, lineaId: 2, linea: { celulaInicial: 'CORTE' } });
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+
+    const res = await new CalidadService(prisma).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, ventas);
+
+    expect(tx.par.updateMany).toHaveBeenCalledWith({
+      where: { id: 50, estado: 'EN_PROCESO' },
+      data: { calidad: 'SEGUNDA' },
+    });
+    // JP (2026-09-11): la segunda se repone, el pedido no se despacha corto.
+    expect(tx.par.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', lineaId: 2, reponeAParId: 50,
+        }),
+      }),
+    );
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ parId: 99, estacionDestino: 'PREPARACION', operarioId: 9 }),
+    });
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ parId: 50, tipoDanoId: 19, celulaDeteccion: 'INYECCION', autorizadoPorId: 7, parReposicionId: 99 }),
+      }),
+    );
+    expect(res.parReposicion).toMatchObject({ codigo: 'OF1-0001-R1' });
+  });
+
+  it('409 si otro proceso terminó el par entre la lectura y el sello (race): no nace reposición', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnProceso);
+    prisma.tipoDano.findUnique.mockResolvedValue(tipoSegunda);
+    tx.par.updateMany.mockResolvedValue({ count: 0 });
+    await expect(new CalidadService(prisma).reportar('OF1-0001', { tipoDanoId: 19, operarioId: 9 }, gerente))
+      .rejects.toBeInstanceOf(ConflictException);
+    expect(tx.par.create).not.toHaveBeenCalled();
+  });
+});

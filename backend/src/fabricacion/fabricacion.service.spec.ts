@@ -764,22 +764,35 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
     return { prisma, tx, service };
   }
 
-  it('SEGUNDA en una estación intermedia: sella el grado, deja la incidencia en la estación de ENTRADA y el par sigue', async () => {
-    const { tx, service } = armar({ celulaActual: 'ALMACEN' }, tipoSegunda);
+  it('SEGUNDA en una estación intermedia: sella el grado, pare la reposición, deja la incidencia en la estación de ENTRADA y el par sigue', async () => {
+    const { tx, service } = armar({ celulaActual: 'ALMACEN', linea: { celulaInicial: 'CORTE' }, lineaId: 2 }, tipoSegunda);
     const res = await service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario);
 
     // Todo dentro de la misma transacción del pistolazo.
     expect(tx.par.updateMany).toHaveBeenCalledWith({ where: { id: 50, estado: 'EN_PROCESO' }, data: { calidad: 'SEGUNDA' } });
-    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+    // El pedido se completa con primeras (JP, 2026-09-11): nace la reposición en Preparación.
+    expect(tx.par.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ parId: 50, tipoDanoId: 11, celulaDeteccion: 'INYECCION', operarioId: 3, autorizadoPorId: 8 }),
+        data: expect.objectContaining({ codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', lineaId: 2, reponeAParId: 50 }),
       }),
     );
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ parId: 99, estacionDestino: 'PREPARACION', operarioId: 3 }),
+    });
+    expect(tx.incidenciaCalidad.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          parId: 50, tipoDanoId: 11, celulaDeteccion: 'INYECCION', operarioId: 3, autorizadoPorId: 8, parReposicionId: 99,
+        }),
+      }),
+    );
+    // Y la segunda sigue su camino: entra a Montaje.
     expect(tx.par.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoInyeccion: 'MONTAJE' }) }),
     );
     expect(res.avance).toMatchObject({
-      estacion: 'MONTAJE', terminado: false, calidad: 'SEGUNDA', parReposicion: null,
+      estacion: 'MONTAJE', terminado: false, calidad: 'SEGUNDA',
+      parReposicion: { codigo: 'OF1-0001-R1', celulaActual: 'GUARNICION' },
       incidencia: { tipoDano: { codigo: 'REBABA-SUELA', nombre: 'Rebaba en la suela', clase: 'SEGUNDA' } },
     });
     // No exige nota: el tipo ya dice por qué.
@@ -882,5 +895,46 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
       service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * El tablero por órdenes cuenta por CUPO: la cadena par → -R1 → -R2 es un solo
+ * cupo del programado, y lo ocupa el último par de la cadena.
+ */
+describe('FabricacionService.tableroOrdenes — cupos y reposiciones', () => {
+  it('una baja repuesta y una segunda repuesta no descuadran el 2/2', async () => {
+    const { prisma } = makePrisma();
+    prisma.ordenFabricacion = {
+      findMany: jest.fn().mockResolvedValue([{
+        id: 1, consecutivo: 1, estado: 'EN_PROCESO', fecha: new Date('2026-09-11'),
+        op: {
+          consecutivo: 1, linea: null, oc: null,
+          lineas: [{
+            productoConfiguradoId: 10,
+            productoConfigurado: { codigo: 'BP-101', nombreComercial: 'Bota Poderosa' },
+            tallas: [{ tallaId: 1, cantAProducir: 2, talla: { valor: 36 } }],
+          }],
+        },
+        pares: [
+          // Cupo A: el original se dio de baja en Bodega; su -R1 ya terminó.
+          { id: 1, estado: 'DADO_DE_BAJA', calidad: 'PRIMERA', celulaActual: 'ALMACEN', subPasoActual: null, subPasoInyeccion: null, tallaId: 1, productoConfiguradoId: 10, reponeAParId: null },
+          { id: 3, estado: 'TERMINADO', calidad: 'PRIMERA', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null, tallaId: 1, productoConfiguradoId: 10, reponeAParId: 1 },
+          // Cupo B: el original salió de SEGUNDA (terminó, se vende aparte); su -R1 va en Montaje.
+          { id: 2, estado: 'TERMINADO', calidad: 'SEGUNDA', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null, tallaId: 1, productoConfiguradoId: 10, reponeAParId: null },
+          { id: 4, estado: 'EN_PROCESO', calidad: 'PRIMERA', celulaActual: 'INYECCION', subPasoActual: null, subPasoInyeccion: 'MONTAJE', tallaId: 1, productoConfiguradoId: 10, reponeAParId: 2 },
+        ],
+      }]),
+    };
+
+    const r = await new FabricacionService(prisma).tableroOrdenes();
+    const o = r.ordenes[0];
+
+    // Dos cupos abiertos (los originales), uno completo con primera, una segunda aparte.
+    expect(o).toMatchObject({ programado: 2, nacidos: 2, terminados: 1, segundas: 1 });
+    // El avance por estación lo dan los pares que HOY ocupan el cupo: -R1 terminado (cuenta en
+    // todas) y -R1 en Montaje. Ni el dado de baja ni la segunda repuesta cuentan.
+    expect(o.porEstacion).toEqual({ PREPARACION: 2, BODEGA_CORTE: 2, MONTAJE: 2, FINIZAJE: 1, PT: 1 });
+    expect(o.programa[0]).toMatchObject({ talla: '36', programado: 2, nacidos: 2, terminados: 1, segundas: 1 });
   });
 });

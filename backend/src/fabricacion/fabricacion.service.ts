@@ -281,7 +281,12 @@ export class FabricacionService {
   async avanzar(codigo: string, dto: AvanzarDto, user?: Usuario) {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
-      include: { of: true },
+      // La línea decide dónde nace la reposición de una segunda (Feroz → Montaje).
+      include: {
+        of: true,
+        linea: true,
+        productoConfigurado: { include: { marca: { include: { linea: true } } } },
+      },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
     if (par.estado !== 'EN_PROCESO')
@@ -344,6 +349,7 @@ export class FabricacionService {
 
     let resultado: any;
     let incidencia: { tipoDano: { codigo: string; nombre: string; clase: string } } | null = null;
+    let parReposicion: { codigo: string; celulaActual: Celula } | null = null;
     try {
       resultado = await this.prisma.$transaction(async (tx) => {
         await tx.eventoTrazabilidad.create({
@@ -360,15 +366,35 @@ export class FabricacionService {
 
         // El daño se detecta en la estación a la que ENTRA el par (es su operario
         // quien lo ve); la célula causante viaja en el tipo, puede ser otra.
-        if (tipo) {
-          if (tipo.clase === 'SEGUNDA') await this.calidad.sellarSegunda(tx, par.id);
+        if (tipo?.clase === 'SEGUNDA') {
+          // La segunda sigue (se vende como segunda) y el pedido se completa con
+          // una reposición que nace en Preparación (JP, 2026-09-11).
+          const marca = (par as any).productoConfigurado?.marca;
+          const celulaInicial: Celula =
+            (par as any).linea?.celulaInicial ?? marca?.linea?.celulaInicial ?? 'CORTE';
+          const r = await this.calidad.marcarSegundaEn(
+            tx,
+            par,
+            {
+              tipoDanoId: tipo.id,
+              celulaDeteccion: destino.celulaDestino,
+              operarioId: dto.operarioId,
+              descripcion: dto.descripcion,
+              autorizadoPorId: user?.sub ?? null,
+            },
+            celulaInicial,
+            par.lineaId ?? marca?.lineaId ?? null,
+            estaciones,
+          );
+          incidencia = r.incidencia;
+          parReposicion = { codigo: r.parReposicion.codigo, celulaActual: r.parReposicion.celulaActual };
+        } else if (tipo) {
           incidencia = await this.calidad.registrarIncidencia(tx, {
             parId: par.id,
             tipoDanoId: tipo.id,
             celulaDeteccion: destino.celulaDestino,
             operarioId: dto.operarioId,
             descripcion: dto.descripcion,
-            autorizadoPorId: tipo.clase === 'SEGUNDA' ? user?.sub : null,
           });
         }
 
@@ -473,7 +499,7 @@ export class FabricacionService {
         hoy,
         calidad,
         incidencia: this.resumenIncidencia(incidencia),
-        parReposicion: null,
+        parReposicion,
       },
     };
   }
@@ -577,6 +603,7 @@ export class FabricacionService {
             codigo: true,
             celulaActual: true,
             estado: true,
+            calidad: true,
             talla: { select: { valor: true } },
             // Para las etiquetas físicas: qué es el par y por qué línea se fabrica.
             productoConfigurado: { select: { codigo: true, nombreComercial: true } },
@@ -603,7 +630,7 @@ export class FabricacionService {
     const where = ofId ? { ofId } : {};
     const [grupos, tallas, estaciones, ofs] = await Promise.all([
       this.prisma.par.groupBy({
-        by: ['celulaActual', 'subPasoActual', 'subPasoInyeccion', 'estado', 'tallaId'],
+        by: ['celulaActual', 'subPasoActual', 'subPasoInyeccion', 'estado', 'tallaId', 'calidad'],
         where,
         _count: { _all: true },
       }),
@@ -631,13 +658,16 @@ export class FabricacionService {
     columnas.set(OTRAS_ESTACIONES, { codigo: OTRAS_ESTACIONES, nombre: 'Otros', total: 0, porTalla: new Map() });
 
     let terminados = 0;
+    let segundas = 0;
     let fueraDeFlujo = 0;
     let total = 0;
     for (const g of grupos) {
       const cuantos = g._count._all;
       total += cuantos;
       if (g.estado === 'TERMINADO') {
-        terminados += cuantos;
+        // Una segunda terminada no completa el pedido (se repone): va aparte.
+        if ((g as any).calidad === 'SEGUNDA') segundas += cuantos;
+        else terminados += cuantos;
         continue;
       }
       if (g.estado === 'DADO_DE_BAJA' || g.estado === 'CANCELADO') {
@@ -694,7 +724,7 @@ export class FabricacionService {
           .map(({ talla, cantidad }) => ({ talla, cantidad })),
       }));
 
-    return { estaciones: salida, terminados, fueraDeFlujo, total, programado };
+    return { estaciones: salida, terminados, segundas, fueraDeFlujo, total, programado };
   }
 
   /**
@@ -1146,7 +1176,9 @@ export class FabricacionService {
         },
         pares: {
           select: {
+            id: true,
             estado: true,
+            calidad: true,
             celulaActual: true,
             subPasoActual: true,
             subPasoInyeccion: true,
@@ -1174,8 +1206,9 @@ export class FabricacionService {
           programado: programa.reduce((a, p) => a + p.programado, 0),
           nacidos: programa.reduce((a, p) => a + p.nacidos, 0),
           terminados: programa.reduce((a, p) => a + p.terminados, 0),
+          segundas: programa.reduce((a, p) => a + p.segundas, 0),
           porEstacion: paresPorEstacion(
-            of.pares.map((p: any) => ({
+            paresVivos(of.pares).map((p: any) => ({
               estado: p.estado,
               celula: p.celulaActual,
               subPaso: p.subPasoActual,
@@ -1196,6 +1229,17 @@ export const META_DIARIA_DEFAULT = 1206;
 const HABILES_POR_DEFECTO = 24;
 const CELULAS_META: string[] = ['CORTE', 'GUARNICION', 'ALMACEN', 'INYECCION', 'PT'];
 
+/**
+ * Los pares que ocupan un cupo del programado HOY: cada par dado de baja o marcado
+ * de segunda que ya tiene reposición cede su cupo a la reposición (la cadena
+ * par → -R1 → -R2 es UN cupo). Sin esto, la reposición no contaba y una orden con
+ * una baja se quedaba en 19/20 para siempre.
+ */
+function paresVivos(pares: readonly any[]): any[] {
+  const reemplazados = new Set(pares.filter((p) => p.reponeAParId != null).map((p) => p.reponeAParId));
+  return pares.filter((p) => !reemplazados.has(p.id));
+}
+
 /** Programado vs nacidos vs terminados por producto × talla, a partir de la OF cargada con OP y pares. */
 function programaDeOf(
   of: any,
@@ -1208,18 +1252,25 @@ function programaDeOf(
   talla: string;
   programado: number;
   nacidos: number;
+  /** Primeras terminadas: las que completan el pedido. */
   terminados: number;
+  /** Segundas terminadas: se venden aparte y su cupo lo completa la reposición. */
+  segundas: number;
   /** Avance acumulado por estación, igual que la cabecera de la orden. */
   porEstacion: Record<string, number>;
 }[] {
   const pares: any[] = of.pares ?? [];
-  const deLinea = (pcId: number, tallaId: number) =>
-    pares.filter((p) => p.productoConfiguradoId === pcId && p.tallaId === tallaId && !p.reponeAParId);
+  const vivos = paresVivos(pares);
+  const deLinea = (lista: any[], pcId: number, tallaId: number) =>
+    lista.filter((p) => p.productoConfiguradoId === pcId && p.tallaId === tallaId);
   const out: ReturnType<typeof programaDeOf> = [];
   for (const l of (of.op?.lineas ?? []) as any[]) {
     for (const t of (l.tallas ?? []) as any[]) {
       if (!(t.cantAProducir > 0)) continue;
-      const suyos = deLinea(l.productoConfiguradoId, t.tallaId);
+      // Nacidos = cupos abiertos (los originales; una reposición no abre cupo nuevo).
+      const originales = deLinea(pares, l.productoConfiguradoId, t.tallaId).filter((p) => !p.reponeAParId);
+      // Avance = el par que hoy ocupa cada cupo (el original o su última reposición).
+      const suyos = deLinea(vivos, l.productoConfiguradoId, t.tallaId);
       out.push({
         productoConfiguradoId: l.productoConfiguradoId,
         producto: l.productoConfigurado?.nombreComercial ?? '',
@@ -1227,8 +1278,10 @@ function programaDeOf(
         tallaId: t.tallaId,
         talla: String(t.talla?.valor ?? t.tallaId),
         programado: t.cantAProducir,
-        nacidos: suyos.filter((p) => p.estado !== 'CANCELADO').length,
-        terminados: suyos.filter((p) => p.estado === 'TERMINADO').length,
+        nacidos: originales.filter((p) => p.estado !== 'CANCELADO').length,
+        terminados: suyos.filter((p) => p.estado === 'TERMINADO' && p.calidad !== 'SEGUNDA').length,
+        segundas: deLinea(pares, l.productoConfiguradoId, t.tallaId)
+          .filter((p) => p.estado === 'TERMINADO' && p.calidad === 'SEGUNDA').length,
         porEstacion: paresPorEstacion(
           suyos.map((p) => ({
             estado: p.estado,
