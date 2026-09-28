@@ -3,9 +3,11 @@ import {
   Controller,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -20,8 +22,13 @@ import { ActualizarLineaDto } from './dto/actualizar-linea.dto';
 export class LineaController {
   constructor(private readonly lineas: LineaService) {}
 
-  @Get() listar() {
-    return this.lineas.listar();
+  // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
+  // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
+  @Get() listar(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.lineas.listar(incluirInactivas);
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.lineas.obtener(id);
@@ -44,5 +51,12 @@ export class LineaController {
   @Roles('ADMIN', 'GERENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.lineas.desactivar(id);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.lineas.reactivar(id);
   }
 }

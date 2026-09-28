@@ -48,4 +48,11 @@ export class ClientesController {
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.clientes.desactivar(id);
   }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.clientes.reactivar(id);
+  }
 }

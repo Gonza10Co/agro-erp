@@ -22,9 +22,10 @@ export class LineaService {
     });
   }
 
-  listar() {
+  /** Solo activas salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listar(incluirInactivas = false) {
     return this.prisma.linea.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: { nombre: 'asc' },
     });
   }
@@ -46,5 +47,11 @@ export class LineaService {
     const existe = await this.prisma.linea.findUnique({ where: { id } });
     if (!existe) throw new NotFoundException(`No existe la línea con id ${id}`);
     return this.prisma.linea.update({ where: { id }, data: { activo: false } });
+  }
+
+  async reactivar(id: number) {
+    const existe = await this.prisma.linea.findUnique({ where: { id } });
+    if (!existe) throw new NotFoundException(`No existe la línea con id ${id}`);
+    return this.prisma.linea.update({ where: { id }, data: { activo: true } });
   }
 }

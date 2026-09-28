@@ -2,16 +2,22 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ProveedoresApi, Proveedor } from '../../core/api/proveedores.api';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 @Component({
   selector: 'app-proveedores-list',
   standalone: true,
-  imports: [DrawerComponent, FormsModule],
+  imports: [DrawerComponent, FormsModule, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Proveedores</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar inactivos
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrirNuevo()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nuevo proveedor
@@ -36,7 +42,7 @@ import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
               <thead><tr><th>NIT</th><th>Nombre</th><th>Ciudad</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (p of proveedores(); track p.id) {
-                  <tr>
+                  <tr [class.is-inactive]="!p.activo">
                     <td class="cell-mono">{{ p.nit }}</td>
                     <td>{{ p.nombre }}</td>
                     <td class="cell-sub">{{ p.ciudad || '—' }}</td>
@@ -50,7 +56,14 @@ import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
                     <td class="cell-actions">
                       <button class="btn btn-ghost btn-sm" type="button" (click)="abrirEditar(p)">Editar</button>
                       @if (p.activo) {
-                        <button class="btn btn-ghost btn-sm" type="button" (click)="desactivar(p)">Desactivar</button>
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === p.id"
+                          [pregunta]="'¿Desactivar ' + p.nombre + '?'"
+                          (pedir)="confirmandoId.set(p.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(p)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(p)">Reactivar</button>
                       }
                     </td>
                   </tr>
@@ -89,6 +102,10 @@ export class ProveedoresListComponent {
   proveedores = signal<Proveedor[]>([]);
   cargando = signal(true);
   drawerAbierto = signal(false);
+  /** Casilla "Mostrar inactivos": pide también los desactivados para poder reactivarlos. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
   editando = signal(false);
 
   private editId: number | null = null;
@@ -104,7 +121,7 @@ export class ProveedoresListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (ps) => { this.proveedores.set(ps); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -163,9 +180,18 @@ export class ProveedoresListComponent {
     });
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(p: Proveedor): void {
-    this.api.desactivar(p.id).subscribe({
-      next: () => this.cargar(),
-    });
+    this.confirmandoId.set(null);
+    this.api.desactivar(p.id).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(p: Proveedor): void {
+    this.api.reactivar(p.id).subscribe({ next: () => this.cargar() });
   }
 }

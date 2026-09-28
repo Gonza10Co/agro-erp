@@ -207,6 +207,8 @@ table.data tbody tr{transition:background var(--dur-fast) var(--ease)}
 table.data tbody tr:hover td{background:var(--surface-hover)}
 table.data tbody tr.is-selected td{background:color-mix(in oklch,var(--accent) 9%,var(--surface))}
 table.data tbody tr.is-selected td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+/* Registro inactivo ("Mostrar inactivas"): atenuado, salvo la celda de acciones (Reactivar). */
+table.data tbody tr.is-inactive td:not(.cell-actions){opacity:.55}
 table.data .cell-mono{font-family:var(--font-mono);font-weight:var(--fw-medium)}
 table.data .cell-sub{color:var(--text-muted);font-size:var(--text-caption)}
 .table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-bottom:var(--bw) solid var(--border);flex-wrap:wrap}

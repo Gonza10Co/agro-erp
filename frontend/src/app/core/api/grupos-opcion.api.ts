@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { inactivas } from './inactivas.params';
 
 export interface Opcion {
   id: number;
@@ -41,8 +42,9 @@ export class GruposOpcionApi {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/catalog`;
 
-  listar() {
-    return this.http.get<GrupoOpcion[]>(`${this.base}/grupos-opcion`);
+  /** Opciones solo activas por defecto (configurador); `incluirInactivas` es opt-in. */
+  listar(opts?: { incluirInactivas?: boolean }) {
+    return this.http.get<GrupoOpcion[]>(`${this.base}/grupos-opcion`, { params: inactivas(opts) });
   }
 
   crearGrupo(dto: CrearGrupoDto) {
@@ -59,5 +61,9 @@ export class GruposOpcionApi {
 
   desactivarOpcion(opcionId: number) {
     return this.http.patch<Opcion>(`${this.base}/grupos-opcion/opciones/${opcionId}/desactivar`, {});
+  }
+
+  reactivarOpcion(opcionId: number) {
+    return this.http.patch<Opcion>(`${this.base}/grupos-opcion/opciones/${opcionId}/reactivar`, {});
   }
 }

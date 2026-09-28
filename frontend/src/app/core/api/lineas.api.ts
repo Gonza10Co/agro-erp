@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { inactivas } from './inactivas.params';
 
 export type Celula = 'CORTE' | 'GUARNICION' | 'ALMACEN' | 'INYECCION' | 'PT';
 
@@ -23,8 +24,10 @@ export class LineasApi {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/catalog/lineas`;
 
-  listar() { return this.http.get<Linea[]>(this.base); }
+  /** Solo activas por defecto; `incluirInactivas` es opt-in (pantalla de maestros). */
+  listar(opts?: { incluirInactivas?: boolean }) { return this.http.get<Linea[]>(this.base, { params: inactivas(opts) }); }
   crear(dto: CrearLineaDto) { return this.http.post<Linea>(this.base, dto); }
   actualizar(id: number, dto: ActualizarLineaDto) { return this.http.patch<Linea>(`${this.base}/${id}`, dto); }
   desactivar(id: number) { return this.http.patch<Linea>(`${this.base}/${id}/desactivar`, {}); }
+  reactivar(id: number) { return this.http.patch<Linea>(`${this.base}/${id}/reactivar`, {}); }
 }

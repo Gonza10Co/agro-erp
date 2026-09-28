@@ -8,6 +8,40 @@ describe('ShellComponent', () => {
   afterEach(() => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('agro-sidebar');
+    localStorage.removeItem('agro-nav-grupos');
+  });
+
+  function crear() {
+    TestBed.configureTestingModule({
+      imports: [ShellComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(ShellComponent);
+    fixture.detectChanges();
+    return { fixture, host: fixture.nativeElement as HTMLElement };
+  }
+
+  it('agrupa el menú por áreas, con Configuración cerrada al arrancar', () => {
+    const { host } = crear();
+    const areas = [...host.querySelectorAll('.nav-group-btn span')].map((e) => e.textContent?.trim());
+    expect(areas).toEqual(['Ventas', 'Producción', 'Planta', 'Compras e inventario', 'Reportes', 'Configuración']);
+    const cerradas = [...host.querySelectorAll('.nav-group.cerrado .nav-group-btn span')].map((e) => e.textContent?.trim());
+    expect(cerradas).toEqual(['Configuración']);
+  });
+
+  it('abre y cierra un área, y recuerda cómo quedó', () => {
+    const { fixture, host } = crear();
+    const ventas = host.querySelectorAll('.nav-group-btn')[0] as HTMLButtonElement;
+    ventas.click();
+    fixture.detectChanges();
+    expect(ventas.closest('.nav-group')!.classList.contains('cerrado')).toBeTrue();
+    expect(JSON.parse(localStorage.getItem('agro-nav-grupos')!)).not.toContain('ventas');
+  });
+
+  it('retiró del menú el puesto de operario (lo reemplazó Estación)', () => {
+    const text = crear().host.textContent ?? '';
+    expect(text).not.toContain('Puesto de operario');
+    expect(text).toContain('Estación');
   });
 
   it('muestra el usuario logueado del JWT, no un nombre fijo', () => {
@@ -69,8 +103,8 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     // visibles (demos 1-2)
-    expect(text).toContain('Órdenes de Compra');
-    expect(text).toContain('Órdenes de Producción');
+    expect(text).toContain('Órdenes de compra');
+    expect(text).toContain('Órdenes de producción');
     expect(text).toContain('Clientes');
     expect(text).toContain('Configurador de BOM');
     // visibles desde el 2026-08-08: Entregas 5 y 6 liberadas al cliente.
@@ -114,7 +148,7 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     // lo del cliente + la próxima entrega
-    expect(text).toContain('Órdenes de Compra');
+    expect(text).toContain('Órdenes de compra');
     expect(text).toContain('Clientes');
     expect(text).toContain('Compras');
     expect(text).toContain('Stage');
@@ -125,7 +159,7 @@ describe('ShellComponent', () => {
     // puerta al consumo real de materiales, a los sub-pasos de inyección y a la meta
     // diaria contra días hábiles — todo lo que se muestra el 2026-08-04.
     expect(text).toContain('Reporte diario');
-    expect(text).toContain('Tablero de fabricación');
+    expect(text).toContain('Tablero por estaciones');
     // Desde el 2026-08-12 tampoco quedan internos ocultos para STAGE. Su privilegio
     // (alcanzar EN_STAGE) sigue vivo en el escalafón, pero hoy no hay nada ahí:
     // volverá a notarse cuando la próxima entrega nazca oculta al cliente.

@@ -57,4 +57,21 @@ describe('ClientesService', () => {
     await service.desactivar(1);
     expect(prisma.cliente.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { activo: false } });
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.cliente.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.cliente.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivar(1);
+    expect(prisma.cliente.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.cliente.findUnique.mockResolvedValue(null);
+    await expect(service.reactivar(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

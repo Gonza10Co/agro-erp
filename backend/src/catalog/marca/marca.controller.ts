@@ -3,9 +3,11 @@ import {
   Controller,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -20,8 +22,13 @@ import { ActualizarMarcaDto } from './dto/actualizar-marca.dto';
 export class MarcaController {
   constructor(private readonly marcas: MarcaService) {}
 
-  @Get() listar() {
-    return this.marcas.listar();
+  // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
+  // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
+  @Get() listar(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.marcas.listar(incluirInactivas);
   }
 
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
@@ -48,5 +55,12 @@ export class MarcaController {
   @Roles('ADMIN', 'GERENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.marcas.desactivar(id);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.marcas.reactivar(id);
   }
 }

@@ -28,9 +28,10 @@ export class MarcaService {
     });
   }
 
-  listar() {
+  /** Solo activas salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listar(incluirInactivas = false) {
     return this.prisma.marca.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: { nombre: 'asc' },
     });
   }
@@ -59,6 +60,15 @@ export class MarcaService {
     return this.prisma.marca.update({
       where: { id },
       data: { activo: false },
+    });
+  }
+
+  async reactivar(id: number) {
+    const existe = await this.prisma.marca.findUnique({ where: { id } });
+    if (!existe) throw new NotFoundException(`No existe la marca con id ${id}`);
+    return this.prisma.marca.update({
+      where: { id },
+      data: { activo: true },
     });
   }
 }

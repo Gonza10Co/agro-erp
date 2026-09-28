@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PiezasApi, Pieza } from '../../../core/api/piezas.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 /**
  * Despiece de la bota. Cada línea del BOM puede apuntar a una pieza para decir
@@ -10,7 +11,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 @Component({
   selector: 'app-piezas-list',
   standalone: true,
-  imports: [FormsModule, DrawerComponent],
+  imports: [FormsModule, DrawerComponent, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -19,6 +20,11 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
           <div class="cell-sub">El despiece: a qué parte de la bota va cada material.</div>
         </div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar archivadas
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrirNueva()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nueva pieza
@@ -42,13 +48,27 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
               <thead><tr><th>Código</th><th>Nombre</th><th class="num">Orden</th><th></th></tr></thead>
               <tbody>
                 @for (p of piezas(); track p.id) {
-                  <tr>
+                  <tr [class.is-inactive]="!p.activo">
                     <td class="cell-mono">{{ p.codigo }}</td>
-                    <td>{{ p.nombre }}</td>
+                    <td>
+                      {{ p.nombre }}
+                      @if (!p.activo) { <span class="badge badge-neutral" style="margin-left:var(--sp-2)"><span class="dot"></span>Archivada</span> }
+                    </td>
                     <td class="num cell-sub">{{ p.orden }}</td>
-                    <td style="text-align:right;white-space:nowrap">
+                    <td class="cell-actions" style="text-align:right;white-space:nowrap">
                       <button class="btn btn-ghost btn-sm" type="button" (click)="editar(p)">Editar</button>
-                      <button class="btn btn-ghost btn-sm" type="button" (click)="desactivar(p)">Archivar</button>
+                      @if (p.activo) {
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === p.id"
+                          [pregunta]="'¿Archivar ' + p.nombre + '?'"
+                          etiqueta="Archivar"
+                          textoConfirmar="Sí, archivar"
+                          (pedir)="confirmandoId.set(p.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(p)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(p)">Reactivar</button>
+                      }
                     </td>
                   </tr>
                 }
@@ -95,6 +115,10 @@ export class PiezasListComponent implements OnInit {
   guardando = signal(false);
   abierto = signal(false);
   editando = signal<Pieza | null>(null);
+  /** Casilla "Mostrar archivadas": pide también las archivadas para poder reactivarlas. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
   error = signal('');
   errorDrawer = signal('');
 
@@ -106,7 +130,7 @@ export class PiezasListComponent implements OnInit {
 
   private cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (p) => { this.piezas.set(p); this.cargando.set(false); },
       error: () => { this.cargando.set(false); this.error.set('No se pudieron cargar las piezas'); },
     });
@@ -146,7 +170,22 @@ export class PiezasListComponent implements OnInit {
     });
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  reactivar(p: Pieza): void {
+    this.error.set('');
+    this.api.reactivar(p.id).subscribe({
+      next: () => this.cargar(),
+      error: (e) => this.error.set(e?.error?.message ?? 'No se pudo reactivar la pieza'),
+    });
+  }
+
+  /** Solo se llama desde "Sí, archivar": el primer clic únicamente abre la confirmación. */
   desactivar(p: Pieza): void {
+    this.confirmandoId.set(null);
     this.error.set('');
     this.api.desactivar(p.id).subscribe({
       next: () => this.cargar(),

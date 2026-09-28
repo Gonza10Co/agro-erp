@@ -117,4 +117,33 @@ describe('ReferenciaAbmService', () => {
     });
     expect(r).toMatchObject({ id: 7, grupoOpcionId: 2 });
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.referencia.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.referencia.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivar(1);
+    expect(prisma.referencia.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.referencia.findUnique.mockResolvedValue(null);
+    await expect(service.reactivar(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('listar sin flag trae solo activos; con incluirInactivas trae todos', async () => {
+    prisma.referencia.findMany.mockResolvedValue([]);
+    await service.listar();
+    expect(prisma.referencia.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { activo: true } }),
+    );
+    await service.listar(true);
+    expect(prisma.referencia.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
 });

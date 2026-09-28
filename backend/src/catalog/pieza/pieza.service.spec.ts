@@ -64,4 +64,33 @@ describe('PiezaService', () => {
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     });
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.pieza.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.pieza.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivar(1);
+    expect(prisma.pieza.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.pieza.findUnique.mockResolvedValue(null);
+    await expect(service.reactivar(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('listar sin flag trae solo activos; con incluirInactivas trae todos', async () => {
+    prisma.pieza.findMany.mockResolvedValue([]);
+    await service.listar();
+    expect(prisma.pieza.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { activo: true } }),
+    );
+    await service.listar(true);
+    expect(prisma.pieza.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
 });

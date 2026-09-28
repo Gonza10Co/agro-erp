@@ -31,16 +31,18 @@ export class MaterialService {
     });
   }
 
-  // Mismo shape que CatalogService.listarMateriales (lo consume el editor de BOM).
-  async listar() {
+  // Mismo shape que CatalogService.listarMateriales (lo consume el editor de BOM),
+  // más `activo`. Solo activos salvo `incluirInactivas` (pantalla de maestros).
+  async listar(incluirInactivas = false) {
     const filas = await this.prisma.material.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: { nombreCanonico: 'asc' },
       select: {
         id: true,
         codigo: true,
         nombreCanonico: true,
         origen: true,
+        activo: true,
         unidadMedida: { select: { codigo: true } },
       },
     });
@@ -49,6 +51,7 @@ export class MaterialService {
       codigo: m.codigo,
       nombreCanonico: m.nombreCanonico,
       origen: m.origen,
+      activo: m.activo,
       unidad: m.unidadMedida?.codigo ?? '',
     }));
   }
@@ -82,6 +85,15 @@ export class MaterialService {
     return this.prisma.material.update({
       where: { id },
       data: { activo: false },
+    });
+  }
+
+  async reactivar(id: number) {
+    const existe = await this.prisma.material.findUnique({ where: { id } });
+    if (!existe) throw new NotFoundException(`Material ${id} no encontrado`);
+    return this.prisma.material.update({
+      where: { id },
+      data: { activo: true },
     });
   }
 

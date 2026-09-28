@@ -91,4 +91,33 @@ describe('GrupoOpcionService', () => {
       service.agregarOpcion(999, { codigo: 'NEGRO', nombre: 'Negro' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.opcion.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.opcion.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivarOpcion(1);
+    expect(prisma.opcion.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.opcion.findUnique.mockResolvedValue(null);
+    await expect(service.reactivarOpcion(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('listarGrupos trae solo opciones activas salvo incluirInactivas', async () => {
+    prisma.grupoOpcion.findMany.mockResolvedValue([]);
+    await service.listarGrupos();
+    expect(prisma.grupoOpcion.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ include: { opciones: { where: { activo: true } } } }),
+    );
+    await service.listarGrupos(true);
+    expect(prisma.grupoOpcion.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ include: { opciones: true } }),
+    );
+  });
 });

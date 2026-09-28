@@ -32,9 +32,10 @@ export class ReferenciaAbmService {
     });
   }
 
-  listar() {
+  /** Solo activas salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listar(incluirInactivas = false) {
     return this.prisma.referencia.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: { codigo: 'asc' },
       select: { id: true, codigo: true, nombreInterno: true, activo: true, piezasPorPar: true },
     });
@@ -70,6 +71,15 @@ export class ReferenciaAbmService {
     return this.prisma.referencia.update({
       where: { id },
       data: { activo: false },
+    });
+  }
+
+  async reactivar(id: number) {
+    const existe = await this.prisma.referencia.findUnique({ where: { id } });
+    if (!existe) throw new NotFoundException(`No existe la referencia ${id}`);
+    return this.prisma.referencia.update({
+      where: { id },
+      data: { activo: true },
     });
   }
 

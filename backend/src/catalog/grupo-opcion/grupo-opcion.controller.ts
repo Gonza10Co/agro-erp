@@ -3,9 +3,11 @@ import {
   Controller,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -22,8 +24,13 @@ export class GrupoOpcionController {
   constructor(private readonly grupos: GrupoOpcionService) {}
 
   // Lectura: cualquier usuario autenticado.
-  @Get() listarGrupos() {
-    return this.grupos.listarGrupos();
+  // Sin parámetros trae solo las opciones activas (lo que consume el configurador);
+  // `?incluirInactivas=true` es para la pantalla de maestros, que las puede reactivar.
+  @Get() listarGrupos(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.grupos.listarGrupos(incluirInactivas);
   }
 
   // Escrituras: solo roles internos.
@@ -57,5 +64,14 @@ export class GrupoOpcionController {
     @Param('opcionId', ParseIntPipe) opcionId: number,
   ) {
     return this.grupos.desactivarOpcion(opcionId);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Patch('opciones/:opcionId/reactivar') reactivarOpcion(
+    @Param('opcionId', ParseIntPipe) opcionId: number,
+  ) {
+    return this.grupos.reactivarOpcion(opcionId);
   }
 }

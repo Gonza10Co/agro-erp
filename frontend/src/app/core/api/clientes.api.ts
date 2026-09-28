@@ -18,6 +18,7 @@ export class ClientesApi {
   crear(dto: CrearClienteDto) { return this.http.post<Cliente>(this.base, dto); }
   actualizar(id: number, dto: Partial<CrearClienteDto>) { return this.http.patch<Cliente>(`${this.base}/${id}`, dto); }
   desactivar(id: number) { return this.http.patch<Cliente>(`${this.base}/${id}/desactivar`, {}); }
+  reactivar(id: number) { return this.http.patch<Cliente>(`${this.base}/${id}/reactivar`, {}); }
 
   // Sedes de entrega del cliente.
   listarSedes(clienteId: number) { return this.http.get<SedeCliente[]>(`${this.base}/${clienteId}/sedes`); }

@@ -4,16 +4,22 @@ import { ReferenciasAbmApi, ReferenciaAbm, CrearReferenciaDto } from '../../../c
 import { CatalogoApi } from '../../../core/api/catalogo.api';
 import { Talla } from '../../../core/api/models/pedidos.models';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 @Component({
   selector: 'app-referencias-list',
   standalone: true,
-  imports: [DrawerComponent, FormsModule],
+  imports: [DrawerComponent, FormsModule, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Referencias</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar inactivas
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrir()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nueva referencia
@@ -38,7 +44,7 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
               <thead><tr><th>Código</th><th>Nombre interno</th><th class="num">Piezas/par</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (r of referencias(); track r.id) {
-                  <tr>
+                  <tr [class.is-inactive]="!r.activo">
                     <td class="cell-mono">{{ r.codigo }}</td>
                     <td>{{ r.nombreInterno }}</td>
                     <td class="num cell-mono">{{ r.piezasPorPar ?? '—' }}</td>
@@ -51,7 +57,14 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
                     </td>
                     <td class="cell-actions">
                       @if (r.activo) {
-                        <button class="btn btn-ghost btn-sm" type="button" (click)="desactivar(r)">Desactivar</button>
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === r.id"
+                          [pregunta]="'¿Desactivar ' + r.codigo + '?'"
+                          (pedir)="confirmandoId.set(r.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(r)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(r)">Reactivar</button>
                       }
                     </td>
                   </tr>
@@ -110,6 +123,10 @@ export class ReferenciasListComponent {
   tallas = signal<Talla[]>([]);
   cargando = signal(true);
   drawerAbierto = signal(false);
+  /** Casilla "Mostrar inactivas": pide también las desactivadas para poder reactivarlas. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
 
   codigo = '';
   nombreInterno = '';
@@ -126,7 +143,7 @@ export class ReferenciasListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (rs) => { this.referencias.set(rs); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -156,8 +173,19 @@ export class ReferenciasListComponent {
     });
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(r: ReferenciaAbm): void {
+    this.confirmandoId.set(null);
     this.api.desactivar(r.id).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(r: ReferenciaAbm): void {
+    this.api.reactivar(r.id).subscribe({ next: () => this.cargar() });
   }
 
   private resetForm(): void {

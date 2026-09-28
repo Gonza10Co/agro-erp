@@ -2,16 +2,22 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MaterialesApi, Material, CrearMaterialDto, OrigenMaterial, ClaseBom } from '../../../core/api/materiales.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 @Component({
   selector: 'app-materiales-list',
   standalone: true,
-  imports: [DrawerComponent, FormsModule],
+  imports: [DrawerComponent, FormsModule, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Materiales</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar inactivos
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrir()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nuevo material
@@ -36,9 +42,12 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
               <thead><tr><th>Código</th><th>Nombre</th><th>Origen</th><th>Unidad</th><th></th></tr></thead>
               <tbody>
                 @for (m of materiales(); track m.id) {
-                  <tr>
+                  <tr [class.is-inactive]="m.activo === false">
                     <td class="cell-mono">{{ m.codigo }}</td>
-                    <td>{{ m.nombreCanonico }}</td>
+                    <td>
+                      {{ m.nombreCanonico }}
+                      @if (m.activo === false) { <span class="badge badge-neutral" style="margin-left:var(--sp-2)"><span class="dot"></span>Inactivo</span> }
+                    </td>
                     <td>
                       @if (m.origen === 'FABRICADO') {
                         <span class="badge badge-info"><span class="dot"></span>Fabricado</span>
@@ -48,7 +57,16 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
                     </td>
                     <td class="cell-sub">{{ m.unidad }}</td>
                     <td class="cell-actions">
-                      <button class="btn btn-ghost btn-sm" type="button" (click)="desactivar(m)">Desactivar</button>
+                      @if (m.activo !== false) {
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === m.id"
+                          [pregunta]="'¿Desactivar ' + m.codigo + '?'"
+                          (pedir)="confirmandoId.set(m.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(m)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(m)">Reactivar</button>
+                      }
                     </td>
                   </tr>
                 }
@@ -103,6 +121,10 @@ export class MaterialesListComponent {
   materiales = signal<Material[]>([]);
   cargando = signal(true);
   drawerAbierto = signal(false);
+  /** Casilla "Mostrar inactivos": pide también los desactivados para poder reactivarlos. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
 
   // form
   codigo = '';
@@ -120,7 +142,7 @@ export class MaterialesListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (ms) => { this.materiales.set(ms); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -155,8 +177,19 @@ export class MaterialesListComponent {
     });
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(m: Material): void {
+    this.confirmandoId.set(null);
     this.api.desactivar(m.id).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(m: Material): void {
+    this.api.reactivar(m.id).subscribe({ next: () => this.cargar() });
   }
 
   private resetForm(): void {
