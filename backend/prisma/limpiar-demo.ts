@@ -13,6 +13,10 @@ import { describirBase, esBaseDeProduccion } from '../src/prisma/base-url';
  *   npm run limpiar:demo -- --ejecutar         → borra (en una sola transacción)
  *   npm run limpiar:demo -- --ejecutar --prod-confirmado   → obligatorio además si la base es Railway
  *   --sin-reiniciar-consecutivos               → no vuelve a 1 las secuencias de las tablas que quedan vacías
+ *   --arranque-real                            → además de lo demo, borra TODO lo transaccional (OC, OP, OF,
+ *        pares, despachos, facturas, compras, corte, calidad, kardex) y deja en cero los inventarios de PT
+ *        y de MP, aunque sea de clientes reales: es el borrón para arrancar con datos reales (2026-09-28).
+ *        Los maestros (clientes reales, catálogo, BOM, usuarios, operarios, metas…) se conservan igual.
  *
  * Qué es "demo" (marcadores, todos verificables en seed-demo.ts / seed-catalogo.ts / seed-corte.ts):
  *   · productos configurados con código `PC-…` (el generador real nunca produce ese prefijo)
@@ -31,6 +35,8 @@ const GRUPOS_DEMO = ['COLOR', 'SUELA'];
 const ORDENES_CORTE_EJEMPLO = ['AGR-862', 'AGR-863', 'AGR-880', 'AGR-881'];
 const REFERENCIAS_MOV_DEMO = ['OC-PROV-101', 'OC-PROV-102', 'OF-9001', 'OF-9005', 'DEV-PROV-01'];
 const RANGO_OC_DEMO = { gte: 9000, lte: 9999 };
+// La marca "Poderosa" del seed-catalogo (código PODEROSA). La del catálogo real es la 60.
+const MARCAS_DEMO = ['PODEROSA'];
 
 interface Plan {
   ids: Record<string, number[]>;
@@ -41,7 +47,7 @@ interface Plan {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-async function clasificar(): Promise<Plan> {
+async function clasificar(arranqueReal: boolean): Promise<Plan> {
   const ids: Record<string, number[]> = {};
   const avisos: string[] = [];
   const id = (rows: { id: number }[]) => rows.map((r) => r.id);
@@ -157,6 +163,68 @@ async function clasificar(): Promise<Plan> {
     avisos.push(`Categoría "${c.nombre}" tiene ${c._count.materiales} material(es) real(es): se conserva`);
   }
 
+  // Marca demo: solo si no le queda ningún producto real colgando.
+  const marcasDemo = await prisma.marca.findMany({
+    where: { codigo: { in: MARCAS_DEMO } },
+    select: {
+      id: true,
+      codigo: true,
+      _count: {
+        select: {
+          productosConfigurados: { where: { id: { notIn: ids.productos } } },
+          overrides: { where: { id: { notIn: ids.reglas } } },
+          ordenesCorte: arranqueReal ? { where: { id: -1 } } : true,
+        },
+      },
+    },
+  });
+  const libre = (m: (typeof marcasDemo)[number]) =>
+    m._count.productosConfigurados + m._count.overrides + m._count.ordenesCorte === 0;
+  ids.marcas = marcasDemo.filter(libre).map((m) => m.id);
+  for (const m of marcasDemo.filter((m) => !libre(m))) {
+    avisos.push(`Marca demo ${m.codigo} todavía tiene datos reales colgando: se conserva`);
+  }
+  ids.referenciaMarcas = id(await prisma.referenciaMarca.findMany({ where: { marcaId: { in: ids.marcas } }, select: { id: true } }));
+
+  if (arranqueReal) {
+    // Borrón transaccional: todo, sea demo o no. Los maestros no entran aquí.
+    const todo = async (m: { findMany: (a: { select: { id: true } }) => Promise<{ id: number }[]> }) => id(await m.findMany({ select: { id: true } }));
+    ids.ocs = await todo(prisma.ordenCompra);
+    ids.ocLineas = await todo(prisma.ordenCompraLinea);
+    ids.ocLineaTallas = await todo(prisma.ordenCompraLineaTalla);
+    ids.ops = await todo(prisma.ordenProduccion);
+    ids.opLineas = await todo(prisma.ordenProduccionLinea);
+    ids.opLineaTallas = await todo(prisma.ordenProduccionLineaTalla);
+    ids.reservasPT = await todo(prisma.reservaInventarioPT);
+    ids.requerimientos = await todo(prisma.requerimientoCompra);
+    ids.requerimientoLineas = await todo(prisma.requerimientoCompraLinea);
+    ids.ofs = await todo(prisma.ordenFabricacion);
+    ids.pares = await todo(prisma.par);
+    ids.eventos = await todo(prisma.eventoTrazabilidad);
+    ids.incidencias = await todo(prisma.incidenciaCalidad);
+    ids.despachos = await todo(prisma.despacho);
+    ids.despachoLineas = await todo(prisma.despachoLinea);
+    ids.facturas = await todo(prisma.factura);
+    ids.facturaLineas = await todo(prisma.facturaLinea);
+    ids.pagos = await todo(prisma.pago);
+    ids.ocps = await todo(prisma.ordenCompraProveedor);
+    ids.ocpLineas = await todo(prisma.ordenCompraProveedorLinea);
+    ids.recepciones = await todo(prisma.recepcionCompra);
+    ids.recepcionLineas = await todo(prisma.recepcionCompraLinea);
+    ids.devoluciones = await todo(prisma.devolucionProveedor);
+    ids.devolucionLineas = await todo(prisma.devolucionProveedorLinea);
+    ids.ordenesCorte = await todo(prisma.ordenCorte);
+    ids.movimientos = await todo(prisma.movimientoInventario);
+    ids.inventarioPT = await todo(prisma.inventarioPT);
+    ids.inventarioMaterial = await todo(prisma.inventarioMaterial);
+    // COLOR y SUELA son ejes reales (el color va por pedido; falta la lista de JP): se
+    // conservan los grupos y su enganche a las referencias; solo se van sus opciones demo.
+    ids.grupos = [];
+    ids.referenciaEjes = [];
+    ocsReales = 0;
+    avisos.push('ARRANQUE REAL: se borra todo lo transaccional y los inventarios de PT y MP quedan en cero.');
+  }
+
   // Lo que a propósito NO se toca, para que quede dicho en el dry-run.
   avisos.push('Se conservan: usuarios (incluido "gerente"), operarios, máquinas, tipos de daño, umbrales, metas, bodegas, servicios, calendario, BOM real y ReferenciaMarca.');
   return { ids, avisos, ocsReales };
@@ -168,10 +236,11 @@ const ETIQUETAS: [keyof Plan['ids'], string][] = [
   ['despachos', 'Despachos'], ['facturas', 'Facturas'], ['pagos', 'Pagos'], ['requerimientos', 'Requerimientos de compra'],
   ['ocps', 'Órdenes de compra a proveedor'], ['recepciones', 'Recepciones'], ['devoluciones', 'Devoluciones a proveedor'],
   ['movimientos', 'Movimientos de inventario (kardex)'], ['inventarioPT', 'Inventario PT'], ['reservasPT', 'Reservas de PT'],
-  ['productos', 'Productos configurados PC-*'], ['grupos', 'Ejes COLOR/SUELA'], ['reglas', 'Reglas de override'],
+  ['productos', 'Productos configurados PC-*'], ['grupos', 'Ejes COLOR/SUELA'], ['opciones', 'Opciones demo de COLOR/SUELA'], ['reglas', 'Reglas de override'],
   ['boms', 'BOM de materiales demo'], ['bomLineas', 'Líneas de BOM con material demo'],
   ['materiales', 'Materiales'], ['categorias', 'Categorías de material'], ['clientes', 'Clientes'], ['sedes', 'Sedes'],
-  ['proveedores', 'Proveedores'], ['ordenesCorte', 'Órdenes de corte de ejemplo'],
+  ['proveedores', 'Proveedores'], ['ordenesCorte', 'Órdenes de corte'],
+  ['inventarioMaterial', 'Inventario de MP (saldos)'], ['marcas', 'Marcas demo'],
 ];
 
 function imprimirPlan(plan: Plan): number {
@@ -203,6 +272,7 @@ async function ejecutar(plan: Plan, reiniciarConsecutivos: boolean): Promise<voi
       await tx.despacho.deleteMany({ where: en(ids.despachos) });
       await tx.movimientoInventario.deleteMany({ where: en(ids.movimientos) });
       await tx.par.deleteMany({ where: en(ids.pares) });
+      await tx.ordenCorte.deleteMany({ where: en(ids.ordenesCorte) }); // líneas y avances caen en cascada
       await tx.ordenFabricacion.deleteMany({ where: en(ids.ofs) });
       await tx.reservaInventarioPT.deleteMany({ where: en(ids.reservasPT) });
       await tx.recepcionCompraLinea.deleteMany({ where: en(ids.recepcionLineas) });
@@ -222,6 +292,8 @@ async function ejecutar(plan: Plan, reiniciarConsecutivos: boolean): Promise<voi
       await tx.inventarioPT.deleteMany({ where: en(ids.inventarioPT) });
       await tx.productoConfiguradoOpcion.deleteMany({ where: en(ids.productoOpciones) });
       await tx.productoConfigurado.deleteMany({ where: en(ids.productos) });
+      await tx.referenciaMarca.deleteMany({ where: en(ids.referenciaMarcas) });
+      await tx.marca.deleteMany({ where: en(ids.marcas) });
       await tx.reglaOverrideTalla.deleteMany({ where: en(ids.reglaTallas) });
       await tx.reglaOverride.deleteMany({ where: en(ids.reglas) });
       await tx.referenciaEje.deleteMany({ where: en(ids.referenciaEjes) });
@@ -237,20 +309,21 @@ async function ejecutar(plan: Plan, reiniciarConsecutivos: boolean): Promise<voi
       await tx.sedeCliente.deleteMany({ where: en(ids.sedes) });
       await tx.cliente.deleteMany({ where: en(ids.clientes) });
       await tx.proveedor.deleteMany({ where: en(ids.proveedores) });
-      await tx.ordenCorte.deleteMany({ where: en(ids.ordenesCorte) }); // líneas y avances caen en cascada
 
       if (reiniciarConsecutivos) {
         // Solo las tablas que quedaron vacías vuelven a 1: si sobrevivió algo real, su numeración sigue.
         const secuencias: [string, () => Promise<number>][] = [
           ['oc_consecutivo_seq', () => tx.ordenCompra.count()],
           ['op_consecutivo_seq', () => tx.ordenProduccion.count()],
-          ['of_consecutivo_seq', () => tx.ordenFabricacion.count()],
+          // of_consecutivo_seq NO vuelve a 1: el código del par es OF{n}-{seq} y en planta quedan
+          // etiquetas QR impresas del piloto; reiniciar haría que un sticker viejo leyera un par nuevo.
           ['despacho_consecutivo_seq', () => tx.despacho.count()],
           ['req_consecutivo_seq', () => tx.requerimientoCompra.count()],
           ['factura_consecutivo_seq', () => tx.factura.count()],
           ['ocp_consecutivo_seq', () => tx.ordenCompraProveedor.count()],
           ['recepcion_consecutivo_seq', () => tx.recepcionCompra.count()],
           ['devolucion_consecutivo_seq', () => tx.devolucionProveedor.count()],
+          ['ajuste_pt_consecutivo_seq', () => tx.movimientoInventario.count()],
         ];
         for (const [seq, count] of secuencias) {
           if ((await count()) === 0) {
@@ -269,16 +342,18 @@ async function main() {
   const ejecutarDeVerdad = args.includes('--ejecutar');
   const prodConfirmado = args.includes('--prod-confirmado');
   const reiniciar = !args.includes('--sin-reiniciar-consecutivos');
+  const arranqueReal = args.includes('--arranque-real');
   const prod = esBaseDeProduccion();
 
   console.log(`Limpiar demo — base: ${describirBase()}${prod ? '  ⚠ PRODUCCIÓN' : ''}`);
   console.log(ejecutarDeVerdad ? 'Modo: EJECUTAR (borra)' : 'Modo: dry-run (no borra nada; agrega --ejecutar para borrar)');
+  if (arranqueReal) console.log('Alcance: ARRANQUE REAL (todo lo transaccional + inventarios en cero)');
   if (ejecutarDeVerdad && prod && !prodConfirmado) {
     console.error('✖ La base es producción: para borrar hay que pasar también --prod-confirmado.');
     process.exit(2);
   }
 
-  const plan = await clasificar();
+  const plan = await clasificar(arranqueReal);
   const total = imprimirPlan(plan);
   if (!ejecutarDeVerdad || total === 0) {
     if (total === 0) console.log('\nNada que borrar.');
