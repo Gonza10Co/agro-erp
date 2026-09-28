@@ -3,7 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   Bodega,
+  FilaAjusteMp,
+  FilaAjusteMpRevisada,
   FilaAjustePt,
+  FilaPlantillaMp,
+  ResumenAjusteMp,
   FilaAjustePtRevisada,
   FilaPlantillaPt,
   ResumenAjustePt,
@@ -49,6 +53,22 @@ export class InventarioApi {
   aplicarAjustePt(filas: FilaAjustePt[], observaciones?: string) {
     return this.http.post<{ referencia: string; resumen: ResumenAjustePt }>(
       `${this.base}/pt/ajuste`,
+      { filas, observaciones },
+    );
+  }
+
+  plantillaAjusteMp() {
+    return this.http.get<FilaPlantillaMp[]>(`${this.base}/material/plantilla`);
+  }
+  previsualizarAjusteMp(filas: FilaAjusteMp[]) {
+    return this.http.post<{ filas: FilaAjusteMpRevisada[]; resumen: ResumenAjusteMp }>(
+      `${this.base}/material/ajuste/previsualizar`,
+      { filas },
+    );
+  }
+  aplicarAjusteMp(filas: FilaAjusteMp[], observaciones?: string) {
+    return this.http.post<{ referencia: string; resumen: ResumenAjusteMp }>(
+      `${this.base}/material/ajuste`,
       { filas, observaciones },
     );
   }

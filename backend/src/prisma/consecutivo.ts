@@ -10,6 +10,9 @@ const SECUENCIAS = {
   ocp: 'ocp_consecutivo_seq',
   recepcion: 'recepcion_consecutivo_seq',
   devolucion: 'devolucion_consecutivo_seq',
+  // Un solo consecutivo AJ-n para TODOS los ajustes por conteo físico, de botas
+  // y de materia prima: el kardex los distingue por materialId/inventarioPTId y
+  // así no hay dos "AJ-5" distintos. El nombre 'ajustePt' quedó por historia.
   ajustePt: 'ajuste_pt_consecutivo_seq',
 } as const;
 

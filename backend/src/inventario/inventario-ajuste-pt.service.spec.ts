@@ -8,9 +8,10 @@ describe('InventarioService: carga y ajuste de producto terminado', () => {
     bodega: { findMany: jest.fn() },
     inventarioPT: {
       findMany: jest.fn(),
-      upsert: jest.fn(),
       updateMany: jest.fn(),
       findUniqueOrThrow: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     movimientoInventario: { create: jest.fn() },
     $queryRawUnsafe: jest.fn(),
@@ -108,10 +109,25 @@ describe('InventarioService: carga y ajuste de producto terminado', () => {
 
   it('aplica: un saldo nuevo nace con lo contado y entra como ENTRADA', async () => {
     prisma.inventarioPT.findMany.mockResolvedValue([]);
-    prisma.inventarioPT.upsert.mockResolvedValue({ id: 90, cantDisponible: 25 });
+    prisma.inventarioPT.updateMany.mockResolvedValue({ count: 0 });
+    prisma.inventarioPT.findUnique.mockResolvedValue(null);
+    prisma.inventarioPT.create.mockResolvedValue({ id: 90, cantDisponible: 25 });
     await service.aplicarAjustePt({ filas: [filaDto()], observaciones: 'Conteo inicial' }, user);
     expect(prisma.movimientoInventario.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ tipo: 'ENTRADA', cantidad: 25, observaciones: 'Conteo inicial' }),
+    });
+  });
+
+  it('aplica: un saldo que existe en cero se fija sin crear otro', async () => {
+    prisma.inventarioPT.findMany.mockResolvedValue([
+      { productoConfiguradoId: 1, tallaId: 14, bodegaId: 5, calidad: 'PRIMERA', cantDisponible: 0, cantReservada: 0 },
+    ]);
+    prisma.inventarioPT.updateMany.mockResolvedValue({ count: 1 });
+    prisma.inventarioPT.findUniqueOrThrow.mockResolvedValue({ id: 91 });
+    await service.aplicarAjustePt({ filas: [filaDto({ conteo: 7 })] }, user);
+    expect(prisma.inventarioPT.create).not.toHaveBeenCalled();
+    expect(prisma.movimientoInventario.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tipo: 'ENTRADA', cantidad: 7, inventarioPTId: 91 }),
     });
   });
 

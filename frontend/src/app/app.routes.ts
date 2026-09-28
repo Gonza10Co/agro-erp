@@ -46,6 +46,7 @@ export const routes: Routes = [
       { path: 'compras/ordenes/:id', data: { modulo: 'compras' }, loadComponent: () => import('./features/compras/ocp-detalle.component').then(m => m.OcpDetalleComponent) },
       { path: 'inventario', data: { modulo: 'inventario' }, loadComponent: () => import('./features/inventario/inventario-consolidado.component').then(m => m.InventarioConsolidadoComponent) },
       { path: 'inventario/ajuste-pt', data: { modulo: 'inventario', seccion: 'ajuste-pt' }, loadComponent: () => import('./features/inventario/ajuste-pt.component').then(m => m.AjustePtComponent) },
+      { path: 'inventario/ajuste-mp', data: { modulo: 'inventario', seccion: 'ajuste-mp' }, loadComponent: () => import('./features/inventario/ajuste-mp.component').then(m => m.AjusteMpComponent) },
       { path: 'fabricacion', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/of-list.component').then(m => m.OfListComponent) },
       { path: 'fabricacion/operario', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/pantalla-operario.component').then(m => m.PantallaOperarioComponent) },
       { path: 'fabricacion/tablero', data: { modulo: 'fabricacion' }, loadComponent: () => import('./features/fabricacion/tablero.component').then(m => m.FabricacionTableroComponent) },

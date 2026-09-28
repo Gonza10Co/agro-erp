@@ -35,6 +35,9 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
           @if (puedeAjustarPt) {
             <a class="btn" routerLink="/inventario/ajuste-pt">Carga y ajuste de botas</a>
           }
+          @if (puedeAjustarMp) {
+            <a class="btn" routerLink="/inventario/ajuste-mp">Carga y ajuste de materiales</a>
+          }
           <button class="btn btn-primary" (click)="formAbierto.set(!formAbierto())">
             {{ formAbierto() ? 'Cerrar' : 'Movimiento de materia prima' }}
           </button>
@@ -229,6 +232,7 @@ export class InventarioConsolidadoComponent implements OnInit {
   private readonly auth = inject(AuthService);
 
   readonly puedeAjustarPt = puedeVerSeccion(this.auth.rol(), 'ajuste-pt');
+  readonly puedeAjustarMp = puedeVerSeccion(this.auth.rol(), 'ajuste-mp');
 
   data = signal<InventarioConsolidado | null>(null);
   kardex = signal<MovimientoKardex[]>([]);

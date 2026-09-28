@@ -15,6 +15,7 @@ import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { RegistrarStockDto } from './dto/registrar-stock.dto';
 import { MovimientoMaterialDto } from './dto/movimiento-material.dto';
 import { AjustePtDto } from './dto/ajuste-pt.dto';
+import { AjusteMpDto } from './dto/ajuste-mp.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
@@ -42,6 +43,20 @@ export class InventarioController {
   @Roles('ADMIN', 'GERENTE')
   @Post('pt/ajuste') aplicarAjustePt(@Body() dto: AjustePtDto, @Req() req: any) {
     return this.inventario.aplicarAjustePt(dto, req.user);
+  }
+
+  // Carga y ajuste del inventario de materia prima por conteo físico. Mismas
+  // reglas que el de botas: cualquiera revisa, solo gerencia o administración aplica.
+  @Get('material/plantilla') plantillaAjusteMp() {
+    return this.inventario.plantillaAjusteMp();
+  }
+  @Post('material/ajuste/previsualizar') previsualizarAjusteMp(@Body() dto: AjusteMpDto) {
+    return this.inventario.previsualizarAjusteMp(dto);
+  }
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Post('material/ajuste') aplicarAjusteMp(@Body() dto: AjusteMpDto, @Req() req: any) {
+    return this.inventario.aplicarAjusteMp(dto, req.user);
   }
 
   @Get('consolidado') consolidado(
