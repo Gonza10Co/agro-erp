@@ -27,7 +27,7 @@ export class ConfiguracionInvalida extends Error {}
 /**
  * Valida la selección contra la configuración de la referencia y arma el código y
  * nombre comercial determinísticos del producto. Reglas:
- *  - la marca debe estar habilitada para la referencia;
+ *  - la marca debe estar entre las ofrecidas (hoy: cualquier marca activa, JP 2026-09-28);
  *  - cada opción elegida debe pertenecer a un eje de la referencia;
  *  - a lo sumo una opción por grupo;
  *  - todos los ejes obligatorios deben tener una opción elegida.
