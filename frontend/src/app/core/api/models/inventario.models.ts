@@ -149,5 +149,41 @@ export interface ResumenAjustePt {
   paresSalen: number;
 }
 
-/** Quién puede fijar saldos de producto terminado (el backend lo exige igual). */
+/** Quién puede fijar saldos por conteo, de botas y de materiales (el backend lo exige igual). */
 export const ROLES_AJUSTE_PT = ['GERENTE', 'ADMIN'];
+
+/** Fila de la plantilla de conteo físico de materia prima (un saldo por material). */
+export interface FilaPlantillaMp {
+  codigo: string;
+  material: string;
+  unidad: string;
+  categoria: string;
+  disponible: number;
+  reservado: number;
+}
+
+/** Fila del conteo de materia prima que se envía al backend (admite decimales). */
+export interface FilaAjusteMp {
+  fila: number;
+  codigo: string;
+  conteo: number;
+}
+
+export interface FilaAjusteMpRevisada extends FilaAjusteMp {
+  material: string | null;
+  unidad: string | null;
+  actual: number;
+  reservado: number;
+  diferencia: number;
+  error: string | null;
+}
+
+export interface ResumenAjusteMp {
+  filas: number;
+  errores: number;
+  sinCambio: number;
+  suben: number;
+  bajan: number;
+  cantidadEntra: number;
+  cantidadSale: number;
+}

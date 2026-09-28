@@ -199,6 +199,12 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
             <span class="nav-label">Carga y ajuste de botas</span>
           </a>
           }
+          @if (puedeVer('inventario') && puedeVerSec('ajuste-mp')) {
+          <a class="nav-item" routerLink="/inventario/ajuste-mp" routerLinkActive="is-active" title="Carga y ajuste de materiales">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/><path d="M8 4h8M8 8h8M12 8v7M9 12l3 3 3-3"/></svg></span>
+            <span class="nav-label">Carga y ajuste de materiales</span>
+          </a>
+          }
           </div>
         </div>
         }

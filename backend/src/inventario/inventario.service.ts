@@ -18,6 +18,15 @@ import {
   resumirAjuste,
 } from './ajuste-pt-core';
 import { siguienteConsecutivo } from '../prisma/consecutivo';
+import { AjusteMpDto, FilaAjusteMpDto } from './dto/ajuste-mp.dto';
+import {
+  CatalogoAjusteMp,
+  aTextoDecimal,
+  aUnidades,
+  decimalADiezmilesimas,
+  resolverFilasAjusteMp,
+  resumirAjusteMp,
+} from './ajuste-mp-core';
 
 export interface FilaPlantillaPt {
   referencia: string;
@@ -27,6 +36,16 @@ export interface FilaPlantillaPt {
   talla: number;
   bodega: string;
   calidad: 'PRIMERA' | 'SEGUNDA';
+  disponible: number;
+  reservado: number;
+}
+
+export interface FilaPlantillaMp {
+  codigo: string;
+  material: string;
+  unidad: string;
+  categoria: string;
+  /** En unidades del material; el CSV los escribe con coma decimal. */
   disponible: number;
   reservado: number;
 }
@@ -300,25 +319,25 @@ export class InventarioService {
         const llave = { productoConfiguradoId, tallaId, bodegaId, calidad };
         // Guarda contra carrera: el saldo debe seguir siendo el que se previsualizó
         // (un pistolazo a PT o un despacho en el medio cambiaría la diferencia).
+        // El saldo puede existir en cero (se despachó todo) o no existir: primero se
+        // intenta fijar el que hay; si no hay fila y se previsualizó en cero, nace.
+        const res = await tx.inventarioPT.updateMany({
+          where: { ...llave, cantDisponible: f.actual, cantReservada: { lte: f.conteo } },
+          data: { cantDisponible: f.conteo },
+        });
         let invId: number;
-        if (f.actual === 0 && f.reservado === 0) {
-          const inv = await tx.inventarioPT.upsert({
-            where: { productoConfiguradoId_tallaId_bodegaId_calidad: llave },
-            create: { ...llave, cantDisponible: f.conteo },
-            update: {},
-          });
-          if (inv.cantDisponible !== f.conteo) throw this.saldoCambio(f.fila);
-          invId = inv.id;
-        } else {
-          const res = await tx.inventarioPT.updateMany({
-            where: { ...llave, cantDisponible: f.actual, cantReservada: { lte: f.conteo } },
-            data: { cantDisponible: f.conteo },
-          });
-          if (res.count === 0) throw this.saldoCambio(f.fila);
+        if (res.count === 1) {
           invId = (await tx.inventarioPT.findUniqueOrThrow({
             where: { productoConfiguradoId_tallaId_bodegaId_calidad: llave },
             select: { id: true },
           })).id;
+        } else {
+          const existe = await tx.inventarioPT.findUnique({
+            where: { productoConfiguradoId_tallaId_bodegaId_calidad: llave },
+            select: { id: true },
+          });
+          if (existe || f.actual !== 0 || f.reservado !== 0) throw this.saldoCambio(f.fila);
+          invId = (await tx.inventarioPT.create({ data: { ...llave, cantDisponible: f.conteo } })).id;
         }
         await tx.movimientoInventario.create({
           data: {
@@ -340,6 +359,129 @@ export class InventarioService {
     return new ConflictException(
       `El saldo de la fila ${fila} cambió mientras revisaba el archivo; vuelva a importarlo`,
     );
+  }
+
+  // Plantilla del conteo físico de materia prima: una fila por material activo,
+  // ordenada por código, con el saldo actual (cero si aún no tiene inventario).
+  async plantillaAjusteMp(): Promise<FilaPlantillaMp[]> {
+    const materiales = await this.prisma.material.findMany({
+      where: { activo: true },
+      select: {
+        codigo: true,
+        nombreCanonico: true,
+        unidadMedida: { select: { codigo: true } },
+        categoria: { select: { nombre: true } },
+        inventario: { select: { cantDisponible: true, cantReservada: true } },
+      },
+      orderBy: { codigo: 'asc' },
+    });
+    return materiales.map((m) => ({
+      codigo: m.codigo,
+      material: m.nombreCanonico,
+      unidad: m.unidadMedida.codigo,
+      categoria: m.categoria.nombre,
+      disponible: aUnidades(decimalADiezmilesimas(m.inventario?.cantDisponible)),
+      reservado: aUnidades(decimalADiezmilesimas(m.inventario?.cantReservada)),
+    }));
+  }
+
+  private async catalogoAjusteMp(filas: FilaAjusteMpDto[]): Promise<CatalogoAjusteMp> {
+    const codigos = [...new Set(filas.map((f) => f.codigo.trim()))];
+    // Trae también los inactivos para decir "está inactivo" y no "no existe".
+    const materiales = await this.prisma.material.findMany({
+      where: { codigo: { in: codigos } },
+      select: {
+        id: true,
+        codigo: true,
+        nombreCanonico: true,
+        activo: true,
+        unidadMedida: { select: { codigo: true } },
+        inventario: { select: { cantDisponible: true, cantReservada: true } },
+      },
+    });
+    return {
+      materiales: new Map(
+        materiales.map((m) => [
+          m.codigo,
+          { id: m.id, nombre: m.nombreCanonico, unidad: m.unidadMedida.codigo, activo: m.activo },
+        ]),
+      ),
+      saldos: new Map(
+        materiales
+          .filter((m) => m.inventario)
+          .map((m) => [
+            m.id,
+            {
+              disponible: decimalADiezmilesimas(m.inventario!.cantDisponible),
+              reservado: decimalADiezmilesimas(m.inventario!.cantReservada),
+            },
+          ]),
+      ),
+    };
+  }
+
+  async previsualizarAjusteMp(dto: AjusteMpDto) {
+    const filas = resolverFilasAjusteMp(dto.filas, await this.catalogoAjusteMp(dto.filas));
+    return {
+      filas: filas.map(({ ids: _ids, ...f }) => f),
+      resumen: resumirAjusteMp(filas),
+    };
+  }
+
+  // Aplica el conteo de materia prima: mismo contrato que el de botas (todo o
+  // nada, AJ-n, AJUSTE_MANUAL en el kardex). Las cantidades viajan a Prisma como
+  // texto decimal exacto, nunca como float.
+  async aplicarAjusteMp(dto: AjusteMpDto, user: Usuario) {
+    const filas = resolverFilasAjusteMp(dto.filas, await this.catalogoAjusteMp(dto.filas));
+    const conError = filas.filter((f) => f.error);
+    if (conError.length)
+      throw new BadRequestException(
+        `El archivo tiene ${conError.length} fila(s) con error; corríjalas y vuelva a importar`,
+      );
+    const cambios = filas.filter((f) => f.ids!.diferenciaDz !== 0);
+    if (!cambios.length) throw new BadRequestException('El conteo no cambia ningún saldo');
+
+    return this.prisma.$transaction(async (tx) => {
+      const referencia = `AJ-${await siguienteConsecutivo(tx, 'ajustePt')}`;
+      for (const f of cambios) {
+        const { materialId, existe, actualDz, conteoDz, diferenciaDz } = f.ids!;
+        const conteo = aTextoDecimal(conteoDz);
+        // Guarda contra carrera: el saldo debe seguir siendo el que se previsualizó
+        // (una recepción, un consumo o un amarre en el medio cambiaría la diferencia).
+        if (existe) {
+          const res = await tx.inventarioMaterial.updateMany({
+            where: {
+              materialId,
+              cantDisponible: aTextoDecimal(actualDz),
+              cantReservada: { lte: conteo },
+            },
+            data: { cantDisponible: conteo },
+          });
+          if (res.count === 0) throw this.saldoCambio(f.fila);
+        } else {
+          // Si alguien creó el saldo en el medio, el upsert no lo pisa y la
+          // verificación lo detecta.
+          const inv = await tx.inventarioMaterial.upsert({
+            where: { materialId },
+            create: { materialId, cantDisponible: conteo },
+            update: {},
+          });
+          if (decimalADiezmilesimas(inv.cantDisponible) !== conteoDz) throw this.saldoCambio(f.fila);
+        }
+        await tx.movimientoInventario.create({
+          data: {
+            tipo: diferenciaDz > 0 ? 'ENTRADA' : 'SALIDA',
+            motivo: 'AJUSTE_MANUAL',
+            materialId,
+            cantidad: aTextoDecimal(Math.abs(diferenciaDz)),
+            referencia,
+            observaciones: dto.observaciones?.trim() || 'Conteo físico de materiales (plantilla)',
+            usuarioId: user.sub,
+          },
+        });
+      }
+      return { referencia, resumen: resumirAjusteMp(filas) };
+    });
   }
 
   // Movimiento manual de materia prima (recepción de compra, devolución a

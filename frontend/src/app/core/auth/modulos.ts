@@ -96,6 +96,8 @@ export type Seccion =
   | 'calidad-en-planta'
   // Carga y ajuste del inventario de producto terminado por plantilla (2026-09-28).
   | 'ajuste-pt'
+  // Carga y ajuste del inventario de materia prima por plantilla (2026-09-28).
+  | 'ajuste-mp'
   // Entrega 2 — ya liberadas al cliente (se dejan acá como tablero histórico).
   | 'costo-utilidad-oc'
   | 'proforma-oc'
@@ -133,6 +135,10 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // el amarre de cada OP reserva contra cero. Fijar saldos exige GERENTE/ADMIN en
   // el backend; el cliente puede bajar la plantilla y revisar, no aplicar.
   'ajuste-pt': 'ENTREGADO',
+  // Carga y ajuste de materiales por plantilla CSV (2026-09-28: arranque real, los
+  // inventarios quedaron en cero tras limpiar el demo). Sin el saldo real de materia
+  // prima el amarre de insumos pide comprar todo. Aplicar exige GERENTE/ADMIN en el backend.
+  'ajuste-mp': 'ENTREGADO',
   // Quincena 1 del rediseño lote↔par (2026-08-20). Controla la orden de corte del
   // día — programado vs. cortado, piezas repuestas y consumo real. Liberada el
   // 2026-09-11 junto con todo lo demás. ⚠️ Sigue siendo un control aparte: el
