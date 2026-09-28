@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MaterialesApi, Material, CrearMaterialDto, OrigenMaterial, ClaseBom } from '../../../core/api/materiales.api';
+import { MaterialesApi, Material, CrearMaterialDto, OrigenMaterial, ClaseBom, CategoriaMaterial, UnidadMedida } from '../../../core/api/materiales.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
@@ -88,12 +88,18 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
           <input class="input" id="nombreCanonico" name="nombreCanonico" [(ngModel)]="nombreCanonico" autocomplete="off" />
         </div>
         <div class="field">
-          <label class="label" for="categoriaId">Categoría (id) <span class="req">*</span></label>
-          <input class="input" id="categoriaId" name="categoriaId" type="number" [(ngModel)]="categoriaId" />
+          <label class="label" for="categoriaId">Categoría <span class="req">*</span></label>
+          <select class="select" id="categoriaId" name="categoriaId" [(ngModel)]="categoriaId">
+            <option [ngValue]="undefined" disabled>Elige una categoría…</option>
+            @for (c of categorias(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+          </select>
         </div>
         <div class="field">
-          <label class="label" for="unidadMedidaId">Unidad de medida (id) <span class="req">*</span></label>
-          <input class="input" id="unidadMedidaId" name="unidadMedidaId" type="number" [(ngModel)]="unidadMedidaId" />
+          <label class="label" for="unidadMedidaId">Unidad de medida <span class="req">*</span></label>
+          <select class="select" id="unidadMedidaId" name="unidadMedidaId" [(ngModel)]="unidadMedidaId">
+            <option [ngValue]="undefined" disabled>Elige una unidad…</option>
+            @for (u of unidades(); track u.id) { <option [ngValue]="u.id">{{ u.codigo }} · {{ u.nombre }}</option> }
+          </select>
         </div>
         <div class="field">
           <label class="label" for="origen">Origen</label>
@@ -136,8 +142,14 @@ export class MaterialesListComponent {
   loading = signal(false);
   error = signal('');
 
+  categorias = signal<CategoriaMaterial[]>([]);
+  unidades = signal<UnidadMedida[]>([]);
+
   constructor() {
     this.cargar();
+    // Antes se tecleaban los ids a mano; un id que no existe reventaba en el servidor.
+    this.api.categorias().subscribe((c) => this.categorias.set(c));
+    this.api.unidades().subscribe((u) => this.unidades.set(u));
   }
 
   cargar(): void {

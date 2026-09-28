@@ -14,10 +14,25 @@ describe('MaterialesListComponent', () => {
     });
     const fixture = TestBed.createComponent(MaterialesListComponent);
     http = TestBed.inject(HttpTestingController);
+    // Opciones del formulario: se piden al abrir la pantalla.
+    http.expectOne('http://localhost:3001/catalog/materiales/categorias').flush([{ id: 5, nombre: 'FINIZAJE' }]);
+    http.expectOne('http://localhost:3001/catalog/materiales/unidades').flush([{ id: 2, codigo: 'PAR', nombre: 'Par' }]);
     return fixture;
   }
 
   afterEach(() => http.verify());
+
+  it('el formulario ofrece categorías y unidades por nombre, no ids a mano', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/catalog/materiales').flush([]);
+    fixture.componentInstance.abrir();
+    fixture.detectChanges();
+    const texto = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texto).toContain('FINIZAJE');
+    expect(texto).toContain('PAR · Par');
+    expect(texto).not.toContain('(id)');
+  });
 
   it('carga la lista de materiales al iniciar (GET)', () => {
     const fixture = setup();

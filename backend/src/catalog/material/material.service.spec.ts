@@ -10,6 +10,8 @@ describe('MaterialService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    categoriaMaterial: { findUnique: jest.fn(), findMany: jest.fn() },
+    unidadMedida: { findUnique: jest.fn(), findMany: jest.fn() },
     materialAlias: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -17,7 +19,11 @@ describe('MaterialService', () => {
     },
   } as any;
   const service = new MaterialService(prisma);
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.categoriaMaterial.findUnique.mockResolvedValue({ id: 1, nombre: 'FINIZAJE' });
+    prisma.unidadMedida.findUnique.mockResolvedValue({ id: 2, codigo: 'M' });
+  });
 
   const baseDto = {
     codigo: 'MAT-1',
@@ -44,6 +50,25 @@ describe('MaterialService', () => {
       },
     });
     expect(r).toMatchObject({ id: 1, codigo: 'MAT-1' });
+  });
+
+  // Caso real (2026-09-28): el formulario pedía el id a mano, se escribió 0 y
+  // la llave foránea reventaba como 500 "Internal server error".
+  it('categoría o unidad inexistente es 400 con mensaje claro, no 500', async () => {
+    prisma.material.findUnique.mockResolvedValue(null);
+    prisma.categoriaMaterial.findUnique.mockResolvedValue(null);
+    await expect(service.crear({ ...baseDto, categoriaId: 0 })).rejects.toThrow('La categoría elegida no existe');
+    prisma.categoriaMaterial.findUnique.mockResolvedValue({ id: 1 });
+    prisma.unidadMedida.findUnique.mockResolvedValue(null);
+    await expect(service.crear(baseDto)).rejects.toThrow('La unidad de medida elegida no existe');
+    expect(prisma.material.create).not.toHaveBeenCalled();
+  });
+
+  it('lista categorías y unidades para el formulario', async () => {
+    prisma.categoriaMaterial.findMany.mockResolvedValue([{ id: 5, nombre: 'FINIZAJE' }]);
+    prisma.unidadMedida.findMany.mockResolvedValue([{ id: 2, codigo: 'M', nombre: 'Metro' }]);
+    expect(await service.categorias()).toEqual([{ id: 5, nombre: 'FINIZAJE' }]);
+    expect(await service.unidades()).toEqual([{ id: 2, codigo: 'M', nombre: 'Metro' }]);
   });
 
   it('rechaza código duplicado', async () => {

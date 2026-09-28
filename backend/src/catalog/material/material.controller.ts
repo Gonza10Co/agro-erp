@@ -33,6 +33,14 @@ export class MaterialController {
   ) {
     return this.materiales.listar(incluirInactivas);
   }
+  // Opciones del formulario "Nuevo material" (antes se tecleaban los ids a mano).
+  // Van antes de `:id` para que Nest no las tome como un id.
+  @Get('categorias') categorias() {
+    return this.materiales.categorias();
+  }
+  @Get('unidades') unidades() {
+    return this.materiales.unidades();
+  }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.materiales.obtener(id);
   }

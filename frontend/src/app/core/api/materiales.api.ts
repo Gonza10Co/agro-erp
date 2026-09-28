@@ -16,6 +16,9 @@ export interface Material {
   activo?: boolean;
 }
 
+export interface CategoriaMaterial { id: number; nombre: string; }
+export interface UnidadMedida { id: number; codigo: string; nombre: string; }
+
 export interface CrearMaterialDto {
   codigo: string;
   nombreCanonico: string;
@@ -35,6 +38,8 @@ export class MaterialesApi {
   listar(opts?: { incluirInactivas?: boolean }) {
     return this.http.get<Material[]>(`${this.base}/materiales`, { params: inactivas(opts) });
   }
+  categorias() { return this.http.get<CategoriaMaterial[]>(`${this.base}/materiales/categorias`); }
+  unidades() { return this.http.get<UnidadMedida[]>(`${this.base}/materiales/unidades`); }
   crear(dto: CrearMaterialDto) { return this.http.post<Material>(`${this.base}/materiales`, dto); }
   actualizar(id: number, dto: Partial<CrearMaterialDto>) {
     return this.http.patch<Material>(`${this.base}/materiales/${id}`, dto);
