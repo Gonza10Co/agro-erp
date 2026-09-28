@@ -30,6 +30,23 @@ export interface ActualizarMarcaDto {
   lineaId?: number;
 }
 
+/** Material resumido tal como lo devuelve el backend en los reemplazos de marca. */
+export interface MaterialResumen {
+  id: number;
+  codigo: string;
+  nombre: string;
+}
+
+/**
+ * Material propio de la marca: en el BOM de CUALQUIER referencia, cuando el pedido lleva
+ * esta marca, `materialObjetivo` se cambia por `materialNuevo` (mismo consumo por talla).
+ */
+export interface MaterialMarca {
+  id: number;
+  materialObjetivo: MaterialResumen | null;
+  materialNuevo: MaterialResumen | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MarcasApi {
   private readonly http = inject(HttpClient);
@@ -41,4 +58,11 @@ export class MarcasApi {
   actualizar(id: number, dto: ActualizarMarcaDto) { return this.http.patch<Marca>(`${this.base}/${id}`, dto); }
   desactivar(id: number) { return this.http.patch<Marca>(`${this.base}/${id}/desactivar`, {}); }
   reactivar(id: number) { return this.http.patch<Marca>(`${this.base}/${id}/reactivar`, {}); }
+
+  // Materiales propios de la marca (reemplazos que aplican a todas las referencias).
+  listarMateriales(id: number) { return this.http.get<MaterialMarca[]>(`${this.base}/${id}/materiales`); }
+  agregarMaterial(id: number, dto: { materialObjetivoId: number; materialNuevoId: number }) {
+    return this.http.post<MaterialMarca>(`${this.base}/${id}/materiales`, dto);
+  }
+  quitarMaterial(id: number, reglaId: number) { return this.http.delete<{ id: number }>(`${this.base}/${id}/materiales/${reglaId}`); }
 }

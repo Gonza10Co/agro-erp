@@ -94,6 +94,8 @@ export type Seccion =
   // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
   // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
   | 'calidad-en-planta'
+  // Materiales propios de la marca (2026-09-28): reemplazos marca → todas las referencias.
+  | 'materiales-marca'
   // Carga y ajuste del inventario de producto terminado por plantilla (2026-09-28).
   | 'ajuste-pt'
   // Carga y ajuste del inventario de materia prima por plantilla (2026-09-28).
@@ -130,6 +132,11 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // sin ella un par malo entra a bodega como bueno, y el cliente ya usa el
   // piloto. Ver docs/specs/2026-09-11-quincena-calidad-en-planta.md
   'calidad-en-planta': 'ENTREGADO',
+  // Materiales propios de la marca (2026-09-28): la marquilla (y a veces la malla)
+  // cambia según la marca en TODAS las referencias; se define una vez por marca en vez
+  // de ~760 reglas referencia × marca. Liberada de una: sin esto el BOM de un pedido
+  // ABRUZZO pide MARQUILLA AGRO. Agregar/quitar exige GERENTE/ADMIN en el backend.
+  'materiales-marca': 'ENTREGADO',
   // Carga y ajuste de inventario de botas por plantilla CSV (2026-09-28). Es con lo
   // que arranca la implementación en planta (Valentina): sin el saldo real de PT
   // el amarre de cada OP reserva contra cero. Fijar saldos exige GERENTE/ADMIN en

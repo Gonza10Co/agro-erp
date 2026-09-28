@@ -6,6 +6,7 @@ import {
   MaterialInfo,
   Override,
 } from './bom-resolver.types';
+import { descartarGlobalesPisadas } from './bom-reglas-core';
 
 export interface SeleccionBom {
   referenciaId: number;
@@ -75,13 +76,23 @@ export class BomLoaderService {
       disparadores.push({ opcionId: { in: sel.opcionIds } });
     if (!disparadores.length) return [];
 
-    const reglas = await this.prisma.reglaOverride.findMany({
-      where: { referenciaId: sel.referenciaId, OR: disparadores },
+    // Reglas de la referencia (por marca u opción) + materiales propios de la marca
+    // (reglas globales, referenciaId NULL), que aplican a todas las referencias.
+    const alcances: any[] = [
+      { referenciaId: sel.referenciaId, OR: disparadores },
+    ];
+    if (sel.marcaId != null)
+      alcances.push({ referenciaId: null, marcaId: sel.marcaId });
+
+    const filas = await this.prisma.reglaOverride.findMany({
+      where: { OR: alcances },
       include: {
         tallas: { include: { talla: true } },
         opcion: { include: { grupoOpcion: true } },
       },
     });
+    // La regla de marca propia de la referencia gana sobre la global del mismo material.
+    const reglas = descartarGlobalesPisadas(filas as any[]);
 
     return reglas.map((r: any) => {
       const consumoPorTalla: Record<number, number> = {};

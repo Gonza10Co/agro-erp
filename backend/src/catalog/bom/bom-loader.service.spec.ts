@@ -140,6 +140,47 @@ describe('BomLoaderService.cargarEntrada', () => {
     }); // 3 + 1
   });
 
+  it('incluye las reglas GLOBALES de la marca (referenciaId NULL) en la consulta', async () => {
+    prisma.bom.findFirst.mockResolvedValue({ id: 1, lineas: [] });
+    prisma.reglaOverride.findMany.mockResolvedValue([]);
+    prisma.material.findMany.mockResolvedValue([]);
+
+    await service.cargarEntrada({ referenciaId: 3, marcaId: 5, opcionIds: [7], talla: 40 });
+
+    const where = prisma.reglaOverride.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { referenciaId: 3, OR: [{ marcaId: 5 }, { opcionId: { in: [7] } }] },
+      { referenciaId: null, marcaId: 5 },
+    ]);
+  });
+
+  it('sin marca no busca reglas globales', async () => {
+    prisma.bom.findFirst.mockResolvedValue({ id: 1, lineas: [] });
+    prisma.reglaOverride.findMany.mockResolvedValue([]);
+    prisma.material.findMany.mockResolvedValue([]);
+
+    await service.cargarEntrada({ referenciaId: 3, marcaId: null, opcionIds: [7], talla: 40 });
+
+    const where = prisma.reglaOverride.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([{ referenciaId: 3, OR: [{ opcionId: { in: [7] } }] }]);
+  });
+
+  it('la regla de marca de la referencia pisa a la global del mismo material objetivo', async () => {
+    prisma.bom.findFirst.mockResolvedValue({ id: 1, lineas: [] });
+    const regla = (referenciaId: number | null, nuevo: number) => ({
+      accion: 'REPLACE', referenciaId, opcionId: null, marcaId: 5,
+      materialObjetivoId: 10, materialNuevoId: nuevo, consumoFijo: null,
+      heredaCurva: true, tallas: [], opcion: null,
+    });
+    prisma.reglaOverride.findMany.mockResolvedValue([regla(null, 11), regla(3, 12)]);
+    prisma.material.findMany.mockResolvedValue([]);
+
+    const entrada = await service.cargarEntrada({ referenciaId: 3, marcaId: 5, opcionIds: [], talla: 40 });
+
+    expect(entrada.overrides).toHaveLength(1);
+    expect(entrada.overrides[0]).toMatchObject({ materialNuevoId: 12, heredaCurva: true, orden: 0 });
+  });
+
   it('lanza NotFound si la referencia no tiene BOM activo', async () => {
     prisma.bom.findFirst.mockResolvedValue(null);
     await expect(

@@ -134,6 +134,24 @@ describe('aplicarOverrides', () => {
     });
   });
 
+  it('REPLACE de marca cuyo objetivo no está en el BOM: se ignora sin error', () => {
+    // Material propio de la marca definido para todas las referencias: la referencia
+    // que no usa ese material (p. ej. sin marquilla) simplemente no cambia.
+    const ov: Override[] = [
+      {
+        accion: 'REPLACE',
+        orden: 0,
+        materialObjetivoId: 777,
+        materialNuevoId: 778,
+        consumoFijo: null,
+        heredaCurva: true,
+        consumoPorTalla: {},
+      },
+    ];
+    const r = aplicarOverrides(base, ov);
+    expect(r.map((l) => l.materialId).sort()).toEqual([10, 20]);
+  });
+
   it('SET_CONSUMO: reescribe el consumo del material objetivo', () => {
     const ov: Override[] = [
       {
