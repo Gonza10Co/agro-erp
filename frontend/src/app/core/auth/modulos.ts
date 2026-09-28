@@ -94,6 +94,8 @@ export type Seccion =
   // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
   // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
   | 'calidad-en-planta'
+  // Carga y ajuste del inventario de producto terminado por plantilla (2026-09-28).
+  | 'ajuste-pt'
   // Entrega 2 — ya liberadas al cliente (se dejan acá como tablero histórico).
   | 'costo-utilidad-oc'
   | 'proforma-oc'
@@ -126,6 +128,11 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // sin ella un par malo entra a bodega como bueno, y el cliente ya usa el
   // piloto. Ver docs/specs/2026-09-11-quincena-calidad-en-planta.md
   'calidad-en-planta': 'ENTREGADO',
+  // Carga y ajuste de inventario de botas por plantilla CSV (2026-09-28). Es con lo
+  // que arranca la implementación en planta (Valentina): sin el saldo real de PT
+  // el amarre de cada OP reserva contra cero. Fijar saldos exige GERENTE/ADMIN en
+  // el backend; el cliente puede bajar la plantilla y revisar, no aplicar.
+  'ajuste-pt': 'ENTREGADO',
   // Quincena 1 del rediseño lote↔par (2026-08-20). Controla la orden de corte del
   // día — programado vs. cortado, piezas repuestas y consumo real. Liberada el
   // 2026-09-11 junto con todo lo demás. ⚠️ Sigue siendo un control aparte: el

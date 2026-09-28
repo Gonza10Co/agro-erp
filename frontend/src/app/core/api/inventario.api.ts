@@ -3,6 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   Bodega,
+  FilaAjustePt,
+  FilaAjustePtRevisada,
+  FilaPlantillaPt,
+  ResumenAjustePt,
   InventarioConsolidado,
   InventarioPTRow,
   MovimientoKardex,
@@ -31,6 +35,22 @@ export class InventarioApi {
     return this.http.get<MovimientoKardex[]>(`${this.base}/movimientos`, {
       params: limit ? { limit } : {},
     });
+  }
+
+  plantillaAjustePt() {
+    return this.http.get<FilaPlantillaPt[]>(`${this.base}/pt/plantilla`);
+  }
+  previsualizarAjustePt(filas: FilaAjustePt[]) {
+    return this.http.post<{ filas: FilaAjustePtRevisada[]; resumen: ResumenAjustePt }>(
+      `${this.base}/pt/ajuste/previsualizar`,
+      { filas },
+    );
+  }
+  aplicarAjustePt(filas: FilaAjustePt[], observaciones?: string) {
+    return this.http.post<{ referencia: string; resumen: ResumenAjustePt }>(
+      `${this.base}/pt/ajuste`,
+      { filas, observaciones },
+    );
   }
 
   movimientoMaterial(dto: MovimientoMaterialInput) {

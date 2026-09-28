@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -40,7 +41,7 @@ describe('InventarioConsolidadoComponent · kardex', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [InventarioConsolidadoComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
   });

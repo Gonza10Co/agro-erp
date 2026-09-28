@@ -14,6 +14,9 @@ import { InventarioService } from './inventario.service';
 import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { RegistrarStockDto } from './dto/registrar-stock.dto';
 import { MovimientoMaterialDto } from './dto/movimiento-material.dto';
+import { AjustePtDto } from './dto/ajuste-pt.dto';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('inventario')
@@ -25,6 +28,20 @@ export class InventarioController {
   }
   @Post('pt') registrarStock(@Body() dto: RegistrarStockDto) {
     return this.inventario.registrarStock(dto);
+  }
+
+  // Carga y ajuste del inventario de producto terminado por conteo físico.
+  // Solo quien responde por el inventario fija saldos: gerencia o administración.
+  @Get('pt/plantilla') plantillaAjustePt() {
+    return this.inventario.plantillaAjustePt();
+  }
+  @Post('pt/ajuste/previsualizar') previsualizarAjustePt(@Body() dto: AjustePtDto) {
+    return this.inventario.previsualizarAjustePt(dto);
+  }
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Post('pt/ajuste') aplicarAjustePt(@Body() dto: AjustePtDto, @Req() req: any) {
+    return this.inventario.aplicarAjustePt(dto, req.user);
   }
 
   @Get('consolidado') consolidado(
