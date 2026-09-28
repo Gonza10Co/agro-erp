@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -12,12 +13,27 @@ import { CrearAliasDto } from './dto/crear-alias.dto';
 export class MaterialService {
   constructor(private readonly prisma: PrismaService) {}
 
+  categorias() {
+    return this.prisma.categoriaMaterial.findMany({ select: { id: true, nombre: true }, orderBy: { nombre: 'asc' } });
+  }
+
+  unidades() {
+    return this.prisma.unidadMedida.findMany({ select: { id: true, codigo: true, nombre: true }, orderBy: { codigo: 'asc' } });
+  }
+
   async crear(dto: CrearMaterialDto) {
     const existe = await this.prisma.material.findUnique({
       where: { codigo: dto.codigo },
     });
     if (existe)
       throw new ConflictException(`Ya existe un material con código ${dto.codigo}`);
+    // Sin esto, un id inexistente reventaba como 500 por la llave foránea.
+    const [categoria, unidad] = await Promise.all([
+      this.prisma.categoriaMaterial.findUnique({ where: { id: dto.categoriaId } }),
+      this.prisma.unidadMedida.findUnique({ where: { id: dto.unidadMedidaId } }),
+    ]);
+    if (!categoria) throw new BadRequestException('La categoría elegida no existe');
+    if (!unidad) throw new BadRequestException('La unidad de medida elegida no existe');
     return this.prisma.material.create({
       data: {
         codigo: dto.codigo,
