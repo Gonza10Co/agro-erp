@@ -122,6 +122,9 @@ describe('EstacionComponent', () => {
     fixture.detectChanges();
     expect(comp.hoy()).toBe(5);
     expect(comp.resultado()).toEqual(jasmine.objectContaining({ ok: true, titulo: '2 pares de talla 40 nacieron' }));
+    // Si la descarga falla, la tanda sigue a mano para reimprimirla sin volver a nacer.
+    expect(comp.resultado()?.tanda?.map((p) => p.codigo)).toEqual(['OF1-0004', 'OF1-0005']);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Volver a imprimir las 2 etiquetas de esta tanda');
     http.verify();
   });
 });

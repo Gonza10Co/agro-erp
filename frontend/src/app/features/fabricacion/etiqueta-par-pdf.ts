@@ -23,6 +23,23 @@ async function libs() {
   return { jsPDF, toDataURL };
 }
 
+/**
+ * Baja el generador de PDF apenas abre la pantalla, no al imprimir: esos archivos
+ * llevan hash y un deploy los reemplaza, así que una pestaña abierta desde antes
+ * pedía uno que ya no existía y la etiqueta no salía (pasó el 2026-09-28).
+ */
+export function precargarGeneradorEtiquetas(): void {
+  libs().catch(() => { /* si falla aquí, la impresión lo reporta con su mensaje */ });
+}
+
+/** Mensaje para la persona cuando una etiqueta no se pudo generar. */
+export function motivoFalloEtiqueta(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e ?? '');
+  return /dynamically imported module|Loading chunk|Failed to fetch|import/i.test(msg)
+    ? 'El sistema se actualizó mientras la pantalla estaba abierta: recarga la página (F5) y vuelve a imprimir.'
+    : `No se pudo generar el PDF (${msg || 'error desconocido'}).`;
+}
+
 /** Una etiqueta de lengua por par, en un solo PDF (una página por etiqueta). */
 export async function descargarEtiquetasLengua(pares: ParNacido[]): Promise<void> {
   if (pares.length === 0) return;
