@@ -10,6 +10,7 @@ const SECUENCIAS = {
   ocp: 'ocp_consecutivo_seq',
   recepcion: 'recepcion_consecutivo_seq',
   devolucion: 'devolucion_consecutivo_seq',
+  ajustePt: 'ajuste_pt_consecutivo_seq',
 } as const;
 
 export type EntidadConsecutivo = keyof typeof SECUENCIAS;

@@ -12,11 +12,14 @@ import {
   MotivoMovimiento,
 } from '../../core/api/models/inventario.models';
 import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
+import { RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeVerSeccion } from '../../core/auth/modulos';
 
 @Component({
   selector: 'app-inventario-consolidado',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe],
+  imports: [FormsModule, DatePipe, DecimalPipe, RouterLink],
   template: `
     <div class="page">
       <div class="page-header">
@@ -29,6 +32,9 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
             }
           </select>
           <button class="btn" (click)="cargar()">Actualizar</button>
+          @if (puedeAjustarPt) {
+            <a class="btn" routerLink="/inventario/ajuste-pt">Carga y ajuste de botas</a>
+          }
           <button class="btn btn-primary" (click)="formAbierto.set(!formAbierto())">
             {{ formAbierto() ? 'Cerrar' : 'Movimiento de materia prima' }}
           </button>
@@ -220,6 +226,9 @@ export class InventarioConsolidadoComponent implements OnInit {
   private readonly api = inject(InventarioApi);
   private readonly lineasApi = inject(LineasApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
+
+  readonly puedeAjustarPt = puedeVerSeccion(this.auth.rol(), 'ajuste-pt');
 
   data = signal<InventarioConsolidado | null>(null);
   kardex = signal<MovimientoKardex[]>([]);

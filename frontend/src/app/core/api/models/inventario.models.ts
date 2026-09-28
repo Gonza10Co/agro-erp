@@ -107,3 +107,47 @@ export const MOTIVOS_MANUALES: Record<'ENTRADA' | 'SALIDA', MotivoMovimiento[]> 
   ENTRADA: ['COMPRA', 'AJUSTE_MANUAL'],
   SALIDA: ['CONSUMO_PRODUCCION', 'DEVOLUCION_PROVEEDOR', 'AJUSTE_MANUAL'],
 };
+
+/** Fila de la plantilla de conteo físico de producto terminado. */
+export interface FilaPlantillaPt {
+  referencia: string;
+  marca: string;
+  producto: string;
+  codigo: string;
+  talla: number;
+  bodega: string;
+  calidad: CalidadPT;
+  disponible: number;
+  reservado: number;
+}
+
+/** Fila del conteo que se envía al backend (solo las que traen conteo). */
+export interface FilaAjustePt {
+  fila: number;
+  codigo: string;
+  talla: number;
+  bodega: string;
+  calidad: string;
+  conteo: number;
+}
+
+export interface FilaAjustePtRevisada extends FilaAjustePt {
+  producto: string | null;
+  actual: number;
+  reservado: number;
+  diferencia: number;
+  error: string | null;
+}
+
+export interface ResumenAjustePt {
+  filas: number;
+  errores: number;
+  sinCambio: number;
+  suben: number;
+  bajan: number;
+  paresEntran: number;
+  paresSalen: number;
+}
+
+/** Quién puede fijar saldos de producto terminado (el backend lo exige igual). */
+export const ROLES_AJUSTE_PT = ['GERENTE', 'ADMIN'];
