@@ -5,6 +5,7 @@ describe('CatalogService', () => {
     productoConfigurado: { findMany: jest.fn() },
     talla: { findMany: jest.fn() },
     referencia: { findMany: jest.fn(), findFirst: jest.fn() },
+    marca: { findMany: jest.fn() },
   } as any;
   const service = new CatalogService(prisma);
   beforeEach(() => jest.clearAllMocks());
@@ -42,15 +43,21 @@ describe('CatalogService', () => {
     prisma.referencia.findFirst.mockResolvedValue({
       id: 1, codigo: '101', nombreInterno: 'PODEROSA base',
       tallaMin: { valor: 38 }, tallaMax: { valor: 46 },
-      marcas: [{ marca: { id: 5, codigo: 'PODEROSA', nombre: 'Poderosa', tipo: 'PROPIA' } }],
+      marcas: [{ marcaId: 5 }],
       ejes: [
         { obligatorio: true, grupoOpcion: { id: 2, codigo: 'SUELA', nombre: 'Suela', orden: 2, opciones: [{ id: 9, codigo: 'RIVER', nombre: 'River Creek' }] } },
         { obligatorio: true, grupoOpcion: { id: 1, codigo: 'COLOR', nombre: 'Color', orden: 1, opciones: [{ id: 8, codigo: 'CAFE', nombre: 'Café' }] } },
       ],
     });
+    prisma.marca.findMany.mockResolvedValue([
+      { id: 3, codigo: '8', nombre: 'AGRO CUERO', tipo: 'PROPIA' },
+      { id: 5, codigo: 'PODEROSA', nombre: 'Poderosa', tipo: 'PROPIA' },
+    ]);
     const r = await service.configReferencia(1);
     expect(r.referencia).toEqual({ id: 1, codigo: '101', nombreInterno: 'PODEROSA base', tallaMin: 38, tallaMax: 46 });
-    expect(r.marcas).toEqual([{ id: 5, codigo: 'PODEROSA', nombre: 'Poderosa', tipo: 'PROPIA' }]);
+    // Todas las marcas activas, sin exigir que estén asignadas; las asignadas primero.
+    expect(prisma.marca.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { activo: true } }));
+    expect(r.marcas.map((m) => m.id)).toEqual([5, 3]);
     expect(r.ejes.map((e) => e.grupo.codigo)).toEqual(['COLOR', 'SUELA']);
     expect(r.ejes[0]).toEqual({
       grupo: { id: 1, codigo: 'COLOR', nombre: 'Color', obligatorio: true },

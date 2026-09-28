@@ -81,10 +81,7 @@ export class CatalogService {
         nombreInterno: true,
         tallaMin: { select: { valor: true } },
         tallaMax: { select: { valor: true } },
-        marcas: {
-          where: { marca: { activo: true } },
-          select: { marca: { select: { id: true, codigo: true, nombre: true, tipo: true } } },
-        },
+        marcas: { select: { marcaId: true } },
         ejes: {
           select: {
             obligatorio: true,
@@ -102,6 +99,16 @@ export class CatalogService {
       },
     });
     if (!ref) throw new NotFoundException(`Referencia ${id} no encontrada`);
+    // Cualquier referencia se vende con cualquier marca (JP, 2026-09-28): se ofrecen
+    // todas las activas. Las asignadas a la referencia (ReferenciaMarca) van primero.
+    const habituales = new Set(ref.marcas.map((m) => m.marcaId));
+    const marcas = (
+      await this.prisma.marca.findMany({
+        where: { activo: true },
+        select: { id: true, codigo: true, nombre: true, tipo: true },
+        orderBy: { nombre: 'asc' },
+      })
+    ).sort((a, b) => Number(habituales.has(b.id)) - Number(habituales.has(a.id)));
     return {
       referencia: {
         id: ref.id,
@@ -110,7 +117,7 @@ export class CatalogService {
         tallaMin: ref.tallaMin.valor,
         tallaMax: ref.tallaMax.valor,
       },
-      marcas: ref.marcas.map((m) => m.marca),
+      marcas,
       ejes: ref.ejes
         .slice()
         .sort((a, b) => a.grupoOpcion.orden - b.grupoOpcion.orden)

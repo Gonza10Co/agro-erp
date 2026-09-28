@@ -32,10 +32,12 @@ type ResolverResp = { ok: true; r: BomResuelto } | { ok: false; e: unknown };
 
           @if (config(); as c) {
             <label class="label" style="margin-top:var(--sp-4)">Marca</label>
-            <select class="input" (change)="elegirMarca($event)">
-              <option [value]="''">— sin marca —</option>
-              @for (m of c.marcas; track m.id) { <option [value]="m.id">{{ m.nombre }}</option> }
-            </select>
+            <!-- Son todas las marcas activas (~110): buscador en vez de lista. El @for por
+                 referencia recrea el buscador, para que no quede el texto de la marca anterior. -->
+            @for (refId of [c.referencia.id]; track refId) {
+              <app-buscador-select [items]="c.marcas" [etiqueta]="etiquetaMarca" [sub]="subMarca"
+                placeholder="Buscar marca…" (seleccionar)="elegirMarca($event)" />
+            }
 
             @for (e of c.ejes; track e.grupo.id) {
               <label class="label" style="margin-top:var(--sp-4)">
@@ -217,6 +219,8 @@ export class ConfiguradorComponent implements OnInit {
 
   etiquetaRef = (r: ReferenciaListItem) => `${r.codigo} · ${r.nombreInterno}`;
   subRef = (r: ReferenciaListItem) => r.codigo;
+  etiquetaMarca = (m: MarcaOpt) => m.nombre;
+  subMarca = (m: MarcaOpt) => `código ${m.codigo}`;
 
   private readonly trigger = new Subject<ResolverParams>();
   private readonly refTrigger = new Subject<ReferenciaListItem>();
@@ -266,9 +270,7 @@ export class ConfiguradorComponent implements OnInit {
     this.refTrigger.next(r);
   }
 
-  elegirMarca(e: Event) {
-    const id = (e.target as HTMLSelectElement).value;
-    const m = this.config()?.marcas.find((x) => x.id === +id) ?? null;
+  elegirMarca(m: MarcaOpt) {
     this.marcaSel.set(m);
     this.recalcular();
   }

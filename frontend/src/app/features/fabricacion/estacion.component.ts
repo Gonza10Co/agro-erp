@@ -5,7 +5,7 @@ import { FabricacionApi } from '../../core/api/fabricacion.api';
 import { CalidadApi } from '../../core/api/calidad.api';
 import {
   Estacion, Operario, Maquina, OFListItem, OFDetalle, ProgramaOfLinea, LABEL_CELULA,
-  AvanceResultado, DanoEscaneo, ROLES_BAJA, ROLES_SEGUNDA,
+  AvanceResultado, DanoEscaneo, ParNacido, ROLES_BAJA, ROLES_SEGUNDA,
 } from '../../core/api/models/fabricacion.models';
 import { DESTINO_CLASE, TipoDano } from '../../core/api/models/calidad.models';
 import { AuthService } from '../../core/auth/auth.service';
@@ -13,6 +13,7 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
 import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
 import {
   descargarEtiquetasLengua, descargarStickerCaja, datosCajaDePar, datosLenguaDePar,
+  motivoFalloEtiqueta, precargarGeneradorEtiquetas,
 } from './etiqueta-par-pdf';
 import { agruparPrograma } from './programa-of';
 
@@ -27,6 +28,10 @@ interface Resultado {
   sticker?: string;
   /** Código de la reposición que acaba de nacer: hay que imprimirle la lengua. */
   lengua?: string;
+  /** Pares de la tanda que acaba de nacer: para volver a imprimirlos si la descarga falló. */
+  tanda?: ParNacido[];
+  /** La etiqueta no salió: el par ya existe, solo falta imprimir. */
+  errorImpresion?: string;
 }
 
 /** Orden del catálogo en la estación: lo que más pasa primero, la baja al final. */
@@ -237,6 +242,10 @@ export function guardarConfig(c: ConfigEstacion | null): void {
               @if (r.sticker) {
                 <button class="btn btn-sm" type="button" (click)="imprimirSticker(r.sticker)">Imprimir sticker de la caja 🏷️</button>
               }
+              @if (r.tanda?.length) {
+                <button class="btn btn-sm" type="button" (click)="imprimirTanda(r.tanda!)">Volver a imprimir {{ r.tanda!.length === 1 ? 'la etiqueta' : 'las ' + r.tanda!.length + ' etiquetas' }} de esta tanda 🏷️</button>
+              }
+              @if (r.errorImpresion) { <div class="res-detalle res-error-imp">⚠ La etiqueta no salió. {{ r.errorImpresion }}</div> }
               @if (r.lengua) {
                 <button class="btn btn-sm" type="button" (click)="imprimirLengua(r.lengua)">Imprimir etiqueta de la lengua de {{ r.lengua }} 🏷️</button>
               }
@@ -248,6 +257,7 @@ export function guardarConfig(c: ConfigEstacion | null): void {
   `,
   styles: [`
     .est{max-width:720px}
+    .res-error-imp{color:var(--error);font-weight:var(--fw-semibold);margin-top:var(--sp-2)}
     .config{display:flex;flex-direction:column;gap:var(--sp-3)}
     .config label,.scan-label,.of-sel{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
     select,.scan-input,.tanda{padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
@@ -396,6 +406,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   nombreSel = () => this.estaciones().find((e) => e.codigo === this.selEstacion)?.nombre ?? '';
 
   ngOnInit(): void {
+    precargarGeneradorEtiquetas();
     this.api.estaciones().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (es) => {
         this.estaciones.set(es);
@@ -523,8 +534,9 @@ export class EstacionComponent implements OnInit, OnDestroy {
             ok: true,
             titulo: `${r.pares.length} par${r.pares.length === 1 ? '' : 'es'} de talla ${l.talla} nacieron`,
             detalle: r.pares.length === 1 ? primero : `${primero} → ${ultimo} · imprimiendo etiquetas`,
+            tanda: r.pares,
           });
-          void descargarEtiquetasLengua(r.pares);
+          this.imprimirTanda(r.pares);
           this.cargarOf();
         },
         error: (e) => {
@@ -652,9 +664,21 @@ export class EstacionComponent implements OnInit, OnDestroy {
     return null;
   }
 
+  /** Imprime (o reimprime) las lenguas de la tanda que acaba de nacer. */
+  imprimirTanda(pares: ParNacido[]): void {
+    this.resultado.update((r) => (r ? { ...r, errorImpresion: undefined } : r));
+    descargarEtiquetasLengua(pares).catch((e) => this.falloImpresion(e));
+  }
+
+  // Los pares ya existen: que se vea que falta la etiqueta, no que "no pasó nada".
+  private falloImpresion(e: unknown): void {
+    const motivo = motivoFalloEtiqueta(e);
+    this.resultado.update((r) => (r ? { ...r, errorImpresion: motivo } : { ok: false, titulo: 'La etiqueta no salió', detalle: motivo }));
+  }
+
   imprimirSticker(codigo: string): void {
     this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => void descargarStickerCaja(datosCajaDePar(p)),
+      next: (p) => descargarStickerCaja(datosCajaDePar(p)).catch((e) => this.falloImpresion(e)),
       error: () => this.resultado.set({ ok: false, titulo: 'No se pudo armar el sticker', detalle: codigo }),
     });
   }
@@ -662,7 +686,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   /** La reposición nace en Preparación, pero la etiqueta se imprime desde donde se dio la baja. */
   imprimirLengua(codigo: string): void {
     this.api.par(codigo).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (p) => void descargarEtiquetasLengua([datosLenguaDePar(p)]),
+      next: (p) => descargarEtiquetasLengua([datosLenguaDePar(p)]).catch((e) => this.falloImpresion(e)),
       error: () => this.resultado.set({ ok: false, titulo: 'No se pudo armar la etiqueta', detalle: codigo }),
     });
   }
