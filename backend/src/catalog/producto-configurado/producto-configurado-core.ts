@@ -93,3 +93,11 @@ export function armarProducto(
     opcionIds: ordenadas.map((e) => e.opcion.id),
   };
 }
+
+/**
+ * ¿El error es una violación de unicidad de Prisma (P2002)? Se usa para la carrera
+ * de obtener-o-crear: dos usuarios arman la misma combinación al mismo tiempo.
+ */
+export function esViolacionUnica(e: unknown): boolean {
+  return (e as { code?: unknown } | null)?.code === 'P2002';
+}

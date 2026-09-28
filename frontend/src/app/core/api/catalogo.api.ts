@@ -16,6 +16,10 @@ export class CatalogoApi {
   crearProducto(payload: { referenciaId: number; marcaId: number; opcionIds: number[] }) {
     return this.http.post<{ id: number; codigo: string; nombreComercial: string }>(`${this.base}/productos`, payload);
   }
+  /** Armar el producto desde la OC: devuelve el existente (reactivado si hacía falta) o lo crea. */
+  obtenerOCrearProducto(payload: { referenciaId: number; marcaId: number; opcionIds: number[] }) {
+    return this.http.post<ProductoConfiguradoFull & { creado: boolean }>(`${this.base}/productos/obtener-o-crear`, payload);
+  }
   listarTallas() { return this.http.get<Talla[]>(`${this.base}/tallas`); }
   listarMateriales() { return this.http.get<MaterialItem[]>(`${this.base}/materiales`); }
 

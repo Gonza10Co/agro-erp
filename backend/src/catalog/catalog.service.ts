@@ -1,6 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MetaMaterial } from './bom/bom-enriquecer';
+
+/**
+ * Forma "completa" de un ProductoConfigurado que consume el wizard de OC
+ * (ProductoConfiguradoFull en el frontend). Compartida entre el listado y
+ * obtener-o-crear, para que ambos devuelvan exactamente lo mismo.
+ */
+export const PRODUCTO_FULL_SELECT = {
+  id: true,
+  codigo: true,
+  nombreComercial: true,
+  marca: { select: { id: true, nombre: true } },
+  referencia: {
+    select: {
+      id: true,
+      codigo: true,
+      tallaMin: { select: { id: true, valor: true, orden: true } },
+      tallaMax: { select: { id: true, valor: true, orden: true } },
+    },
+  },
+} satisfies Prisma.ProductoConfiguradoSelect;
 
 @Injectable()
 export class CatalogService {
@@ -10,20 +31,7 @@ export class CatalogService {
     return this.prisma.productoConfigurado.findMany({
       where: { activo: true },
       orderBy: { nombreComercial: 'asc' },
-      select: {
-        id: true,
-        codigo: true,
-        nombreComercial: true,
-        marca: { select: { id: true, nombre: true } },
-        referencia: {
-          select: {
-            id: true,
-            codigo: true,
-            tallaMin: { select: { id: true, valor: true, orden: true } },
-            tallaMax: { select: { id: true, valor: true, orden: true } },
-          },
-        },
-      },
+      select: PRODUCTO_FULL_SELECT,
     });
   }
 

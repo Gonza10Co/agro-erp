@@ -1,5 +1,5 @@
 import { Talla, CrearOCDto } from '../../../core/api/models/pedidos.models';
-import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
+import { EjeConfig, ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 
 export interface LineaWizard {
   producto: ProductoConfiguradoFull;
@@ -65,4 +65,12 @@ export function construirDto(args: {
         .filter((t) => t.cantidad > 0),
     })),
   };
+}
+
+/**
+ * Selección inicial de ejes al armar un producto en la OC: si un eje tiene una sola
+ * opción no hay nada que decidir, así que se preselecciona; el resto arranca vacío.
+ */
+export function seleccionInicialEjes(ejes: EjeConfig[]): Map<number, number | null> {
+  return new Map(ejes.map((e) => [e.grupo.id, e.opciones.length === 1 ? e.opciones[0].id : null]));
 }
