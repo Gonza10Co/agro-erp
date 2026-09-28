@@ -60,6 +60,8 @@ export class MaterialService {
         origen: true,
         activo: true,
         unidadMedida: { select: { codigo: true } },
+        familiaTalla: true,
+        talla: { select: { valor: true } },
       },
     });
     return filas.map((m) => ({
@@ -69,6 +71,9 @@ export class MaterialService {
       origen: m.origen,
       activo: m.activo,
       unidad: m.unidadMedida?.codigo ?? '',
+      // Materiales por talla (plantillas): la pantalla muestra "PLANTILLA PU · T38".
+      familiaTalla: m.familiaTalla ?? null,
+      talla: m.talla?.valor ?? null,
     }));
   }
 

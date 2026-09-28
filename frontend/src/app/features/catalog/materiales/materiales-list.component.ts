@@ -46,6 +46,7 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
                     <td class="cell-mono">{{ m.codigo }}</td>
                     <td>
                       {{ m.nombreCanonico }}
+                      @if (m.familiaTalla) { <span class="badge badge-info familia-talla" style="margin-left:var(--sp-2)">{{ m.familiaTalla }}@if (m.talla != null) { · T{{ m.talla }} }</span> }
                       @if (m.activo === false) { <span class="badge badge-neutral" style="margin-left:var(--sp-2)"><span class="dot"></span>Inactivo</span> }
                     </td>
                     <td>

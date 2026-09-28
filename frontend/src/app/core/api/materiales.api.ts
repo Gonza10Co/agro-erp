@@ -14,6 +14,9 @@ export interface Material {
   unidad: string;
   /** Viene del listado de maestros; los consumidores viejos no lo necesitan. */
   activo?: boolean;
+  /** Materiales que existen uno por talla (plantillas): familia y valor de la talla. */
+  familiaTalla?: string | null;
+  talla?: number | null;
 }
 
 export interface CategoriaMaterial { id: number; nombre: string; }

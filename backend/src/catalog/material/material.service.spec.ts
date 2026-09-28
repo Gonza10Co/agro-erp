@@ -96,8 +96,25 @@ describe('MaterialService', () => {
         nombreCanonico: 'Cuero negro',
         origen: 'COMPRADO',
         unidad: 'M2',
+        familiaTalla: null,
+        talla: null,
       },
     ]);
+  });
+
+  it('listar expone la familia y la talla de los materiales por talla', async () => {
+    prisma.material.findMany.mockResolvedValue([
+      {
+        id: 3, codigo: 'PPLA227', nombreCanonico: 'PLANTILLA PU TALLA 38', origen: 'COMPRADO',
+        activo: true, unidadMedida: { codigo: 'PAR' }, familiaTalla: 'PLANTILLA PU', talla: { valor: 38 },
+      },
+    ]);
+    const r = await service.listar();
+    expect(r[0]).toMatchObject({ familiaTalla: 'PLANTILLA PU', talla: 38 });
+    expect(prisma.material.findMany.mock.calls[0][0].select).toMatchObject({
+      familiaTalla: true,
+      talla: { select: { valor: true } },
+    });
   });
 
   it('actualiza un material existente', async () => {

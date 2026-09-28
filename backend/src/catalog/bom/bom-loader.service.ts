@@ -126,34 +126,71 @@ export class BomLoaderService {
     }
 
     const materiales: Record<number, MaterialInfo> = {};
-    let pendientes = [...ids];
-
-    // Carga iterativa: al traer un FABRICADO, sus insumos hijos se agregan a la cola.
-    while (pendientes.length) {
-      const filas = await this.prisma.material.findMany({
-        where: { id: { in: pendientes } },
+    const include = {
+      talla: { select: { valor: true } },
+      // Solo el BOM propio ACTIVO del sub-ensamble (puede haber versiones inactivas).
+      bomsPropios: {
+        where: { activo: true },
         include: {
-          // Solo el BOM propio ACTIVO del sub-ensamble (puede haber versiones inactivas).
-          bomsPropios: {
-            where: { activo: true },
-            include: {
-              lineas: {
-                include: { lineasTalla: { include: { talla: true } } },
-              },
-            },
+          lineas: {
+            include: { lineasTalla: { include: { talla: true } } },
           },
         },
-      });
+      },
+    };
+
+    /** Registra las filas y devuelve los insumos hijos aún sin cargar. */
+    const incorporar = (filas: any[]): number[] => {
       const nuevos: number[] = [];
-      for (const m of filas as any[]) {
+      for (const m of filas) {
         const subBom: LineaBase[] = (m.bomsPropios?.[0]?.lineas ?? []).map(
           (l: any) => this.mapLinea(l),
         );
-        materiales[m.id] = { id: m.id, origen: m.origen, subBom };
+        const info: MaterialInfo = { id: m.id, origen: m.origen, subBom };
+        if (m.familiaTalla)
+          info.familiaTalla = {
+            familia: m.familiaTalla,
+            tallaValor: m.talla?.valor ?? null,
+            codigo: m.codigo,
+            activo: m.activo !== false,
+          };
+        materiales[m.id] = info;
         for (const l of subBom)
           if (!(l.materialId in materiales)) nuevos.push(l.materialId);
       }
-      pendientes = [...new Set(nuevos)].filter((id) => !(id in materiales));
+      return [...new Set(nuevos)].filter((id) => !(id in materiales));
+    };
+
+    // Carga iterativa: al traer un FABRICADO, sus insumos hijos se agregan a la cola.
+    const cargarPendientes = async (ids: number[]): Promise<void> => {
+      let pendientes = ids;
+      while (pendientes.length) {
+        const filas = await this.prisma.material.findMany({
+          where: { id: { in: pendientes } },
+          include,
+        });
+        pendientes = incorporar(filas as any[]);
+      }
+    };
+
+    await cargarPendientes([...ids]);
+
+    // Materiales por talla: se traen de UNA vez todos los hermanos de las familias
+    // presentes, porque la entrada se reutiliza para resolver todas las tallas.
+    const familias = [
+      ...new Set(
+        Object.values(materiales)
+          .map((m) => m.familiaTalla?.familia)
+          .filter((f): f is string => !!f),
+      ),
+    ];
+    if (familias.length) {
+      const hermanos = await this.prisma.material.findMany({
+        where: { familiaTalla: { in: familias } },
+        include,
+      });
+      const nuevos = (hermanos as any[]).filter((m) => !(m.id in materiales));
+      await cargarPendientes(incorporar(nuevos));
     }
 
     return materiales;

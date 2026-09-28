@@ -181,6 +181,61 @@ describe('BomLoaderService.cargarEntrada', () => {
     expect(entrada.overrides[0]).toMatchObject({ materialNuevoId: 12, heredaCurva: true, orden: 0 });
   });
 
+  it('trae en UNA consulta los hermanos de familia-talla y los marca en materiales', async () => {
+    prisma.bom.findFirst.mockResolvedValue({
+      id: 1,
+      lineas: [
+        {
+          materialId: 10,
+          claseConsumo: 'CURVA',
+          consumoFijo: null,
+          mermaPct: null,
+          lineasTalla: [{ talla: { valor: 38 }, consumo: dec(1) }],
+        },
+      ],
+    });
+    prisma.reglaOverride.findMany.mockResolvedValue([]);
+    const pu = (id: number, codigo: string, valor: number, activo = true) => ({
+      id, codigo, origen: 'COMPRADO', activo, familiaTalla: 'PLANTILLA PU',
+      talla: { valor }, bomsPropios: [],
+    });
+    prisma.material.findMany.mockImplementation((args: any) =>
+      Promise.resolve(
+        args.where.familiaTalla
+          ? [pu(10, 'PPLA229', 40), pu(11, 'PPLA227', 38), pu(12, 'MRP-022', 38, false)]
+          : [pu(10, 'PPLA229', 40)],
+      ),
+    );
+
+    const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: null, opcionIds: [], talla: 38 });
+
+    expect(prisma.material.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.material.findMany.mock.calls[1][0].where).toEqual({
+      familiaTalla: { in: ['PLANTILLA PU'] },
+    });
+    expect(entrada.materiales[10].familiaTalla).toEqual({
+      familia: 'PLANTILLA PU', tallaValor: 40, codigo: 'PPLA229', activo: true,
+    });
+    expect(entrada.materiales[11].familiaTalla).toMatchObject({ tallaValor: 38 });
+    expect(entrada.materiales[12].familiaTalla).toMatchObject({ activo: false });
+  });
+
+  it('sin materiales con familia no hace la consulta de hermanos', async () => {
+    prisma.bom.findFirst.mockResolvedValue({
+      id: 1,
+      lineas: [{ materialId: 10, claseConsumo: 'FIJO', consumoFijo: dec(1), mermaPct: null, lineasTalla: [] }],
+    });
+    prisma.reglaOverride.findMany.mockResolvedValue([]);
+    prisma.material.findMany.mockResolvedValue([
+      { id: 10, codigo: 'X', origen: 'COMPRADO', familiaTalla: null, talla: null, bomsPropios: [] },
+    ]);
+
+    const entrada = await service.cargarEntrada({ referenciaId: 1, marcaId: null, opcionIds: [], talla: 38 });
+
+    expect(prisma.material.findMany).toHaveBeenCalledTimes(1);
+    expect(entrada.materiales[10].familiaTalla).toBeUndefined();
+  });
+
   it('lanza NotFound si la referencia no tiene BOM activo', async () => {
     prisma.bom.findFirst.mockResolvedValue(null);
     await expect(
