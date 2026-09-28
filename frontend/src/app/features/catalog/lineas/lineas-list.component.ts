@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LineasApi, Linea, Celula, CrearLineaDto, ActualizarLineaDto } from '../../../core/api/lineas.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 const CELULAS: { valor: Celula; label: string }[] = [
   { valor: 'CORTE', label: 'Corte' },
@@ -17,12 +18,17 @@ const LABEL: Record<Celula, string> = Object.fromEntries(
 @Component({
   selector: 'app-lineas-list',
   standalone: true,
-  imports: [DrawerComponent, FormsModule],
+  imports: [DrawerComponent, FormsModule, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Líneas de producción</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar inactivas
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrirNueva()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nueva línea
@@ -46,15 +52,28 @@ const LABEL: Record<Celula, string> = Object.fromEntries(
               <thead><tr><th>Código</th><th>Nombre</th><th>Arranca en</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (l of lineas(); track l.id) {
-                  <tr>
+                  <tr [class.is-inactive]="!l.activo">
                     <td class="cell-mono">{{ l.codigo }}</td>
                     <td>{{ l.nombre }}</td>
                     <td><span class="badge badge-neutral"><span class="dot"></span>{{ label(l.celulaInicial) }}</span></td>
-                    <td>{{ l.activo ? 'Activa' : 'Inactiva' }}</td>
+                    <td>
+                      @if (l.activo) {
+                        <span class="badge badge-success"><span class="dot"></span>Activa</span>
+                      } @else {
+                        <span class="badge badge-neutral"><span class="dot"></span>Inactiva</span>
+                      }
+                    </td>
                     <td class="cell-actions">
                       <button class="btn btn-ghost" type="button" (click)="abrirEditar(l)">Editar</button>
                       @if (l.activo) {
-                        <button class="btn btn-ghost" type="button" (click)="desactivar(l)">Desactivar</button>
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === l.id"
+                          [pregunta]="'¿Desactivar ' + l.nombre + '?'"
+                          (pedir)="confirmandoId.set(l.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(l)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(l)">Reactivar</button>
                       }
                     </td>
                   </tr>
@@ -99,6 +118,10 @@ export class LineasListComponent {
   cargando = signal(true);
   drawerAbierto = signal(false);
   editando = signal<Linea | null>(null);
+  /** Casilla "Mostrar inactivas": pide también las desactivadas para poder reactivarlas. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
 
   codigo = '';
   nombre = '';
@@ -112,7 +135,7 @@ export class LineasListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (ls) => { this.lineas.set(ls); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -154,7 +177,18 @@ export class LineasListComponent {
     }
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(l: Linea): void {
+    this.confirmandoId.set(null);
     this.api.desactivar(l.id).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(l: Linea): void {
+    this.api.reactivar(l.id).subscribe({ next: () => this.cargar() });
   }
 }

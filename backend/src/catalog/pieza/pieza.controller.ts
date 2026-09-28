@@ -3,9 +3,11 @@ import {
   Controller,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -20,8 +22,13 @@ import { ActualizarPiezaDto } from './dto/actualizar-pieza.dto';
 export class PiezaController {
   constructor(private readonly piezas: PiezaService) {}
 
-  @Get() listar() {
-    return this.piezas.listar();
+  // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
+  // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
+  @Get() listar(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.piezas.listar(incluirInactivas);
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.piezas.obtener(id);
@@ -46,5 +53,12 @@ export class PiezaController {
   @Roles('ADMIN', 'GERENTE', 'CLIENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.piezas.desactivar(id);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE', 'CLIENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.piezas.reactivar(id);
   }
 }

@@ -25,9 +25,10 @@ export class PiezaService {
     });
   }
 
-  listar() {
+  /** Solo activas salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listar(incluirInactivas = false) {
     return this.prisma.pieza.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     });
   }
@@ -57,6 +58,11 @@ export class PiezaService {
         `La pieza está usada en ${enUso} línea(s) de BOM; quítala de las recetas antes de archivarla`,
       );
     return this.prisma.pieza.update({ where: { id }, data: { activo: false } });
+  }
+
+  async reactivar(id: number) {
+    await this.existeOFalla(id);
+    return this.prisma.pieza.update({ where: { id }, data: { activo: true } });
   }
 
   private async existeOFalla(id: number) {

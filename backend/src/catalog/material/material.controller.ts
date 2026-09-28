@@ -4,9 +4,11 @@ import {
   Delete,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -23,8 +25,13 @@ export class MaterialController {
   constructor(private readonly materiales: MaterialService) {}
 
   // Lectura: cualquier usuario autenticado (lo consume el editor de BOM).
-  @Get() listar() {
-    return this.materiales.listar();
+  // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
+  // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
+  @Get() listar(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.materiales.listar(incluirInactivas);
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.materiales.obtener(id);
@@ -50,6 +57,13 @@ export class MaterialController {
   @Roles('ADMIN', 'GERENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.materiales.desactivar(id);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.materiales.reactivar(id);
   }
 
   @UseGuards(RolesGuard)

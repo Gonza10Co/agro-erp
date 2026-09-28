@@ -129,4 +129,41 @@ describe('MaterialService', () => {
       service.agregarAlias(1, { textoLegacy: 'CUERO NEG' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.material.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.material.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivar(1);
+    expect(prisma.material.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.material.findUnique.mockResolvedValue(null);
+    await expect(service.reactivar(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('listar sin flag trae solo activos; con incluirInactivas trae todos', async () => {
+    prisma.material.findMany.mockResolvedValue([]);
+    await service.listar();
+    expect(prisma.material.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { activo: true } }),
+    );
+    await service.listar(true);
+    expect(prisma.material.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
+
+  it('listar expone `activo` para que la pantalla atenúe los inactivos', async () => {
+    prisma.material.findMany.mockResolvedValue([
+      { id: 2, codigo: 'MAT-2', nombreCanonico: 'Hilo', origen: 'COMPRADO', activo: false, unidadMedida: null },
+    ]);
+    const r = await service.listar(true);
+    expect(r[0]).toMatchObject({ id: 2, activo: false, unidad: '' });
+  });
 });

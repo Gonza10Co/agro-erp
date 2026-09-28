@@ -8,7 +8,7 @@ import { ProductoConfiguradoController } from '../catalog/producto-configurado/p
 describe('Gating de roles del piloto (CLIENTE)', () => {
   const reflector = new Reflector();
 
-  it.each([['crear'], ['actualizar'], ['desactivar']])(
+  it.each([['crear'], ['actualizar'], ['desactivar'], ['reactivar']])(
     'ClientesController.%s permite al CLIENTE (además de roles internos)',
     (metodo) => {
       const roles = reflector.get<string[]>(

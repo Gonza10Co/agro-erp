@@ -3,16 +3,22 @@ import { FormsModule } from '@angular/forms';
 import { MarcasApi, Marca, TipoMarca, CrearMarcaDto, ActualizarMarcaDto } from '../../../core/api/marcas.api';
 import { LineasApi, Linea } from '../../../core/api/lineas.api';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 
 @Component({
   selector: 'app-marcas-list',
   standalone: true,
-  imports: [DrawerComponent, FormsModule],
+  imports: [DrawerComponent, FormsModule, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Marcas</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar inactivas
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrirNueva()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nueva marca
@@ -36,16 +42,29 @@ import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
               <thead><tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Línea</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (m of marcas(); track m.id) {
-                  <tr>
+                  <tr [class.is-inactive]="!m.activo">
                     <td class="cell-mono">{{ m.codigo }}</td>
                     <td>{{ m.nombre }}</td>
                     <td><span class="badge badge-neutral"><span class="dot"></span>{{ m.tipo }}</span></td>
                     <td>{{ nombreLinea(m.lineaId) }}</td>
-                    <td>{{ m.activo ? 'Activa' : 'Inactiva' }}</td>
+                    <td>
+                      @if (m.activo) {
+                        <span class="badge badge-success"><span class="dot"></span>Activa</span>
+                      } @else {
+                        <span class="badge badge-neutral"><span class="dot"></span>Inactiva</span>
+                      }
+                    </td>
                     <td class="cell-actions">
                       <button class="btn btn-ghost" type="button" (click)="abrirEditar(m)">Editar</button>
                       @if (m.activo) {
-                        <button class="btn btn-ghost" type="button" (click)="desactivar(m)">Desactivar</button>
+                        <app-confirmar-accion
+                          [abierto]="confirmandoId() === m.id"
+                          [pregunta]="'¿Desactivar ' + m.codigo + '?'"
+                          (pedir)="confirmandoId.set(m.id)"
+                          (cancelar)="confirmandoId.set(null)"
+                          (confirmar)="desactivar(m)" />
+                      } @else {
+                        <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(m)">Reactivar</button>
                       }
                     </td>
                   </tr>
@@ -99,6 +118,10 @@ export class MarcasListComponent {
   cargando = signal(true);
   drawerAbierto = signal(false);
   editando = signal<Marca | null>(null);
+  /** Casilla "Mostrar inactivas": pide también las desactivadas para poder reactivarlas. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
 
   codigo = '';
   nombre = '';
@@ -119,7 +142,7 @@ export class MarcasListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (ms) => { this.marcas.set(ms); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -178,7 +201,18 @@ export class MarcasListComponent {
     }
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(m: Marca): void {
+    this.confirmandoId.set(null);
     this.api.desactivar(m.id).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(m: Marca): void {
+    this.api.reactivar(m.id).subscribe({ next: () => this.cargar() });
   }
 }

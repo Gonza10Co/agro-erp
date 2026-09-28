@@ -63,6 +63,11 @@ export class ClientesService {
     return this.prisma.cliente.update({ where: { id }, data: { activo: false } });
   }
 
+  async reactivar(id: number) {
+    await this.existeOFalla(id);
+    return this.prisma.cliente.update({ where: { id }, data: { activo: true } });
+  }
+
   private async existeOFalla(id: number) {
     const c = await this.prisma.cliente.findUnique({ where: { id } });
     if (!c) throw new NotFoundException(`Cliente ${id} no existe`);

@@ -56,4 +56,33 @@ describe('LineaService', () => {
     expect(prisma.linea.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { activo: false } });
     expect(r).toMatchObject({ id: 1, activo: false });
   });
+
+  // Reactivar deshace un desactivar accidental (activo:true).
+  it('reactiva (activo:true)', async () => {
+    prisma.linea.findUnique.mockResolvedValue({ id: 1, activo: false });
+    prisma.linea.update.mockResolvedValue({ id: 1, activo: true });
+    const r = await service.reactivar(1);
+    expect(prisma.linea.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { activo: true },
+    });
+    expect(r).toMatchObject({ id: 1, activo: true });
+  });
+
+  it('lanza NotFound al reactivar uno inexistente', async () => {
+    prisma.linea.findUnique.mockResolvedValue(null);
+    await expect(service.reactivar(99)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('listar sin flag trae solo activos; con incluirInactivas trae todos', async () => {
+    prisma.linea.findMany.mockResolvedValue([]);
+    await service.listar();
+    expect(prisma.linea.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { activo: true } }),
+    );
+    await service.listar(true);
+    expect(prisma.linea.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+  });
 });

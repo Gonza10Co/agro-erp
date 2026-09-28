@@ -26,9 +26,10 @@ export class ProveedoresService {
     });
   }
 
-  listar() {
+  /** Solo activos salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listar(incluirInactivas = false) {
     return this.prisma.proveedor.findMany({
-      where: { activo: true },
+      where: incluirInactivas ? {} : { activo: true },
       orderBy: { nombre: 'asc' },
     });
   }
@@ -57,6 +58,16 @@ export class ProveedoresService {
     return this.prisma.proveedor.update({
       where: { id },
       data: { activo: false },
+    });
+  }
+
+  async reactivar(id: number) {
+    const existe = await this.prisma.proveedor.findUnique({ where: { id } });
+    if (!existe)
+      throw new NotFoundException(`No existe el proveedor ${id}`);
+    return this.prisma.proveedor.update({
+      where: { id },
+      data: { activo: true },
     });
   }
 }

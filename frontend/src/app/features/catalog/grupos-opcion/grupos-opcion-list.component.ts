@@ -1,17 +1,23 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
+import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/confirmar-accion.component';
 import { GruposOpcionApi, GrupoOpcion } from '../../../core/api/grupos-opcion.api';
 
 @Component({
   selector: 'app-grupos-opcion-list',
   standalone: true,
-  imports: [FormsModule, DrawerComponent],
+  imports: [FormsModule, DrawerComponent, ConfirmarAccionComponent],
   template: `
     <div class="page">
       <div class="page-header">
         <div><div class="ph-title">Grupos de opción</div></div>
         <div class="page-actions">
+          <label class="check">
+            <input type="checkbox" [checked]="mostrarInactivas()" (change)="alternarInactivas()" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Mostrar opciones inactivas
+          </label>
           <button class="btn btn-primary" type="button" (click)="abrir()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nuevo grupo
@@ -51,12 +57,16 @@ import { GruposOpcionApi, GrupoOpcion } from '../../../core/api/grupos-opcion.ap
                     <span class="dot"></span>{{ o.nombre }}
                     <span class="cell-mono cell-sub">{{ o.codigo }}</span>
                     @if (o.activo) {
-                      <button class="icon-btn" type="button" title="Desactivar" (click)="desactivar(o.id)"
-                              style="width:18px;height:18px">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                      </button>
+                      <app-confirmar-accion
+                        [compacto]="true"
+                        [abierto]="confirmandoId() === o.id"
+                        [pregunta]="'¿Desactivar ' + o.nombre + '?'"
+                        (pedir)="confirmandoId.set(o.id)"
+                        (cancelar)="confirmandoId.set(null)"
+                        (confirmar)="desactivar(o.id)" />
                     } @else {
                       <span class="cell-sub">(inactiva)</span>
+                      <button class="btn btn-ghost btn-sm" type="button" (click)="reactivar(o.id)">Reactivar</button>
                     }
                   </span>
                 } @empty {
@@ -115,6 +125,10 @@ export class GruposOpcionListComponent {
   grupos = signal<GrupoOpcionVM[]>([]);
   cargando = signal(true);
   drawerAbierto = signal(false);
+  /** Casilla "Mostrar inactivas": pide también las desactivadas para poder reactivarlas. */
+  mostrarInactivas = signal(false);
+  /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
+  confirmandoId = signal<number | null>(null);
 
   codigo = '';
   nombre = '';
@@ -129,7 +143,7 @@ export class GruposOpcionListComponent {
 
   cargar(): void {
     this.cargando.set(true);
-    this.api.listar().subscribe({
+    this.api.listar({ incluirInactivas: this.mostrarInactivas() }).subscribe({
       next: (gs) => { this.grupos.set(gs); this.cargando.set(false); },
       error: () => this.cargando.set(false),
     });
@@ -176,8 +190,19 @@ export class GruposOpcionListComponent {
     });
   }
 
+  alternarInactivas(): void {
+    this.mostrarInactivas.update((v) => !v);
+    this.cargar();
+  }
+
+  /** Solo se llama desde "Sí, desactivar": el primer clic únicamente abre la confirmación. */
   desactivar(opcionId: number): void {
+    this.confirmandoId.set(null);
     this.api.desactivarOpcion(opcionId).subscribe({ next: () => this.cargar() });
+  }
+
+  reactivar(opcionId: number): void {
+    this.api.reactivarOpcion(opcionId).subscribe({ next: () => this.cargar() });
   }
 }
 

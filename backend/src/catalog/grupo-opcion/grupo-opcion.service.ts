@@ -30,10 +30,11 @@ export class GrupoOpcionService {
     });
   }
 
-  listarGrupos() {
+  /** Opciones solo activas salvo `incluirInactivas` (pantalla de maestros, para reactivar). */
+  listarGrupos(incluirInactivas = false) {
     return this.prisma.grupoOpcion.findMany({
       orderBy: { orden: 'asc' },
-      include: { opciones: { where: { activo: true } } },
+      include: { opciones: incluirInactivas ? true : { where: { activo: true } } },
     });
   }
 
@@ -82,6 +83,18 @@ export class GrupoOpcionService {
     return this.prisma.opcion.update({
       where: { id: opcionId },
       data: { activo: false },
+    });
+  }
+
+  async reactivarOpcion(opcionId: number) {
+    const existe = await this.prisma.opcion.findUnique({
+      where: { id: opcionId },
+    });
+    if (!existe)
+      throw new NotFoundException(`No existe la opción ${opcionId}`);
+    return this.prisma.opcion.update({
+      where: { id: opcionId },
+      data: { activo: true },
     });
   }
 }

@@ -4,9 +4,11 @@ import {
   Delete,
   Get,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,8 +26,13 @@ export class ReferenciaController {
   constructor(private readonly referencias: ReferenciaAbmService) {}
 
   // Lectura: cualquier usuario autenticado.
-  @Get() listar() {
-    return this.referencias.listar();
+  // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
+  // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
+  @Get() listar(
+    @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
+    incluirInactivas?: boolean,
+  ) {
+    return this.referencias.listar(incluirInactivas);
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.referencias.obtener(id);
@@ -51,6 +58,13 @@ export class ReferenciaController {
   @Roles('ADMIN', 'GERENTE')
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.referencias.desactivar(id);
+  }
+
+  // Deshace un desactivar (clic accidental); mismos roles que desactivar.
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
+    return this.referencias.reactivar(id);
   }
 
   @UseGuards(RolesGuard)
