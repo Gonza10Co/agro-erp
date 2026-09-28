@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { MarcasListComponent } from './marcas-list.component';
+import { Material } from '../../../core/api/materiales.api';
 
 describe('MarcasListComponent', () => {
   let http: HttpTestingController;
@@ -144,6 +145,104 @@ describe('MarcasListComponent', () => {
       patch.flush({});
       // Recarga respetando la casilla marcada.
       http.expectOne(listUrl + '?incluirInactivas=true').flush([]);
+    });
+  });
+
+  // ── Materiales propios de la marca (marquilla/malla según la marca, en todas las referencias) ──
+  describe('materiales propios de la marca', () => {
+    const API = 'http://localhost:3001';
+    const MARCA = { id: 5, codigo: 'ABZ', nombre: 'ABRUZZO', tipo: 'MAQUILA', activo: true };
+    const AGRO: Material = { id: 10, codigo: 'MQ-AGRO', nombreCanonico: 'MARQUILLA AGRO', origen: 'COMPRADO', unidad: 'UND' };
+    const ABZ: Material = { id: 11, codigo: 'MQ-ABZ', nombreCanonico: 'MARQUILLA ABRUZZO', origen: 'COMPRADO', unidad: 'UND' };
+    const REGLA = {
+      id: 9,
+      materialObjetivo: { id: 10, codigo: 'MQ-AGRO', nombre: 'MARQUILLA AGRO' },
+      materialNuevo: { id: 11, codigo: 'MQ-ABZ', nombre: 'MARQUILLA ABRUZZO' },
+    };
+    const el = (f: { nativeElement: HTMLElement }) => f.nativeElement as HTMLElement;
+    const boton = (f: { nativeElement: HTMLElement }, texto: string) =>
+      Array.from(el(f).querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.trim() === texto);
+
+    function abrirPanel(reglas: unknown[] = [REGLA]) {
+      const fixture = setup();
+      fixture.detectChanges();
+      http.expectOne(`${API}/catalog/marcas`).flush([MARCA]);
+      http.expectOne(`${API}/catalog/lineas`).flush([]);
+      fixture.detectChanges();
+      boton(fixture, 'Materiales')!.click();
+      http.expectOne(`${API}/catalog/marcas/5/materiales`).flush(reglas);
+      http.expectOne(`${API}/catalog/materiales`).flush([AGRO, ABZ]);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('"Materiales" abre el panel de la marca y lista sus reemplazos', () => {
+      const fixture = abrirPanel();
+      const texto = el(fixture).textContent ?? '';
+      expect(texto).toContain('Materiales propios de ABRUZZO');
+      expect(texto).toContain('en el BOM de cualquier referencia se cambia el material de la izquierda por el de la derecha');
+      expect(texto).toContain('MARQUILLA AGRO');
+      expect(texto).toContain('→');
+      expect(texto).toContain('MARQUILLA ABRUZZO');
+      expect(fixture.componentInstance.materialesActivos().length).toBe(2);
+    });
+
+    it('Agregar sin elegir los dos materiales muestra el error en línea y no llama al backend', () => {
+      const fixture = abrirPanel([]);
+      const cmp = fixture.componentInstance;
+      cmp.elegirObjetivo(AGRO);
+      cmp.agregarMaterial();
+      fixture.detectChanges();
+      http.expectNone((r) => r.method === 'POST');
+      expect(el(fixture).textContent).toContain('Elige el material del BOM base y el de la marca');
+    });
+
+    it('Agregar hace POST con los dos ids y muestra el reemplazo nuevo', () => {
+      const fixture = abrirPanel([]);
+      const cmp = fixture.componentInstance;
+      cmp.elegirObjetivo(AGRO);
+      cmp.elegirNuevo(ABZ);
+      cmp.agregarMaterial();
+      const post = http.expectOne(`${API}/catalog/marcas/5/materiales`);
+      expect(post.request.method).toBe('POST');
+      expect(post.request.body).toEqual({ materialObjetivoId: 10, materialNuevoId: 11 });
+      post.flush(REGLA);
+      fixture.detectChanges();
+      expect(cmp.materialesMarca()).toEqual([REGLA]);
+      expect(el(fixture).textContent).toContain('MARQUILLA ABRUZZO');
+      // El formulario queda limpio para el siguiente reemplazo.
+      expect(cmp.objetivo()).toBeNull();
+      expect(cmp.nuevo()).toBeNull();
+    });
+
+    it('el rechazo del backend (duplicado) se muestra en línea', () => {
+      const fixture = abrirPanel([REGLA]);
+      const cmp = fixture.componentInstance;
+      cmp.elegirObjetivo(AGRO);
+      cmp.elegirNuevo(ABZ);
+      cmp.agregarMaterial();
+      http.expectOne(`${API}/catalog/marcas/5/materiales`).flush(
+        { message: 'MARQUILLA AGRO ya se reemplaza por MARQUILLA ABRUZZO en esta marca; quita ese reemplazo primero' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+      fixture.detectChanges();
+      expect(el(fixture).textContent).toContain('ya se reemplaza por MARQUILLA ABRUZZO');
+      expect(cmp.materialesMarca().length).toBe(1);
+    });
+
+    it('Quitar pide confirmación en línea y solo "Sí, quitar" hace el DELETE', () => {
+      const fixture = abrirPanel([REGLA]);
+      boton(fixture, 'Quitar')!.click();
+      fixture.detectChanges();
+      http.expectNone((r) => r.method === 'DELETE');
+      expect(el(fixture).textContent).toContain('¿Quitar este reemplazo?');
+      boton(fixture, 'Sí, quitar')!.click();
+      const del = http.expectOne(`${API}/catalog/marcas/5/materiales/9`);
+      expect(del.request.method).toBe('DELETE');
+      del.flush({ id: 9 });
+      fixture.detectChanges();
+      expect(fixture.componentInstance.materialesMarca()).toEqual([]);
+      expect(el(fixture).textContent).toContain('Esta marca todavía no tiene materiales propios');
     });
   });
 });

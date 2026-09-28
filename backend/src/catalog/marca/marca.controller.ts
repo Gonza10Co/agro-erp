@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseBoolPipe,
@@ -16,6 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { MarcaService } from './marca.service';
 import { CrearMarcaDto } from './dto/crear-marca.dto';
 import { ActualizarMarcaDto } from './dto/actualizar-marca.dto';
+import { MaterialMarcaDto } from './dto/material-marca.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('catalog/marcas')
@@ -62,5 +64,28 @@ export class MarcaController {
   @Roles('ADMIN', 'GERENTE')
   @Patch(':id/reactivar') reactivar(@Param('id', ParseIntPipe) id: number) {
     return this.marcas.reactivar(id);
+  }
+
+  // Materiales propios de la marca (reemplazos que aplican a todas las referencias).
+  @Get(':id/materiales') listarMateriales(@Param('id', ParseIntPipe) id: number) {
+    return this.marcas.listarMateriales(id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Post(':id/materiales') agregarMaterial(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: MaterialMarcaDto,
+  ) {
+    return this.marcas.agregarMaterial(id, dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  @Delete(':id/materiales/:reglaId') quitarMaterial(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('reglaId', ParseIntPipe) reglaId: number,
+  ) {
+    return this.marcas.quitarMaterial(id, reglaId);
   }
 }

@@ -309,8 +309,11 @@ model Marca {
 
 model ReglaOverride {
   id                 Int            @id @default(autoincrement())
-  referenciaId       Int
-  referencia         Referencia     @relation(fields: [referenciaId], references: [id])
+  // NULL = regla GLOBAL de marca ("materiales propios de la marca"): aplica a TODAS las
+  // referencias cuando el pedido lleva esa marca. Exige marcaId. Una regla de la misma
+  // marca ESPECÍFICA de la referencia gana sobre la global para el mismo material objetivo.
+  referenciaId       Int?
+  referencia         Referencia?    @relation(fields: [referenciaId], references: [id])
   opcionId           Int?
   opcion             Opcion?        @relation(fields: [opcionId], references: [id])
   marcaId            Int?
@@ -332,6 +335,7 @@ model ReglaOverride {
 
   @@index([referenciaId])
   @@index([materialObjetivoId])
+  @@index([marcaId])
 }
 
 model ReglaOverrideTalla {
