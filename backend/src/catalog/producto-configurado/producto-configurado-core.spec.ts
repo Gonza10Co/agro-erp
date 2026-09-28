@@ -1,4 +1,4 @@
-import { armarProducto, ConfiguracionInvalida, ReferenciaConfigData } from './producto-configurado-core';
+import { armarProducto, ConfiguracionInvalida, esViolacionUnica, ReferenciaConfigData } from './producto-configurado-core';
 
 const CONFIG: ReferenciaConfigData = {
   referencia: { id: 1, codigo: '101', nombreInterno: 'PODEROSA base' },
@@ -42,5 +42,14 @@ describe('armarProducto', () => {
   it('acepta omitir un eje no obligatorio', () => {
     const p = armarProducto(CONFIG, { marcaId: 5, opcionIds: [100] });
     expect(p.codigo).toBe('101-PODEROSA-CAFE');
+  });
+});
+
+describe('esViolacionUnica', () => {
+  it('reconoce el P2002 de Prisma y nada más', () => {
+    expect(esViolacionUnica({ code: 'P2002' })).toBe(true);
+    expect(esViolacionUnica({ code: 'P2025' })).toBe(false);
+    expect(esViolacionUnica(new Error('x'))).toBe(false);
+    expect(esViolacionUnica(null)).toBe(false);
   });
 });

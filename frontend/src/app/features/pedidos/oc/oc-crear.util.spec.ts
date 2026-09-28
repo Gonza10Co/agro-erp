@@ -1,4 +1,4 @@
-import { tallasDeProducto, construirDto, destinoAlEditar, LineaWizard } from './oc-crear.util';
+import { tallasDeProducto, construirDto, destinoAlEditar, seleccionInicialEjes, LineaWizard } from './oc-crear.util';
 import { Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 
@@ -100,5 +100,17 @@ describe('destinoAlEditar', () => {
     expect(
       destinoAlEditar({ sedeEntregaIdActual: 9, direccionOriginal: 'Cra 5', direccionEditada: '  ' }),
     ).toEqual({ sedeEntregaId: undefined, direccionDespacho: undefined });
+  });
+});
+
+describe('seleccionInicialEjes', () => {
+  it('preselecciona los ejes de una sola opción y deja vacíos los demás', () => {
+    const sel = seleccionInicialEjes([
+      { grupo: { id: 1, codigo: 'PUNTERA', nombre: 'Puntera', obligatorio: true },
+        opciones: [{ id: 10, codigo: 'CP', nombre: 'Con puntera' }, { id: 11, codigo: 'SP', nombre: 'Sin puntera' }] },
+      { grupo: { id: 2, codigo: 'VERSION', nombre: 'Versión', obligatorio: true },
+        opciones: [{ id: 20, codigo: 'EST', nombre: 'Estándar' }] },
+    ]);
+    expect([...sel.entries()]).toEqual([[1, null], [2, 20]]);
   });
 });

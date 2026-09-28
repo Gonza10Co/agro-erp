@@ -9,10 +9,11 @@ import { LineasApi, Linea } from '../../../core/api/lineas.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.models';
-import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
+import { MarcaOpt, ProductoConfiguradoFull, ReferenciaConfig, ReferenciaListItem } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
 import { TallaGridComponent } from '../../../shared/ui/talla-grid/talla-grid.component';
-import { LineaWizard, tallasDeProducto, construirDto } from './oc-crear.util';
+import { LineaWizard, tallasDeProducto, construirDto, seleccionInicialEjes } from './oc-crear.util';
+import { obligatoriosFaltantes, opcionIdsSel } from '../../catalog/configurador/configurador.util';
 import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
 
 @Component({
@@ -83,6 +84,44 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
         <!-- PASO 1: PRODUCTOS -->
         @if (paso() === 1) {
           <div class="panel-title">Productos</div>
+          <!-- Armar producto: cualquier referencia se vende con cualquier marca (~110), así que
+               el producto se arma acá y el backend lo obtiene o lo crea. La línea de producción
+               del paso 0 NO filtra marcas ni referencias. -->
+          <div class="armar">
+            <div class="armar-title">Armar producto</div>
+            <label class="label">Referencia <span style="color:var(--accent)">*</span></label>
+            <app-buscador-select [items]="referencias()" [etiqueta]="etiquetaRef" [sub]="subRef"
+              placeholder="Buscar referencia…" (seleccionar)="elegirReferencia($event)" />
+            @if (configRef(); as c) {
+              <label class="label" style="margin-top:var(--sp-3)">Marca <span style="color:var(--accent)">*</span></label>
+              <!-- El @for por referencia (y por cada producto agregado) recrea el buscador
+                   para que no quede escrito el texto de la marca anterior. -->
+              @for (k of [c.referencia.id + '-' + reinicioMarca()]; track k) {
+                <app-buscador-select [items]="c.marcas" [etiqueta]="etiquetaMarca" [sub]="subMarca"
+                  placeholder="Buscar marca…" (seleccionar)="marcaArmar.set($event)" />
+              }
+              @if (marcaArmar(); as m) { <p class="cell-sub" style="margin-top:var(--sp-1)">Marca: <b>{{ m.nombre }}</b></p> }
+              <div class="armar-ejes">
+                @for (e of c.ejes; track e.grupo.id) {
+                  <div>
+                    <label class="label">{{ e.grupo.nombre }} @if (e.grupo.obligatorio) { <span style="color:var(--accent)">*</span> }</label>
+                    <select class="input" [ngModel]="ejesArmar().get(e.grupo.id) ?? null" (ngModelChange)="setEje(e.grupo.id, $event)">
+                      <option [ngValue]="null">— elegir —</option>
+                      @for (o of e.opciones; track o.id) { <option [ngValue]="o.id">{{ o.nombre }}</option> }
+                    </select>
+                  </div>
+                }
+              </div>
+            }
+            <div class="armar-foot">
+              <button class="btn btn-primary btn-sm" type="button" [class.is-loading]="armando()"
+                [disabled]="!puedeArmar() || armando()" (click)="agregarArmado()">Agregar al pedido</button>
+              @if (avisoArmar()) { <span class="cell-sub">{{ avisoArmar() }}</span> }
+            </div>
+            @if (errorArmar()) { <p style="color:var(--error);font-size:var(--text-sm);margin-top:var(--sp-2)">{{ errorArmar() }}</p> }
+          </div>
+
+          <label class="label" style="margin-top:var(--sp-4)">o busca un producto ya creado</label>
           <app-buscador-select [items]="productosDisponibles()" [etiqueta]="nombreProducto" [sub]="codigoProducto"
             placeholder="Buscar producto…" (seleccionar)="agregarProducto($event)" />
           <div style="margin-top:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-2)">
@@ -178,6 +217,10 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
     .kv{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0}
     /* Precio y calidad van juntos: el grado es lo que justifica el precio. */
     .fila-precio{display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-top:var(--sp-3)}
+    .armar{border:var(--bw) solid var(--border);border-radius:var(--r-sm);padding:var(--sp-4);background:var(--surface-sunken)}
+    .armar-title{font-weight:var(--fw-semibold);margin-bottom:var(--sp-3)}
+    .armar-ejes{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--sp-3);margin-top:var(--sp-3)}
+    .armar-foot{display:flex;align-items:center;gap:var(--sp-3);margin-top:var(--sp-4);flex-wrap:wrap}
     .nota-seg{font-size:var(--text-caption);color:var(--warn,#d97706);margin-top:var(--sp-1);max-width:220px}
   `],
 })
@@ -212,6 +255,23 @@ export class OcCrearComponent implements OnInit {
   lineaProdId = signal<number | null>(null);
   lineas = signal<LineaWizard[]>([]);
   paso = signal<0 | 1 | 2 | 3>(0);
+
+  // --- Armar producto (paso 1) ---
+  referencias = signal<ReferenciaListItem[]>([]);
+  refArmar = signal<ReferenciaListItem | null>(null);
+  configRef = signal<ReferenciaConfig | null>(null);
+  marcaArmar = signal<MarcaOpt | null>(null);
+  ejesArmar = signal<Map<number, number | null>>(new Map());
+  // Se incrementa para recrear el buscador de marca (y borrar su texto) tras agregar.
+  reinicioMarca = signal(0);
+  armando = signal(false);
+  avisoArmar = signal('');
+  errorArmar = signal('');
+
+  puedeArmar = computed(() => {
+    const c = this.configRef();
+    return !!c && !!this.marcaArmar() && obligatoriosFaltantes(c.ejes, this.ejesArmar()).length === 0;
+  });
   enviando = signal(false);
   error = signal('');
 
@@ -244,6 +304,10 @@ export class OcCrearComponent implements OnInit {
 
   nombreCliente = (c: Cliente) => c.nombre;
   nitCliente = (c: Cliente) => c.nit;
+  etiquetaRef = (r: ReferenciaListItem) => `${r.codigo} · ${r.nombreInterno}`;
+  subRef = (r: ReferenciaListItem) => r.codigo;
+  etiquetaMarca = (m: MarcaOpt) => m.nombre;
+  subMarca = (m: MarcaOpt) => `código ${m.codigo}`;
   nombreProducto = (p: ProductoConfiguradoFull) => p.nombreComercial;
   codigoProducto = (p: ProductoConfiguradoFull) => p.codigo;
 
@@ -258,6 +322,7 @@ export class OcCrearComponent implements OnInit {
   ngOnInit(): void {
     this.clientesApi.listar().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((c) => this.clientes.set(c));
     this.catalogoApi.listarProductos().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => this.productos.set(p));
+    this.catalogoApi.listarReferencias().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((r) => this.referencias.set(r));
     this.catalogoApi.listarTallas().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((t) => this.tallas.set(t));
     if (this.puedeElegirLinea) {
       this.lineasApi.listar().pipe(takeUntilDestroyed(this.destroyRef))
@@ -278,6 +343,61 @@ export class OcCrearComponent implements OnInit {
     if (this.lineas().some((l) => l.producto.id === p.id)) return;
     this.lineas.update((ls) => [...ls, { producto: p, precio: 0, valores: {} }]);
   }
+  elegirReferencia(r: ReferenciaListItem) {
+    this.refArmar.set(r);
+    this.configRef.set(null);
+    this.limpiarArmado();
+    this.errorArmar.set('');
+    this.catalogoApi.configReferencia(r.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (c) => {
+        // Si el usuario ya cambió de referencia, esta respuesta llegó tarde: se ignora.
+        if (this.refArmar()?.id !== r.id) return;
+        this.configRef.set(c);
+        this.ejesArmar.set(seleccionInicialEjes(c.ejes));
+      },
+      error: (e) => this.errorArmar.set(this.msg(e, 'No se pudo cargar la configuración de la referencia')),
+    });
+  }
+
+  setEje(grupoId: number, opcionId: number | null) {
+    this.ejesArmar.update((m) => new Map(m).set(grupoId, opcionId));
+  }
+
+  agregarArmado() {
+    const ref = this.refArmar();
+    const marca = this.marcaArmar();
+    if (!ref || !marca || !this.puedeArmar() || this.armando()) return;
+    this.armando.set(true);
+    this.avisoArmar.set('');
+    this.errorArmar.set('');
+    this.catalogoApi
+      .obtenerOCrearProducto({ referenciaId: ref.id, marcaId: marca.id, opcionIds: opcionIdsSel(this.ejesArmar()) })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ creado, ...p }) => {
+          this.armando.set(false);
+          if (this.lineas().some((l) => l.producto.id === p.id)) {
+            this.avisoArmar.set(`${p.nombreComercial} ya está en el pedido`);
+          } else {
+            // Al listado local también, para que no reaparezca en "ya creado".
+            if (!this.productos().some((x) => x.id === p.id)) this.productos.update((ps) => [...ps, p]);
+            this.agregarProducto(p);
+            this.avisoArmar.set(`Agregado: ${p.nombreComercial} (${creado ? 'nuevo' : 'ya existía'})`);
+          }
+          // Se deja la referencia elegida para agregar rápido otra marca de la misma.
+          this.limpiarArmado();
+        },
+        error: (e) => { this.armando.set(false); this.errorArmar.set(this.msg(e, 'No se pudo armar el producto')); },
+      });
+  }
+
+  private limpiarArmado() {
+    this.marcaArmar.set(null);
+    const c = this.configRef();
+    this.ejesArmar.set(c ? seleccionInicialEjes(c.ejes) : new Map());
+    this.reinicioMarca.update((n) => n + 1);
+  }
+
   quitarProducto(id: number) { this.lineas.update((ls) => ls.filter((l) => l.producto.id !== id)); }
   setValores(productoId: number, valores: Record<number, number>) {
     this.lineas.update((ls) => ls.map((l) => (l.producto.id === productoId ? { ...l, valores } : l)));
@@ -309,12 +429,12 @@ export class OcCrearComponent implements OnInit {
     const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
-      error: (e) => { this.enviando.set(false); this.error.set(this.msg(e)); },
+      error: (e) => { this.enviando.set(false); this.error.set(this.msg(e, 'No se pudo crear la OC')); },
     });
   }
 
-  private msg(e: any): string {
+  private msg(e: any, porDefecto: string): string {
     const m = e?.error?.message;
-    return Array.isArray(m) ? m.join(' ') : (m ?? 'No se pudo crear la OC');
+    return Array.isArray(m) ? m.join(' ') : (m ?? porDefecto);
   }
 }

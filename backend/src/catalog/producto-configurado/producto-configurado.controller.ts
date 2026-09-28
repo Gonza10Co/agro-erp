@@ -18,6 +18,11 @@ export class ProductoConfiguradoController {
     return this.productos.crear(dto);
   }
 
+  // Armar el producto dentro de la OC: devuelve el existente o lo crea (idempotente).
+  @Post('obtener-o-crear') obtenerOCrear(@Body() dto: CrearProductoDto) {
+    return this.productos.obtenerOCrear(dto);
+  }
+
   @Patch(':id/desactivar') desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.productos.desactivar(id);
   }
