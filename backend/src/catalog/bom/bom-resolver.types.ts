@@ -38,11 +38,25 @@ export interface Override {
   consumoPorTalla: Record<number, number>;
 }
 
+/**
+ * Material que existe uno POR TALLA (familia "PLANTILLA PU": un material por cada talla).
+ * Solo viene cuando el material tiene familia; el resolvedor lo usa para cambiar el
+ * material de la línea por el hermano de la talla que se está resolviendo.
+ */
+export interface FamiliaTallaInfo {
+  familia: string;
+  /** Valor de la talla (38, 40…); null si el material tiene familia pero no talla. */
+  tallaValor: number | null;
+  codigo: string;
+  activo: boolean;
+}
+
 /** Metadato de material para la explosión multinivel. */
 export interface MaterialInfo {
   id: number;
   origen: OrigenMaterial;
   subBom: LineaBase[]; // [] si COMPRADO
+  familiaTalla?: FamiliaTallaInfo;
 }
 
 /** Nodo del árbol resuelto (un material con su consumo ya calculado para la talla). */
@@ -62,5 +76,9 @@ export interface EntradaResolucion {
   lineasBase: LineaBase[];
   overrides: Override[];
   talla: number;
-  materiales: Record<number, MaterialInfo>; // indexado por materialId
+  /**
+   * Indexado por materialId. Incluye también a los hermanos de familia-talla de los
+   * materiales con familia (candidatos para la sustitución por talla).
+   */
+  materiales: Record<number, MaterialInfo>;
 }

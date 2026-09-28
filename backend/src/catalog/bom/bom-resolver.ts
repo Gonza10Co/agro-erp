@@ -6,6 +6,7 @@ import {
   BomResuelto,
   EntradaResolucion,
 } from './bom-resolver.types';
+import { sustituirPorTalla } from './bom-talla-core';
 
 /** Consumo de una línea para una talla concreta, con merma aplicada. */
 export function resolverConsumoTalla(linea: LineaBase, talla: number): number {
@@ -152,7 +153,10 @@ export function explotarMultinivel(
   factor = 1,
   ruta: number[] = [],
 ): NodoResuelto[] {
-  return lineas.map((linea) => {
+  // Materiales por talla (plantillas): se cambia el material por el de la talla pedida.
+  // Va DESPUÉS de los overrides (resolverBom los aplica antes), así una regla que meta
+  // otro material con familia también queda ajustada a la talla. Aplica en todo nivel.
+  return sustituirPorTalla(lineas, talla, materiales).map((linea) => {
     const consumo = resolverConsumoTalla(linea, talla) * factor;
     const info = materiales[linea.materialId];
     const origen = info?.origen ?? 'COMPRADO';

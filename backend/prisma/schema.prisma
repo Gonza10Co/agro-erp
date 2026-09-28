@@ -106,6 +106,11 @@ model Material {
   activo         Boolean           @default(true)
   proveedorId    Int?
   proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
+  // Materiales que existen uno POR TALLA (p. ej. "PLANTILLA PU TALLA 38"): la familia
+  // agrupa a los hermanos y el resolvedor del BOM cambia el material por el de la talla pedida.
+  familiaTalla   String?
+  tallaId        Int?
+  talla          Talla?            @relation(fields: [tallaId], references: [id])
 
   alias             MaterialAlias[]
   bomsPropios       Bom[]                       @relation("BomDeMaterial")
@@ -118,6 +123,8 @@ model Material {
   lineasOcp         OrdenCompraProveedorLinea[]
   lineasDevolucion  DevolucionProveedorLinea[]
   consumosCorte     ConsumoCorteMaterial[]
+
+  @@index([familiaTalla, tallaId])
 }
 
 model MaterialAlias {
@@ -145,6 +152,7 @@ model Talla {
   lineasFactura  FacturaLinea[]
   pares          Par[]
   lineasCorte    OrdenCorteLinea[]
+  materiales     Material[]
 }
 
 model Referencia {

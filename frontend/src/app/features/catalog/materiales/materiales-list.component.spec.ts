@@ -46,6 +46,19 @@ describe('MaterialesListComponent', () => {
     expect(fixture.componentInstance.cargando()).toBe(false);
   });
 
+  it('muestra la familia y la talla de los materiales por talla ("PLANTILLA PU · T38")', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/catalog/materiales').flush([
+      { id: 1, codigo: 'PPLA227', nombreCanonico: 'PLANTILLA PU TALLA 38', origen: 'COMPRADO', unidad: 'PAR', familiaTalla: 'PLANTILLA PU', talla: 38 },
+      { id: 2, codigo: 'M-1', nombreCanonico: 'Cuero', origen: 'COMPRADO', unidad: 'm2', familiaTalla: null, talla: null },
+    ]);
+    fixture.detectChanges();
+    const badges = fixture.nativeElement.querySelectorAll('.familia-talla');
+    expect(badges.length).toBe(1);
+    expect(badges[0].textContent.replace(/\s+/g, ' ').trim()).toBe('PLANTILLA PU · T38');
+  });
+
   it('crear envía POST /catalog/materiales y recarga la lista', () => {
     const fixture = setup();
     fixture.detectChanges();
