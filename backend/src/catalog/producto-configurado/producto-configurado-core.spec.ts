@@ -43,6 +43,24 @@ describe('armarProducto', () => {
     const p = armarProducto(CONFIG, { marcaId: 5, opcionIds: [100] });
     expect(p.codigo).toBe('101-PODEROSA-CAFE');
   });
+
+  it('no repite la referencia cuando la marca ya arranca con su nombre', () => {
+    const cfg: ReferenciaConfigData = {
+      referencia: { id: 1, codigo: '101', nombreInterno: 'PODEROSA' },
+      marcas: [
+        { id: 60, codigo: '60', nombre: 'PODEROSA' },
+        { id: 61, codigo: '61', nombre: 'Poderosa Café' },
+        { id: 62, codigo: '62', nombre: 'PODEROSAS' },
+      ],
+      ejes: [],
+    };
+    expect(armarProducto(cfg, { marcaId: 60, opcionIds: [] }).nombreComercial).toBe('PODEROSA');
+    expect(armarProducto(cfg, { marcaId: 61, opcionIds: [] }).nombreComercial).toBe('Poderosa Café');
+    // Solo palabra completa: "PODEROSAS" no es la referencia repetida.
+    expect(armarProducto(cfg, { marcaId: 62, opcionIds: [] }).nombreComercial).toBe(
+      'PODEROSA · PODEROSAS',
+    );
+  });
 });
 
 describe('esViolacionUnica', () => {

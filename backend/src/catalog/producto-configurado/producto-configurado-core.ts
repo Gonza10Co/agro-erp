@@ -24,6 +24,16 @@ export interface ProductoArmado {
 
 export class ConfiguracionInvalida extends Error {}
 
+const normalizar = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toUpperCase();
+
+/** ¿`texto` empieza con `prefijo` como palabra completa (sin mirar tildes ni mayúsculas)? */
+function empiezaConPalabra(texto: string, prefijo: string): boolean {
+  const t = normalizar(texto);
+  const p = normalizar(prefijo);
+  return p.length > 0 && (t === p || t.startsWith(p + ' '));
+}
+
 /**
  * Valida la selección contra la configuración de la referencia y arma el código y
  * nombre comercial determinísticos del producto. Reglas:
@@ -80,8 +90,11 @@ export function armarProducto(
   const sufijoOpciones = ordenadas.map((e) => e.opcion.codigo);
 
   const codigo = [config.referencia.codigo, marca.codigo, ...sufijoOpciones].join('-');
+  // Si la marca ya arranca con el nombre de la referencia (101 PODEROSA + marca
+  // PODEROSA CAFÉ), repetirlo da "PODEROSA · PODEROSA CAFÉ": basta con la marca.
+  const marcaIncluyeReferencia = empiezaConPalabra(marca.nombre, config.referencia.nombreInterno);
   const nombreComercial = [
-    config.referencia.nombreInterno,
+    ...(marcaIncluyeReferencia ? [] : [config.referencia.nombreInterno]),
     marca.nombre,
     ...ordenadas.map((e) => e.opcion.nombre),
   ].join(' · ');
