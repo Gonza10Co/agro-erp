@@ -10,6 +10,10 @@ export interface ReferenciaAbm {
   activo: boolean;
   /** Piezas que se cortan por par; null = no informado. */
   piezasPorPar?: number | null;
+  tallaMinId?: number;
+  tallaMaxId?: number;
+  tallaMin?: { valor: number };
+  tallaMax?: { valor: number };
   ejes?: unknown[];
   marcas?: unknown[];
 }
@@ -31,7 +35,7 @@ export class ReferenciasAbmApi {
   listar(opts?: { incluirInactivas?: boolean }) { return this.http.get<ReferenciaAbm[]>(this.base, { params: inactivas(opts) }); }
   obtener(id: number) { return this.http.get<ReferenciaAbm>(`${this.base}/${id}`); }
   crear(dto: CrearReferenciaDto) { return this.http.post<ReferenciaAbm>(this.base, dto); }
-  actualizar(id: number, dto: Partial<CrearReferenciaDto>) { return this.http.patch<ReferenciaAbm>(`${this.base}/${id}`, dto); }
+  actualizar(id: number, dto: Partial<Omit<CrearReferenciaDto, 'codigo'>>) { return this.http.patch<ReferenciaAbm>(`${this.base}/${id}`, dto); }
   desactivar(id: number) { return this.http.patch<ReferenciaAbm>(`${this.base}/${id}/desactivar`, {}); }
   reactivar(id: number) { return this.http.patch<ReferenciaAbm>(`${this.base}/${id}/reactivar`, {}); }
 }

@@ -172,4 +172,43 @@ describe('ReferenciasListComponent', () => {
       http.expectOne(listUrl + '?incluirInactivas=true').flush([]);
     });
   });
+
+  it('editar abre el cajón con los datos y guarda con PATCH (la 102 arranca en 33)', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    const ref = { id: 3, codigo: '102', nombreInterno: 'ALPACA', activo: true, piezasPorPar: 24,
+      tallaMinId: 11, tallaMaxId: 9, tallaMin: { valor: 34 }, tallaMax: { valor: 46 } };
+    http.expectOne(refsUrl).flush([ref]);
+    http.expectOne(tallasUrl).flush([{ id: 10, valor: 33, orden: 0 }, { id: 11, valor: 34, orden: 1 }, { id: 9, valor: 46, orden: 13 }]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('34 a 46');
+
+    const cmp = fixture.componentInstance;
+    cmp.editar(ref);
+    expect(cmp.drawerAbierto()).toBe(true);
+    expect(cmp.codigo).toBe('102');
+    cmp.tallaMinId = 10;
+    cmp.guardar();
+
+    const req = http.expectOne(`${refsUrl}/3`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ nombreInterno: 'ALPACA', tallaMinId: 10, tallaMaxId: 9, piezasPorPar: 24 });
+    req.flush({ id: 3 });
+    http.expectOne(refsUrl).flush([]);
+    expect(cmp.drawerAbierto()).toBe(false);
+    expect(cmp.editandoId()).toBeNull();
+  });
+
+  it('después de editar, "Nueva referencia" abre el cajón vacío', () => {
+    const fixture = setup();
+    fixture.detectChanges();
+    http.expectOne(refsUrl).flush([]);
+    http.expectOne(tallasUrl).flush([]);
+    const cmp = fixture.componentInstance;
+    cmp.editar({ id: 3, codigo: '102', nombreInterno: 'ALPACA', activo: true, tallaMinId: 11, tallaMaxId: 9 });
+    cmp.cerrar();
+    cmp.abrir();
+    expect(cmp.codigo).toBe('');
+    expect(cmp.editandoId()).toBeNull();
+  });
 });

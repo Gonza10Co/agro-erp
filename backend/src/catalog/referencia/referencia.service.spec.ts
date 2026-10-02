@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ReferenciaAbmService } from './referencia.service';
 
 describe('ReferenciaAbmService', () => {
@@ -9,6 +9,7 @@ describe('ReferenciaAbmService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    talla: { findMany: jest.fn() },
     referenciaMarca: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -25,6 +26,7 @@ describe('ReferenciaAbmService', () => {
 
   it('crea una referencia con los datos provistos', async () => {
     prisma.referencia.findUnique.mockResolvedValue(null);
+    prisma.talla.findMany.mockResolvedValue([{ id: 1, valor: 34 }, { id: 9, valor: 46 }]);
     prisma.referencia.create.mockResolvedValue({ id: 1, codigo: 'REF1' });
     const r = await service.crear({
       codigo: 'REF1',
@@ -68,6 +70,26 @@ describe('ReferenciaAbmService', () => {
       },
     });
     expect(r).toMatchObject({ id: 1, nombreInterno: 'Nuevo' });
+  });
+
+  it('cambia el rango de tallas (102 arranca en 33) validando contra la talla que no cambia', async () => {
+    prisma.referencia.findUnique.mockResolvedValue({ id: 3, tallaMinId: 11, tallaMaxId: 9 });
+    prisma.talla.findMany.mockResolvedValue([{ id: 10, valor: 33 }, { id: 9, valor: 46 }]);
+    prisma.referencia.update.mockResolvedValue({ id: 3 });
+    await service.actualizar(3, { tallaMinId: 10 });
+    expect(prisma.talla.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: [10, 9] } } }),
+    );
+    expect(prisma.referencia.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tallaMinId: 10 }) }),
+    );
+  });
+
+  it('rechaza una talla mínima mayor que la máxima', async () => {
+    prisma.referencia.findUnique.mockResolvedValue({ id: 3, tallaMinId: 11, tallaMaxId: 9 });
+    prisma.talla.findMany.mockResolvedValue([{ id: 15, valor: 47 }, { id: 9, valor: 46 }]);
+    await expect(service.actualizar(3, { tallaMinId: 15 })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.referencia.update).not.toHaveBeenCalled();
   });
 
   it('lanza NotFound al actualizar una referencia inexistente', async () => {

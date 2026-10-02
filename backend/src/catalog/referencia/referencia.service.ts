@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -21,6 +22,7 @@ export class ReferenciaAbmService {
       throw new ConflictException(
         `Ya existe una referencia con código ${dto.codigo}`,
       );
+    await this.validarRango(dto.tallaMinId, dto.tallaMaxId);
     return this.prisma.referencia.create({
       data: {
         codigo: dto.codigo,
@@ -37,7 +39,12 @@ export class ReferenciaAbmService {
     return this.prisma.referencia.findMany({
       where: incluirInactivas ? {} : { activo: true },
       orderBy: { codigo: 'asc' },
-      select: { id: true, codigo: true, nombreInterno: true, activo: true, piezasPorPar: true },
+      select: {
+        id: true, codigo: true, nombreInterno: true, activo: true, piezasPorPar: true,
+        tallaMinId: true, tallaMaxId: true,
+        tallaMin: { select: { valor: true } },
+        tallaMax: { select: { valor: true } },
+      },
     });
   }
 
@@ -54,6 +61,11 @@ export class ReferenciaAbmService {
   async actualizar(id: number, dto: ActualizarReferenciaDto) {
     const existe = await this.prisma.referencia.findUnique({ where: { id } });
     if (!existe) throw new NotFoundException(`No existe la referencia ${id}`);
+    if (dto.tallaMinId != null || dto.tallaMaxId != null)
+      await this.validarRango(
+        dto.tallaMinId ?? existe.tallaMinId,
+        dto.tallaMaxId ?? existe.tallaMaxId,
+      );
     return this.prisma.referencia.update({
       where: { id },
       data: {
@@ -154,5 +166,20 @@ export class ReferenciaAbmService {
     return this.prisma.referenciaEje.delete({
       where: { id: referenciaEjeId },
     });
+  }
+
+  /** La talla mínima no puede quedar por encima de la máxima (p. ej. 46 → 34). */
+  private async validarRango(tallaMinId: number, tallaMaxId: number) {
+    const tallas = await this.prisma.talla.findMany({
+      where: { id: { in: [tallaMinId, tallaMaxId] } },
+      select: { id: true, valor: true },
+    });
+    const min = tallas.find((t) => t.id === tallaMinId);
+    const max = tallas.find((t) => t.id === tallaMaxId);
+    if (!min || !max) throw new BadRequestException('La talla no existe');
+    if (min.valor > max.valor)
+      throw new BadRequestException(
+        `La talla mínima (${min.valor}) no puede ser mayor que la máxima (${max.valor})`,
+      );
   }
 }

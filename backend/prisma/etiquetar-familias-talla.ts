@@ -66,6 +66,8 @@ async function main() {
         data: { familiaTalla: e.familiaTalla, tallaId: e.tallaId },
       }),
     ),
+    // Contra Railway por internet, 66 updates pasan de los 5 s por defecto (P2028).
+    { timeout: 120_000 },
   );
   console.log(`\n✔ Listo: ${plan.etiquetar.length} materiales etiquetados en una transacción.`);
 }
