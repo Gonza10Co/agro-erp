@@ -41,12 +41,13 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
         <div class="card">
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Código</th><th>Nombre interno</th><th class="num">Piezas/par</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Código</th><th>Nombre interno</th><th>Tallas</th><th class="num">Piezas/par</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (r of referencias(); track r.id) {
                   <tr [class.is-inactive]="!r.activo">
                     <td class="cell-mono">{{ r.codigo }}</td>
                     <td>{{ r.nombreInterno }}</td>
+                    <td class="cell-mono">{{ r.tallaMin && r.tallaMax ? r.tallaMin.valor + ' a ' + r.tallaMax.valor : '—' }}</td>
                     <td class="num cell-mono">{{ r.piezasPorPar ?? '—' }}</td>
                     <td>
                       @if (r.activo) {
@@ -56,6 +57,7 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
                       }
                     </td>
                     <td class="cell-actions">
+                      <button class="btn btn-ghost btn-sm" type="button" (click)="editar(r)">Editar</button>
                       @if (r.activo) {
                         <app-confirmar-accion
                           [abierto]="confirmandoId() === r.id"
@@ -76,11 +78,12 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
       }
     </div>
 
-    <app-drawer [open]="drawerAbierto()" title="Nueva referencia" (closed)="cerrar()">
+    <app-drawer [open]="drawerAbierto()" [title]="editandoId() ? 'Editar referencia' : 'Nueva referencia'" (closed)="cerrar()">
       <form (ngSubmit)="guardar()">
         <div class="field">
           <label class="label" for="codigo">Código <span class="req">*</span></label>
-          <input class="input" id="codigo" name="codigo" [(ngModel)]="codigo" autocomplete="off" />
+          <input class="input" id="codigo" name="codigo" [(ngModel)]="codigo" autocomplete="off" [disabled]="!!editandoId()" />
+          @if (editandoId()) { <small class="hint">El código no se cambia: lo usan los pedidos y los códigos de par.</small> }
         </div>
         <div class="field">
           <label class="label" for="nombreInterno">Nombre interno <span class="req">*</span></label>
@@ -110,7 +113,7 @@ import { ConfirmarAccionComponent } from '../../../shared/ui/confirmar-accion/co
                  [(ngModel)]="piezasPorPar" placeholder="Del despiece (p. ej. 28)" />
         </div>
         @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin-bottom:var(--sp-3)">{{ error() }}</p> }
-        <button class="btn btn-primary btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">Crear referencia</button>
+        <button class="btn btn-primary btn-block" type="submit" [class.is-loading]="loading()" [disabled]="loading()">{{ editandoId() ? 'Guardar cambios' : 'Crear referencia' }}</button>
       </form>
     </app-drawer>
   `,
@@ -127,6 +130,8 @@ export class ReferenciasListComponent {
   mostrarInactivas = signal(false);
   /** Fila que está pidiendo "¿Desactivar…?" (una a la vez). */
   confirmandoId = signal<number | null>(null);
+  /** Referencia abierta en el cajón para editar; null = alta nueva. */
+  editandoId = signal<number | null>(null);
 
   codigo = '';
   nombreInterno = '';
@@ -149,8 +154,19 @@ export class ReferenciasListComponent {
     });
   }
 
-  abrir(): void { this.drawerAbierto.set(true); }
-  cerrar(): void { this.drawerAbierto.set(false); }
+  abrir(): void { this.resetForm(); this.drawerAbierto.set(true); }
+  cerrar(): void { this.drawerAbierto.set(false); this.editandoId.set(null); this.error.set(''); }
+
+  editar(r: ReferenciaAbm): void {
+    this.editandoId.set(r.id);
+    this.codigo = r.codigo;
+    this.nombreInterno = r.nombreInterno;
+    this.tallaMinId = r.tallaMinId;
+    this.tallaMaxId = r.tallaMaxId;
+    this.piezasPorPar = r.piezasPorPar ?? undefined;
+    this.error.set('');
+    this.drawerAbierto.set(true);
+  }
 
   guardar(): void {
     if (!this.codigo.trim() || !this.nombreInterno.trim() || this.tallaMinId == null || this.tallaMaxId == null) {
@@ -160,6 +176,19 @@ export class ReferenciasListComponent {
     if (this.loading()) return;
     this.error.set('');
     this.loading.set(true);
+    const id = this.editandoId();
+    if (id) {
+      this.api.actualizar(id, {
+        nombreInterno: this.nombreInterno.trim(),
+        tallaMinId: this.tallaMinId,
+        tallaMaxId: this.tallaMaxId,
+        ...(this.piezasPorPar ? { piezasPorPar: this.piezasPorPar } : {}),
+      }).subscribe({
+        next: () => { this.loading.set(false); this.resetForm(); this.cerrar(); this.cargar(); },
+        error: (e) => { this.loading.set(false); this.error.set(e?.error?.message ?? 'No se pudo guardar la referencia'); },
+      });
+      return;
+    }
     const dto: CrearReferenciaDto = {
       codigo: this.codigo.trim(),
       nombreInterno: this.nombreInterno.trim(),
