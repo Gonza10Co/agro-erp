@@ -18,6 +18,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { FabricacionService } from './fabricacion.service';
 import { AvanzarDto } from './dto/avanzar.dto';
 import { NacerDto } from './dto/nacer.dto';
+import { ReservarEtiquetasDto } from './dto/reservar-etiquetas.dto';
 import { ActivarEstacionDto } from './dto/activar-estacion.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
 
@@ -61,6 +62,21 @@ export class FabricacionController {
   @Post('of/:id/nacer')
   nacer(@Param('id', ParseIntPipe) id: number, @Body() dto: NacerDto) {
     return this.service.nacer(id, dto);
+  }
+
+  /**
+   * Imprimir por adelantado: reserva los códigos de la lengua sin que nazca el par
+   * (nace en su primer pistolazo en Preparación).
+   */
+  @Post('of/:id/reservar-etiquetas')
+  reservarEtiquetas(@Param('id', ParseIntPipe) id: number, @Body() dto: ReservarEtiquetasDto) {
+    return this.service.reservarEtiquetas(id, dto);
+  }
+
+  /** Etiquetas impresas por adelantado que no han nacido (para reimprimirlas). */
+  @Get('of/:id/etiquetas-reservadas')
+  etiquetasReservadas(@Param('id', ParseIntPipe) id: number) {
+    return this.service.etiquetasReservadas(id);
   }
 
   @Post('par/:codigo/avanzar')

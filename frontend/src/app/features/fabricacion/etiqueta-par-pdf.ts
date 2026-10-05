@@ -43,6 +43,20 @@ export function motivoFalloEtiqueta(e: unknown): string {
 /** Una etiqueta de lengua por par, en un solo PDF (una página por etiqueta). */
 export async function descargarEtiquetasLengua(pares: ParNacido[]): Promise<void> {
   if (pares.length === 0) return;
+  const doc = await pdfEtiquetasLengua(pares);
+  doc.save(nombrePdfLenguas(pares));
+}
+
+/** `etiquetas-OF19-T39-32.pdf`: la talla va en el nombre cuando la tanda es de una sola. */
+export function nombrePdfLenguas(pares: ParNacido[]): string {
+  if (pares.length === 1) return `etiqueta-${pares[0].codigo}.pdf`;
+  const tallas = new Set(pares.map((p) => p.talla));
+  const talla = tallas.size === 1 ? `-T${pares[0].talla}` : '';
+  return `etiquetas-OF${pares[0].of}${talla}-${pares.length}.pdf`;
+}
+
+/** Arma el PDF de las lenguas (50×30 mm, una por página) sin bajarlo. */
+export async function pdfEtiquetasLengua(pares: ParNacido[]) {
   const { jsPDF, toDataURL } = await libs();
   const { ancho, alto } = ETIQUETA_LENGUA;
   const doc = new jsPDF({ unit: 'mm', format: [ancho, alto], orientation: 'landscape' });
@@ -76,8 +90,7 @@ export async function descargarEtiquetasLengua(pares: ParNacido[]): Promise<void
     });
   });
 
-  const nombre = pares.length === 1 ? `etiqueta-${pares[0].codigo}.pdf` : `etiquetas-OF${pares[0].of}-${pares.length}.pdf`;
-  doc.save(nombre);
+  return doc;
 }
 
 /**

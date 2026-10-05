@@ -141,18 +141,19 @@ model Talla {
   valor Int @unique
   orden Int
 
-  referenciasMin Referencia[]                @relation("TallaMin")
-  referenciasMax Referencia[]                @relation("TallaMax")
-  lineasTalla    BomLineaTalla[]
-  overridesTalla ReglaOverrideTalla[]
-  ocLineasTalla  OrdenCompraLineaTalla[]
-  opLineasTalla  OrdenProduccionLineaTalla[]
-  inventarioPT   InventarioPT[]
-  lineasDespacho DespachoLinea[]
-  lineasFactura  FacturaLinea[]
-  pares          Par[]
-  lineasCorte    OrdenCorteLinea[]
-  materiales     Material[]
+  referenciasMin      Referencia[]                @relation("TallaMin")
+  referenciasMax      Referencia[]                @relation("TallaMax")
+  lineasTalla         BomLineaTalla[]
+  overridesTalla      ReglaOverrideTalla[]
+  ocLineasTalla       OrdenCompraLineaTalla[]
+  opLineasTalla       OrdenProduccionLineaTalla[]
+  inventarioPT        InventarioPT[]
+  lineasDespacho      DespachoLinea[]
+  lineasFactura       FacturaLinea[]
+  pares               Par[]
+  etiquetasReservadas EtiquetaReservada[]
+  lineasCorte         OrdenCorteLinea[]
+  materiales          Material[]
 }
 
 model Referencia {
@@ -270,21 +271,21 @@ model Opcion {
 // comerciales y define el punto de arranque en el flujo de células: la línea
 // Externa (capellada de Bogotá) entra directo en INYECCION, no en CORTE.
 model Linea {
-  id            Int     @id @default(autoincrement())
-  codigo        String  @unique
-  nombre        String
-  celulaInicial Celula  @default(CORTE)
+  id             Int                @id @default(autoincrement())
+  codigo         String             @unique
+  nombre         String
+  celulaInicial  Celula             @default(CORTE)
   // Sub-paso de guarnición donde NACE el par: el punto de conversión lote→par.
   // NULL = comportamiento histórico (el par entra a guarnición por AREA). Se
   // llena el día que el par deje de nacer en corte; cuál sub-paso exacto es
   // decisión de planta (Amarre vs. Alistamiento), por eso es dato y no código.
   subPasoInicial SubPasoGuarnicion?
-  activo        Boolean @default(true)
+  activo         Boolean            @default(true)
   // Datos de la empresa que emite cotizaciones/proformas a nombre de esta línea.
   // Nullable: una línea sin estos datos no puede emitir proforma (no aparece en el selector).
-  razonSocial   String?
-  nit           String?
-  datosPago     String? // bloque de consignación tal cual se imprime (banco · cuenta · titular)
+  razonSocial    String?
+  nit            String?
+  datosPago      String? // bloque de consignación tal cual se imprime (banco · cuenta · titular)
 
   marcas                Marca[]
   pares                 Par[]
@@ -388,14 +389,15 @@ model ProductoConfigurado {
   marca           Marca      @relation(fields: [marcaId], references: [id])
   activo          Boolean    @default(true)
 
-  opciones       ProductoConfiguradoOpcion[]
-  lineasCorte    OrdenCorteLinea[]
-  lineasOC       OrdenCompraLinea[]
-  lineasOP       OrdenProduccionLinea[]
-  inventarioPT   InventarioPT[]
-  lineasDespacho DespachoLinea[]
-  lineasFactura  FacturaLinea[]
-  pares          Par[]
+  opciones            ProductoConfiguradoOpcion[]
+  lineasCorte         OrdenCorteLinea[]
+  lineasOC            OrdenCompraLinea[]
+  lineasOP            OrdenProduccionLinea[]
+  inventarioPT        InventarioPT[]
+  lineasDespacho      DespachoLinea[]
+  lineasFactura       FacturaLinea[]
+  pares               Par[]
+  etiquetasReservadas EtiquetaReservada[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -1037,9 +1039,10 @@ model OrdenFabricacion {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  pares       Par[]
-  movimientos MovimientoInventario[]
-  lineasCorte OrdenCorteLinea[]
+  pares               Par[]
+  etiquetasReservadas EtiquetaReservada[]
+  movimientos         MovimientoInventario[]
+  lineasCorte         OrdenCorteLinea[]
 
   @@index([opId])
 }
@@ -1081,13 +1084,40 @@ model Par {
   incidencias            IncidenciaCalidad[] @relation("incidencias")
   reposicionDeIncidencia IncidenciaCalidad?  @relation("reposicionDeIncidencia")
 
-  eventos EventoTrazabilidad[]
+  eventos           EventoTrazabilidad[]
+  // La etiqueta impresa por adelantado de la que nació este par (si nació así).
+  etiquetaReservada EtiquetaReservada?
 
   @@index([ofId])
   @@index([celulaActual])
   @@index([ordenCorteId])
   @@index([subPasoActual])
   @@index([lineaId])
+}
+
+// Etiqueta de la lengua impresa POR ADELANTADO (2026-10-05): la planta imprime y
+// corta las etiquetas mientras las botas siguen en corte. El código queda
+// reservado (mismo formato y misma secuencia que el par, así nunca chocan) pero
+// el par todavía NO existe: no cuenta en la TV, el reporte ni el tablero. Nace
+// en el primer pistolazo en la estación de nacimiento (Preparación), con la hora
+// real, y ahí se llena `parId`.
+model EtiquetaReservada {
+  id                    Int                 @id @default(autoincrement())
+  codigo                String              @unique
+  ofId                  Int
+  of                    OrdenFabricacion    @relation(fields: [ofId], references: [id])
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  creadaEn              DateTime            @default(now())
+  // El par que nació de esta etiqueta. NULL mientras siga pendiente.
+  parId                 Int?                @unique
+  par                   Par?                @relation(fields: [parId], references: [id])
+  // Una etiqueta anulada no nace, pero su número queda gastado en la secuencia.
+  anulada               Boolean             @default(false)
+
+  @@index([ofId, productoConfiguradoId, tallaId])
 }
 
 model EventoTrazabilidad {
@@ -1123,13 +1153,13 @@ model EventoTrazabilidad {
 // código: Cierre la pidió JP y Mauricio no la ve necesaria, así que nace apagada.
 // Las 6 filas del piloto se insertan en la migración `piloto_estaciones`.
 model Estacion {
-  codigo           String            @id
+  codigo           String             @id
   nombre           String
-  orden            Int               @unique
+  orden            Int                @unique
   celula           Celula
   subPaso          SubPasoGuarnicion?
   subPasoInyeccion SubPasoInyeccion?
-  activa           Boolean           @default(true)
+  activa           Boolean            @default(true)
 }
 
 model Operario {

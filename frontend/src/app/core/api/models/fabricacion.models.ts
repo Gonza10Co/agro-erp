@@ -46,6 +46,8 @@ export interface ProgramaOfLinea {
   talla: string;
   programado: number;
   nacidos: number;
+  /** Etiquetas impresas por adelantado que todavía no nacen (ocupan cupo, no son pares). */
+  reservados?: number;
   terminados: number;
   /** Avance acumulado por estación (código → cantidad); solo lo trae el tablero por órdenes. */
   porEstacion?: Record<string, number | undefined>;
@@ -281,6 +283,8 @@ export interface AvanceResultado {
     incidencia: { tipoDano: { codigo: string; nombre: string; clase: ClaseDano } } | null;
     /** Solo en una BAJA: el par que nace en Preparación para reponerlo. */
     parReposicion: { codigo: string; celulaActual: Celula } | null;
+    /** El código era una etiqueta impresa por adelantado: el par nació con este pistolazo. */
+    nacio?: boolean;
   };
 }
 
@@ -307,6 +311,11 @@ export interface ParNacido {
   marca: string;
   linea: string;
   of: number;
+}
+
+/** Etiquetas de la lengua impresas por adelantado: el código existe, el par todavía no. */
+export interface EtiquetasReservadas {
+  etiquetas: ParNacido[];
 }
 
 export interface NacerResultado {

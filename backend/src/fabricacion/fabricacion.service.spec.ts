@@ -38,6 +38,8 @@ function makePrisma(overrides: any = {}) {
       update: jest.fn().mockResolvedValue({}),
     },
     eventoTrazabilidad: { count: jest.fn().mockResolvedValue(0) },
+    // Etiquetas impresas por adelantado: por defecto, ningún código está reservado.
+    etiquetaReservada: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(async (cb: any) => cb(tx)),
     ...overrides.root,
   };
@@ -135,11 +137,26 @@ function ofParaNacer(extra: any = {}) {
   };
 }
 
-function makeNacer(of: any = ofParaNacer(), nacidos = 0, seqBase = 0) {
+function makeNacer(of: any = ofParaNacer(), nacidos = 0, seqBase = 0, reservados = 0, reservasSeq = reservados) {
   const { prisma, tx } = makePrisma();
   prisma.ordenFabricacion = { findUnique: jest.fn().mockResolvedValue(of) };
   tx.$queryRaw = jest.fn().mockResolvedValue([]);
   tx.par.count = jest.fn().mockResolvedValueOnce(nacidos).mockResolvedValueOnce(seqBase);
+  // Etiquetas impresas por adelantado: 1º las de la talla (cupo), 2º todas las pendientes (secuencia).
+  tx.etiquetaReservada = {
+    count: jest.fn().mockResolvedValueOnce(reservados).mockResolvedValueOnce(reservasSeq),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    findMany: jest.fn().mockImplementation(async ({ where }: any) =>
+      where.codigo.in.map((codigo: string, i: number) => ({
+        id: 500 + i,
+        codigo,
+        talla: { valor: 40 },
+        productoConfigurado: { codigo: 'BOT-40', nombreComercial: 'Bota Fortia', referencia: { codigo: '107' }, marca: { nombre: 'Fortia', linea: null } },
+      })),
+    ),
+    findUnique: jest.fn(),
+    update: jest.fn().mockResolvedValue({}),
+  };
   tx.par.findMany = jest.fn().mockImplementation(async ({ where }: any) =>
     where.codigo.in.map((codigo: string, i: number) => ({
       id: 100 + i,
@@ -223,6 +240,159 @@ describe('FabricacionService.nacer', () => {
   });
 });
 
+// ─────────────── Imprimir por adelantado: etiquetas reservadas (2026-10-05) ───────────────
+describe('FabricacionService.reservarEtiquetas', () => {
+  const dto = { productoConfiguradoId: 10, tallaId: 1, cantidad: 3 };
+
+  it('reserva los códigos sin que nazca ningún par (no cuenta en la TV)', async () => {
+    const { tx, service } = makeNacer();
+    const res = await service.reservarEtiquetas(1, dto);
+
+    expect(tx.$queryRaw).toHaveBeenCalled(); // misma cerradura que nacer
+    expect(tx.etiquetaReservada.createMany).toHaveBeenCalledWith({
+      data: [
+        { codigo: 'OF5-0001', ofId: 1, productoConfiguradoId: 10, tallaId: 1 },
+        { codigo: 'OF5-0002', ofId: 1, productoConfiguradoId: 10, tallaId: 1 },
+        { codigo: 'OF5-0003', ofId: 1, productoConfiguradoId: 10, tallaId: 1 },
+      ],
+    });
+    // Ni pares, ni eventos de entrada, ni la OF cambia de estado: la TV y el tablero no se enteran.
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+    expect(tx.eventoTrazabilidad.createMany).not.toHaveBeenCalled();
+    expect(tx.ordenFabricacion.update).not.toHaveBeenCalled();
+    // La etiqueta lleva la talla y la línea del pedido.
+    expect(res.etiquetas[0]).toEqual(expect.objectContaining({
+      codigo: 'OF5-0001', talla: '40', referencia: '107', marca: 'Fortia', of: 5,
+    }));
+  });
+
+  it('la secuencia sigue después de los pares Y de las reservas: nunca chocan', async () => {
+    // 7 pares (sin reposiciones) + 4 etiquetas pendientes → la siguiente es la 12.
+    const { tx, service } = makeNacer(ofParaNacer(), 2, 7, 1, 4);
+    await service.reservarEtiquetas(1, { ...dto, cantidad: 1 });
+    expect(tx.etiquetaReservada.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ codigo: 'OF5-0012' })],
+    });
+    // La secuencia cuenta todas las reservas sin par (anuladas incluidas: su número ya se imprimió).
+    expect(tx.etiquetaReservada.count).toHaveBeenCalledWith({ where: { ofId: 1, parId: null } });
+  });
+
+  it('nacer también salta los números reservados', async () => {
+    const { tx, service } = makeNacer(ofParaNacer(), 0, 0, 3, 3);
+    await service.nacer(1, { productoConfiguradoId: 10, tallaId: 1, cantidad: 1, operarioId: 3 });
+    expect(tx.par.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ codigo: 'OF5-0004' })],
+    });
+  });
+
+  it('el tope de la talla cuenta nacidos + reservados pendientes', async () => {
+    // 20 programados: 15 nacidos + 4 impresos → cabe 1.
+    const { tx, service } = makeNacer(ofParaNacer(), 15, 15, 4, 4);
+    await expect(service.reservarEtiquetas(1, { ...dto, cantidad: 2 })).rejects.toMatchObject({
+      message: expect.stringContaining('ya tiene 19 de 20 pares programados (15 nacidos + 4 con etiqueta impresa); caben 1'),
+    });
+    expect(tx.etiquetaReservada.createMany).not.toHaveBeenCalled();
+  });
+
+  it('nacer respeta el cupo que ya ocupan las etiquetas impresas', async () => {
+    const { tx, service } = makeNacer(ofParaNacer(), 0, 0, 20, 20);
+    await expect(
+      service.nacer(1, { productoConfiguradoId: 10, tallaId: 1, cantidad: 1, operarioId: 3 }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+  });
+
+  it('400 si la OF no programa esa talla; 409 si la OF está anulada', async () => {
+    const { service } = makeNacer();
+    await expect(service.reservarEtiquetas(1, { ...dto, tallaId: 2 })).rejects.toBeInstanceOf(BadRequestException);
+    const anulada = makeNacer(ofParaNacer({ estado: 'ANULADA' }));
+    await expect(anulada.service.reservarEtiquetas(1, dto)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('lista las pendientes para reimprimir (sin las nacidas ni las anuladas)', async () => {
+    const { prisma, service } = makeNacer();
+    prisma.ordenFabricacion.findUnique.mockResolvedValue({ consecutivo: 19, op: { linea: { codigo: 'AGRO', nombre: 'Agro' } } });
+    prisma.etiquetaReservada.findMany.mockResolvedValue([
+      { id: 1, codigo: 'OF19-0001', talla: { valor: 39 }, productoConfigurado: { codigo: '101-61-CON_PUNTERA', nombreComercial: 'Bota 101', referencia: { codigo: '101' }, marca: { nombre: 'Agro' } } },
+    ]);
+    const res = await service.etiquetasReservadas(19);
+    expect(prisma.etiquetaReservada.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ofId: 19, parId: null, anulada: false }, orderBy: { codigo: 'asc' } }),
+    );
+    expect(res.etiquetas).toEqual([
+      expect.objectContaining({ codigo: 'OF19-0001', talla: '39', linea: 'Agro', of: 19 }),
+    ]);
+  });
+});
+
+describe('FabricacionService.avanzar: etiqueta impresa por adelantado', () => {
+  const reserva = { id: 77, codigo: 'OF5-0003', ofId: 1, productoConfiguradoId: 10, tallaId: 1, parId: null, anulada: false };
+
+  function makeReserva() {
+    const m = makeNacer();
+    m.prisma.par.findUnique.mockResolvedValue(null);
+    m.prisma.etiquetaReservada.findUnique.mockResolvedValue(reserva);
+    m.tx.etiquetaReservada.findUnique.mockResolvedValue(reserva);
+    m.prisma.eventoTrazabilidad.count.mockResolvedValue(12);
+    return m;
+  }
+
+  it('escaneada en Preparación, el par NACE con ese código y la reserva queda amarrada', async () => {
+    const { tx, service } = makeReserva();
+    const res: any = await service.avanzar('OF5-0003', { operarioId: 3, maquinaId: 4, estacion: 'PREPARACION' });
+
+    expect(tx.par.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ codigo: 'OF5-0003', ofId: 1, tallaId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', lineaId: 3 })],
+    });
+    // El evento de entrada es el del pistolazo: con su operario y máquina (la hora la pone la base).
+    expect(tx.eventoTrazabilidad.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ parId: 100, estacionDestino: 'PREPARACION', operarioId: 3, maquinaId: 4 })],
+    });
+    expect(tx.etiquetaReservada.update).toHaveBeenCalledWith({ where: { id: 77 }, data: { parId: 100 } });
+    expect(tx.ordenFabricacion.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'EN_PROCESO' } }),
+    );
+    expect(res.avance).toEqual(expect.objectContaining({ estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 12, nacio: true }));
+  });
+
+  it('escaneada en otra estación, se rechaza: todavía no ha nacido', async () => {
+    const { tx, service } = makeReserva();
+    await expect(
+      service.avanzar('OF5-0003', { operarioId: 3, estacion: 'BODEGA_CORTE' }),
+    ).rejects.toMatchObject({ message: 'Este código todavía no ha nacido: se escanea primero en Preparación' });
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+  });
+
+  it('sin estación declarada tampoco nace (no se sabe dónde se escaneó)', async () => {
+    const { tx, service } = makeReserva();
+    await expect(service.avanzar('OF5-0003', { operarioId: 3 })).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+  });
+
+  it('si otro pistolazo ya la hizo nacer, 409 sin duplicar el par', async () => {
+    const { tx, service } = makeReserva();
+    tx.etiquetaReservada.findUnique.mockResolvedValue({ ...reserva, parId: 900 });
+    await expect(
+      service.avanzar('OF5-0003', { operarioId: 3, estacion: 'PREPARACION' }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('ya nació') });
+    expect(tx.par.createMany).not.toHaveBeenCalled();
+  });
+
+  it('una etiqueta anulada no nace', async () => {
+    const { prisma, service } = makeReserva();
+    prisma.etiquetaReservada.findUnique.mockResolvedValue({ ...reserva, anulada: true });
+    await expect(
+      service.avanzar('OF5-0003', { operarioId: 3, estacion: 'PREPARACION' }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('anulada') });
+  });
+
+  it('un código que no es par ni reserva sigue siendo 404', async () => {
+    const { prisma, service } = makeReserva();
+    prisma.etiquetaReservada.findUnique.mockResolvedValue(null);
+    await expect(service.avanzar('OF5-9999', { operarioId: 3 })).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
 describe('FabricacionService.activarEstacion', () => {
   it('apaga y prende una estación; PT no se puede apagar', async () => {
     const { prisma } = makePrisma();
@@ -246,6 +416,23 @@ describe('FabricacionService.obtenerOF', () => {
     const select = prisma.ordenFabricacion.findUnique.mock.calls[0][0].include.pares.select;
     expect(select.productoConfigurado).toEqual({ select: { codigo: true, nombreComercial: true } });
     expect(select.linea).toEqual({ select: { codigo: true, nombre: true } });
+  });
+
+  it('el programa cuenta aparte las etiquetas impresas que no han nacido', async () => {
+    const { prisma } = makePrisma({
+      root: { ordenFabricacion: { findUnique: jest.fn().mockResolvedValue({
+        id: 19, pares: [],
+        op: { lineas: [{ productoConfiguradoId: 10, productoConfigurado: {}, tallas: [
+          { tallaId: 1, cantAProducir: 32, talla: { valor: 39 } },
+          { tallaId: 2, cantAProducir: 32, talla: { valor: 40 } },
+        ] }] },
+        etiquetasReservadas: [{ productoConfiguradoId: 10, tallaId: 1 }, { productoConfiguradoId: 10, tallaId: 1 }],
+      }) } },
+    });
+    const res: any = await new FabricacionService(prisma).obtenerOF(19);
+    const include = prisma.ordenFabricacion.findUnique.mock.calls[0][0].include;
+    expect(include.etiquetasReservadas.where).toEqual({ parId: null, anulada: false });
+    expect(res.programa.map((l: any) => [l.talla, l.nacidos, l.reservados])).toEqual([['39', 0, 2], ['40', 0, 0]]);
   });
 
   it('404 si la OF no existe', async () => {
