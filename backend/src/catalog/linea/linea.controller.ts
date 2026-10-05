@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { esRolAcotado } from '../../common/guards/acceso-por-rol';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -24,11 +26,16 @@ export class LineaController {
 
   // Solo activas por defecto (selects, BOM, wizard de OC); `?incluirInactivas=true`
   // es opt-in para la pantalla de maestros, que necesita verlas para reactivarlas.
-  @Get() listar(
+  // Un rol acotado (JEFE_CORTE) solo recibe lo que usa su filtro por línea: nada de
+  // razón social, NIT ni datos de pago.
+  @Get() async listar(
+    @Req() req: any,
     @Query('incluirInactivas', new ParseBoolPipe({ optional: true }))
     incluirInactivas?: boolean,
   ) {
-    return this.lineas.listar(incluirInactivas);
+    const lineas = await this.lineas.listar(incluirInactivas);
+    if (!esRolAcotado(req?.user?.role)) return lineas;
+    return lineas.map(({ id, codigo, nombre, activo }) => ({ id, codigo, nombre, activo }));
   }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.lineas.obtener(id);
