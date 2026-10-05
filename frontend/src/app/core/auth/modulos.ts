@@ -25,6 +25,9 @@ export type Modulo =
   | 'compras'
   | 'inventario'
   | 'fabricacion'
+  // Control de corte (orden de corte del día). Módulo propio desde el 2026-10-05
+  // para poder darle al jefe de corte SOLO esto, sin el resto de fabricación.
+  | 'corte'
   | 'calidad'
   | 'indicadores'
   | 'reportes'
@@ -63,6 +66,10 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
   // Ninguno enlaza hacia módulos que sigan INTERNO, así que no deja botones muertos.
   facturas: 'ENTREGADO',
   fabricacion: 'ENTREGADO',
+  // Las pantallas de corte vivían bajo `fabricacion`; se separaron el 2026-10-05
+  // (rol JEFE_CORTE) con el mismo nivel que ya tenían. El nivel fino sigue en la
+  // sección `programacion-corte`.
+  corte: 'ENTREGADO',
   reportes: 'ENTREGADO',
   // Liberados al cliente el 2026-08-12: el sistema entero queda a la vista. La razón
   // no fue que estuvieran "listos" (lo estaban hace demos), sino que mantenerlos
@@ -197,10 +204,36 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
 const ALCANCE_ROL: Record<string, NivelLiberacion> = {
   CLIENTE: 'ENTREGADO',
   STAGE: 'EN_STAGE',
+  JEFE_CORTE: 'ENTREGADO',
 };
 
 function alcanceRol(rol: string | null | undefined): NivelLiberacion {
   return ALCANCE_ROL[rol ?? ''] ?? 'INTERNO';
+}
+
+/**
+ * Roles ACOTADOS (perfiles de planta): además del nivel, una lista blanca de lo
+ * que pueden abrir. Lo que no esté acá no lo ven, aunque esté ENTREGADO. Los roles
+ * que no aparecen no tienen lista y siguen viendo según su nivel.
+ *
+ * Es el espejo de `backend/src/common/guards/acceso-por-rol.ts`, que es el que de
+ * verdad manda (403 fuera de la lista): si se amplía una, se amplía la otra.
+ */
+interface AccesoRol {
+  modulos: readonly Modulo[];
+  secciones: readonly Seccion[];
+  /** A dónde aterriza el rol (y a dónde lo devuelve el guard). */
+  rutaInicial: string;
+}
+
+const ACCESO_ROL: Record<string, AccesoRol> = {
+  // Jefe de corte (2026-10-05): la orden de corte del día y sus avances. Nada de
+  // precios, cartera, clientes, facturas, compras ni el resto de fabricación.
+  JEFE_CORTE: { modulos: ['corte'], secciones: ['programacion-corte'], rutaInicial: '/corte' },
+};
+
+function accesoRol(rol: string | null | undefined): AccesoRol | undefined {
+  return Object.prototype.hasOwnProperty.call(ACCESO_ROL, rol ?? '') ? ACCESO_ROL[rol as string] : undefined;
 }
 
 /**
@@ -217,16 +250,23 @@ export function puedeVerNivel(rol: string | null | undefined, nivel: NivelLibera
  * nuevas: el nivel vive en NIVEL_SECCION, no regado por los componentes.
  */
 export function puedeVerSeccion(rol: string | null | undefined, seccion: Seccion): boolean {
+  const acceso = accesoRol(rol);
+  if (acceso && !acceso.secciones.includes(seccion)) return false;
   return puedeVerNivel(rol, NIVEL_SECCION[seccion]);
 }
 
 /** ¿El rol puede ver el módulo completo? (menú + guard de ruta). */
 export function puedeVerModulo(rol: string | null | undefined, modulo: Modulo): boolean {
+  const acceso = accesoRol(rol);
+  if (acceso && !acceso.modulos.includes(modulo)) return false;
   return puedeVerNivel(rol, NIVEL_MODULO[modulo]);
 }
 
 /** Ruta de aterrizaje según el rol (a dónde enviar si cae en una ruta no permitida). */
 export function rutaInicial(rol: string | null | undefined): string {
+  // Los roles acotados aterrizan en su única pantalla (JEFE_CORTE → /corte).
+  const acceso = accesoRol(rol);
+  if (acceso) return acceso.rutaInicial;
   // Desde el 2026-08-12 `inicio` es ENTREGADO, así que TODOS aterrizan en el panel.
   // Antes cliente y stage caían en la capa comercial (/pedidos/oc) porque el
   // dashboard enlazaba a módulos que no podían abrir; ya no queda ninguno.

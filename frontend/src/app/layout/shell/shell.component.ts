@@ -4,7 +4,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { filter } from 'rxjs';
 import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.component';
 import { AuthService } from '../../core/auth/auth.service';
-import { Modulo, Seccion, puedeVerModulo, puedeVerSeccion } from '../../core/auth/modulos';
+import { Modulo, Seccion, puedeVerModulo, puedeVerSeccion, rutaInicial } from '../../core/auth/modulos';
 
 const SIDEBAR_KEY = 'agro-sidebar';
 const GRUPOS_KEY = 'agro-nav-grupos';
@@ -35,7 +35,7 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
   template: `
     <aside class="app-sidebar">
       <div class="sidebar-head">
-        <a class="brand" routerLink="/pedidos/oc">
+        <a class="brand" [routerLink]="inicio">
           <!-- Monograma BÁ del cliente (vectorizado de su logo) -->
           <span class="brand-mark"><svg viewBox="0 0 499 355" fill="currentColor"><path fill-rule="evenodd" d="M375 55L305 162L352 229L418 139L418 276L357 279L306 353L496 355L499 59ZM2 54L0 353L48 354L80 306L81 138L181 135L114 198L112 245L202 247L221 274L137 277L85 354L268 354L332 260L268 163L302 107L273 59ZM396 23L398 25L493 25L499 21L499 2L496 0L413 0L405 8Z"/></svg></span>
           <span class="brand-text"><b>BOTAS</b><small>AGROINDUSTRIAL</small></span>
@@ -100,7 +100,7 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
           </div>
         </div>
         }
-        @if (puedeVer('pedidos') || puedeVer('fabricacion')) {
+        @if (puedeVer('pedidos') || puedeVer('fabricacion') || puedeVer('corte')) {
         <div class="nav-group" [class.cerrado]="!abierto('produccion')">
           <button class="nav-group-h nav-group-btn" type="button" (click)="toggleGrupo('produccion')" [attr.aria-expanded]="abierto('produccion')">
             <span>Producción</span>
@@ -113,7 +113,7 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
             <span class="nav-label">Órdenes de producción</span>
           </a>
           }
-          @if (puedeVer('fabricacion') && puedeVerSec('programacion-corte')) {
+          @if (puedeVer('corte') && puedeVerSec('programacion-corte')) {
           <a class="nav-item" routerLink="/corte" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Control de corte">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5L20 18M8 16.5L20 6"/></svg></span>
             <span class="nav-label">Control de corte</span>
@@ -318,9 +318,12 @@ export class ShellComponent {
   readonly usuario = this.auth.usuario();
   readonly iniciales = (this.usuario?.username ?? '?').slice(0, 2).toUpperCase();
   readonly rolLabel =
-    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage' } as Record<string, string>)[
+    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage', JEFE_CORTE: 'Jefe de corte' } as Record<string, string>)[
       this.usuario?.role ?? ''
     ] ?? (this.usuario?.role ?? '');
+
+  /** El logo lleva a la pantalla de aterrizaje del rol (JEFE_CORTE → /corte). */
+  readonly inicio = rutaInicial(this.usuario?.role ?? null);
 
   puedeVer(modulo: Modulo): boolean {
     return puedeVerModulo(this.usuario?.role ?? null, modulo);

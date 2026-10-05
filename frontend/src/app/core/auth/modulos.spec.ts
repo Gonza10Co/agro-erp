@@ -200,3 +200,37 @@ describe('rutaInicial', () => {
     expect(rutaInicial(null)).toBe('/inicio');
   });
 });
+
+describe('rol acotado JEFE_CORTE (lista blanca)', () => {
+  it('solo ve el módulo de corte', () => {
+    expect(puedeVerModulo('JEFE_CORTE', 'corte')).toBeTrue();
+    const otros = [
+      'inicio', 'pedidos', 'clientes', 'proveedores', 'catalogo', 'maestros', 'despachos',
+      'facturas', 'cartera', 'compras', 'inventario', 'fabricacion', 'calidad', 'indicadores',
+      'reportes', 'administracion',
+    ] as const;
+    for (const m of otros) {
+      expect(puedeVerModulo('JEFE_CORTE', m)).withContext(m).toBeFalse();
+    }
+  });
+
+  it('solo ve la sección de programación de corte', () => {
+    expect(puedeVerSeccion('JEFE_CORTE', 'programacion-corte')).toBeTrue();
+    for (const s of Object.keys(NIVEL_SECCION) as Seccion[]) {
+      if (s === 'programacion-corte') continue;
+      expect(puedeVerSeccion('JEFE_CORTE', s)).withContext(s).toBeFalse();
+    }
+  });
+
+  it('aterriza directo en el control de corte', () => {
+    expect(rutaInicial('JEFE_CORTE')).toBe('/corte');
+  });
+
+  it('el módulo corte sigue visible para los demás roles', () => {
+    for (const rol of ['ADMIN', 'GERENTE', 'CLIENTE', 'STAGE', 'CALIDAD', null]) {
+      expect(puedeVerModulo(rol, 'corte')).withContext(String(rol)).toBeTrue();
+      expect(puedeVerSeccion(rol, 'programacion-corte')).withContext(String(rol)).toBeTrue();
+      expect(puedeVerModulo(rol, 'fabricacion')).withContext(String(rol)).toBeTrue();
+    }
+  });
+});

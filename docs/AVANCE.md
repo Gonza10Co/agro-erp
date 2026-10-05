@@ -4,8 +4,16 @@
 > Se actualiza al cierre de cada demo. El **git log** manda sobre el detalle fino
 > (los commits `feat(...)` son el handoff real); este doc es el mapa ejecutivo.
 >
-> Última actualización: **2026-09-11** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
+> Última actualización: **2026-10-05** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
+>
+> **✂️ ROL JEFE_CORTE (2026-10-05), en `develop`, sin desplegar.** Usuario propio para el jefe
+> de corte: ve y opera SOLO el control de corte (`/corte`, aterriza ahí). Front: `corte` pasa a
+> ser módulo propio (antes colgaba de `fabricacion`) y `ACCESO_ROL` en `modulos.ts` es la lista
+> blanca por rol. Back: `JwtAuthGuard` aplica `acceso-por-rol.ts` (deny by default: `auth/*`,
+> `corte/*` y `GET catalog/lineas`; lo demás 403). El detalle de corte dejó de mandar
+> `costoBase`/`costoPromedio` del material. Para prod: `INSERT INTO "Role"(name) VALUES
+> ('JEFE_CORTE') ON CONFLICT (name) DO NOTHING;` y crear el usuario desde Administración.
 >
 > **🩹 CALIDAD EN LA PANTALLA DE PLANTA — construido el 2026-09-11, en `develop`, sección
 > `calidad-en-planta` EN_STAGE.** Plan: `docs/specs/2026-09-11-quincena-calidad-en-planta.md`.

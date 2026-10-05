@@ -108,4 +108,19 @@ describe('moduloGuard', () => {
       }
     });
   });
+
+  describe('rol acotado JEFE_CORTE', () => {
+    it('entra al control de corte', () => {
+      setRol('JEFE_CORTE');
+      expect(correr('corte', 'programacion-corte')).toBeTrue();
+    });
+
+    it('lo devuelve a /corte si teclea otra ruta (fabricación, facturas, inicio)', () => {
+      setRol('JEFE_CORTE');
+      for (const [m, s] of [['fabricacion', undefined], ['fabricacion', 'piloto'], ['facturas', undefined], ['inicio', undefined], ['cartera', undefined]] as const) {
+        const res = correr(m, s) as UrlTree;
+        expect(res.toString()).withContext(`${m}/${s}`).toBe('/corte');
+      }
+    });
+  });
 });
