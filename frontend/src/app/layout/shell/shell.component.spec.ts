@@ -184,4 +184,16 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).classList.contains('sb-collapsed')).toBeTrue();
   });
+
+  it('un JEFE_CORTE solo ve el control de corte en el menú', () => {
+    const payload = btoa(JSON.stringify({ sub: 3, username: 'jefecorte', role: 'JEFE_CORTE' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    const { host } = crear();
+    const items = [...host.querySelectorAll('.nav-item .nav-label')].map((e) => e.textContent?.trim());
+    expect(items).toEqual(['Control de corte']);
+    const areas = [...host.querySelectorAll('.nav-group-btn span')].map((e) => e.textContent?.trim());
+    expect(areas).toEqual(['Producción']);
+    expect(host.textContent).toContain('Jefe de corte');
+    expect(host.querySelector('a.brand')?.getAttribute('href')).toBe('/corte');
+  });
 });

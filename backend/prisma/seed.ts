@@ -31,6 +31,14 @@ async function main() {
     update: {},
     create: { name: 'CALIDAD' },
   });
+  // JEFE_CORTE: el jefe de corte de planta (2026-10-05). Solo ve y opera la orden de
+  // corte del día; el backend lo amarra con lista blanca (common/guards/acceso-por-rol.ts).
+  // SQL equivalente para prod: INSERT INTO "Role"(name) VALUES ('JEFE_CORTE') ON CONFLICT (name) DO NOTHING;
+  await prisma.role.upsert({
+    where: { name: 'JEFE_CORTE' },
+    update: {},
+    create: { name: 'JEFE_CORTE' },
+  });
   const stage = await prisma.role.upsert({
     where: { name: 'STAGE' },
     update: {},
