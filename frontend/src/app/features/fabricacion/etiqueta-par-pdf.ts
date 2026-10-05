@@ -19,8 +19,22 @@ export const ETIQUETA_LENGUA = { ancho: 50, alto: 30 } as const;
 export const STICKER_CAJA = { ancho: 60, alto: 40 } as const;
 
 async function libs() {
-  const [{ jsPDF }, { toDataURL }] = await Promise.all([import('jspdf'), import('qrcode')]);
-  return { jsPDF, toDataURL };
+  const [{ jsPDF }, qr] = await Promise.all([import('jspdf'), import('qrcode')]);
+  return { jsPDF, toDataURL: toDataURLDe(qr) };
+}
+
+type ModuloQr = { toDataURL?: unknown; default?: { toDataURL?: unknown } };
+
+/**
+ * qrcode es CommonJS: en el build de producción su chunk solo exporta `default`
+ * y el `toDataURL` nombrado llega undefined ("r is not a function", 2026-10-05).
+ * En dev y en los tests sí llega nombrado, por eso se aceptan las dos formas.
+ */
+export function toDataURLDe(mod: unknown): (texto: string, opciones?: object) => Promise<string> {
+  const m = mod as ModuloQr;
+  const fn = typeof m.toDataURL === 'function' ? m.toDataURL : m.default?.toDataURL;
+  if (typeof fn !== 'function') throw new Error('no se pudo cargar el generador de QR');
+  return fn as (texto: string, opciones?: object) => Promise<string>;
 }
 
 /**

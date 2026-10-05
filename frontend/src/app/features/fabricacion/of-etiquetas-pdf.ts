@@ -1,3 +1,4 @@
+import { toDataURLDe } from './etiqueta-par-pdf';
 import { OFDetalle } from '../../core/api/models/fabricacion.models';
 import { armarEtiquetas, posicionEtiqueta, GRILLA } from './of-etiquetas.util';
 
@@ -20,11 +21,12 @@ export async function descargarEtiquetasPdf(of: OFDetalle): Promise<void> {
   const etiquetas = armarEtiquetas(of);
   if (etiquetas.length === 0) return; // OF sin pares activos: nada que imprimir
 
-  const [{ jsPDF }, { default: JsBarcode }, { toDataURL }] = await Promise.all([
+  const [{ jsPDF }, { default: JsBarcode }, qr] = await Promise.all([
     import('jspdf'),
     import('jsbarcode'),
     import('qrcode'),
   ]);
+  const toDataURL = toDataURLDe(qr);
   const qrs = await Promise.all(
     etiquetas.map((e) => toDataURL(e.codigo, { margin: 0, width: 240, errorCorrectionLevel: 'M' })),
   );
