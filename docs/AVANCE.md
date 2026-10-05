@@ -7,6 +7,8 @@
 > Última actualización: **2026-10-05** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
+> **🖨️ IMPRIMIR POR ADELANTADO (2026-10-05), en `develop`, sin desplegar.** En `/fabricacion/estacion` (Preparación) se imprimen las lenguas mientras las botas siguen en corte: `POST /fabricacion/of/:id/reservar-etiquetas` reserva el código (tabla `EtiquetaReservada`, misma secuencia que los pares) sin que nazca el par; nace en su primer pistolazo en Preparación (en otra estación se rechaza). Migración `20261005150000_etiqueta_reservada`.
+
 > **✂️ ROL JEFE_CORTE (2026-10-05), en `develop`, sin desplegar.** Usuario propio para el jefe
 > de corte: ve y opera SOLO el control de corte (`/corte`, aterriza ahí). Front: `corte` pasa a
 > ser módulo propio (antes colgaba de `fabricacion`) y `ACCESO_ROL` en `modulos.ts` es la lista

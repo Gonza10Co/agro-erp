@@ -25,6 +25,7 @@ import {
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
 import { NacerDto } from './dto/nacer.dto';
+import { ReservarEtiquetasDto } from './dto/reservar-etiquetas.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
 import {
   consolidarConsumo,
@@ -129,12 +130,12 @@ export class FabricacionService {
   }
 
   /**
-   * Nace una tanda de pares de la OF en su estación inicial (Preparación para
-   * Basarili: se imprime la etiqueta y se pega en la lengua). Devuelve los pares
-   * con lo que va en la etiqueta. Es el primer pistolazo: "de no existir a existir".
+   * Lo que hace falta para que nazca (o se reserve) un par de una OF: la OF viva,
+   * la línea del programa y la talla, la línea de producción y la estación donde
+   * nace. Lo comparten `nacer`, `reservarEtiquetas` y el pistolazo de una etiqueta
+   * impresa por adelantado, para que las tres validen igual.
    */
-  async nacer(ofId: number, dto: NacerDto) {
-    const cantidad = dto.cantidad ?? 1;
+  private async contextoNacimiento(ofId: number, productoConfiguradoId: number, tallaId: number) {
     const of = await this.prisma.ordenFabricacion.findUnique({
       where: { id: ofId },
       include: {
@@ -156,10 +157,10 @@ export class FabricacionService {
       throw new ConflictException(`La OF está ${of.estado.toLowerCase()}: no nacen más pares`);
 
     const linea: any = of.op.lineas.find(
-      (l: any) => l.productoConfiguradoId === dto.productoConfiguradoId,
+      (l: any) => l.productoConfiguradoId === productoConfiguradoId,
     );
     if (!linea) throw new BadRequestException('La OF no fabrica ese producto');
-    const talla: any = linea.tallas.find((t: any) => t.tallaId === dto.tallaId);
+    const talla: any = linea.tallas.find((t: any) => t.tallaId === tallaId);
     if (!talla || talla.cantAProducir <= 0)
       throw new BadRequestException('La OF no programa esa talla');
 
@@ -172,25 +173,125 @@ export class FabricacionService {
     const estaciones = await this.estaciones();
     const nac = estacionNacimiento(celulaInicial, estaciones);
     if (!nac) throw new BadRequestException('No hay ninguna estación activa donde nazca el par');
+    return { of, talla, lineaId, nac };
+  }
+
+  /**
+   * Dentro de la tx (con la OF bloqueada): valida el tope de la talla y devuelve
+   * desde qué número sigue la secuencia. El tope cuenta los nacidos MÁS las
+   * etiquetas reservadas que no han nacido; la secuencia cuenta pares y TODAS las
+   * reservas pendientes (anuladas incluidas: su número ya está impreso), así un
+   * par y una reserva nunca comparten código. Las reposiciones llevan sufijo
+   * (-R1), así que no ocupan número.
+   */
+  private async cupoYSecuencia(
+    tx: Prisma.TransactionClient,
+    ofId: number,
+    productoConfiguradoId: number,
+    tallaId: number,
+    cantidad: number,
+    talla: { cantAProducir: number; talla?: { valor: number } | null },
+  ): Promise<number> {
+    await tx.$queryRaw`SELECT id FROM "OrdenFabricacion" WHERE id = ${ofId} FOR UPDATE`;
+    const [nacidos, reservados, paresSeq, reservasSeq] = await Promise.all([
+      tx.par.count({
+        where: { ofId, productoConfiguradoId, tallaId, reponeAParId: null, estado: { not: 'CANCELADO' } },
+      }),
+      tx.etiquetaReservada.count({
+        where: { ofId, productoConfiguradoId, tallaId, parId: null, anulada: false },
+      }),
+      tx.par.count({ where: { ofId, reponeAParId: null } }),
+      tx.etiquetaReservada.count({ where: { ofId, parId: null } }),
+    ]);
+    const ocupados = nacidos + reservados;
+    if (ocupados + cantidad > talla.cantAProducir) {
+      const detalle = reservados > 0 ? ` (${nacidos} nacidos + ${reservados} con etiqueta impresa)` : '';
+      throw new ConflictException(
+        `La talla ${talla.talla?.valor ?? tallaId} ya tiene ${ocupados} de ${talla.cantAProducir} pares programados${detalle}; caben ${Math.max(talla.cantAProducir - ocupados, 0)}`,
+      );
+    }
+    return paresSeq + reservasSeq;
+  }
+
+  /**
+   * Crea los pares en la estación de nacimiento con su evento de entrada (la TV
+   * lo cuenta) y pone la OF EN_PROCESO. Es el corazón de `nacer` y del nacimiento
+   * de una etiqueta impresa por adelantado: los códigos ya vienen decididos.
+   */
+  private async crearParesNacidos(
+    tx: Prisma.TransactionClient,
+    of: { id: number; estado: string },
+    pares: { codigo: string; productoConfiguradoId: number; tallaId: number; lineaId: number | null }[],
+    nac: EstacionDef,
+    operarioId: number,
+    maquinaId: number | null | undefined,
+  ) {
+    await tx.par.createMany({
+      data: pares.map((p) => ({
+        ofId: of.id,
+        codigo: p.codigo,
+        productoConfiguradoId: p.productoConfiguradoId,
+        tallaId: p.tallaId,
+        celulaActual: nac.celula,
+        subPasoActual: nac.subPaso,
+        subPasoInyeccion: nac.subPasoInyeccion,
+        lineaId: p.lineaId,
+      })),
+    });
+    const nuevos = await tx.par.findMany({
+      where: { codigo: { in: pares.map((p) => p.codigo) } },
+      orderBy: { codigo: 'asc' },
+      select: {
+        id: true,
+        codigo: true,
+        celulaActual: true,
+        estado: true,
+        talla: { select: { valor: true } },
+        productoConfigurado: {
+          select: {
+            codigo: true,
+            nombreComercial: true,
+            referencia: { select: { codigo: true, nombreInterno: true } },
+            marca: { select: { nombre: true } },
+          },
+        },
+        linea: { select: { codigo: true, nombre: true } },
+      },
+    });
+    // El nacimiento es un evento de entrada a la estación inicial: la TV lo cuenta.
+    await tx.eventoTrazabilidad.createMany({
+      data: nuevos.map((n) => ({
+        parId: n.id,
+        celula: nac.celula,
+        subPaso: nac.subPaso,
+        subPasoInyeccion: nac.subPasoInyeccion,
+        estacionDestino: nac.codigo,
+        celulaDestino: nac.celula,
+        operarioId,
+        maquinaId: maquinaId ?? null,
+      })),
+    });
+    if (of.estado === 'ABIERTA')
+      await tx.ordenFabricacion.update({ where: { id: of.id }, data: { estado: 'EN_PROCESO' } });
+    return nuevos;
+  }
+
+  /**
+   * Nace una tanda de pares de la OF en su estación inicial (Preparación para
+   * Basarili: se imprime la etiqueta y se pega en la lengua). Devuelve los pares
+   * con lo que va en la etiqueta. Es el primer pistolazo: "de no existir a existir".
+   */
+  async nacer(ofId: number, dto: NacerDto) {
+    const cantidad = dto.cantidad ?? 1;
+    const { of, talla, lineaId, nac } = await this.contextoNacimiento(
+      ofId,
+      dto.productoConfiguradoId,
+      dto.tallaId,
+    );
 
     const creados = await this.prisma.$transaction(async (tx) => {
       // Dos celulares imprimiendo a la vez sobre la misma OF no se pisan la numeración.
-      await tx.$queryRaw`SELECT id FROM "OrdenFabricacion" WHERE id = ${ofId} FOR UPDATE`;
-      const nacidos = await tx.par.count({
-        where: {
-          ofId,
-          productoConfiguradoId: dto.productoConfiguradoId,
-          tallaId: dto.tallaId,
-          reponeAParId: null,
-          estado: { not: 'CANCELADO' },
-        },
-      });
-      if (nacidos + cantidad > talla.cantAProducir)
-        throw new ConflictException(
-          `La talla ${talla.talla?.valor ?? dto.tallaId} ya tiene ${nacidos} de ${talla.cantAProducir} pares programados; caben ${Math.max(talla.cantAProducir - nacidos, 0)}`,
-        );
-      // Las reposiciones llevan sufijo (-R1), así que no ocupan número de la secuencia.
-      const seqBase = await tx.par.count({ where: { ofId, reponeAParId: null } });
+      const seqBase = await this.cupoYSecuencia(tx, ofId, dto.productoConfiguradoId, dto.tallaId, cantidad, talla);
       const pares = generarPares(
         of.consecutivo,
         [{
@@ -203,69 +304,128 @@ export class FabricacionService {
         }],
         seqBase,
       );
-      await tx.par.createMany({
-        data: pares.map((p) => ({
-          ofId,
-          codigo: p.codigo,
-          productoConfiguradoId: p.productoConfiguradoId,
-          tallaId: p.tallaId,
-          celulaActual: nac.celula,
-          subPasoActual: nac.subPaso,
-          subPasoInyeccion: nac.subPasoInyeccion,
-          lineaId: p.lineaId,
-        })),
-      });
-      const nuevos = await tx.par.findMany({
-        where: { codigo: { in: pares.map((p) => p.codigo) } },
-        orderBy: { codigo: 'asc' },
-        select: {
-          id: true,
-          codigo: true,
-          talla: { select: { valor: true } },
-          productoConfigurado: {
-            select: {
-              codigo: true,
-              nombreComercial: true,
-              referencia: { select: { codigo: true, nombreInterno: true } },
-              marca: { select: { nombre: true } },
-            },
-          },
-          linea: { select: { codigo: true, nombre: true } },
-        },
-      });
-      // El nacimiento es un evento de entrada a la estación inicial: la TV lo cuenta.
-      await tx.eventoTrazabilidad.createMany({
-        data: nuevos.map((n) => ({
-          parId: n.id,
-          celula: nac.celula,
-          subPaso: nac.subPaso,
-          subPasoInyeccion: nac.subPasoInyeccion,
-          estacionDestino: nac.codigo,
-          celulaDestino: nac.celula,
-          operarioId: dto.operarioId,
-          maquinaId: dto.maquinaId ?? null,
-        })),
-      });
-      if (of.estado === 'ABIERTA')
-        await tx.ordenFabricacion.update({ where: { id: ofId }, data: { estado: 'EN_PROCESO' } });
-      return nuevos;
+      return this.crearParesNacidos(tx, of, pares, nac, dto.operarioId, dto.maquinaId);
     });
 
     const hoy = await this.hoyEnEstacion(nac.codigo);
     return {
       estacion: nac,
       hoy,
-      pares: creados.map((n: any) => ({
-        id: n.id,
-        codigo: n.codigo,
-        talla: String(n.talla.valor),
-        producto: n.productoConfigurado?.nombreComercial ?? '',
-        productoCodigo: n.productoConfigurado?.codigo ?? '',
-        referencia: n.productoConfigurado?.referencia?.codigo ?? '',
-        marca: n.productoConfigurado?.marca?.nombre ?? '',
-        linea: n.linea?.nombre ?? '',
-        of: of.consecutivo,
-      })),
+      pares: creados.map((n: any) => datosEtiqueta(n, of.consecutivo)),
+    };
+  }
+
+  /**
+   * Imprimir por adelantado (2026-10-05): la planta imprime y corta las etiquetas
+   * mientras las botas siguen en corte. Se reservan los códigos (misma secuencia
+   * que los pares) pero NO nace nada: ni pares, ni eventos, ni TV. Cada par nace
+   * en el pistolazo de su etiqueta en Preparación.
+   */
+  async reservarEtiquetas(ofId: number, dto: ReservarEtiquetasDto) {
+    const { of, talla } = await this.contextoNacimiento(ofId, dto.productoConfiguradoId, dto.tallaId);
+    const reservas = await this.prisma.$transaction(async (tx) => {
+      const seqBase = await this.cupoYSecuencia(tx, ofId, dto.productoConfiguradoId, dto.tallaId, dto.cantidad, talla);
+      const codigos = generarPares(
+        of.consecutivo,
+        [{ productoConfiguradoId: dto.productoConfiguradoId, tallaId: dto.tallaId, cantAProducir: dto.cantidad }],
+        seqBase,
+      ).map((p) => p.codigo);
+      await tx.etiquetaReservada.createMany({
+        data: codigos.map((codigo) => ({
+          codigo,
+          ofId,
+          productoConfiguradoId: dto.productoConfiguradoId,
+          tallaId: dto.tallaId,
+        })),
+      });
+      return tx.etiquetaReservada.findMany({
+        where: { codigo: { in: codigos } },
+        orderBy: { codigo: 'asc' },
+        select: SELECT_ETIQUETA_RESERVADA,
+      });
+    });
+    return { etiquetas: reservas.map((r: any) => datosEtiquetaReservada(r, of.consecutivo, of.op)) };
+  }
+
+  /** Las etiquetas impresas por adelantado que no han nacido: para reimprimirlas. */
+  async etiquetasReservadas(ofId: number) {
+    const of = await this.prisma.ordenFabricacion.findUnique({
+      where: { id: ofId },
+      select: { consecutivo: true, op: { select: { linea: { select: { codigo: true, nombre: true } } } } },
+    });
+    if (!of) throw new NotFoundException(`OF ${ofId} no existe`);
+    const reservas = await this.prisma.etiquetaReservada.findMany({
+      where: { ofId, parId: null, anulada: false },
+      orderBy: { codigo: 'asc' },
+      select: SELECT_ETIQUETA_RESERVADA,
+    });
+    return { etiquetas: reservas.map((r: any) => datosEtiquetaReservada(r, of.consecutivo, of.op)) };
+  }
+
+  /**
+   * El pistolazo de una etiqueta impresa por adelantado: si es en la estación de
+   * nacimiento, el par NACE ahora (hora real, operario y máquina del escaneo);
+   * en cualquier otra estación se rechaza, porque el par todavía no existe.
+   */
+  private async nacerDesdeReserva(
+    reserva: { id: number; codigo: string; ofId: number; productoConfiguradoId: number; tallaId: number; parId: number | null; anulada: boolean },
+    dto: AvanzarDto,
+  ) {
+    if (reserva.anulada) throw new ConflictException(`La etiqueta ${reserva.codigo} fue anulada: no se usa`);
+    const { of, lineaId, nac } = await this.contextoNacimiento(
+      reserva.ofId,
+      reserva.productoConfiguradoId,
+      reserva.tallaId,
+    );
+    if (dto.estacion !== nac.codigo)
+      throw new ConflictException(
+        `Este código todavía no ha nacido: se escanea primero en ${nac.nombre}`,
+      );
+    if (dto.tipoDanoId != null)
+      throw new BadRequestException(
+        'Este par apenas va a nacer: escanéalo normal y reporta el daño en la siguiente estación',
+      );
+
+    let par: any;
+    try {
+      par = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "OrdenFabricacion" WHERE id = ${reserva.ofId} FOR UPDATE`;
+        // Dos pistolazos seguidos de la misma etiqueta: el segundo ya la encuentra nacida.
+        const vigente = await tx.etiquetaReservada.findUnique({ where: { id: reserva.id } });
+        if (!vigente || vigente.parId != null || vigente.anulada)
+          throw new ConflictException(`El par ${reserva.codigo} ya nació`);
+        const [nuevo] = await this.crearParesNacidos(
+          tx,
+          of,
+          [{ codigo: reserva.codigo, productoConfiguradoId: reserva.productoConfiguradoId, tallaId: reserva.tallaId, lineaId }],
+          nac,
+          dto.operarioId,
+          dto.maquinaId,
+        );
+        await tx.etiquetaReservada.update({ where: { id: reserva.id }, data: { parId: nuevo.id } });
+        return nuevo;
+      });
+    } catch (e: unknown) {
+      if ((e as { code?: string })?.code === 'P2003')
+        throw new BadRequestException('Operario o máquina inexistente');
+      throw e;
+    }
+    const hoy = await this.hoyEnEstacion(nac.codigo);
+    return {
+      id: par.id,
+      codigo: par.codigo,
+      celulaActual: par.celulaActual,
+      estado: par.estado,
+      avance: {
+        estacion: nac.codigo,
+        nombre: nac.nombre,
+        terminado: false,
+        hoy,
+        calidad: 'PRIMERA' as const,
+        incidencia: null,
+        parReposicion: null,
+        nacio: true,
+      },
     };
   }
 
@@ -286,7 +446,12 @@ export class FabricacionService {
         productoConfigurado: { include: { marca: { include: { linea: true } } } },
       },
     });
-    if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
+    if (!par) {
+      // ¿Es una etiqueta impresa por adelantado? Nace en este pistolazo.
+      const reserva = await this.prisma.etiquetaReservada.findUnique({ where: { codigo } });
+      if (reserva) return this.nacerDesdeReserva(reserva, dto);
+      throw new NotFoundException(`Par ${codigo} no existe`);
+    }
     if (par.estado !== 'EN_PROCESO')
       throw new ConflictException(
         {
@@ -614,6 +779,11 @@ export class FabricacionService {
             productoConfiguradoId: true,
             reponeAParId: true,
           },
+        },
+        // Etiquetas impresas por adelantado que no han nacido: ocupan cupo de la talla.
+        etiquetasReservadas: {
+          where: { parId: null, anulada: false },
+          select: { productoConfiguradoId: true, tallaId: true },
         },
       },
     });
@@ -1254,6 +1424,8 @@ function programaDeOf(
   talla: string;
   programado: number;
   nacidos: number;
+  /** Etiquetas impresas por adelantado que todavía no nacen (no son pares). */
+  reservados: number;
   /** Primeras terminadas: las que completan el pedido. */
   terminados: number;
   /** Segundas terminadas: se venden aparte y su cupo lo completa la reposición. */
@@ -1281,6 +1453,9 @@ function programaDeOf(
         talla: String(t.talla?.valor ?? t.tallaId),
         programado: t.cantAProducir,
         nacidos: originales.filter((p) => p.estado !== 'CANCELADO').length,
+        reservados: ((of.etiquetasReservadas ?? []) as any[]).filter(
+          (r) => r.productoConfiguradoId === l.productoConfiguradoId && r.tallaId === t.tallaId,
+        ).length,
         terminados: suyos.filter((p) => p.estado === 'TERMINADO' && p.calidad !== 'SEGUNDA').length,
         segundas: deLinea(pares, l.productoConfiguradoId, t.tallaId)
           .filter((p) => p.estado === 'TERMINADO' && p.calidad === 'SEGUNDA').length,
@@ -1297,4 +1472,42 @@ function programaDeOf(
     }
   }
   return out;
+}
+
+/** Lo que trae una etiqueta reservada para imprimirse (mismos datos que la del par). */
+const SELECT_ETIQUETA_RESERVADA = {
+  id: true,
+  codigo: true,
+  talla: { select: { valor: true } },
+  productoConfigurado: {
+    select: {
+      codigo: true,
+      nombreComercial: true,
+      referencia: { select: { codigo: true } },
+      marca: { select: { nombre: true, linea: { select: { codigo: true, nombre: true } } } },
+    },
+  },
+} as const;
+
+/** Los datos de la etiqueta de la lengua de un par recién nacido. */
+function datosEtiqueta(n: any, consecutivoOF: number) {
+  return {
+    id: n.id,
+    codigo: n.codigo,
+    talla: String(n.talla.valor),
+    producto: n.productoConfigurado?.nombreComercial ?? '',
+    productoCodigo: n.productoConfigurado?.codigo ?? '',
+    referencia: n.productoConfigurado?.referencia?.codigo ?? '',
+    marca: n.productoConfigurado?.marca?.nombre ?? '',
+    linea: n.linea?.nombre ?? '',
+    of: consecutivoOF,
+  };
+}
+
+/** Igual que la de un par, pero la línea sale del pedido (el par aún no existe). */
+function datosEtiquetaReservada(r: any, consecutivoOF: number, op: any) {
+  return datosEtiqueta(
+    { ...r, linea: op?.linea ?? r.productoConfigurado?.marca?.linea ?? null },
+    consecutivoOF,
+  );
 }

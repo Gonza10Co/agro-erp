@@ -129,6 +129,80 @@ describe('EstacionComponent', () => {
   });
 });
 
+describe('EstacionComponent: imprimir por adelantado', () => {
+  afterEach(() => localStorage.removeItem(CLAVE_CONFIG));
+
+  const L39 = { productoConfiguradoId: 1, producto: 'Bota', productoCodigo: '101-61-CON_PUNTERA', tallaId: 39, talla: '39', programado: 32, nacidos: 0, reservados: 32, terminados: 0 };
+  const L40 = { productoConfiguradoId: 1, producto: 'Bota', productoCodigo: '101-61-CON_PUNTERA', tallaId: 40, talla: '40', programado: 32, nacidos: 2, reservados: 0, terminados: 0 };
+  const etiqueta = (codigo: string, talla = '40') => ({ id: 1, codigo, talla, producto: 'Bota', productoCodigo: 'PC', referencia: '101', marca: 'Agro', linea: 'Agro', of: 19 });
+
+  function enPreparacion() {
+    guardarConfig({ estacion: 'PREPARACION', operarioId: 2 });
+    const m = crear();
+    m.http.expectOne(`${BASE}/operarios?celula=GUARNICION`).flush([{ id: 2, nombre: 'Gloria', celula: 'GUARNICION' }]);
+    m.http.expectOne(`${BASE}/maquinas?celula=GUARNICION`).flush([]);
+    m.http.expectOne(`${BASE}/hoy`).flush({ fecha: '', actualizado: '', estaciones: [] });
+    m.http.expectOne(`${BASE}/of`).flush([{ id: 19, consecutivo: 19, estado: 'ABIERTA', fecha: '', op: { consecutivo: 54 }, _count: { pares: 0 } }]);
+    m.comp.ofId = 19;
+    m.comp.cargarOf();
+    m.http.expectOne(`${BASE}/of/19`).flush({ id: 19, consecutivo: 19, estado: 'ABIERTA', fecha: '', op: { consecutivo: 54 }, pares: [], programa: [L39, L40] });
+    m.fixture.detectChanges();
+    return m;
+  }
+
+  it('prellena la primera talla con cupo y todo lo que le falta; la impresa no cuenta como nacida', () => {
+    const { fixture, http, comp } = enPreparacion();
+    // La 39 ya está toda impresa: se salta y se ofrece la 40 con sus 30 pendientes.
+    expect(comp.adelantoClave).toBe('1-40');
+    expect(comp.adelantoCantidad).toBe(30);
+    expect(comp.libres(L39)).toBe(0);
+    expect(comp.reservadosOf()).toBe(32);
+    const texto = (fixture.nativeElement as HTMLElement).textContent!;
+    expect(texto).toContain('32 impresas sin nacer');
+    expect(texto).toContain('Imprimir por adelantado 🖨️');
+    expect(texto).toContain('Reimprimir las 32 impresas sin nacer');
+    http.verify();
+  });
+
+  it('Imprimir por adelantado reserva los códigos (no nace nada) y baja el PDF', () => {
+    const { fixture, http, comp } = enPreparacion();
+    comp.adelantoCantidad = 2;
+    comp.imprimirAdelantado(comp.of()!);
+    const req = http.expectOne(`${BASE}/of/19/reservar-etiquetas`);
+    expect(req.request.body).toEqual({ productoConfiguradoId: 1, tallaId: 40, cantidad: 2 });
+    req.flush({ etiquetas: [etiqueta('OF19-0033'), etiqueta('OF19-0034')] });
+    http.expectOne(`${BASE}/of/19`).flush({ id: 19, consecutivo: 19, estado: 'ABIERTA', fecha: '', op: { consecutivo: 54 }, pares: [], programa: [L39, { ...L40, reservados: 2 }] });
+    fixture.detectChanges();
+    expect(comp.hoy()).toBe(0); // la TV y el contador no se enteran
+    expect(comp.resultado()).toEqual(jasmine.objectContaining({ ok: true, titulo: '2 etiquetas de talla 40 impresas por adelantado' }));
+    expect(comp.resultado()?.tanda?.map((p) => p.codigo)).toEqual(['OF19-0033', 'OF19-0034']);
+    expect(comp.adelantoCantidad).toBe(28);
+    http.verify();
+  });
+
+  it('reimprime las pendientes de la OF', () => {
+    const { http, comp } = enPreparacion();
+    comp.reimprimirReservadas(comp.of()!);
+    http.expectOne(`${BASE}/of/19/etiquetas-reservadas`).flush({ etiquetas: [etiqueta('OF19-0001', '39')] });
+    expect(comp.resultado()?.tanda?.map((p) => p.codigo)).toEqual(['OF19-0001']);
+    http.verify();
+  });
+
+  it('escanear una impresa en Preparación la hace nacer y recarga la OF', () => {
+    const { fixture, http, comp } = enPreparacion();
+    comp.codigo = 'OF19-0001';
+    comp.escanear();
+    const req = http.expectOne(`${BASE}/par/OF19-0001/avanzar`);
+    expect(req.request.body).toEqual({ operarioId: 2, estacion: 'PREPARACION' });
+    req.flush({ id: 9, codigo: 'OF19-0001', celulaActual: 'GUARNICION', estado: 'EN_PROCESO', avance: { estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 1, calidad: 'PRIMERA', incidencia: null, parReposicion: null, nacio: true } });
+    http.expectOne(`${BASE}/of/19`).flush({ id: 19, consecutivo: 19, estado: 'EN_PROCESO', fecha: '', op: { consecutivo: 54 }, pares: [], programa: [{ ...L39, nacidos: 1, reservados: 31 }, L40] });
+    fixture.detectChanges();
+    expect(comp.hoy()).toBe(1);
+    expect(comp.resultado()).toEqual(jasmine.objectContaining({ ok: true, titulo: 'OF19-0001 nació en Preparación ✓' }));
+    http.verify();
+  });
+});
+
 /**
  * "Algo pasó con este par": el botón arma el SIGUIENTE escaneo con un daño
  * tipificado; la clase decide el destino y la pantalla lo muestra en ámbar.

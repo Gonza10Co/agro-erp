@@ -66,8 +66,10 @@ export function guardarConfig(c: ConfigEstacion | null): void {
  * Pantalla de ESTACIÓN (piloto 2026-09-09): el celular o la tablet está amarrado
  * a UN punto de control. Cero manipulación por pistolazo: estación y operario se
  * fijan una vez por turno, la máquina es opcional, el destino lo decide el
- * sistema. En Preparación no se escanea: ahí NACEN los pares (se imprime la
- * etiqueta de la lengua contra lo programado en la OF).
+ * sistema. En Preparación NACEN los pares (se imprime la etiqueta de la lengua
+ * contra lo programado en la OF). Desde el 2026-10-05 también se puede imprimir
+ * por adelantado (mientras las botas siguen en corte): el código queda reservado
+ * y el par nace cuando su etiqueta se escanea aquí.
  *
  * "Algo pasó con este par" (quincena de calidad, 2026-09-11): un botón secundario
  * arma el SIGUIENTE escaneo con un daño tipificado; la clase del tipo decide el
@@ -146,15 +148,16 @@ export function guardarConfig(c: ConfigEstacion | null): void {
                   <thead><tr><th>Talla</th><th class="num">Nacidos / programados</th><th class="acc">Tanda</th></tr></thead>
                   <tbody>
                     @for (l of g.lineas; track l.tallaId) {
-                      <tr [class.completa]="l.nacidos >= l.programado">
+                      <tr [class.completa]="libres(l) <= 0">
                         <td class="talla">{{ l.talla }}</td>
                         <td class="num"><b>{{ l.nacidos }}</b> / {{ l.programado }}
+                          @if (l.reservados) { <div class="cell-sub impresas">{{ l.reservados }} impresas sin nacer</div> }
                           <div class="barra"><div class="barra-fill" [style.width.%]="pct(l)"></div></div>
                         </td>
                         <td class="acc">
                           <div class="lote">
-                            <input class="tanda" type="number" min="1" [max]="l.programado - l.nacidos" [(ngModel)]="tanda[clave(l)]" [disabled]="l.nacidos >= l.programado" aria-label="Cuántos pares nacen en esta tanda" />
-                            <button class="btn btn-primary btn-nacer" type="button" [disabled]="l.nacidos >= l.programado || naciendo()" (click)="nacer(d, l)">Nacer + etiquetas 🏷️</button>
+                            <input class="tanda" type="number" min="1" [max]="libres(l)" [(ngModel)]="tanda[clave(l)]" [disabled]="libres(l) <= 0" aria-label="Cuántos pares nacen en esta tanda" />
+                            <button class="btn btn-primary btn-nacer" type="button" [disabled]="libres(l) <= 0 || naciendo()" (click)="nacer(d, l)">Nacer + etiquetas 🏷️</button>
                           </div>
                         </td>
                       </tr>
@@ -164,7 +167,44 @@ export function guardarConfig(c: ConfigEstacion | null): void {
               } @empty {
                 <p class="cell-sub">Esta OF no tiene producción programada.</p>
               }
+
+              <!-- ── Imprimir por adelantado: las etiquetas salen mientras las botas siguen en corte ── -->
+              @if (d.programa?.length) {
+                <div class="adelanto" role="group" aria-label="Imprimir por adelantado">
+                  <div class="ph-title">Imprimir por adelantado</div>
+                  <p class="cell-sub">Las etiquetas salen ya, pero el par NO nace: nace cuando se escanea su etiqueta aquí en {{ estacionActual()?.nombre }}.</p>
+                  <div class="adelanto-fila">
+                    <label>Talla
+                      <select [(ngModel)]="adelantoClave" (ngModelChange)="onAdelantoTalla()">
+                        @for (l of d.programa; track clave(l)) {
+                          <option [value]="clave(l)" [disabled]="libres(l) <= 0">{{ l.talla }} · {{ grupos().length > 1 ? l.productoCodigo + ' · ' : '' }}faltan {{ libres(l) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>Cantidad
+                      <input class="tanda" type="number" min="1" [max]="adelantoLinea() ? libres(adelantoLinea()!) : 1" [(ngModel)]="adelantoCantidad" aria-label="Cuántas etiquetas imprimir por adelantado" />
+                    </label>
+                    <button class="btn btn-primary btn-nacer" type="button" [disabled]="!adelantoLinea() || libres(adelantoLinea()!) <= 0 || naciendo()" (click)="imprimirAdelantado(d)">Imprimir por adelantado 🖨️</button>
+                  </div>
+                  @if (reservadosOf() > 0) {
+                    <button class="btn btn-sm" type="button" [disabled]="naciendo()" (click)="reimprimirReservadas(d)">Reimprimir las {{ reservadosOf() }} impresas sin nacer 🏷️</button>
+                  }
+                </div>
+              }
             }
+
+            <!-- ── Las impresas por adelantado nacen con su pistolazo aquí ── -->
+            <div class="scan-fila scan-nacer">
+              <label class="scan-label">Escanear etiqueta impresa por adelantado
+                <input #scan class="scan-input mono" [(ngModel)]="codigo" (keyup.enter)="escanear()" placeholder="OF5-0001" />
+              </label>
+              @if (tieneCamara) {
+                <button class="btn btn-camara" type="button" (click)="camaraActiva() ? cerrarCamara() : abrirCamara()">
+                  {{ camaraActiva() ? 'Cerrar cámara ✕' : 'Leer con la cámara 📷' }}
+                </button>
+              }
+            </div>
+            <div id="lector-camara" class="lector" [hidden]="!camaraActiva()"></div>
           </div></div>
         } @else {
           <!-- ── Cualquier otra estación: el pistolazo ── -->
@@ -257,6 +297,13 @@ export function guardarConfig(c: ConfigEstacion | null): void {
   `,
   styles: [`
     .est{max-width:720px}
+    .impresas{color:var(--text-subtle);font-size:var(--text-micro)}
+    .adelanto{margin-top:var(--sp-5);padding-top:var(--sp-3);border-top:var(--bw) solid var(--border);display:flex;flex-direction:column;gap:var(--sp-2)}
+    .adelanto-fila{display:flex;gap:var(--sp-3);align-items:flex-end;flex-wrap:wrap}
+    .adelanto-fila label{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
+    .adelanto-fila .tanda{width:90px;height:48px}
+    .adelanto .btn-sm{align-self:flex-start}
+    .scan-nacer{margin-top:var(--sp-5);padding-top:var(--sp-3);border-top:var(--bw) solid var(--border)}
     .res-error-imp{color:var(--error);font-weight:var(--fw-semibold);margin-top:var(--sp-2)}
     .config{display:flex;flex-direction:column;gap:var(--sp-3)}
     .config label,.scan-label,.of-sel{display:flex;flex-direction:column;gap:var(--sp-1);font-size:var(--text-caption);color:var(--text-subtle)}
@@ -385,6 +432,11 @@ export class EstacionComponent implements OnInit, OnDestroy {
   ofId?: number;
   tanda: Record<string, number> = {};
   naciendo = signal(false);
+  /** Imprimir por adelantado: qué talla (clave producto-talla) y cuántas. */
+  adelantoClave = '';
+  adelantoCantidad = 1;
+  adelantoLinea = signal<ProgramaOfLinea | undefined>(undefined);
+  reservadosOf = computed(() => (this.of()?.programa ?? []).reduce((acc, l) => acc + (l.reservados ?? 0), 0));
 
   // Formulario de configuración
   selEstacion = '';
@@ -503,14 +555,22 @@ export class EstacionComponent implements OnInit, OnDestroy {
         this.of.set(d);
         for (const l of d.programa ?? []) {
           const k = this.clave(l);
-          if (!this.tanda[k]) this.tanda[k] = Math.min(20, Math.max(l.programado - l.nacidos, 1)); // una canasta
+          if (!this.tanda[k]) this.tanda[k] = Math.min(20, Math.max(this.libres(l), 1)); // una canasta
         }
+        // Por adelantado se ofrece la primera talla con cupo, prellenada con todo lo que falta.
+        const programa = d.programa ?? [];
+        const actual = programa.find((l) => this.clave(l) === this.adelantoClave);
+        const elegida = actual && this.libres(actual) > 0 ? actual : programa.find((l) => this.libres(l) > 0) ?? programa[0];
+        this.adelantoClave = elegida ? this.clave(elegida) : '';
+        this.onAdelantoTalla();
       },
       error: () => this.resultado.set({ ok: false, titulo: 'No se pudo cargar la OF' }),
     });
   }
 
   clave = (l: ProgramaOfLinea) => `${l.productoConfiguradoId}-${l.tallaId}`;
+  /** Cupo de la talla: lo programado menos lo nacido y lo ya impreso por adelantado. */
+  libres = (l: ProgramaOfLinea) => l.programado - l.nacidos - (l.reservados ?? 0);
   pct = (l: ProgramaOfLinea) => (l.programado ? Math.min(100, Math.round((l.nacidos / l.programado) * 100)) : 0);
 
   grupos = computed(() => agruparPrograma(this.of()?.programa));
@@ -518,7 +578,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   nacer(d: OFDetalle, l: ProgramaOfLinea): void {
     const c = this.config();
     if (!c) return;
-    const cantidad = Math.max(1, Math.min(Number(this.tanda[this.clave(l)] || 1), l.programado - l.nacidos));
+    const cantidad = Math.max(1, Math.min(Number(this.tanda[this.clave(l)] || 1), this.libres(l)));
     this.naciendo.set(true);
     this.resultado.set(null);
     this.api
@@ -544,6 +604,59 @@ export class EstacionComponent implements OnInit, OnDestroy {
           this.resultado.set({ ok: false, titulo: 'No nacieron', detalle: this.msgError(e, 'No se pudo crear la tanda') });
         },
       });
+  }
+
+  // ─────────────── Preparación: imprimir por adelantado ───────────────
+
+  onAdelantoTalla(): void {
+    const l = (this.of()?.programa ?? []).find((x) => this.clave(x) === this.adelantoClave);
+    this.adelantoLinea.set(l);
+    this.adelantoCantidad = l ? Math.max(this.libres(l), 1) : 1;
+  }
+
+  /** Reserva los códigos y baja el PDF; el par nace después, al escanear su etiqueta aquí. */
+  imprimirAdelantado(d: OFDetalle): void {
+    const l = this.adelantoLinea();
+    if (!l) return;
+    const cantidad = Math.max(1, Math.min(Number(this.adelantoCantidad || 1), this.libres(l)));
+    this.naciendo.set(true);
+    this.resultado.set(null);
+    this.api
+      .reservarEtiquetas(d.id, { productoConfiguradoId: l.productoConfiguradoId, tallaId: l.tallaId, cantidad })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (r) => {
+          this.naciendo.set(false);
+          const e = r.etiquetas;
+          this.resultado.set({
+            ok: true,
+            titulo: `${e.length} etiqueta${e.length === 1 ? '' : 's'} de talla ${l.talla} impresa${e.length === 1 ? '' : 's'} por adelantado`,
+            detalle: `${e[0]?.codigo ?? ''}${e.length > 1 ? ' → ' + e[e.length - 1].codigo : ''} · nacen al escanearlas aquí`,
+            tanda: e,
+          });
+          this.imprimirTanda(e);
+          this.cargarOf();
+        },
+        error: (err) => {
+          this.naciendo.set(false);
+          this.resultado.set({ ok: false, titulo: 'No se imprimieron', detalle: this.msgError(err, 'No se pudieron reservar las etiquetas') });
+        },
+      });
+  }
+
+  /** Vuelve a bajar las etiquetas impresas por adelantado que todavía no nacen. */
+  reimprimirReservadas(d: OFDetalle): void {
+    this.api.etiquetasReservadas(d.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (r) => {
+        if (!r.etiquetas.length) {
+          this.resultado.set({ ok: true, titulo: 'No hay etiquetas pendientes', detalle: 'Todas las impresas ya nacieron.' });
+          return;
+        }
+        this.resultado.set({ ok: true, titulo: `Reimprimiendo ${r.etiquetas.length} etiquetas sin nacer`, tanda: r.etiquetas });
+        this.imprimirTanda(r.etiquetas);
+      },
+      error: (err) => this.resultado.set({ ok: false, titulo: 'No se pudieron traer las etiquetas', detalle: this.msgError(err, 'Intenta de nuevo') }),
+    });
   }
 
   // ─────────────── Cualquier otra estación: el pistolazo ───────────────
@@ -572,6 +685,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
       next: (r) => {
         this.hoy.set(r.avance.hoy);
         this.resultado.set(this.resumen(r));
+        // Nació una impresa por adelantado: los números de la OF cambiaron.
+        if (r.avance.nacio && this.of()) this.cargarOf();
         // Una lectura por reporte: el siguiente escaneo vuelve a ser normal.
         if (dano) this.cerrarCalidad();
         this.reanudarCamaraConGracia();
@@ -597,6 +712,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
         lengua: rep?.codigo,
       };
     }
+    if (a.nacio) return { ok: true, titulo: `${r.codigo} nació en ${a.nombre} ✓`, detalle: `van ${a.hoy} hoy` };
     const segunda = a.calidad === 'SEGUNDA';
     const grado = segunda ? ' · SEGUNDA' : '';
     const titulo = a.terminado ? `${r.codigo} terminado${segunda ? grado : ' ✓'}` : `${r.codigo} → ${a.nombre}${grado}`;

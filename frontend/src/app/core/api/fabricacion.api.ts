@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf, Estacion, AvanceResultado, NacerResultado, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, EtiquetasReservadas, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -46,6 +46,14 @@ export class FabricacionApi {
   /** Nacen pares de la OF en su estación inicial: una etiqueta por lengua. */
   nacer(ofId: number, dto: { productoConfiguradoId: number; tallaId: number; cantidad: number; operarioId: number; maquinaId?: number }) {
     return this.http.post<NacerResultado>(`${this.base}/fabricacion/of/${ofId}/nacer`, dto);
+  }
+  /** Imprimir por adelantado: reserva los códigos sin que nazca el par (nace al escanearlo en Preparación). */
+  reservarEtiquetas(ofId: number, dto: { productoConfiguradoId: number; tallaId: number; cantidad: number }) {
+    return this.http.post<EtiquetasReservadas>(`${this.base}/fabricacion/of/${ofId}/reservar-etiquetas`, dto);
+  }
+  /** Las impresas por adelantado que aún no nacen: para reimprimirlas. */
+  etiquetasReservadas(ofId: number) {
+    return this.http.get<EtiquetasReservadas>(`${this.base}/fabricacion/of/${ofId}/etiquetas-reservadas`);
   }
   estaciones() {
     return this.http.get<Estacion[]>(`${this.base}/fabricacion/estaciones`);
