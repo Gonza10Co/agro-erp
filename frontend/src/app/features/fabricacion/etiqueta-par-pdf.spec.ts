@@ -1,4 +1,4 @@
-import { motivoFalloEtiqueta, nombrePdfLenguas, pdfEtiquetasLengua, ETIQUETA_LENGUA } from './etiqueta-par-pdf';
+import { motivoFalloEtiqueta, nombrePdfLenguas, pdfEtiquetasLengua, ETIQUETA_LENGUA, toDataURLDe } from './etiqueta-par-pdf';
 import { ParNacido } from '../../core/api/models/fabricacion.models';
 
 const lengua = (codigo: string, talla: string): ParNacido => ({
@@ -34,5 +34,21 @@ describe('motivoFalloEtiqueta', () => {
 
   it('cualquier otro fallo muestra su causa', () => {
     expect(motivoFalloEtiqueta(new Error('sin memoria'))).toBe('No se pudo generar el PDF (sin memoria).');
+  });
+});
+
+describe('toDataURLDe', () => {
+  const fn = () => Promise.resolve('data:');
+
+  it('toma el toDataURL nombrado (dev y tests)', () => {
+    expect(toDataURLDe({ toDataURL: fn })).toBe(fn);
+  });
+
+  it('toma el de default cuando el chunk de producción solo exporta default', () => {
+    expect(toDataURLDe({ default: { toDataURL: fn } })).toBe(fn);
+  });
+
+  it('falla con un mensaje claro si no viene en ninguna de las dos', () => {
+    expect(() => toDataURLDe({})).toThrowError(/generador de QR/);
   });
 });
