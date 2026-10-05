@@ -64,4 +64,25 @@ describe('CorteApi', () => {
     expect(req.request.body.piezasRepuestas).toBe(120);
     req.flush({});
   });
+
+  it('ofsDisponibles pide las OF abiertas dentro de corte', () => {
+    api.ofsDisponibles().subscribe();
+    const req = http.expectOne(`${base}/corte/ofs-disponibles`);
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('crear manda la orden con sus renglones', () => {
+    const dto = {
+      codigo: 'AGR-905',
+      fecha: '2026-10-05',
+      lineaId: 2,
+      lineas: [{ productoConfiguradoId: 7, tallaId: 39, cantProgramada: 30, ofId: 19 }],
+    };
+    api.crear(dto).subscribe();
+    const req = http.expectOne(`${base}/corte/ordenes`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(dto);
+    req.flush({ id: 3 });
+  });
 });

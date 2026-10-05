@@ -321,3 +321,56 @@ export function lineasDesdeProgramacion(
 
   return lineas;
 }
+
+/** Lo que la OP le pidió a la OF para un producto × talla. */
+export interface ProgramaOf {
+  productoConfiguradoId: number;
+  tallaId: number;
+  cantAProducir: number;
+}
+
+/** Lo que ya quedó en alguna orden de corte (no anulada) contra esa OF. */
+export interface YaProgramadoEnCorte {
+  productoConfiguradoId: number;
+  tallaId: number;
+  cantProgramada: number;
+}
+
+export interface PendienteDeCorte {
+  productoConfiguradoId: number;
+  tallaId: number;
+  aProducir: number;
+  programado: number;
+  /** Lo que falta mandar a corte. Nunca negativo: programar de más es válido (reposición de segundas). */
+  pendiente: number;
+}
+
+/**
+ * Cuánto falta por programar en corte de cada producto × talla de una OF: lo que
+ * la OP pide producir menos lo que ya va en órdenes de corte de otros días. Las
+ * tallas sin nada que producir no son renglones (lo cubrió el amarre de stock).
+ */
+export function pendientesDeCorte(
+  programa: ProgramaOf[],
+  yaProgramado: YaProgramadoEnCorte[],
+): PendienteDeCorte[] {
+  const clave = (p: number, t: number) => `${p}-${t}`;
+  const programadoPor = new Map<string, number>();
+  for (const l of yaProgramado) {
+    const k = clave(l.productoConfiguradoId, l.tallaId);
+    programadoPor.set(k, (programadoPor.get(k) ?? 0) + l.cantProgramada);
+  }
+
+  return programa
+    .filter((p) => p.cantAProducir > 0)
+    .map((p) => {
+      const programado = programadoPor.get(clave(p.productoConfiguradoId, p.tallaId)) ?? 0;
+      return {
+        productoConfiguradoId: p.productoConfiguradoId,
+        tallaId: p.tallaId,
+        aProducir: p.cantAProducir,
+        programado,
+        pendiente: Math.max(p.cantAProducir - programado, 0),
+      };
+    });
+}

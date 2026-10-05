@@ -272,3 +272,14 @@ export function rutaInicial(rol: string | null | undefined): string {
   // dashboard enlazaba a módulos que no podían abrir; ya no queda ninguno.
   return puedeVerModulo(rol, 'inicio') ? '/inicio' : '/pedidos/oc';
 }
+
+/**
+ * Quién carga la orden de corte del día: la gerencia y el jefe de corte. Espejo de
+ * `ROLES_PROGRAMAN_CORTE` en `backend/src/corte/corte.controller.ts`, que es el que
+ * de verdad manda (403 al resto).
+ */
+export const ROLES_PROGRAMAN_CORTE: readonly string[] = ['ADMIN', 'GERENTE', 'JEFE_CORTE'];
+
+export function puedeProgramarCorte(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_PROGRAMAN_CORTE.includes(rol);
+}

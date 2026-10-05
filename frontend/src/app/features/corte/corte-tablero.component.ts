@@ -10,6 +10,8 @@ import {
   EstadoOrdenCorte,
 } from '../../core/api/models/corte.models';
 import { LineasApi, Linea } from '../../core/api/lineas.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeProgramarCorte } from '../../core/auth/modulos';
 
 /** Color del badge según qué tan lejos está el cumplimiento de lo programado. */
 function claseCumplimiento(v: number | null): string {
@@ -44,9 +46,14 @@ export function cumplimientoMedible(estado: EstadoOrdenCorte, cumplimiento: numb
             La orden del día es la unidad de trabajo hasta que el par existe en Amarre.
           </div>
         </div>
-        <button class="btn" (click)="cargar()" [disabled]="cargando()">
-          {{ cargando() ? 'Cargando…' : 'Actualizar' }}
-        </button>
+        <div class="acciones">
+          @if (puedeProgramar) {
+            <a class="btn btn-primary" routerLink="/corte/ordenes/nueva">Nueva orden de corte</a>
+          }
+          <button class="btn" (click)="cargar()" [disabled]="cargando()">
+            {{ cargando() ? 'Cargando…' : 'Actualizar' }}
+          </button>
+        </div>
       </div>
 
       <div class="table-toolbar">
@@ -184,6 +191,7 @@ export function cumplimientoMedible(estado: EstadoOrdenCorte, cumplimiento: numb
   `,
   styles: [
     `
+      .acciones { display: flex; gap: 8px; align-items: center; }
       .kpis {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -218,6 +226,9 @@ export function cumplimientoMedible(estado: EstadoOrdenCorte, cumplimiento: numb
 export class CorteTableroComponent implements OnInit {
   private readonly api = inject(CorteApi);
   private readonly lineasApi = inject(LineasApi);
+
+  /** La gerencia y el jefe de corte cargan la orden del día; el resto solo mira. */
+  readonly puedeProgramar = puedeProgramarCorte(inject(AuthService).rol());
 
   readonly ordenes = signal<OrdenCorteItem[]>([]);
   readonly resumen = signal<ResumenCorte | null>(null);

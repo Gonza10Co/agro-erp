@@ -29,6 +29,8 @@ describe('rolPuedeLlamar (lista blanca de roles acotados)', () => {
       expect(rolPuedeLlamar('JEFE_CORTE', 'POST', '/corte/ordenes')).toBe(true);
       expect(rolPuedeLlamar('JEFE_CORTE', 'PATCH', '/corte/ordenes/:id/estado')).toBe(true);
       expect(rolPuedeLlamar('JEFE_CORTE', 'POST', '/corte/ordenes/:id/avances')).toBe(true);
+      // El formulario "Nueva orden de corte" lista las OF sin abrir fabricación.
+      expect(rolPuedeLlamar('JEFE_CORTE', 'GET', '/corte/ofs-disponibles')).toBe(true);
     });
 
     it('lee el listado de líneas (filtro del tablero), pero no lo escribe', () => {

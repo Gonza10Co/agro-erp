@@ -1,4 +1,9 @@
-import { cumplimientoMedible } from './corte-tablero.component';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
+import { CorteTableroComponent, cumplimientoMedible } from './corte-tablero.component';
 
 describe('cumplimientoMedible', () => {
   it('no mide el cumplimiento de una orden que apenas está programada', () => {
@@ -20,4 +25,34 @@ describe('cumplimientoMedible', () => {
   it('respeta el null que ya venía del backend', () => {
     expect(cumplimientoMedible('CERRADA', null)).toBeNull();
   });
+});
+
+describe('CorteTableroComponent: botón "Nueva orden de corte"', () => {
+  const base = 'http://localhost:3001';
+
+  function render(rol: string) {
+    TestBed.configureTestingModule({
+      imports: [CorteTableroComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AuthService, useValue: { rol: () => rol } },
+      ],
+    });
+    const fixture = TestBed.createComponent(CorteTableroComponent);
+    const http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === `${base}/catalog/lineas`).flush([]);
+    http.expectOne((r) => r.url === `${base}/corte/tablero`).flush({ ordenes: [], resumen: null });
+    fixture.detectChanges();
+    http.verify();
+    return fixture.nativeElement.querySelector('a[href="/corte/ordenes/nueva"]');
+  }
+
+  for (const rol of ['ADMIN', 'GERENTE', 'JEFE_CORTE']) {
+    it(`lo ve ${rol}`, () => expect(render(rol)).not.toBeNull());
+  }
+
+  it('no lo ve el CLIENTE', () => expect(render('CLIENTE')).toBeNull());
 });
