@@ -25,8 +25,12 @@ import { RegistrarAvanceDto } from './dto/registrar-avance.dto';
 // fuera `costoBase`/`costoPromedio`, que el jefe de corte no debe ver.
 const MATERIAL_SIN_COSTO = { select: { id: true, codigo: true, nombreCanonico: true } };
 
+// Las pantallas de corte solo muestran el nombre de la línea: el select deja fuera
+// la razón social, el NIT y los datos de pago.
+const LINEA_BASICA = { select: { id: true, codigo: true, nombre: true } };
+
 const INCLUDE_DETALLE = {
-  linea: true,
+  linea: LINEA_BASICA,
   marca: true,
   lineas: {
     include: {
@@ -55,7 +59,7 @@ export class CorteService {
     const ordenes = await this.prisma.ordenCorte.findMany({
       where,
       include: {
-        linea: true,
+        linea: LINEA_BASICA,
         marca: true,
         lineas: { select: { cantProgramada: true, cantCortada: true, cantAmarrada: true } },
         avances: { select: { piezasCortadas: true, piezasDanadas: true, piezasRepuestas: true } },

@@ -276,6 +276,15 @@ describe('obtener detalle', () => {
     }
   });
 
+  it('no trae razón social, NIT ni datos de pago de la línea', async () => {
+    const { service, prisma } = makePrisma();
+    await service.obtener(1);
+    await service.listar({});
+    const lineaBasica = { select: { id: true, codigo: true, nombre: true } };
+    expect(prisma.ordenCorte.findUnique.mock.calls[0][0].include.linea).toEqual(lineaBasica);
+    expect(prisma.ordenCorte.findMany.mock.calls[0][0].include.linea).toEqual(lineaBasica);
+  });
+
   it('dice cuál es el siguiente estado, para que la UI sepa qué botón ofrecer', async () => {
     const { service } = makePrisma();
     const o: any = await service.obtener(1);
