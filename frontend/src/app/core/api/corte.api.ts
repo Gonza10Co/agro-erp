@@ -1,7 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { FiltrosCorte, OrdenCorteDetalle, OrdenCorteItem, TableroCorte } from './models/corte.models';
+import {
+  CrearOrdenCorteDto,
+  FiltrosCorte,
+  OfDisponible,
+  OrdenCorteDetalle,
+  OrdenCorteItem,
+  TableroCorte,
+} from './models/corte.models';
 
 @Injectable({ providedIn: 'root' })
 export class CorteApi {
@@ -46,5 +53,14 @@ export class CorteApi {
     },
   ) {
     return this.http.post<unknown>(`${this.base}/corte/ordenes/${id}/avances`, avance);
+  }
+
+  /** OF abiertas con lo que falta programar por talla: el insumo de "Nueva orden de corte". */
+  ofsDisponibles() {
+    return this.http.get<OfDisponible[]>(`${this.base}/corte/ofs-disponibles`);
+  }
+
+  crear(dto: CrearOrdenCorteDto) {
+    return this.http.post<OrdenCorteDetalle>(`${this.base}/corte/ordenes`, dto);
   }
 }

@@ -13,6 +13,7 @@ import {
   rangoDeJornadas,
   esTransicionValida,
   indicadoresDeOrden,
+  pendientesDeCorte,
   selloDeEstado,
   siguienteEstadoCorte,
   UMBRALES_CORTE_DEFAULT,
@@ -108,6 +109,21 @@ export class CorteService {
       throw new BadRequestException('La orden trae la misma referencia y talla repetida');
     }
 
+    // Un renglón amarrado a una OF cerrada o inexistente sería corte huérfano.
+    const ofIds = [...new Set(dto.lineas.map((l) => l.ofId).filter((x): x is number => !!x))];
+    if (ofIds.length) {
+      const abiertas = await this.prisma.ordenFabricacion.findMany({
+        where: { id: { in: ofIds }, estado: { in: ['ABIERTA', 'EN_PROCESO'] } },
+        select: { id: true },
+      });
+      const faltan = ofIds.filter((id) => !abiertas.some((o) => o.id === id));
+      if (faltan.length) {
+        throw new BadRequestException(
+          `La OF ${faltan.join(', ')} no existe o ya no está abierta: no se le puede programar corte`,
+        );
+      }
+    }
+
     return this.prisma.ordenCorte.create({
       data: {
         codigo: dto.codigo,
@@ -125,6 +141,94 @@ export class CorteService {
         },
       },
       include: INCLUDE_DETALLE,
+    });
+  }
+
+  /**
+   * Las OF abiertas que se pueden mandar a corte, con lo que falta programar por
+   * producto × talla. Alimenta el formulario "Nueva orden de corte". Vive en
+   * `corte/*` para que el jefe de corte lo use sin abrirle fabricación, y por eso
+   * el select es corto: nombres e ids, nada de precios, NIT ni cartera.
+   */
+  async ofsDisponibles() {
+    const ofs = await this.prisma.ordenFabricacion.findMany({
+      where: {
+        estado: { in: ['ABIERTA', 'EN_PROCESO'] },
+        op: { estado: { in: ['CREADA', 'AMARRADA', 'EN_PRODUCCION'] } },
+      },
+      orderBy: { consecutivo: 'asc' },
+      select: {
+        id: true,
+        consecutivo: true,
+        estado: true,
+        op: {
+          select: {
+            id: true,
+            consecutivo: true,
+            linea: LINEA_BASICA,
+            oc: {
+              select: {
+                id: true,
+                consecutivo: true,
+                ocCliente: true,
+                cliente: { select: { nombre: true } },
+              },
+            },
+            lineas: {
+              select: {
+                productoConfiguradoId: true,
+                productoConfigurado: {
+                  select: { codigo: true, nombreComercial: true, referencia: { select: { codigo: true } } },
+                },
+                tallas: {
+                  select: { tallaId: true, cantAProducir: true, talla: { select: { valor: true } } },
+                },
+              },
+            },
+          },
+        },
+        // Lo que ya salió para corte en órdenes de otros días. Una anulada no cuenta.
+        lineasCorte: {
+          where: { ordenCorte: { estado: { not: 'ANULADA' } } },
+          select: { productoConfiguradoId: true, tallaId: true, cantProgramada: true },
+        },
+      },
+    });
+
+    return ofs.map((of) => {
+      const producto = new Map<number, { codigo: string; nombre: string; referencia: string | null }>();
+      const talla = new Map<number, number>();
+      const programa = of.op.lineas.flatMap((l) => {
+        producto.set(l.productoConfiguradoId, {
+          codigo: l.productoConfigurado.codigo,
+          nombre: l.productoConfigurado.nombreComercial,
+          referencia: l.productoConfigurado.referencia?.codigo ?? null,
+        });
+        return l.tallas.map((t) => {
+          talla.set(t.tallaId, t.talla.valor);
+          return { productoConfiguradoId: l.productoConfiguradoId, tallaId: t.tallaId, cantAProducir: t.cantAProducir };
+        });
+      });
+      const renglones = pendientesDeCorte(programa, of.lineasCorte)
+        .map((r) => ({ ...r, producto: producto.get(r.productoConfiguradoId)!, talla: talla.get(r.tallaId)! }))
+        .sort((a, b) => a.productoConfiguradoId - b.productoConfiguradoId || a.talla - b.talla);
+
+      return {
+        id: of.id,
+        consecutivo: of.consecutivo,
+        estado: of.estado,
+        op: { id: of.op.id, consecutivo: of.op.consecutivo },
+        oc: {
+          id: of.op.oc.id,
+          consecutivo: of.op.oc.consecutivo,
+          ocCliente: of.op.oc.ocCliente,
+          cliente: of.op.oc.cliente.nombre,
+        },
+        linea: of.op.linea,
+        aProducir: renglones.reduce((a, r) => a + r.aProducir, 0),
+        pendiente: renglones.reduce((a, r) => a + r.pendiente, 0),
+        renglones,
+      };
     });
   }
 

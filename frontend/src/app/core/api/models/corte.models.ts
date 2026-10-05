@@ -133,3 +133,36 @@ export interface OrdenCorteDetalle extends OrdenCorteItem {
   /** Null cuando la orden ya está cerrada o anulada: no hay botón que ofrecer. */
   siguienteEstado: EstadoOrdenCorte | null;
 }
+
+/** Lo que falta mandar a corte de un producto × talla de una OF. */
+export interface RenglonOfDisponible {
+  productoConfiguradoId: number;
+  producto: { codigo: string; nombre: string; referencia: string | null };
+  tallaId: number;
+  talla: number;
+  aProducir: number;
+  programado: number;
+  pendiente: number;
+}
+
+/** OF abierta que se puede cargar en una orden de corte (`GET /corte/ofs-disponibles`). */
+export interface OfDisponible {
+  id: number;
+  consecutivo: number;
+  estado: 'ABIERTA' | 'EN_PROCESO';
+  op: { id: number; consecutivo: number };
+  oc: { id: number; consecutivo: number; ocCliente: string | null; cliente: string };
+  linea: { id: number; codigo: string; nombre: string } | null;
+  aProducir: number;
+  pendiente: number;
+  renglones: RenglonOfDisponible[];
+}
+
+export interface CrearOrdenCorteDto {
+  codigo: string;
+  fecha: string;
+  lineaId: number;
+  marcaId?: number;
+  observaciones?: string;
+  lineas: { productoConfiguradoId: number; tallaId: number; cantProgramada: number; ofId?: number }[];
+}

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { moduloGuard } from './core/auth/modulo.guard';
+import { programarCorteGuard } from './core/auth/programar-corte.guard';
 
 export const routes: Routes = [
   {
@@ -60,6 +61,8 @@ export const routes: Routes = [
       // Quincena 1 del rediseño lote↔par: el tramo previo a que el par exista.
       // La sección va en data para que modulo.guard bloquee la URL tecleada.
       { path: 'corte', data: { modulo: 'corte', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-tablero.component').then(m => m.CorteTableroComponent) },
+      // Nueva orden de corte (2026-10-05): antes de `:id`, o "nueva" se lee como id.
+      { path: 'corte/ordenes/nueva', canActivate: [programarCorteGuard], data: { modulo: 'corte', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-orden-crear.component').then(m => m.CorteOrdenCrearComponent) },
       { path: 'corte/ordenes/:id', data: { modulo: 'corte', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-orden-detalle.component').then(m => m.CorteOrdenDetalleComponent) },
       { path: 'calidad', data: { modulo: 'calidad' }, loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', data: { modulo: 'indicadores' }, loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },

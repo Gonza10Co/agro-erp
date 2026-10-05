@@ -15,6 +15,12 @@
 > `costoBase`/`costoPromedio` del material. Para prod: `INSERT INTO "Role"(name) VALUES
 > ('JEFE_CORTE') ON CONFLICT (name) DO NOTHING;` y crear el usuario desde Administración.
 >
+> **📝 NUEVA ORDEN DE CORTE (2026-10-05), en `develop`, sin desplegar.** Botón en `/corte` →
+> `/corte/ordenes/nueva`: código de canasta, fecha (hoy), línea y renglones cargados desde OF
+> abiertas (`GET /corte/ofs-disponibles`: pendiente por talla = `cantAProducir` de la OP menos lo
+> ya programado en órdenes no anuladas). Varias OF por orden; al guardar abre el detalle. Crear y
+> listar OF quedan solo para ADMIN/GERENTE/JEFE_CORTE (`@Roles` en back, guard + botón en front).
+>
 > **🩹 CALIDAD EN LA PANTALLA DE PLANTA — construido el 2026-09-11, en `develop`, sección
 > `calidad-en-planta` EN_STAGE.** Plan: `docs/specs/2026-09-11-quincena-calidad-en-planta.md`.
 > El piloto se entregó ese mismo día (tag `entrega-piloto`) y quedó claro el hueco: la estación

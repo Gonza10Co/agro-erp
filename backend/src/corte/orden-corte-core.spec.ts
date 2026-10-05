@@ -9,6 +9,7 @@ import {
   indicadoresDeOrden,
   alertasDeOrden,
   lineasDesdeProgramacion,
+  pendientesDeCorte,
   UMBRALES_CORTE_DEFAULT,
 } from './orden-corte-core';
 
@@ -352,5 +353,39 @@ describe('consolidar el consumo de material de la orden', () => {
 
   it('una orden sin avances no rompe', () => {
     expect(consolidarConsumos([])).toEqual([]);
+  });
+});
+
+describe('pendientesDeCorte', () => {
+  const programa = [
+    { productoConfiguradoId: 7, tallaId: 39, cantAProducir: 30 },
+    { productoConfiguradoId: 7, tallaId: 40, cantAProducir: 36 },
+    { productoConfiguradoId: 7, tallaId: 41, cantAProducir: 30 },
+  ];
+
+  it('sin órdenes previas, todo lo que se produce está pendiente', () => {
+    const r = pendientesDeCorte(programa, []);
+    expect(r.map((x) => x.pendiente)).toEqual([30, 36, 30]);
+    expect(r.every((x) => x.programado === 0)).toBe(true);
+  });
+
+  it('descuenta lo ya programado en otras órdenes, sumando varios días', () => {
+    const r = pendientesDeCorte(programa, [
+      { productoConfiguradoId: 7, tallaId: 40, cantProgramada: 20 },
+      { productoConfiguradoId: 7, tallaId: 40, cantProgramada: 10 },
+    ]);
+    expect(r.find((x) => x.tallaId === 40)).toEqual({
+      productoConfiguradoId: 7, tallaId: 40, aProducir: 36, programado: 30, pendiente: 6,
+    });
+  });
+
+  it('programar de más no deja un pendiente negativo', () => {
+    const r = pendientesDeCorte(programa, [{ productoConfiguradoId: 7, tallaId: 41, cantProgramada: 32 }]);
+    expect(r.find((x) => x.tallaId === 41)!.pendiente).toBe(0);
+  });
+
+  it('las tallas que cubrió el amarre de stock no son renglones', () => {
+    const r = pendientesDeCorte([...programa, { productoConfiguradoId: 7, tallaId: 42, cantAProducir: 0 }], []);
+    expect(r).toHaveLength(3);
   });
 });

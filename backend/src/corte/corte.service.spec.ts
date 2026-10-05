@@ -26,6 +26,7 @@ function makePrisma(overrides: any = {}) {
       create: jest.fn().mockResolvedValue({ id: 1, codigo: 'AGR-861' }),
     },
     avanceCorte: { create: jest.fn().mockResolvedValue({ id: 5 }) },
+    ordenFabricacion: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(async (cb: any) => cb(tx)),
     ...overrides.root,
   };
@@ -289,5 +290,97 @@ describe('obtener detalle', () => {
     const { service } = makePrisma();
     const o: any = await service.obtener(1);
     expect(o.siguienteEstado).toBe('EN_CORTE');
+  });
+});
+
+describe('crear orden de corte amarrada a OF', () => {
+  const dto = {
+    codigo: 'AGR-905',
+    fecha: '2026-10-05',
+    lineaId: 2,
+    lineas: [
+      { productoConfiguradoId: 7, tallaId: 39, cantProgramada: 30, ofId: 19 },
+      { productoConfiguradoId: 7, tallaId: 40, cantProgramada: 36, ofId: 19 },
+    ],
+  } as any;
+
+  it('guarda el ofId de cada renglón cuando la OF está abierta', async () => {
+    const { service, prisma } = makePrisma({
+      root: {
+        ordenCorte: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 3 }) },
+        ordenFabricacion: { findMany: jest.fn().mockResolvedValue([{ id: 19 }]) },
+      },
+    });
+    await service.crear(dto);
+    expect(prisma.ordenFabricacion.findMany.mock.calls[0][0].where.id).toEqual({ in: [19] });
+    const lineas = prisma.ordenCorte.create.mock.calls[0][0].data.lineas.create;
+    expect(lineas.map((l: any) => l.ofId)).toEqual([19, 19]);
+  });
+
+  it('rechaza una OF cerrada o que no existe', async () => {
+    const { service, prisma } = makePrisma({
+      root: {
+        ordenCorte: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+        ordenFabricacion: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+    });
+    await expect(service.crear(dto)).rejects.toThrow(BadRequestException);
+    expect(prisma.ordenCorte.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ofsDisponibles', () => {
+  const ofCruda = {
+    id: 19,
+    consecutivo: 19,
+    estado: 'ABIERTA',
+    op: {
+      id: 1,
+      consecutivo: 1,
+      linea: { id: 2, codigo: 'AGRO', nombre: 'Agro' },
+      oc: { id: 8, consecutivo: 8, ocCliente: 'PO-123', cliente: { nombre: 'Cliente 69561' } },
+      lineas: [
+        {
+          productoConfiguradoId: 7,
+          productoConfigurado: { codigo: 'PC-101', nombreComercial: '101 PODEROSA café', referencia: { codigo: '101' } },
+          tallas: [
+            { tallaId: 41, cantAProducir: 30, talla: { valor: 41 } },
+            { tallaId: 39, cantAProducir: 30, talla: { valor: 39 } },
+            { tallaId: 40, cantAProducir: 36, talla: { valor: 40 } },
+            { tallaId: 42, cantAProducir: 0, talla: { valor: 42 } },
+          ],
+        },
+      ],
+    },
+    lineasCorte: [{ productoConfiguradoId: 7, tallaId: 40, cantProgramada: 10 }],
+  };
+
+  it('devuelve lo pendiente por talla, ordenado, y los totales', async () => {
+    const { service } = makePrisma({
+      root: { ordenFabricacion: { findMany: jest.fn().mockResolvedValue([ofCruda]) } },
+    });
+    const [of] = await service.ofsDisponibles();
+    expect(of.oc).toEqual({ id: 8, consecutivo: 8, ocCliente: 'PO-123', cliente: 'Cliente 69561' });
+    expect(of.linea?.codigo).toBe('AGRO');
+    expect(of.renglones.map((r) => [r.talla, r.pendiente])).toEqual([[39, 30], [40, 26], [41, 30]]);
+    expect(of.renglones[0].producto).toEqual({ codigo: 'PC-101', nombre: '101 PODEROSA café', referencia: '101' });
+    expect(of.aProducir).toBe(96);
+    expect(of.pendiente).toBe(86);
+  });
+
+  it('solo pide OF abiertas de OP vivas, sin precios ni datos del cliente fuera del nombre', async () => {
+    const { service, prisma } = makePrisma({
+      root: { ordenFabricacion: { findMany: jest.fn().mockResolvedValue([]) } },
+    });
+    await service.ofsDisponibles();
+    const arg = prisma.ordenFabricacion.findMany.mock.calls[0][0];
+    expect(arg.where.estado).toEqual({ in: ['ABIERTA', 'EN_PROCESO'] });
+    expect(arg.where.op.estado.in).not.toContain('ANULADA');
+    expect(arg.select.op.select.oc.select.cliente).toEqual({ select: { nombre: true } });
+    expect(arg.select.lineasCorte.where).toEqual({ ordenCorte: { estado: { not: 'ANULADA' } } });
+    const texto = JSON.stringify(arg.select);
+    for (const prohibido of ['precio', 'costo', 'nit', 'cupo', 'cartera']) {
+      expect(texto.toLowerCase()).not.toContain(prohibido);
+    }
   });
 });
