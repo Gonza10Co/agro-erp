@@ -132,7 +132,7 @@ export function agregarRenglonesDeOf(
         @if (renglones().length) {
           <div class="table-wrap">
             <div class="table-scroll">
-              <table>
+              <table class="data">
                 <thead>
                   <tr>
                     <th>OF</th>

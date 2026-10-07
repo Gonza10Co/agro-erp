@@ -130,7 +130,7 @@ export function cumplimientoMedible(estado: EstadoOrdenCorte, cumplimiento: numb
 
         <div class="table-wrap">
           <div class="table-scroll">
-            <table>
+            <table class="data">
               <thead>
                 <tr>
                   <th>Orden</th>

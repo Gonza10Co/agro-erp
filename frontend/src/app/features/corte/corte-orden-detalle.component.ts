@@ -107,7 +107,7 @@ import {
         <h3 class="sec">Programación por talla</h3>
         <div class="table-wrap">
           <div class="table-scroll">
-            <table>
+            <table class="data">
               <thead>
                 <tr>
                   <th>Referencia</th>
@@ -192,7 +192,7 @@ import {
 
         <div class="table-wrap">
           <div class="table-scroll">
-            <table>
+            <table class="data">
               <thead>
                 <tr>
                   <th>Fecha</th>
@@ -230,7 +230,7 @@ import {
           <h3 class="sec">Consumo de material · teórico contra real</h3>
           <div class="table-wrap">
             <div class="table-scroll">
-              <table>
+              <table class="data">
                 <thead>
                   <tr>
                     <th>Material</th>
