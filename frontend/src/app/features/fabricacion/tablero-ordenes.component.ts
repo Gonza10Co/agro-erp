@@ -73,7 +73,7 @@ export const ORDENES_REFRESCO_MS = 60_000;
 
             @if (abierta() === o.id) {
               <div class="scroll">
-                <table class="tabla tallas">
+                <table class="data tallas">
                   <thead>
                     <tr>
                       <th>Producto</th>
