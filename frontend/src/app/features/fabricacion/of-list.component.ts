@@ -224,7 +224,7 @@ export class OfListComponent implements OnInit {
     this.noEncontrado.set(false);
   }
 
-  /** Una sola etiqueta de lengua (50×30, solo QR), la misma que nace en Preparación. */
+  /** Una sola etiqueta de lengua (40×25, solo QR), la misma que nace en Preparación. */
   reimprimir(p: ParDetalle): void {
     void descargarEtiquetasLengua([datosLenguaDePar(p)]);
   }
