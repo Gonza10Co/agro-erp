@@ -4,7 +4,8 @@ import { ParNacido, ParDetalle } from '../../core/api/models/fabricacion.models'
  * Etiquetas del piloto (2026-09-09), pensadas para impresora de etiquetas con
  * guillotina: una etiqueta por página, no la hoja carta troquelada de of-etiquetas.
  *
- *  - Etiqueta de la LENGUA (50×30 mm): nace con el par en Preparación. Solo QR
+ *  - Etiqueta de la LENGUA (40×25 mm; era de 50×30 y Valen la pidió más pequeña
+ *    el 2026-10-07): nace con el par en Preparación. Solo QR
  *    (Mauricio: "de aquí en adelante solo QR, por facilidad"), talla grande para
  *    que se lea a un metro, código y referencia/marca.
  *  - Sticker de la CAJA (60×40 mm): sale al terminar el par en PT. Reemplaza los
@@ -15,7 +16,7 @@ import { ParNacido, ParDetalle } from '../../core/api/models/fabricacion.models'
 
 const TINTA: [number, number, number] = [20, 20, 20];
 
-export const ETIQUETA_LENGUA = { ancho: 50, alto: 30 } as const;
+export const ETIQUETA_LENGUA = { ancho: 40, alto: 25 } as const;
 export const STICKER_CAJA = { ancho: 60, alto: 40 } as const;
 
 async function libs() {
@@ -69,7 +70,7 @@ export function nombrePdfLenguas(pares: ParNacido[]): string {
   return `etiquetas-OF${pares[0].of}${talla}-${pares.length}.pdf`;
 }
 
-/** Arma el PDF de las lenguas (50×30 mm, una por página) sin bajarlo. */
+/** Arma el PDF de las lenguas (40×25 mm, una por página) sin bajarlo. */
 export async function pdfEtiquetasLengua(pares: ParNacido[]) {
   const { jsPDF, toDataURL } = await libs();
   const { ancho, alto } = ETIQUETA_LENGUA;
@@ -81,26 +82,27 @@ export async function pdfEtiquetasLengua(pares: ParNacido[]) {
   pares.forEach((p, i) => {
     if (i > 0) doc.addPage([ancho, alto], 'landscape');
     // QR a la izquierda, casi toda la altura: lo lee la cámara del celular torcido y arrugado.
-    doc.addImage(qrs[i], 'PNG', 2, 2, 26, 26);
+    doc.addImage(qrs[i], 'PNG', 1.5, 1.5, 22, 22);
 
     doc.setTextColor(...TINTA);
+    const centro = 32; // columna de datos, a la derecha del QR
     // La talla es lo que el operario busca a un metro: gigante.
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(30);
-    doc.text(p.talla, 39, 14, { align: 'center' });
-    doc.setFontSize(6);
+    doc.setFontSize(24);
+    doc.text(p.talla, centro, 10.5, { align: 'center' });
+    doc.setFontSize(5);
     doc.setFont('helvetica', 'normal');
-    doc.text('TALLA', 39, 17.5, { align: 'center' });
+    doc.text('TALLA', centro, 13.5, { align: 'center' });
 
     doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
-    doc.text(p.codigo, 39, 22.5, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text(p.codigo, centro, 18, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5.5);
+    doc.setFontSize(5);
     const detalle = [p.referencia, p.marca].filter(Boolean).join(' · ');
-    doc.splitTextToSize(detalle, 20).slice(0, 1).forEach((linea: string) => {
-      doc.text(linea, 39, 26.5, { align: 'center' });
+    doc.splitTextToSize(detalle, 15).slice(0, 1).forEach((linea: string) => {
+      doc.text(linea, centro, 22, { align: 'center' });
     });
   });
 

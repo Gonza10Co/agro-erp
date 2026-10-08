@@ -6,7 +6,7 @@ const lengua = (codigo: string, talla: string): ParNacido => ({
 });
 
 describe('etiqueta de la lengua', () => {
-  it('una página de 50×30 mm por par, con la TALLA grande, el código y la referencia', async () => {
+  it('una página de 40×25 mm por par, con la TALLA grande, el código y la referencia', async () => {
     const doc = await pdfEtiquetasLengua([lengua('OF19-0001', '39'), lengua('OF19-0002', '39')]);
     expect(doc.getNumberOfPages()).toBe(2);
     const w = doc.internal.pageSize.getWidth();
