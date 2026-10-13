@@ -21,6 +21,7 @@ import {
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
   OFFSET_BOGOTA_HORAS,
+  conNombreDeEstacion,
 } from './fabricacion-core';
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
@@ -996,7 +997,7 @@ export class FabricacionService {
       },
     });
     if (!par) throw new NotFoundException(`Par ${codigo} no existe`);
-    return par;
+    return { ...par, eventos: conNombreDeEstacion(par.eventos, await this.estaciones()) };
   }
 
   listarOperarios(celula?: Celula) {

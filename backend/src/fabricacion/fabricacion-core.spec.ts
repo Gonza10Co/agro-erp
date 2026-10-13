@@ -10,6 +10,7 @@ import {
   ORDEN_SUBPASOS,
   ESTACIONES_PILOTO,
   EstacionDef,
+  conNombreDeEstacion,
   rangoEstado,
   siguienteEstacion,
   esEstacionTerminal,
@@ -391,5 +392,22 @@ describe('inicioDelDiaBogota', () => {
   it('a las 3 am UTC todavía es el día anterior en Bogotá', () => {
     expect(inicioDelDiaBogota(new Date('2026-09-10T03:00:00Z')).toISOString()).toBe('2026-09-09T05:00:00.000Z');
     expect(inicioDelDiaBogota(new Date('2026-09-10T06:00:00Z')).toISOString()).toBe('2026-09-10T05:00:00.000Z');
+  });
+});
+
+describe('conNombreDeEstacion', () => {
+  it('el recorrido nombra la estación a la que ENTRÓ el par, no de dónde venía', () => {
+    const eventos = [
+      { id: 1, celula: 'GUARNICION', estacionDestino: 'PREPARACION' },
+      { id: 2, celula: 'GUARNICION', estacionDestino: 'BODEGA_CORTE' },
+    ];
+    const r = conNombreDeEstacion(eventos, ESTACIONES_PILOTO);
+    expect(r.map((e) => e.estacionNombre)).toEqual(['Preparación', 'Bodega de corte']);
+    expect(r[1].id).toBe(2);
+  });
+
+  it('los escaneos de antes del piloto (sin estación) quedan sin nombre', () => {
+    const r = conNombreDeEstacion([{ id: 1, estacionDestino: null }, { id: 2, estacionDestino: 'NO_EXISTE' }], ESTACIONES_PILOTO);
+    expect(r.map((e) => e.estacionNombre)).toEqual([null, null]);
   });
 });

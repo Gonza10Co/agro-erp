@@ -52,7 +52,7 @@ type ItemTimeline =
                 @for (item of timeline(); track item.kind + '-' + itemId(item)) {
                   @if (item.kind === 'evento') {
                     <li>
-                      <span class="tl-cel">{{ label(item.evento.celula) }}@if (item.evento.subPaso) { · {{ subPasoLabel(item.evento.subPaso) }} }@if (item.evento.subPasoInyeccion) { · {{ subPasoInyeccionLabel(item.evento.subPasoInyeccion) }} }</span>
+                      <span class="tl-cel">@if (item.evento.estacionNombre) { {{ item.evento.estacionNombre }} } @else { {{ label(item.evento.celula) }}@if (item.evento.subPaso) { · {{ subPasoLabel(item.evento.subPaso) }} }@if (item.evento.subPasoInyeccion) { · {{ subPasoInyeccionLabel(item.evento.subPasoInyeccion) }} } }</span>
                       <span class="cell-sub">{{ item.evento.operario.nombre }}@if (item.evento.maquina) { · {{ item.evento.maquina.nombre }} }</span>
                       <span class="cell-sub mono">{{ item.evento.timestamp | date:'dd MMM HH:mm' }}</span>
                     </li>
