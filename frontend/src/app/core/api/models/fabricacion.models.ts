@@ -97,6 +97,8 @@ export interface EventoTrazabilidad {
   celula: Celula;
   subPaso: SubPasoGuarnicion | null;
   subPasoInyeccion: SubPasoInyeccion | null;
+  /** Estación a la que ENTRÓ el par (piloto); null en los escaneos de antes. */
+  estacionNombre?: string | null;
   timestamp: string;
   operario: { nombre: string };
   maquina: { nombre: string };

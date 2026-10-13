@@ -192,6 +192,23 @@ export const ESTACIONES_PILOTO: readonly EstacionDef[] = [
 ];
 
 /**
+ * El recorrido del par nombra la estación a la que ENTRÓ (el pistolazo es de entrada):
+ * el evento guarda también de dónde venía, y mostrar eso hacía ver la entrada a Bodega
+ * como "Guarnición · Preparación" (2026-10-13). Los eventos de antes del piloto no
+ * tienen estación y la pantalla los sigue nombrando por célula.
+ */
+export function conNombreDeEstacion<T extends { estacionDestino?: string | null }>(
+  eventos: T[],
+  estaciones: readonly Pick<EstacionDef, 'codigo' | 'nombre'>[],
+): (T & { estacionNombre: string | null })[] {
+  const nombres = new Map(estaciones.map((e) => [e.codigo, e.nombre]));
+  return eventos.map((e) => ({
+    ...e,
+    estacionNombre: (e.estacionDestino && nombres.get(e.estacionDestino)) || null,
+  }));
+}
+
+/**
  * Posición absoluta de un estado en el flujo físico (célula × 100 + sub-paso).
  * Sirve para comparar cualquier par —nacido en el piloto o antes— contra las
  * estaciones: la siguiente estación es la primera activa con rango mayor.

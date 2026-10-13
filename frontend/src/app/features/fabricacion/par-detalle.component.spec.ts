@@ -110,4 +110,24 @@ describe('ParDetalleComponent', () => {
     expect(text).toContain('Gloria');
     http.verify();
   });
+
+  it('nombra la estación a la que entró el par (el pistolazo es de entrada), no de dónde venía', () => {
+    const { fixture, http } = setup();
+    http.expectOne('http://localhost:3001/fabricacion/par/OF5-0001').flush({
+      id: 9, codigo: 'OF5-0001', estado: 'EN_PROCESO', celulaActual: 'ALMACEN',
+      of: { consecutivo: 5 }, talla: { valor: 39 },
+      eventos: [
+        { id: 1, celula: 'GUARNICION', subPaso: 'PREPARACION', estacionNombre: 'Preparación',
+          timestamp: '2026-10-06T15:34:00Z', operario: { nombre: 'Valentina' }, maquina: null },
+        { id: 2, celula: 'GUARNICION', subPaso: 'PREPARACION', estacionNombre: 'Bodega de corte',
+          timestamp: '2026-10-13T09:27:00Z', operario: { nombre: 'Valentina' }, maquina: null },
+      ],
+      incidencias: [], reponeA: null, repuestoPor: null,
+    });
+    fixture.detectChanges();
+    const pasos = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.tl-cel'))
+      .map((e) => e.textContent?.trim());
+    expect(pasos).toEqual(['Preparación', 'Bodega de corte']);
+    http.verify();
+  });
 });
