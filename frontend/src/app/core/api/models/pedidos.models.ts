@@ -178,6 +178,8 @@ export interface Factura {
   iva: string;
   total: string;
   estado: EstadoFactura;
+  /** El detalle trae el cliente en la factura misma (las de servicio no tienen despacho). */
+  cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'>;
   despacho?: { consecutivo: number; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
   lineas?: FacturaLinea[];
 }
