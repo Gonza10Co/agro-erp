@@ -13,8 +13,8 @@ import { Factura } from '../../core/api/models/pedidos.models';
     @if (!cargando() && factura(); as f) {
       <div class="kv-list">
         <div class="kv"><span class="k">Factura</span><span class="v cell-mono">FAC-{{ f.consecutivo }}</span></div>
-        <div class="kv"><span class="k">Cliente</span><span class="v">{{ f.despacho?.op?.oc?.cliente?.nombre }}</span></div>
-        <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ f.despacho?.op?.oc?.cliente?.nit }}</span></div>
+        <div class="kv"><span class="k">Cliente</span><span class="v">{{ f.cliente?.nombre ?? f.despacho?.op?.oc?.cliente?.nombre }}</span></div>
+        <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ f.cliente?.nit ?? f.despacho?.op?.oc?.cliente?.nit }}</span></div>
         <div class="kv"><span class="k">Despacho</span><span class="v cell-mono">DSP-{{ f.despacho?.consecutivo }} · OP-{{ f.despacho?.op?.consecutivo }}</span></div>
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ f.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge badge-neutral"><span class="dot"></span>{{ f.estado }}</span></span></div>
