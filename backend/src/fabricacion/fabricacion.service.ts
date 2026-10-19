@@ -608,6 +608,10 @@ export class FabricacionService {
               lineaId: par.lineaId ?? null,
             },
           });
+          // Cierre del ciclo: el par que termina queda reservado para el pedido
+          // que lo mandó a fabricar. Sin esto la OP nunca llega a despacharse:
+          // el despacho sale de las reservas y el stock quedaría suelto en bodega.
+          await this.reservarParaSuOP(tx, par, inv.id, calidad);
           // El par ya fue marcado TERMINADO en esta misma tx, así que
           // este count no lo incluye (cuenta solo los que aún siguen en proceso).
           const restantes = await tx.par.count({
@@ -665,6 +669,50 @@ export class FabricacionService {
         parReposicion,
       },
     };
+  }
+
+  /**
+   * Un par PRIMERA que entra a PT se reserva para la talla de la OP que lo
+   * programó (misma OP, producto y grado), hasta cubrir lo amarrado + lo
+   * a producir. `cantAProducir` NO se toca: es lo programado y lo leen el
+   * corte y los tableros. Lo que sobre (reposiciones de más, segundas) queda
+   * libre en bodega para otro pedido.
+   */
+  private async reservarParaSuOP(
+    tx: any,
+    par: { ofId: number; productoConfiguradoId: number; tallaId: number; of?: { opId?: number } | null },
+    inventarioPTId: number,
+    calidad: 'PRIMERA' | 'SEGUNDA',
+  ) {
+    const opId = par.of?.opId;
+    if (!opId) return;
+    const talla = await tx.ordenProduccionLineaTalla.findFirst({
+      where: {
+        tallaId: par.tallaId,
+        opLinea: { opId, productoConfiguradoId: par.productoConfiguradoId, calidad },
+      },
+      include: { reservas: { select: { id: true, inventarioPTId: true, cantidad: true } } },
+    });
+    if (!talla) return;
+    const reservado = (talla.reservas ?? []).reduce((acc: number, r: any) => acc + r.cantidad, 0);
+    if (reservado >= (talla.cantAmarrada ?? 0) + (talla.cantAProducir ?? 0)) return;
+
+    const existente = await tx.reservaInventarioPT.findFirst({
+      where: { opLineaTallaId: talla.id, inventarioPTId },
+    });
+    if (existente)
+      await tx.reservaInventarioPT.update({
+        where: { id: existente.id },
+        data: { cantidad: { increment: 1 } },
+      });
+    else
+      await tx.reservaInventarioPT.create({
+        data: { opLineaTallaId: talla.id, inventarioPTId, cantidad: 1 },
+      });
+    await tx.inventarioPT.update({
+      where: { id: inventarioPTId },
+      data: { cantReservada: { increment: 1 } },
+    });
   }
 
   /**

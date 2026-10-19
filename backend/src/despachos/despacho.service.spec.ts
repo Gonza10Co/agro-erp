@@ -49,11 +49,24 @@ describe('DespachoService', () => {
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(BadRequestException);
   });
 
-  it('409 si la OP tiene producción pendiente (cantAProducir > 0)', async () => {
+  it('400 si la OP tiene producción pendiente (lo reservado no cubre amarrado + a producir)', async () => {
     const op = opBase();
+    // 5 amarrados de bodega + 2 por fabricar; solo hay 5 reservados → faltan 2 pares.
+    (op.lineas[0].tallas[0] as any).cantAmarrada = 5;
     op.lineas[0].tallas[0].cantAProducir = 2;
     prisma.ordenProduccion.findUnique.mockResolvedValue(op);
-    await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(BadRequestException);
+    await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(/faltan 2 pares/);
+  });
+
+  it('una OP fabricada se despacha: lo producido quedó reservado al entrar a PT, aunque cantAProducir siga siendo lo programado', async () => {
+    const op = opBase();
+    (op.lineas[0].tallas[0] as any).cantAmarrada = 0;
+    op.lineas[0].tallas[0].cantAProducir = 5; // lo programado no cambia al producir
+    prisma.ordenProduccion.findUnique.mockResolvedValue(op); // reservas: 5 (los 5 pares terminados)
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 6n }]);
+    prisma.despacho.create.mockResolvedValue({ id: 2, consecutivo: 6 });
+    await expect(service.despachar({ opId: 1 }, operario)).resolves.toBeDefined();
+    expect(prisma.despacho.create).toHaveBeenCalled();
   });
 
   it('409 si cartera VENCIDO y no se autoriza', async () => {
