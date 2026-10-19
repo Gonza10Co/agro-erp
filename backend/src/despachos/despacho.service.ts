@@ -37,12 +37,22 @@ export class DespachoService {
     if (op.despacho) throw new BadRequestException('La OP ya fue despachada');
     if (op.estado !== 'AMARRADA')
       throw new BadRequestException('Solo se puede despachar una OP AMARRADA');
-    const pendiente = op.lineas.some((l: any) =>
-      l.tallas.some((t: any) => t.cantAProducir > 0),
+    // Producción pendiente = lo que el pedido necesita (amarrado de bodega +
+    // programado a fabricar) menos lo que ya tiene reservado (el amarre inicial
+    // más cada par que entró a PT). `cantAProducir` no baja al producir: es lo
+    // programado, y así lo leen el corte y los tableros.
+    const faltan = op.lineas.reduce(
+      (acc: number, l: any) =>
+        acc +
+        l.tallas.reduce((a: number, t: any) => {
+          const reservado = (t.reservas ?? []).reduce((x: number, r: any) => x + r.cantidad, 0);
+          return a + Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - reservado, 0);
+        }, 0),
+      0,
     );
-    if (pendiente)
+    if (faltan > 0)
       throw new BadRequestException(
-        'OP con producción pendiente; no se puede despachar',
+        `OP con producción pendiente: faltan ${faltan} pares por terminar; no se puede despachar`,
       );
 
     const estado = op.oc.cliente.estadoCartera;
