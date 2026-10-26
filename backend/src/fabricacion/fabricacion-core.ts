@@ -368,3 +368,18 @@ export function inicioDelDiaBogota(ahora: Date): Date {
     Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), OFFSET_BOGOTA_HORAS),
   );
 }
+
+/**
+ * Deja el código de un par tal como se guardó (`OF19-0021`), venga de donde venga.
+ * La pistola teclea en el idioma de teclado que tenga configurado: con el teclado
+ * latino el guion puede llegar como `'` o `?`, y a mano llega en minúsculas o con
+ * espacios. Cualquier separador entre `OF<n>` y el consecutivo vuelve a ser guion,
+ * y el consecutivo recupera sus 4 cifras. Lo que no tenga forma de código de par se
+ * devuelve solo en mayúsculas y sin espacios (lo resuelve el "no existe" de siempre).
+ */
+export function normalizarCodigoPar(crudo: string): string {
+  const limpio = (crudo ?? '').toUpperCase().replace(/\s+/g, '');
+  const m = /^OF(\d+)[^A-Z0-9]+(\d+)$/.exec(limpio);
+  if (!m) return limpio;
+  return `OF${Number(m[1])}-${m[2].padStart(4, '0')}`;
+}

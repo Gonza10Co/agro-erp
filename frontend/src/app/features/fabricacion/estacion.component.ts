@@ -1,4 +1,4 @@
-import { Component, DestroyRef, NgZone, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
@@ -16,6 +16,7 @@ import {
   motivoFalloEtiqueta, precargarGeneradorEtiquetas,
 } from './etiqueta-par-pdf';
 import { agruparPrograma } from './programa-of';
+import { normalizarCodigoPar } from './codigo-par';
 
 /** Lo que ve el operario después de un pistolazo o un nacimiento: grande, de reojo. */
 interface Resultado {
@@ -443,6 +444,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   selOperario?: number;
   selMaquina?: number;
   codigo = '';
+  @ViewChild('scan') private scanInput?: ElementRef<HTMLInputElement>;
 
   estacionActual = computed(() => this.estaciones().find((e) => e.codigo === this.config()?.estacion));
   /** En PT el botón de calidad es la inspección: "no aprobó" en vez de "algo pasó". */
@@ -519,6 +521,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
     this.config.set(c);
     guardarConfig(c);
     this.configurando.set(false);
+    this.enfocarScan();
     this.resultado.set(null);
     this.arrancar();
   }
@@ -663,7 +666,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
 
   escanear(): void {
     const c = this.config();
-    const cod = this.codigo.trim();
+    const cod = normalizarCodigoPar(this.codigo);
     if (!c || !cod) return;
     this.codigo = '';
     let dano: DanoEscaneo | undefined;
@@ -673,6 +676,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
       if (falta) {
         this.resultado.set({ ok: false, titulo: cod, detalle: falta });
         this.reanudarCamaraConGracia();
+        this.enfocarScan();
         return;
       }
       dano = {
@@ -690,10 +694,12 @@ export class EstacionComponent implements OnInit, OnDestroy {
         // Una lectura por reporte: el siguiente escaneo vuelve a ser normal.
         if (dano) this.cerrarCalidad();
         this.reanudarCamaraConGracia();
+        this.enfocarScan();
       },
       error: (e) => {
         this.resultado.set({ ok: false, titulo: cod, detalle: this.msgError(e, 'No se pudo registrar el pistolazo') });
         this.reanudarCamaraConGracia();
+        this.enfocarScan();
       },
     });
   }
@@ -839,6 +845,30 @@ export class EstacionComponent implements OnInit, OnDestroy {
   private reanudarCamaraConGracia(): void {
     if (!this.lector) return;
     setTimeout(() => this.lector?.reanudar(), 1500);
+  }
+
+  /**
+   * La pistola teclea donde esté el foco: sin foco en el campo, el pistolazo se pierde.
+   * Por eso el campo lo recupera tras cada lectura, y si el operario tocó la pantalla
+   * (el foco quedó en la página o en un botón) la primera tecla de la pistola lo devuelve al campo.
+   */
+  private enfocarScan(): void {
+    requestAnimationFrame(() => this.scanInput?.nativeElement.focus());
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  rescatarPistolazo(ev: KeyboardEvent): void {
+    const input = this.scanInput?.nativeElement;
+    if (!input || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    // Si el foco quedó en un botón, el Enter final de la pistola lo "clicaría":
+    // solo se respeta el foco cuando el operario está escribiendo en otro campo.
+    const activo = document.activeElement as HTMLElement | null;
+    const escribiendo = !!activo && (['INPUT', 'TEXTAREA', 'SELECT'].includes(activo.tagName) || activo.isContentEditable);
+    if (escribiendo || ev.key.length !== 1) return;
+    input.focus();
+    // La tecla que despertó el foco ya pasó: se agrega para no perder el primer carácter.
+    this.codigo += ev.key;
+    ev.preventDefault();
   }
 
   private msgError(e: { status?: number; error?: { message?: string | string[] } }, porDefecto: string): string {
