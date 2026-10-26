@@ -6,8 +6,9 @@ export interface Tramo {
   subPaso: SubPasoGuarnicion | null;
   operarioId: number;
   operarioNombre: string;
-  maquinaId: number;
-  maquinaNombre: string;
+  /** Null en las estaciones que no registran máquina (las del piloto de planta). */
+  maquinaId: number | null;
+  maquinaNombre: string | null;
   duracionMin: number;
 }
 
@@ -17,8 +18,8 @@ export interface EventoConRecursos {
   subPaso: SubPasoGuarnicion | null;
   operarioId: number;
   operario: { nombre: string };
-  maquinaId: number;
-  maquina: { nombre: string };
+  maquinaId: number | null;
+  maquina: { nombre: string } | null;
   timestamp: Date;
 }
 
@@ -40,7 +41,7 @@ export function calcularTramos(createdAt: Date, eventos: EventoConRecursos[]): T
       operarioId: e.operarioId,
       operarioNombre: e.operario.nombre,
       maquinaId: e.maquinaId,
-      maquinaNombre: e.maquina.nombre,
+      maquinaNombre: e.maquina?.nombre ?? null,
       duracionMin: minutosEntre(prev, e.timestamp),
     });
     prev = e.timestamp;
@@ -112,16 +113,18 @@ export interface MaquinaAgrupada {
   promedioMin: number;
 }
 
-/** Promedio y conteo de tramos por máquina, ordenado por # tramos desc (desempate nombre asc). */
+/** Promedio y conteo de tramos por máquina (los tramos sin máquina se omiten), ordenado por # tramos desc (desempate nombre asc). */
 export function agruparPorMaquina(tramos: Tramo[]): MaquinaAgrupada[] {
   const mapa = new Map<number, { nombre: string; suma: number; conteo: number }>();
   for (const t of tramos) {
+    // Un tramo sin máquina no se le atribuye a ninguna: cuenta en etapas y operarios.
+    if (t.maquinaId == null) continue;
     const g = mapa.get(t.maquinaId);
     if (g) {
       g.suma += t.duracionMin;
       g.conteo++;
     } else {
-      mapa.set(t.maquinaId, { nombre: t.maquinaNombre, suma: t.duracionMin, conteo: 1 });
+      mapa.set(t.maquinaId, { nombre: t.maquinaNombre ?? `Máquina ${t.maquinaId}`, suma: t.duracionMin, conteo: 1 });
     }
   }
   return Array.from(mapa.entries())
