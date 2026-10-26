@@ -56,3 +56,20 @@ describe('detectarDemoras', () => {
     expect(al).toEqual([]);
   });
 });
+
+describe('eventos sin máquina (estaciones del piloto de planta)', () => {
+  it('calcularTramos no revienta y deja la máquina en null', () => {
+    const createdAt = new Date('2026-10-16T06:00:00Z');
+    const eventos = [{ celula: 'GUARNICION', subPaso: 'MONTAJE', operarioId: 3, operario: { nombre: 'Valen' }, maquinaId: null, maquina: null, timestamp: new Date('2026-10-16T06:36:00Z') }];
+    expect(calcularTramos(createdAt, eventos as any)[0]).toMatchObject({ operarioId: 3, maquinaId: null, maquinaNombre: null, duracionMin: 36 });
+  });
+  it('porMaquina omite los tramos sin máquina; etapas y operarios sí los cuentan', () => {
+    const tramos = [
+      { celula: 'CORTE', subPaso: null, operarioId: 1, operarioNombre: 'A', maquinaId: null, maquinaNombre: null, duracionMin: 10 },
+      { celula: 'CORTE', subPaso: null, operarioId: 1, operarioNombre: 'A', maquinaId: 7, maquinaNombre: 'M7', duracionMin: 20 },
+    ];
+    expect(agruparPorMaquina(tramos as any)).toEqual([{ maquinaId: 7, nombre: 'M7', tramos: 1, promedioMin: 20 }]);
+    expect(agruparPorOperario(tramos as any)[0]).toMatchObject({ tramos: 2, promedioMin: 15 });
+    expect(agruparPorEtapa(tramos as any)[0]).toMatchObject({ tramos: 2, promedioMin: 15 });
+  });
+});

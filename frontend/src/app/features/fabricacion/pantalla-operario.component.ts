@@ -10,6 +10,7 @@ import { CalidadApi } from '../../core/api/calidad.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { TipoDano } from '../../core/api/models/calidad.models';
 import { LectorCamara, abrirLectorCamara, hayCamara } from './lector-camara';
+import { normalizarCodigoPar } from './codigo-par';
 
 @Component({
   selector: 'app-pantalla-operario',
@@ -309,7 +310,7 @@ export class PantallaOperarioComponent implements OnInit, AfterViewInit, OnDestr
   }
 
   buscar(): void {
-    const c = this.codigo.trim();
+    const c = normalizarCodigoPar(this.codigo);
     if (!c) return;
     this.par.set(null);
     this.msg.set(null);

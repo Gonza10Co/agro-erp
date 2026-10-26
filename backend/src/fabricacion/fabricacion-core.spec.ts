@@ -20,6 +20,7 @@ import {
   paresPorEstacion,
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
+  normalizarCodigoPar,
 } from './fabricacion-core';
 
 describe('siguienteCelula', () => {
@@ -409,5 +410,25 @@ describe('conNombreDeEstacion', () => {
   it('los escaneos de antes del piloto (sin estación) quedan sin nombre', () => {
     const r = conNombreDeEstacion([{ id: 1, estacionDestino: null }, { id: 2, estacionDestino: 'NO_EXISTE' }], ESTACIONES_PILOTO);
     expect(r.map((e) => e.estacionNombre)).toEqual([null, null]);
+  });
+});
+
+describe('normalizarCodigoPar', () => {
+  it.each([
+    ['OF19-0021', 'OF19-0021'],
+    ['of19-0021', 'OF19-0021'],
+    ['  OF19-0021\r\n', 'OF19-0021'],
+    ["OF19'0021", 'OF19-0021'], // pistola con teclado latino
+    ['OF19?0021', 'OF19-0021'],
+    ['OF19_0021', 'OF19-0021'],
+    ['OF19 - 21', 'OF19-0021'],
+    ['OF9006-12345', 'OF9006-12345'],
+  ])('%j → %s', (crudo, esperado) => {
+    expect(normalizarCodigoPar(crudo)).toBe(esperado);
+  });
+
+  it('lo que no parece un código de par solo se limpia', () => {
+    expect(normalizarCodigoPar(' agr-861 ')).toBe('AGR-861');
+    expect(normalizarCodigoPar('OF190021')).toBe('OF190021');
   });
 });

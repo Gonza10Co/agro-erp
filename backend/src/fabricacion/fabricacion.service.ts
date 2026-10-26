@@ -22,6 +22,7 @@ import {
   inicioDelDiaBogota,
   OFFSET_BOGOTA_HORAS,
   conNombreDeEstacion,
+  normalizarCodigoPar,
 } from './fabricacion-core';
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
@@ -437,7 +438,8 @@ export class FabricacionService {
     });
   }
 
-  async avanzar(codigo: string, dto: AvanzarDto, user?: Usuario) {
+  async avanzar(codigoLeido: string, dto: AvanzarDto, user?: Usuario) {
+    const codigo = normalizarCodigoPar(codigoLeido);
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       // La línea decide dónde nace la reposición de una segunda (Feroz → Montaje).
@@ -996,7 +998,8 @@ export class FabricacionService {
     return posicion(est);
   }
 
-  async obtenerPar(codigo: string) {
+  async obtenerPar(codigoLeido: string) {
+    const codigo = normalizarCodigoPar(codigoLeido);
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       include: {
