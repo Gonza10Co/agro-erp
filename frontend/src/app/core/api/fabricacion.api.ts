@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
+import { SIN_TOAST_ERROR } from '../interceptors/error-toast.interceptor';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
@@ -24,7 +25,7 @@ export class FabricacionApi {
    * Un pistolazo. La máquina es opcional (en Bodega o PT no hay) y la estación,
    * si se manda, hace que el backend rechace el escaneo si el par se saltó una.
    */
-  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string, dano?: DanoEscaneo) {
+  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string, dano?: DanoEscaneo, sinToastError = false) {
     const nota = dano?.descripcion?.trim();
     return this.http.post<AvanceResultado>(
       `${this.base}/fabricacion/par/${codigo}/avanzar`,
@@ -41,6 +42,7 @@ export class FabricacionApi {
             }
           : {}),
       },
+      { context: new HttpContext().set(SIN_TOAST_ERROR, sinToastError) },
     );
   }
   /** Nacen pares de la OF en su estación inicial: una etiqueta por lengua. */

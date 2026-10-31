@@ -1,11 +1,23 @@
 import { Injectable, signal } from '@angular/core';
 
-export type ToastTipo = 'exito' | 'error' | 'info';
+export type ToastTipo = 'exito' | 'error' | 'info' | 'alerta';
 
 export interface Toast {
   id: number;
   tipo: ToastTipo;
   mensaje: string;
+  /** Línea secundaria (p. ej. "van 12 hoy"). */
+  detalle?: string;
+  /** No se va solo: queda hasta que alguien lo toque (errores del pistolazo). */
+  fijo?: boolean;
+  /** Más grande, para leerlo de lejos en la estación. */
+  grande?: boolean;
+}
+
+export interface OpcionesToast {
+  detalle?: string;
+  fijo?: boolean;
+  grande?: boolean;
 }
 
 /** Cuánto vive cada toast en pantalla antes de auto-descartarse. */
@@ -13,6 +25,7 @@ const DURACION_MS: Record<ToastTipo, number> = {
   exito: 4000,
   info: 5000,
   error: 7000,
+  alerta: 6000,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -32,13 +45,17 @@ export class ToastService {
     this.mostrar('info', mensaje);
   }
 
+  alerta(mensaje: string): void {
+    this.mostrar('alerta', mensaje);
+  }
+
   cerrar(id: number): void {
     this.toasts.update((ts) => ts.filter((t) => t.id !== id));
   }
 
-  private mostrar(tipo: ToastTipo, mensaje: string): void {
+  mostrar(tipo: ToastTipo, mensaje: string, opts: OpcionesToast = {}): void {
     const id = ++this.seq;
-    this.toasts.update((ts) => [...ts, { id, tipo, mensaje }]);
-    setTimeout(() => this.cerrar(id), DURACION_MS[tipo]);
+    this.toasts.update((ts) => [...ts, { id, tipo, mensaje, ...opts }]);
+    if (!opts.fijo) setTimeout(() => this.cerrar(id), DURACION_MS[tipo]);
   }
 }

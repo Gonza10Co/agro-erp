@@ -17,6 +17,7 @@ import {
   esEstacionTerminal,
   estacionNacimiento,
   validarEstacion,
+  esPistolazoRepetido,
   paresPorEstacion,
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
@@ -476,7 +477,11 @@ export class FabricacionService {
     const estaciones = await this.estaciones();
     if (dto.estacion) {
       const rechazo = validarEstacion(estado, dto.estacion, estaciones);
-      if (rechazo) throw new ConflictException(rechazo);
+      if (rechazo) {
+        // `motivo` deja a la pantalla distinguir el doble pistolazo (amarillo) del error real (rojo).
+        const motivo = esPistolazoRepetido(estado, dto.estacion, estaciones) ? 'REPETIDO' : 'FUERA_DE_ORDEN';
+        throw new ConflictException({ statusCode: 409, error: 'Conflict', message: rechazo, motivo });
+      }
     }
     const next = siguienteEstacion(estado, estaciones);
     // Entrar a Producto terminado ES terminar (5º pistolazo: carga la bodega).

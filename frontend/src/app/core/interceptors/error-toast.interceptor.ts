@@ -1,4 +1,4 @@
-import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpContextToken, HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { ToastService } from '../notificaciones/toast.service';
@@ -8,12 +8,15 @@ import { ToastService } from '../notificaciones/toast.service';
  * Excluye 401 (lo maneja authErrorInterceptor con logout+redirect) y el
  * login (que muestra su error inline) para no duplicar feedback.
  */
+/** La petición muestra su propio aviso (p. ej. el pistolazo): no se toastea dos veces. */
+export const SIN_TOAST_ERROR = new HttpContextToken<boolean>(() => false);
+
 export const errorToastInterceptor: HttpInterceptorFn = (req, next) => {
   const toast = inject(ToastService);
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
       const esLogin = req.url.endsWith('/auth/login');
-      if (err.status !== 401 && !esLogin) {
+      if (err.status !== 401 && !esLogin && !req.context.get(SIN_TOAST_ERROR)) {
         toast.error(mensajeDeError(err));
       }
       return throwError(() => err);

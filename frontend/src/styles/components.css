@@ -383,3 +383,13 @@ table.data .cell-sub{color:var(--text-muted);font-size:var(--text-caption)}
 
 .flex{display:flex} .between{justify-content:space-between} .center{align-items:center} .gap-1{gap:4px} .gap-2{gap:8px} .gap-3{gap:12px} .gap-4{gap:16px}
 .wrap-flex{flex-wrap:wrap} .col{flex-direction:column} .grow{flex:1}
+
+/* Avisos del pistolazo: se leen de lejos en la estación, con el color de fondo del resultado. */
+.toast.toast-grande{padding:16px 18px;border-width:2px}
+.toast.toast-grande .t-msg{font-size:var(--text-lg, 1.15rem);font-weight:var(--fw-semibold)}
+.toast.toast-grande .t-desc{display:block;font-size:var(--text-sm);font-weight:normal}
+.toast.toast-grande .t-ic{width:26px;height:26px}
+.toast.toast-grande.success{border-color:var(--success);background:color-mix(in srgb, var(--success) 12%, var(--surface-raised))}
+.toast.toast-grande.warning{border-color:var(--warning);background:color-mix(in srgb, var(--warning) 16%, var(--surface-raised))}
+.toast.toast-grande.error{border-color:var(--error);background:color-mix(in srgb, var(--error) 14%, var(--surface-raised));cursor:pointer}
+.toast .t-msg .t-desc{display:block}

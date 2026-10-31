@@ -294,12 +294,28 @@ export function validarEstacion(
 ): string | null {
   const est = estaciones.find((x) => x.codigo === declarada);
   if (!est || !est.activa) return `La estación "${declarada}" no existe o está apagada`;
+  if (esPistolazoRepetido(e, declarada, estaciones)) {
+    return `Este par ya está registrado en ${est.nombre}: no se cuenta dos veces`;
+  }
   const next = siguienteEstacion(e, estaciones);
   if (next === null) return 'El par ya recorrió todas las estaciones';
   if (next.codigo === declarada) return null;
   const actual = estacionDeEstado(e, estaciones);
   const desde = actual ? `viene de ${actual.nombre}` : 'todavía no ha pasado por la estación anterior';
   return `Este par ${desde}: le toca ${next.nombre}, no ${est.nombre}`;
+}
+
+/**
+ * El par ya está en la estación que lo escanea: un doble pistolazo (o un par que
+ * se devolvió a la canasta). No es un error de proceso; la pantalla lo muestra
+ * en amarillo y no lo cuenta otra vez.
+ */
+export function esPistolazoRepetido(
+  e: EstadoPar,
+  declarada: string,
+  estaciones: readonly EstacionDef[],
+): boolean {
+  return estacionDeEstado(e, estaciones)?.codigo === declarada;
 }
 
 /** Lo mínimo de un par para el tablero por órdenes. */
