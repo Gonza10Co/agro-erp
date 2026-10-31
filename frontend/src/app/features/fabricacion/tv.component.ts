@@ -5,7 +5,7 @@ import { FabricacionApi } from '../../core/api/fabricacion.api';
 import { HoyEstacion } from '../../core/api/models/fabricacion.models';
 
 /** Cada cuánto se refresca sola la pantalla de planta. */
-export const TV_REFRESCO_MS = 30_000;
+export const TV_REFRESCO_MS = 5_000;
 
 /** Porcentaje de avance sobre la meta, tope 100. */
 export function pctMeta(hoy: number, meta: number): number {
@@ -17,7 +17,7 @@ export function pctMeta(hoy: number, meta: number): number {
  * TV de planta (piloto 2026-09-09): un número gigante por estación, hoy contra la
  * meta del día, y cuántos en la última hora. Reemplaza el tablero manual
  * "HORA / N° PARES" que llevan con marcador. Se lee de reojo a 5 metros: nada de
- * pares, nada de tablas. Se refresca sola cada 30 segundos.
+ * pares, nada de tablas. Se refresca sola cada 5 segundos.
  */
 @Component({
   selector: 'app-tv-planta',

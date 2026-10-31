@@ -17,6 +17,7 @@ import {
 } from './etiqueta-par-pdf';
 import { agruparPrograma } from './programa-of';
 import { normalizarCodigoPar } from './codigo-par';
+import { mantenerPantallaEncendida } from './pantalla-encendida';
 
 /** Lo que ve el operario después de un pistolazo o un nacimiento: grande, de reojo. */
 interface Resultado {
@@ -459,8 +460,12 @@ export class EstacionComponent implements OnInit, OnDestroy {
   maquinaNombre = computed(() => this.maquinas().find((m) => m.id === this.config()?.maquinaId)?.nombre ?? '');
   nombreSel = () => this.estaciones().find((e) => e.codigo === this.selEstacion)?.nombre ?? '';
 
+  /** Suelta el candado de pantalla al salir de la estación. */
+  private soltarPantalla: () => void = () => {};
+
   ngOnInit(): void {
     precargarGeneradorEtiquetas();
+    this.soltarPantalla = mantenerPantallaEncendida();
     this.api.estaciones().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (es) => {
         this.estaciones.set(es);
@@ -482,6 +487,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.soltarPantalla();
     void this.cerrarCamara();
   }
 

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, finalize, map, shareReplay, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 interface Tokens { accessToken: string; refreshToken: string; }
@@ -63,6 +63,31 @@ export class AuthService {
         localStorage.setItem('refreshToken', tokens.refreshToken);
       }),
     );
+  }
+
+  /** Renovación en vuelo: si varios pistolazos rebotan a la vez, todos esperan la misma. */
+  private renovando: Observable<string> | null = null;
+
+  /**
+   * Cambia el refresh token guardado por un par nuevo y devuelve el access token.
+   * Lo usa el interceptor ante un 401: así la tablet de la estación nunca vuelve
+   * al login mientras se use al menos una vez por semana.
+   */
+  renovar(): Observable<string> {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return throwError(() => new Error('Sin refresh token'));
+    if (!this.renovando) {
+      this.renovando = this.http.post<Tokens>(`${this.apiUrl}/auth/refresh`, { refreshToken }).pipe(
+        tap((tokens) => {
+          localStorage.setItem('accessToken', tokens.accessToken);
+          localStorage.setItem('refreshToken', tokens.refreshToken);
+        }),
+        map((tokens) => tokens.accessToken),
+        finalize(() => (this.renovando = null)),
+        shareReplay(1),
+      );
+    }
+    return this.renovando;
   }
 
   logout(): void {
