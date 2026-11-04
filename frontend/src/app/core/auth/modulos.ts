@@ -205,6 +205,7 @@ const ALCANCE_ROL: Record<string, NivelLiberacion> = {
   CLIENTE: 'ENTREGADO',
   STAGE: 'EN_STAGE',
   JEFE_CORTE: 'ENTREGADO',
+  ESTACION: 'ENTREGADO',
 };
 
 function alcanceRol(rol: string | null | undefined): NivelLiberacion {
@@ -222,6 +223,12 @@ function alcanceRol(rol: string | null | undefined): NivelLiberacion {
 interface AccesoRol {
   modulos: readonly Modulo[];
   secciones: readonly Seccion[];
+  /**
+   * Pantallas permitidas dentro de esos módulos, por URL. Hace falta cuando el rol
+   * solo debe ver UNA PARTE de un módulo (la tablet ve la estación y los tableros
+   * de fabricación, no las OF ni el consumo). Sin lista, vale todo el módulo.
+   */
+  rutas?: readonly RegExp[];
   /** A dónde aterriza el rol (y a dónde lo devuelve el guard). */
   rutaInicial: string;
 }
@@ -230,6 +237,16 @@ const ACCESO_ROL: Record<string, AccesoRol> = {
   // Jefe de corte (2026-10-05): la orden de corte del día y sus avances. Nada de
   // precios, cartera, clientes, facturas, compras ni el resto de fabricación.
   JEFE_CORTE: { modulos: ['corte'], secciones: ['programacion-corte'], rutaInicial: '/corte' },
+  // Tablet de estación (2026-11-04): el usuario con el que queda logueada cada tablet
+  // de planta. La estación (con "algo pasó con este par"), los tableros, el detalle
+  // del par y la TV. Nada de OF, consumo, pantalla del operario vieja ni guarnición.
+  // Espejo de la lista ESTACION en `acceso-por-rol.ts`.
+  ESTACION: {
+    modulos: ['fabricacion'],
+    secciones: ['piloto', 'calidad-en-planta'],
+    rutas: [/^\/fabricacion\/estacion$/, /^\/fabricacion\/ordenes$/, /^\/fabricacion\/tablero$/, /^\/fabricacion\/par\/[^/]+$/, /^\/tv$/],
+    rutaInicial: '/fabricacion/estacion',
+  },
 };
 
 function accesoRol(rol: string | null | undefined): AccesoRol | undefined {
@@ -260,6 +277,17 @@ export function puedeVerModulo(rol: string | null | undefined, modulo: Modulo): 
   const acceso = accesoRol(rol);
   if (acceso && !acceso.modulos.includes(modulo)) return false;
   return puedeVerNivel(rol, NIVEL_MODULO[modulo]);
+}
+
+/**
+ * ¿El rol puede abrir esta URL? Solo filtra a los roles acotados con lista de rutas;
+ * para el resto manda el módulo y la sección. La URL se compara sin query string.
+ */
+export function puedeVerRuta(rol: string | null | undefined, url: string | null | undefined): boolean {
+  const rutas = accesoRol(rol)?.rutas;
+  if (!rutas || !url) return true;
+  const limpia = url.split('?')[0].split('#')[0];
+  return rutas.some((r) => r.test(limpia));
 }
 
 /** Ruta de aterrizaje según el rol (a dónde enviar si cae en una ruta no permitida). */

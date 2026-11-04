@@ -196,4 +196,14 @@ describe('ShellComponent', () => {
     expect(host.textContent).toContain('Jefe de corte');
     expect(host.querySelector('a.brand')?.getAttribute('href')).toBe('/corte');
   });
+
+  it('la tablet de ESTACION ve los tableros, la estación y la TV; no las OF', () => {
+    const payload = btoa(JSON.stringify({ sub: 4, username: 'montaje', role: 'ESTACION' }));
+    localStorage.setItem('accessToken', `x.${payload}.y`);
+    const { host } = crear();
+    const items = [...host.querySelectorAll('.nav-item .nav-label')].map((e) => e.textContent?.trim());
+    expect(items).toEqual(['Tablero por estaciones', 'Tablero por órdenes', 'Estación', 'TV de planta']);
+    expect(host.textContent).toContain('Estación');
+    expect(host.querySelector('a.brand')?.getAttribute('href')).toBe('/fabricacion/estacion');
+  });
 });

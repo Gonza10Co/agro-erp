@@ -4,7 +4,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { filter } from 'rxjs';
 import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.component';
 import { AuthService } from '../../core/auth/auth.service';
-import { Modulo, Seccion, puedeVerModulo, puedeVerSeccion, rutaInicial } from '../../core/auth/modulos';
+import { Modulo, Seccion, puedeVerModulo, puedeVerRuta, puedeVerSeccion, rutaInicial } from '../../core/auth/modulos';
 
 const SIDEBAR_KEY = 'agro-sidebar';
 const GRUPOS_KEY = 'agro-nav-grupos';
@@ -119,13 +119,13 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
             <span class="nav-label">Control de corte</span>
           </a>
           }
-          @if (puedeVer('fabricacion')) {
+          @if (puedeVer('fabricacion') && puedeIr('/fabricacion')) {
           <a class="nav-item" routerLink="/fabricacion" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Órdenes de fabricación (OF)">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19" cy="18" r="2"/></svg></span>
             <span class="nav-label">Órdenes de fabricación</span>
           </a>
           }
-          @if (puedeVer('fabricacion')) {
+          @if (puedeVer('fabricacion') && puedeIr('/fabricacion/tablero')) {
           <a class="nav-item" routerLink="/fabricacion/tablero" routerLinkActive="is-active" [routerLinkActiveOptions]="{exact: true}" title="Tablero por estaciones: dónde están hoy los pares">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16"/><rect x="10" y="4" width="5" height="10"/><rect x="17" y="4" width="4" height="7"/></svg></span>
             <span class="nav-label">Tablero por estaciones</span>
@@ -318,7 +318,7 @@ export class ShellComponent {
   readonly usuario = this.auth.usuario();
   readonly iniciales = (this.usuario?.username ?? '?').slice(0, 2).toUpperCase();
   readonly rolLabel =
-    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage', JEFE_CORTE: 'Jefe de corte' } as Record<string, string>)[
+    ({ ADMIN: 'Administración', GERENTE: 'Gerencia', VENTAS: 'Ventas', CLIENTE: 'Cliente', STAGE: 'Stage', JEFE_CORTE: 'Jefe de corte', ESTACION: 'Estación' } as Record<string, string>)[
       this.usuario?.role ?? ''
     ] ?? (this.usuario?.role ?? '');
 
@@ -332,6 +332,11 @@ export class ShellComponent {
   /** Ítems que viven dentro de un módulo ya liberado pero aún no van al cliente. */
   puedeVerSec(seccion: Seccion): boolean {
     return puedeVerSeccion(this.usuario?.role ?? null, seccion);
+  }
+
+  /** Para los roles acotados por URL (la tablet de estación): ¿este enlace es suyo? */
+  puedeIr(url: string): boolean {
+    return puedeVerRuta(this.usuario?.role ?? null, url);
   }
 
   abierto(g: GrupoNav): boolean {
