@@ -900,3 +900,24 @@ npm run dev:front:movil        # = ng serve --configuration movil  (ssl · host 
 
 `environment.movil.ts` pone `apiUrl: '/api'`; los demás environments no cambian.
 Verificado 2026-09-07 en la Mac: build prod y movil limpios, 400 tests front en verde.
+
+### 📟 Tablets de planta: sesión, pistola global y rol ESTACION (2026-11-04, en prod, tag `tablets-planta`)
+
+Primera prueba real con tablet Teclast + lector Tera por Bluetooth (31-oct) y lo que salió de ahí:
+
+- **Sesión que no se cae** (`331d7bc`): `POST /auth/refresh` con rotación del refresh token y 60 s de
+  gracia; el interceptor renueva en silencio ante un 401 y repite la petición (una sola renovación
+  aunque reboten varios pistolazos a la vez). Candado de pantalla (Wake Lock) en la estación; la TV se
+  refresca cada 5 s. Railway: `JWT_ACCESS_TTL=900s`, `JWT_REFRESH_TTL=7d`.
+- **La pistola funciona desde cualquier pantalla** (`5d15341`, `core/pistola/`): reconoce la ráfaga de un
+  código de par y lo registra con la estación guardada en la tablet. Aviso verde = registrado, amarillo =
+  repetido (409 con `motivo: REPETIDO`), rojo fijo hasta tocarlo = no quedó; cada uno con su sonido. La TV
+  pone en pantalla completa la página entera para que los avisos se vean.
+- **Rol ESTACION** (`0ba5a29`): el usuario con el que queda logueada cada tablet. Lista blanca en
+  `acceso-por-rol.ts` (pistolazo, par, estaciones/operarios/máquinas, hoy/tableros, nacer + etiquetas,
+  catálogo de daños) y en el front `ACCESO_ROL.ESTACION` con `rutas` (un rol acotado puede limitarse por
+  URL dentro del módulo; el guard mira `state.url`). Aterriza en `/fabricacion/estacion`; menú: tableros,
+  estación y TV. El rol ya está en la base de prod; **los usuarios de cada tablet se crean en
+  Administración → Usuarios**.
+- En la tablet: Bluetooth HID (página 4 del manual del Tera), "Permanecer activo" en opciones de
+  desarrollador y cargador puesto.
