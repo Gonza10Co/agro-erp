@@ -27,6 +27,28 @@ export const LISTA_BLANCA_ROL: Readonly<Record<string, readonly ReglaAcceso[]>> 
     // El filtro por línea del tablero de corte. Solo el listado, solo lectura.
     { metodos: ['GET'], ruta: /^\/catalog\/lineas\/?$/ },
   ],
+  // Tablet de estación (2026-11-04): el usuario con el que queda logueada cada tablet
+  // de planta. Pistolea, nace pares en Preparación y mira el tablero y la TV. Nada de
+  // crear OF, prender o apagar estaciones, consumo de materiales, inspección en PT,
+  // precios, cartera, clientes ni compras.
+  ESTACION: [
+    // Sesión: login, `auth/me` y la renovación silenciosa (`auth/refresh`).
+    { metodos: '*', ruta: /^\/auth(\/|$)/ },
+    // El pistolazo y el detalle del par (sticker y reimpresión de la lengua).
+    { metodos: ['POST'], ruta: /^\/fabricacion\/par\/[^/]+\/avanzar$/ },
+    { metodos: ['GET'], ruta: /^\/fabricacion\/par\/[^/]+$/ },
+    // Lo que carga la pantalla de estación: estaciones, operarios y máquinas de su célula.
+    { metodos: ['GET'], ruta: /^\/fabricacion\/(estaciones|operarios|maquinas)\/?$/ },
+    // TV de planta y tableros (por estación y por órdenes).
+    { metodos: ['GET'], ruta: /^\/fabricacion\/(hoy|tablero|tablero-resumen|tablero-ordenes)\/?$/ },
+    // Preparación: elige la OF, nace la tanda e imprime etiquetas por adelantado.
+    { metodos: ['GET'], ruta: /^\/fabricacion\/of\/?$/ },
+    { metodos: ['GET'], ruta: /^\/fabricacion\/of\/[^/]+$/ },
+    { metodos: ['POST'], ruta: /^\/fabricacion\/of\/[^/]+\/(nacer|reservar-etiquetas)$/ },
+    { metodos: ['GET'], ruta: /^\/fabricacion\/of\/[^/]+\/etiquetas-reservadas$/ },
+    // "Algo pasó con este par": el catálogo tipificado de daños.
+    { metodos: ['GET'], ruta: /^\/calidad\/tipos-dano\/?$/ },
+  ],
 };
 
 /** ¿El rol tiene lista blanca? (o sea, ¿es un rol acotado?) */

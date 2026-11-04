@@ -17,6 +17,7 @@ import {
   estacionNacimiento,
   estacionDeEstado,
   validarEstacion,
+  esPistolazoRepetido,
   paresPorEstacion,
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
@@ -344,8 +345,15 @@ describe('validarEstacion (el dispositivo está amarrado a una estación)', () =
     expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'CIERRE', E)).toContain('apagada');
     expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'XXX', E)).toContain('no existe');
   });
-  it('un par en PT ya recorrió todo', () => {
-    expect(validarEstacion({ celula: 'PT', subPaso: null }, 'PT', E)).toContain('recorrió');
+  it('un par en PT escaneado en otra estación ya recorrió todo', () => {
+    expect(validarEstacion({ celula: 'PT', subPaso: null }, 'FINIZAJE', E)).toContain('recorrió');
+  });
+  it('el mismo par otra vez en la misma estación: "ya registrado", no "fuera de orden"', () => {
+    const montaje = { celula: 'INYECCION' as const, subPaso: null, subPasoInyeccion: 'MONTAJE' as const };
+    expect(validarEstacion(montaje, 'MONTAJE', E)).toContain('ya está registrado en Inyección · Montaje');
+    expect(esPistolazoRepetido(montaje, 'MONTAJE', E)).toBe(true);
+    expect(esPistolazoRepetido(montaje, 'FINIZAJE', E)).toBe(false);
+    expect(esPistolazoRepetido({ celula: 'PT', subPaso: null }, 'PT', E)).toBe(true);
   });
 });
 

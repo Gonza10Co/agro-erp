@@ -1,11 +1,11 @@
-import { Component, DestroyRef, ElementRef, OnInit, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { interval } from 'rxjs';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
 import { HoyEstacion } from '../../core/api/models/fabricacion.models';
 
 /** Cada cuánto se refresca sola la pantalla de planta. */
-export const TV_REFRESCO_MS = 30_000;
+export const TV_REFRESCO_MS = 5_000;
 
 /** Porcentaje de avance sobre la meta, tope 100. */
 export function pctMeta(hoy: number, meta: number): number {
@@ -17,7 +17,7 @@ export function pctMeta(hoy: number, meta: number): number {
  * TV de planta (piloto 2026-09-09): un número gigante por estación, hoy contra la
  * meta del día, y cuántos en la última hora. Reemplaza el tablero manual
  * "HORA / N° PARES" que llevan con marcador. Se lee de reojo a 5 metros: nada de
- * pares, nada de tablas. Se refresca sola cada 30 segundos.
+ * pares, nada de tablas. Se refresca sola cada 5 segundos.
  */
 @Component({
   selector: 'app-tv-planta',
@@ -50,7 +50,7 @@ export function pctMeta(hoy: number, meta: number): number {
   `,
   styles: [`
     .tv{min-height:calc(100vh - 32px);display:flex;flex-direction:column;gap:var(--sp-5);background:var(--bg);padding:var(--sp-4)}
-    .tv:fullscreen{padding:var(--sp-6,24px);min-height:100vh}
+    :host-context(:root:fullscreen) .tv{padding:var(--sp-6,24px);min-height:100vh}
     .tv-h{display:flex;align-items:baseline;gap:var(--sp-4)}
     .tv-titulo{font-size:var(--text-h1);font-weight:var(--fw-bold);letter-spacing:var(--ls-h1)}
     .tv-meta{flex:1;color:var(--text-subtle)}
@@ -73,7 +73,6 @@ export function pctMeta(hoy: number, meta: number): number {
 export class TvPlantaComponent implements OnInit {
   private readonly api = inject(FabricacionApi);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly tvEl = viewChild<ElementRef<HTMLElement>>('tv');
 
   datos = signal<{ fecha: string; actualizado: string } | null>(null);
   estaciones = signal<HoyEstacion[]>([]);
@@ -102,9 +101,13 @@ export class TvPlantaComponent implements OnInit {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
+  /**
+   * Pantalla completa de la PÁGINA entera, no solo del recuadro de la TV: con un
+   * elemento en pantalla completa el navegador oculta todo lo demás, y ahí viven
+   * los avisos del pistolazo (verde/amarillo/rojo).
+   */
   pantallaCompleta(): void {
-    const el = this.tvEl()?.nativeElement;
-    if (el && !document.fullscreenElement) void el.requestFullscreen?.();
-    else if (document.fullscreenElement) void document.exitFullscreen?.();
+    if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.();
+    else void document.exitFullscreen?.();
   }
 }

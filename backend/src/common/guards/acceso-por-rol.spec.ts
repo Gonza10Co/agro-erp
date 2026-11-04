@@ -60,6 +60,54 @@ describe('rolPuedeLlamar (lista blanca de roles acotados)', () => {
   });
 });
 
+describe('ESTACION (la tablet de la estación)', () => {
+  it('es un rol acotado', () => {
+    expect(esRolAcotado('ESTACION')).toBe(true);
+  });
+
+  it('pistolea, nace pares y lee lo que la estación, el tablero y la TV necesitan', () => {
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/auth/me')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/auth/refresh')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/par/:codigo/avanzar')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/par/OF19-0001/avanzar')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/par/:codigo')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/estaciones')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/operarios')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/maquinas?celula=INYECCION')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/hoy')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/tablero')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/tablero-resumen')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/tablero-ordenes')).toBe(true);
+    // Preparación: elige la OF, nace la tanda e imprime etiquetas.
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/of')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/of/:id')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of/:id/nacer')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of/:id/reservar-etiquetas')).toBe(true);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/of/:id/etiquetas-reservadas')).toBe(true);
+    // "Algo pasó con este par": el catálogo de daños.
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/calidad/tipos-dano')).toBe(true);
+  });
+
+  it('no crea OF, no prende ni apaga estaciones, no registra consumo ni inspecciona en PT', () => {
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'PATCH', '/fabricacion/estaciones/:codigo')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/of/:id/consumo')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of/:id/consumo')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/calidad/pares/:codigo/incidencias')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/calidad/indicadores')).toBe(false);
+  });
+
+  it('niega todo lo demás (deny by default)', () => {
+    for (const ruta of [
+      '/clientes', '/facturas', '/cartera', '/compras/ordenes', '/catalog/materiales', '/catalog/lineas',
+      '/catalog/productos', '/pedidos/oc', '/pedidos/op', '/inventario', '/corte/ordenes',
+      '/dashboard', '/reportes/diario', '/usuarios', '/operarios', '/proveedores', '/',
+    ]) {
+      expect(rolPuedeLlamar('ESTACION', 'GET', ruta)).toBe(false);
+    }
+  });
+});
+
 // Montaje real (Express + passport-jwt + el guard), sin base de datos: comprueba
 // que el filtro mira la ruta que Nest de verdad despacha y responde 403.
 @UseGuards(JwtAuthGuard)
@@ -82,6 +130,15 @@ class FacturasFalsoController {
   @Get() listar() { return []; }
 }
 
+@UseGuards(JwtAuthGuard)
+@Controller('fabricacion')
+class FabricacionFalsoController {
+  @Post('of') crearOf() { return { ok: true }; }
+  @Post('par/:codigo/avanzar') avanzar(@Param('codigo') codigo: string) { return { codigo }; }
+  @Get('hoy') hoy() { return {}; }
+  @Patch('estaciones/:codigo') activar() { return { ok: true }; }
+}
+
 describe('JwtAuthGuard + lista blanca (montaje HTTP)', () => {
   const SECRETO = 'secreto-de-prueba';
   let app: INestApplication;
@@ -92,7 +149,7 @@ describe('JwtAuthGuard + lista blanca (montaje HTTP)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [JwtModule.register({})],
-      controllers: [CorteFalsoController, LineasFalsoController, FacturasFalsoController],
+      controllers: [CorteFalsoController, LineasFalsoController, FacturasFalsoController, FabricacionFalsoController],
       providers: [
         JwtStrategy,
         { provide: ConfigService, useValue: { getOrThrow: () => SECRETO } },
@@ -118,6 +175,15 @@ describe('JwtAuthGuard + lista blanca (montaje HTTP)', () => {
     const t = token('JEFE_CORTE');
     await request(app.getHttpServer()).get('/facturas').set('Authorization', `Bearer ${t}`).expect(403);
     await request(app.getHttpServer()).patch('/catalog/lineas/1/desactivar').set('Authorization', `Bearer ${t}`).expect(403);
+  });
+
+  it('ESTACION pistolea y lee la TV, pero no crea OF ni toca las estaciones', async () => {
+    const t = token('ESTACION');
+    await request(app.getHttpServer()).post('/fabricacion/par/OF19-0001/avanzar').set('Authorization', `Bearer ${t}`).expect(201);
+    await request(app.getHttpServer()).get('/fabricacion/hoy').set('Authorization', `Bearer ${t}`).expect(200);
+    await request(app.getHttpServer()).post('/fabricacion/of').set('Authorization', `Bearer ${t}`).expect(403);
+    await request(app.getHttpServer()).patch('/fabricacion/estaciones/CIERRE').set('Authorization', `Bearer ${t}`).expect(403);
+    await request(app.getHttpServer()).get('/facturas').set('Authorization', `Bearer ${t}`).expect(403);
   });
 
   it('los demás roles siguen igual', async () => {

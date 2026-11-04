@@ -1,4 +1,4 @@
-import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeProgramarCorte, puedeVerSeccion, rutaInicial } from './modulos';
+import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeProgramarCorte, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
 
 describe('puedeVerModulo', () => {
   it('CLIENTE ve clientes, pedidos, catálogo y sus datos maestros', () => {
@@ -231,6 +231,40 @@ describe('rol acotado JEFE_CORTE (lista blanca)', () => {
       expect(puedeVerModulo(rol, 'corte')).withContext(String(rol)).toBeTrue();
       expect(puedeVerSeccion(rol, 'programacion-corte')).withContext(String(rol)).toBeTrue();
       expect(puedeVerModulo(rol, 'fabricacion')).withContext(String(rol)).toBeTrue();
+    }
+  });
+});
+
+describe('rol acotado ESTACION (la tablet de planta)', () => {
+  it('solo ve el módulo de fabricación', () => {
+    expect(puedeVerModulo('ESTACION', 'fabricacion')).toBeTrue();
+    for (const m of ['inicio', 'pedidos', 'clientes', 'corte', 'calidad', 'compras', 'inventario', 'reportes', 'administracion'] as const) {
+      expect(puedeVerModulo('ESTACION', m)).withContext(m).toBeFalse();
+    }
+  });
+
+  it('ve la estación, los tableros, el par y la TV; no las OF, el consumo ni la pantalla vieja', () => {
+    for (const url of ['/fabricacion/estacion', '/fabricacion/ordenes', '/fabricacion/tablero', '/fabricacion/par/OF19-0001', '/tv', '/tv?x=1']) {
+      expect(puedeVerRuta('ESTACION', url)).withContext(url).toBeTrue();
+    }
+    for (const url of ['/fabricacion', '/fabricacion/operario', '/fabricacion/guarnicion', '/fabricacion/of/3/consumo', '/pedidos/oc']) {
+      expect(puedeVerRuta('ESTACION', url)).withContext(url).toBeFalse();
+    }
+  });
+
+  it('tiene la sección del piloto y la de calidad en planta ("algo pasó con este par")', () => {
+    expect(puedeVerSeccion('ESTACION', 'piloto')).toBeTrue();
+    expect(puedeVerSeccion('ESTACION', 'calidad-en-planta')).toBeTrue();
+    expect(puedeVerSeccion('ESTACION', 'programacion-corte')).toBeFalse();
+  });
+
+  it('aterriza en la estación', () => {
+    expect(rutaInicial('ESTACION')).toBe('/fabricacion/estacion');
+  });
+
+  it('los roles sin lista de rutas abren cualquier URL de su módulo', () => {
+    for (const rol of ['ADMIN', 'GERENTE', 'CLIENTE', 'STAGE', 'JEFE_CORTE', null, undefined]) {
+      expect(puedeVerRuta(rol, '/fabricacion')).withContext(String(rol)).toBeTrue();
     }
   });
 });

@@ -10,13 +10,14 @@ function setRol(role: string): void {
   localStorage.setItem('accessToken', `x.${payload}.y`);
 }
 
-function correr(modulo: string | undefined, seccion?: string) {
+function correr(modulo: string | undefined, seccion?: string, url?: string) {
   const data: Record<string, string> = {};
   if (modulo) data['modulo'] = modulo;
   if (seccion) data['seccion'] = seccion;
   const route = { data } as unknown as ActivatedRouteSnapshot;
+  const state = (url ? { url } : {}) as RouterStateSnapshot;
   return TestBed.runInInjectionContext(() =>
-    moduloGuard(route, {} as RouterStateSnapshot),
+    moduloGuard(route, state),
   );
 }
 
@@ -58,6 +59,21 @@ describe('moduloGuard', () => {
     setRol('ADMIN');
     expect(correr('facturas')).toBeTrue();
     expect(correr('reportes')).toBeTrue();
+  });
+
+  describe('gate por URL (rol acotado a una parte del módulo)', () => {
+    it('la tablet de estación abre la estación y la TV, pero no las OF del mismo módulo', () => {
+      setRol('ESTACION');
+      expect(correr('fabricacion', 'piloto', '/fabricacion/estacion')).toBeTrue();
+      expect(correr('fabricacion', 'piloto', '/tv')).toBeTrue();
+      const res = correr('fabricacion', undefined, '/fabricacion') as UrlTree;
+      expect(res.toString()).toBe('/fabricacion/estacion');
+    });
+
+    it('a los demás roles la URL no los limita', () => {
+      setRol('ADMIN');
+      expect(correr('fabricacion', undefined, '/fabricacion')).toBeTrue();
+    });
   });
 
   it('permite rutas sin módulo declarado', () => {

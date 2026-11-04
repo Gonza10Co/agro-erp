@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToasterComponent } from './shared/ui/toaster/toaster.component';
+import { PistolaGlobalService } from './core/pistola/pistola-global.service';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +12,9 @@ import { ToasterComponent } from './shared/ui/toaster/toaster.component';
     <app-toaster />
   `,
 })
-export class AppComponent {}
+export class AppComponent {
+  constructor() {
+    // La pistola registra pares desde cualquier pantalla (aviso verde/amarillo/rojo).
+    inject(PistolaGlobalService).iniciar();
+  }
+}

@@ -39,6 +39,14 @@ async function main() {
     update: {},
     create: { name: 'JEFE_CORTE' },
   });
+  // ESTACION: el usuario de cada tablet de planta (2026-11-04). Pistolea, nace pares y
+  // mira tablero y TV; lista blanca en common/guards/acceso-por-rol.ts.
+  // SQL equivalente para prod: INSERT INTO "Role"(name) VALUES ('ESTACION') ON CONFLICT (name) DO NOTHING;
+  await prisma.role.upsert({
+    where: { name: 'ESTACION' },
+    update: {},
+    create: { name: 'ESTACION' },
+  });
   const stage = await prisma.role.upsert({
     where: { name: 'STAGE' },
     update: {},

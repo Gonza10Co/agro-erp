@@ -31,6 +31,25 @@ describe('AuthService', () => {
     expect(service.accessToken).toBeNull();
     expect(service.isAuthenticated()).toBe(false);
   });
+
+  it('renovar: una sola petición aunque la pidan varios a la vez, y guarda el par nuevo', () => {
+    localStorage.setItem('refreshToken', 'RT-viejo');
+    const recibidos: string[] = [];
+    service.renovar().subscribe((t) => recibidos.push(t));
+    service.renovar().subscribe((t) => recibidos.push(t));
+    const req = httpMock.expectOne('http://localhost:3001/auth/refresh');
+    expect(req.request.body).toEqual({ refreshToken: 'RT-viejo' });
+    req.flush({ accessToken: 'AT2', refreshToken: 'RT2' });
+    expect(recibidos).toEqual(['AT2', 'AT2']);
+    expect(service.accessToken).toBe('AT2');
+    expect(localStorage.getItem('refreshToken')).toBe('RT2');
+  });
+
+  it('renovar sin refresh token falla sin llamar al backend', () => {
+    let fallo = false;
+    service.renovar().subscribe({ error: () => (fallo = true) });
+    expect(fallo).toBe(true);
+  });
 });
 
 function jwtConRol(role: string): string {

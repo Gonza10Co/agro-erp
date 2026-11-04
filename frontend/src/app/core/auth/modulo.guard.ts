@@ -1,15 +1,16 @@
 import { CanActivateChildFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthService } from './auth.service';
-import { Modulo, Seccion, puedeVerModulo, puedeVerSeccion, rutaInicial } from './modulos';
+import { Modulo, Seccion, puedeVerModulo, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
 
 /**
  * Bloquea el acceso por URL directa y redirige a la ruta de aterrizaje del rol.
- * Mira dos cosas: el módulo (`route.data.modulo`) y, para pantallas nuevas que
+ * Mira tres cosas: el módulo (`route.data.modulo`), para pantallas nuevas que
  * viven dentro de un módulo ya entregado, la sección (`route.data.seccion`) —
- * sin esto el cliente entra tecleando la URL aunque el botón esté oculto.
+ * sin esto el cliente entra tecleando la URL aunque el botón esté oculto — y,
+ * para los roles acotados con lista de rutas, la URL misma.
  */
-export const moduloGuard: CanActivateChildFn = (route) => {
+export const moduloGuard: CanActivateChildFn = (route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   const modulo = route.data?.['modulo'] as Modulo | undefined;
@@ -17,7 +18,9 @@ export const moduloGuard: CanActivateChildFn = (route) => {
   const rol = auth.rol();
   const veModulo = !modulo || puedeVerModulo(rol, modulo);
   const veSeccion = !seccion || puedeVerSeccion(rol, seccion);
-  if (veModulo && veSeccion) {
+  // Un rol acotado con lista de rutas (la tablet de estación) solo abre esas URLs.
+  const veRuta = puedeVerRuta(rol, state?.url);
+  if (veModulo && veSeccion && veRuta) {
     return true;
   }
   return router.parseUrl(rutaInicial(rol));
