@@ -1,9 +1,14 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Observable } from 'rxjs';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { puedeOperarLote } from '../../core/auth/modulos';
+import { ToastService } from '../../core/notificaciones/toast.service';
 import {
-  ParTablero, TableroResumen, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO,
+  Estacion, LoteResultado, ParTablero, TableroResumen, LABEL_CELULA, SubPasoGuarnicion, LABEL_SUBPASO,
   SubPasoInyeccion, LABEL_SUBPASO_INYECCION,
 } from '../../core/api/models/fabricacion.models';
 
@@ -15,7 +20,7 @@ type Columna = string | ColumnaExtra;
 @Component({
   selector: 'app-fabricacion-tablero',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   template: `
     <div class="page">
       <div class="page-header">
@@ -69,13 +74,63 @@ type Columna = string | ColumnaExtra;
           <div class="det-h">
             <span class="det-titulo">{{ tituloColumna(col) }}</span>
             <span class="cell-sub">{{ pares().length }} {{ pares().length === 1 ? 'par' : 'pares' }}{{ hayMas() ? ' (primeros ' + tope + ')' : '' }}</span>
+            @if (operaLote() && enLinea(col) && pares().length && !modoLote()) {
+              <button class="btn btn-sm" type="button" (click)="abrirLote()">Mover o cerrar en lote</button>
+            }
             <button class="btn btn-sm" type="button" aria-label="Cerrar el detalle" (click)="cerrar()">✕</button>
           </div>
+          @if (modoLote()) {
+            <div class="lote">
+              <div class="lote-h">
+                <b>{{ seleccionados().length }} de {{ pares().length }} pares seleccionados</b>
+                <span class="cell-sub">Toca un par para quitarlo.{{ hayMas() ? ' Se ven solo los primeros ' + tope + '.' : '' }}</span>
+              </div>
+              <div class="lote-campos">
+                <label>Mover a
+                  <select [(ngModel)]="loteEstacion">
+                    <option value="">Elige la estación</option>
+                    @for (e of destinos(); track e.codigo) { <option [value]="e.codigo">{{ e.nombre }}</option> }
+                  </select>
+                </label>
+                <label class="lote-motivo">Motivo (queda en la trazabilidad de cada par)
+                  <input [(ngModel)]="loteMotivo" maxlength="300" placeholder="Ej.: pasaron sin escanear el martes" />
+                </label>
+              </div>
+              @if (loteEstacion === 'PT') {
+                <p class="lote-aviso">Entrar a Producto terminado carga estos pares al inventario, y eso no se deshace.</p>
+              }
+              @if (confirmandoCierre()) {
+                <p class="lote-aviso">Se cancelan {{ seleccionados().length }} pares: salen del flujo, sin tocar inventario, y su cupo queda libre para nacer otros. Esto no se deshace.</p>
+              }
+              <div class="lote-acciones">
+                <button class="btn btn-primary btn-sm" type="button" [disabled]="!puedeMover()" (click)="mover()">Mover a la estación</button>
+                @if (confirmandoCierre()) {
+                  <button class="btn btn-danger btn-sm" type="button" [disabled]="!puedeCerrar()" (click)="cerrarPares()">Sí, cerrar {{ seleccionados().length }} pares</button>
+                  <button class="btn btn-sm" type="button" (click)="confirmandoCierre.set(false)">No</button>
+                } @else {
+                  <button class="btn btn-sm" type="button" [disabled]="!puedeCerrar()" (click)="confirmandoCierre.set(true)">Cerrar sin terminar</button>
+                }
+                <button class="btn btn-sm" type="button" [disabled]="procesandoLote()" (click)="salirLote()">Cancelar</button>
+              </div>
+              @if (rechazados().length) {
+                <div class="lote-rechazados">
+                  <b>{{ rechazados().length }} no se pudieron:</b>
+                  @for (r of rechazados(); track r.codigo) { <div class="cell-sub"><span class="mono">{{ r.codigo }}</span>: {{ r.motivo }}</div> }
+                </div>
+              }
+            </div>
+          }
           @if (cargandoDetalle()) {
             <p class="cell-sub">Cargando…</p>
           } @else {
             <div class="det-body">
               @for (p of pares(); track p.id) {
+                @if (modoLote()) {
+                  <button class="par-chip chip-sel" type="button" [class.quitado]="quitados().has(p.codigo)" [attr.aria-pressed]="!quitados().has(p.codigo)" (click)="alternar(p.codigo)">
+                    <span class="mono">{{ p.codigo }}</span>
+                    <span class="cell-sub">T{{ p.talla.valor }}</span>
+                  </button>
+                } @else {
                 <a class="par-chip" [class.chip-baja]="p.estado === 'DADO_DE_BAJA'"
                    [routerLink]="['/fabricacion/par', p.codigo]">
                   <span class="mono">{{ p.codigo }}</span>
@@ -87,6 +142,7 @@ type Columna = string | ColumnaExtra;
                     <span class="estado">{{ p.estado === 'DADO_DE_BAJA' ? 'baja ✖' : 'cancelado' }}</span>
                   }
                 </a>
+                }
               } @empty {
                 <div class="cell-sub">Sin pares en esta columna.</div>
               }
@@ -132,6 +188,15 @@ type Columna = string | ColumnaExtra;
     .chip-baja{border-color:var(--danger)}
     .chip-baja .estado{color:var(--danger)}
     .mono{font-family:var(--font-mono)}
+    .lote{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-3);margin-bottom:var(--sp-3);background:var(--inset);border-radius:var(--r-md)}
+    .lote-h{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:baseline}
+    .lote-campos{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
+    .lote-campos label{display:flex;flex-direction:column;gap:4px;font-size:var(--text-sm)}
+    .lote-motivo{flex:1;min-width:240px}
+    .lote-aviso{margin:0;font-size:var(--text-sm);font-weight:var(--fw-medium);color:var(--error)}
+    .lote-acciones{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+    .chip-sel{cursor:pointer;font:inherit;border-color:var(--primary)}
+    .chip-sel.quitado{opacity:.4;border-color:var(--border);text-decoration:line-through}
     @media (max-width:640px){ .kanban{grid-template-columns:repeat(2,1fr)} }
   `],
 })
@@ -139,6 +204,8 @@ export class FabricacionTableroComponent implements OnInit {
   private readonly api = inject(FabricacionApi);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
 
   /** Tope del detalle: una columna puede tener cientos de pares en un día normal. */
   readonly tope = 200;
@@ -166,6 +233,84 @@ export class FabricacionTableroComponent implements OnInit {
   });
   pct = (n: number) => Math.round((n / this.mayor()) * 100);
 
+  // ─────────────── Lote: pares que pasaron sin pistolazo o que se perdieron ───────────────
+
+  readonly operaLote = computed(() => puedeOperarLote(this.auth.rol()));
+  modoLote = signal(false);
+  quitados = signal<ReadonlySet<string>>(new Set());
+  estaciones = signal<Estacion[]>([]);
+  procesandoLote = signal(false);
+  confirmandoCierre = signal(false);
+  rechazados = signal<{ codigo: string; motivo: string }[]>([]);
+  loteEstacion = '';
+  loteMotivo = '';
+
+  seleccionados = computed(() => this.pares().map((p) => p.codigo).filter((c) => !this.quitados().has(c)));
+  /** Solo hacia adelante: un par no se devuelve a una estación por la que ya pasó. */
+  destinos = computed(() => {
+    const activas = this.estaciones().filter((e) => e.activa).sort((a, b) => a.orden - b.orden);
+    const i = activas.findIndex((e) => e.codigo === this.abierta());
+    return i >= 0 ? activas.slice(i + 1) : [];
+  });
+
+  /** Las columnas de estaciones reales: ni Corte (aún no hay pares), ni Terminados, ni Fuera. */
+  enLinea = (col: Columna) => col !== 'TERMINADOS' && col !== 'FUERA' && !this.esCorte(col);
+  puedeCerrar = () => !this.procesandoLote() && this.seleccionados().length > 0 && this.loteMotivo.trim().length >= 5;
+  puedeMover = () => this.puedeCerrar() && !!this.loteEstacion;
+
+  abrirLote(): void {
+    this.modoLote.set(true);
+    if (!this.estaciones().length) {
+      this.api.estaciones().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ next: (e) => this.estaciones.set(e), error: () => {} });
+    }
+  }
+
+  salirLote(): void {
+    this.modoLote.set(false);
+    this.quitados.set(new Set());
+    this.confirmandoCierre.set(false);
+    this.rechazados.set([]);
+    this.loteEstacion = '';
+    this.loteMotivo = '';
+  }
+
+  alternar(codigo: string): void {
+    const q = new Set(this.quitados());
+    if (!q.delete(codigo)) q.add(codigo);
+    this.quitados.set(q);
+  }
+
+  mover(): void {
+    if (!this.puedeMover()) return;
+    const destino = this.destinos().find((e) => e.codigo === this.loteEstacion)?.nombre ?? this.loteEstacion;
+    this.ejecutarLote(this.api.moverLote(this.seleccionados(), this.loteEstacion, this.loteMotivo.trim()), (r) =>
+      `${r.movidos?.length ?? 0} pares movidos a ${destino}`,
+    );
+  }
+
+  cerrarPares(): void {
+    if (!this.puedeCerrar()) return;
+    this.ejecutarLote(this.api.cerrarLote(this.seleccionados(), this.loteMotivo.trim()), (r) =>
+      `${r.cerrados?.length ?? 0} pares cerrados sin terminar`,
+    );
+  }
+
+  private ejecutarLote(peticion: Observable<LoteResultado>, mensaje: (r: LoteResultado) => string): void {
+    this.procesandoLote.set(true);
+    peticion.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (r) => {
+        this.procesandoLote.set(false);
+        this.toast.exito(mensaje(r));
+        this.salirLote();
+        // Los rechazados se quedan a la vista: la coordinadora tiene que verlos.
+        this.rechazados.set(r.rechazados);
+        if (r.rechazados.length) this.modoLote.set(true);
+        this.cargar();
+      },
+      error: () => this.procesandoLote.set(false), // el toast global ya avisa del HTTP
+    });
+  }
+
   ngOnInit(): void {
     const q = this.route.snapshot.queryParamMap.get('ofId');
     this.ofId = q ? Number(q) : undefined;
@@ -186,11 +331,13 @@ export class FabricacionTableroComponent implements OnInit {
 
   abrir(col: Columna): void {
     if (this.abierta() === col) return this.cerrar();
+    this.salirLote();
     this.abierta.set(col);
     this.pedirDetalle(col);
   }
 
   cerrar(): void {
+    this.salirLote();
     this.abierta.set(null);
     this.pares.set([]);
   }

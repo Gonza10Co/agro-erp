@@ -4,7 +4,7 @@ import { SIN_TOAST_ERROR } from '../interceptors/error-toast.interceptor';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf, Estacion, AvanceResultado, NacerResultado, EtiquetasReservadas, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, EtiquetasReservadas, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo, LoteResultado,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -44,6 +44,14 @@ export class FabricacionApi {
       },
       { context: new HttpContext().set(SIN_TOAST_ERROR, sinToastError) },
     );
+  }
+  /** La coordinadora mueve pares a una estación sin pistolazo, con motivo. */
+  moverLote(codigos: string[], estacion: string, motivo: string) {
+    return this.http.post<LoteResultado>(`${this.base}/fabricacion/pares/mover-lote`, { codigos, estacion, motivo });
+  }
+  /** La coordinadora cierra sin terminar pares perdidos, con motivo. */
+  cerrarLote(codigos: string[], motivo: string) {
+    return this.http.post<LoteResultado>(`${this.base}/fabricacion/pares/cerrar-lote`, { codigos, motivo });
   }
   /** Nacen pares de la OF en su estación inicial: una etiqueta por lengua. */
   nacer(ofId: number, dto: { productoConfiguradoId: number; tallaId: number; cantidad: number; operarioId: number; maquinaId?: number }) {

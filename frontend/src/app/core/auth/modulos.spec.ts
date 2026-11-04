@@ -1,4 +1,4 @@
-import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeProgramarCorte, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
+import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeOperarLote, puedeProgramarCorte, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
 
 describe('puedeVerModulo', () => {
   it('CLIENTE ve clientes, pedidos, catálogo y sus datos maestros', () => {
@@ -279,6 +279,15 @@ describe('puedeProgramarCorte', () => {
   it('el resto ve el tablero pero no programa', () => {
     for (const rol of ['CLIENTE', 'STAGE', 'OPERARIO', 'CALIDAD', null, undefined]) {
       expect(puedeProgramarCorte(rol)).withContext(String(rol)).toBeFalse();
+    }
+  });
+});
+
+describe('puedeOperarLote', () => {
+  it('solo la gerencia mueve o cierra pares en lote', () => {
+    for (const rol of ['ADMIN', 'GERENTE']) expect(puedeOperarLote(rol)).withContext(rol).toBeTrue();
+    for (const rol of ['ESTACION', 'STAGE', 'CLIENTE', 'OPERARIO', 'CALIDAD', 'JEFE_CORTE', null, undefined]) {
+      expect(puedeOperarLote(rol)).withContext(String(rol)).toBeFalse();
     }
   });
 });

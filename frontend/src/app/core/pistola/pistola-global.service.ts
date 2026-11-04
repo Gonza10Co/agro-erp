@@ -13,7 +13,8 @@ import { sonar } from './sonido-pistola';
  * La pistola funciona desde CUALQUIER pantalla de la app (no solo la de estación):
  * escucha el teclado, reconoce la ráfaga de un código de par y lo registra con la
  * estación configurada en esta tablet. El resultado sale como aviso:
- * verde = registrado, amarillo = repetido, rojo (fijo, hasta tocarlo) = no quedó.
+ * verde = registrado, amarillo = repetido o con estación saltada, rojo (fijo, hasta
+ * tocarlo) = no quedó.
  *
  * No actúa en la pantalla de estación (ella tiene su propio flujo, con calidad)
  * ni cuando el foco está en un campo de texto (ahí la pistola escribe normal).
@@ -60,6 +61,16 @@ export class PistolaGlobalService {
     }
     this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, undefined, true).subscribe({
       next: (r) => {
+        // Entró, pero se saltó alguna estación: quedó anotado y alguien debe mirarlo.
+        const saltadas = r.avance.saltadas ?? [];
+        if (saltadas.length) {
+          sonar('alerta');
+          this.toast.mostrar('alerta', titulo(r), {
+            detalle: `Sin pistolazo en ${saltadas.map((x) => x.nombre).join(', ')} · ${detalle(r)}`,
+            grande: true,
+          });
+          return;
+        }
         sonar('ok');
         this.toast.mostrar('exito', titulo(r), { detalle: detalle(r), grande: true });
       },

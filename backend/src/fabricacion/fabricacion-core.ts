@@ -197,11 +197,15 @@ export const ESTACIONES_PILOTO: readonly EstacionDef[] = [
  * como "Guarnición · Preparación" (2026-10-13). Los eventos de antes del piloto no
  * tienen estación y la pantalla los sigue nombrando por célula.
  */
+/** `estacionDestino` del evento con que se cierra un par en lote: no es una estación. */
+export const DESTINO_CERRADO = 'CERRADO';
+
 export function conNombreDeEstacion<T extends { estacionDestino?: string | null }>(
   eventos: T[],
   estaciones: readonly Pick<EstacionDef, 'codigo' | 'nombre'>[],
 ): (T & { estacionNombre: string | null })[] {
   const nombres = new Map(estaciones.map((e) => [e.codigo, e.nombre]));
+  nombres.set(DESTINO_CERRADO, 'Cerrado sin terminar');
   return eventos.map((e) => ({
     ...e,
     estacionNombre: (e.estacionDestino && nombres.get(e.estacionDestino)) || null,
@@ -283,9 +287,10 @@ export function estacionNacimiento(
 }
 
 /**
- * El pistolazo se hace desde un dispositivo amarrado a UNA estación. Si el par no
- * viene de la estación anterior, se rechaza con un mensaje que el operario entienda.
- * Devuelve null cuando el escaneo es válido.
+ * El pistolazo se hace desde un dispositivo amarrado a UNA estación. Adelante se
+ * acepta aunque se haya saltado alguna: si el par llegó hasta acá, pasó por las
+ * anteriores (ver `tramosDeAvance`). Lo que se rechaza es lo que ya pasó, para no
+ * devolver un par ni contarlo dos veces. Devuelve null cuando el escaneo es válido.
  */
 export function validarEstacion(
   e: EstadoPar,
@@ -294,28 +299,62 @@ export function validarEstacion(
 ): string | null {
   const est = estaciones.find((x) => x.codigo === declarada);
   if (!est || !est.activa) return `La estación "${declarada}" no existe o está apagada`;
-  if (esPistolazoRepetido(e, declarada, estaciones)) {
+  if (estacionDeEstado(e, estaciones)?.codigo === declarada) {
     return `Este par ya está registrado en ${est.nombre}: no se cuenta dos veces`;
   }
-  const next = siguienteEstacion(e, estaciones);
-  if (next === null) return 'El par ya recorrió todas las estaciones';
-  if (next.codigo === declarada) return null;
-  const actual = estacionDeEstado(e, estaciones);
-  const desde = actual ? `viene de ${actual.nombre}` : 'todavía no ha pasado por la estación anterior';
-  return `Este par ${desde}: le toca ${next.nombre}, no ${est.nombre}`;
+  if (esPistolazoRepetido(e, declarada, estaciones)) {
+    const actual = estacionDeEstado(e, estaciones);
+    return `Este par ya pasó por ${est.nombre}${actual ? `: va en ${actual.nombre}` : ''}`;
+  }
+  return null;
+}
+
+/** Las estaciones activas que quedan entre el par y la estación que lo escanea. */
+export function estacionesSaltadas(
+  e: EstadoPar,
+  objetivo: EstacionDef,
+  estaciones: readonly EstacionDef[],
+): EstacionDef[] {
+  const desde = rangoEstado(e);
+  const hasta = rangoEstado(estadoDeEstacion(objetivo));
+  return activasEnOrden(estaciones).filter((x) => {
+    const r = rangoEstado(estadoDeEstacion(x));
+    return r > desde && r < hasta;
+  });
 }
 
 /**
- * El par ya está en la estación que lo escanea: un doble pistolazo (o un par que
- * se devolvió a la canasta). No es un error de proceso; la pantalla lo muestra
- * en amarillo y no lo cuenta otra vez.
+ * Los saltos que da el par hasta el objetivo: uno por cada estación saltada (eventos
+ * inferidos) y el último, el de la estación que lo escaneó. Así cada estación queda
+ * con su entrada y los conteos por estación siguen reflejando el flujo físico.
+ */
+export function tramosDeAvance(
+  e: EstadoPar,
+  objetivo: EstacionDef,
+  estaciones: readonly EstacionDef[],
+): { desde: EstadoPar; hacia: EstacionDef; inferido: boolean }[] {
+  const tramos: { desde: EstadoPar; hacia: EstacionDef; inferido: boolean }[] = [];
+  let desde = e;
+  for (const hacia of estacionesSaltadas(e, objetivo, estaciones)) {
+    tramos.push({ desde, hacia, inferido: true });
+    desde = estadoDeEstacion(hacia);
+  }
+  tramos.push({ desde, hacia: objetivo, inferido: false });
+  return tramos;
+}
+
+/**
+ * El par ya está en la estación que lo escanea, o más adelante: un doble pistolazo
+ * o un par que volvió a pasar por ahí. No es un error de proceso; la pantalla lo
+ * muestra en amarillo y no lo cuenta otra vez.
  */
 export function esPistolazoRepetido(
   e: EstadoPar,
   declarada: string,
   estaciones: readonly EstacionDef[],
 ): boolean {
-  return estacionDeEstado(e, estaciones)?.codigo === declarada;
+  const est = estaciones.find((x) => x.codigo === declarada);
+  return !!est && rangoEstado(e) >= rangoEstado(estadoDeEstacion(est));
 }
 
 /** Lo mínimo de un par para el tablero por órdenes. */
@@ -347,6 +386,7 @@ export function paresPorEstacion(
 export interface EventoEstacionMin {
   estacionDestino: string | null;
   timestamp: Date;
+  inferido?: boolean;
 }
 
 /**
@@ -358,19 +398,21 @@ export function avanceHoyPorEstacion(
   estaciones: readonly EstacionDef[],
   inicioDia: Date,
   ahora: Date,
-): { codigo: string; nombre: string; celula: Celula; hoy: number; ultimaHora: number }[] {
+): { codigo: string; nombre: string; celula: Celula; hoy: number; ultimaHora: number; inferidos: number }[] {
   const haceUnaHora = ahora.getTime() - 60 * 60 * 1000;
   return activasEnOrden(estaciones).map((x) => {
     let hoy = 0;
     let ultimaHora = 0;
+    let inferidos = 0;
     for (const ev of eventos) {
       if (ev.estacionDestino !== x.codigo) continue;
       const t = ev.timestamp.getTime();
       if (t < inicioDia.getTime() || t > ahora.getTime()) continue;
       hoy += 1;
       if (t >= haceUnaHora) ultimaHora += 1;
+      if (ev.inferido) inferidos += 1;
     }
-    return { codigo: x.codigo, nombre: x.nombre, celula: x.celula, hoy, ultimaHora };
+    return { codigo: x.codigo, nombre: x.nombre, celula: x.celula, hoy, ultimaHora, inferidos };
   });
 }
 

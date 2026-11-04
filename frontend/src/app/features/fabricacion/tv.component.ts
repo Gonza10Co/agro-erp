@@ -41,6 +41,7 @@ export function pctMeta(hoy: number, meta: number): number {
             <div class="meta">de {{ e.meta }}</div>
             <div class="barra"><div class="fill" [style.width.%]="pct(e.hoy, e.meta)"></div></div>
             <div class="pie"><span class="pct">{{ pct(e.hoy, e.meta) }}%</span><span>última hora <b>{{ e.ultimaHora }}</b></span></div>
+            @if (e.inferidos) { <div class="sin-pistolazo">{{ e.inferidos }} sin pistolazo</div> }
           </div>
         } @empty {
           <div class="empty"><h4>Sin estaciones activas</h4></div>
@@ -62,6 +63,7 @@ export function pctMeta(hoy: number, meta: number): number {
     .num{font-size:clamp(64px,11vw,200px);line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--text)}
     .tarjeta.cumplida .num{color:var(--success)}
     .meta{font-size:clamp(14px,1.8vw,26px);color:var(--text-subtle)}
+    .sin-pistolazo{font-size:clamp(13px,1.4vw,20px);font-weight:var(--fw-semibold);color:var(--warning)}
     .barra{height:14px;background:var(--inset);border-radius:7px;overflow:hidden;margin-top:var(--sp-2)}
     .fill{height:100%;background:var(--primary);transition:width .6s ease}
     .tarjeta.cumplida .fill{background:var(--success)}

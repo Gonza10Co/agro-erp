@@ -921,3 +921,14 @@ Primera prueba real con tablet Teclast + lector Tera por Bluetooth (31-oct) y lo
   Administración → Usuarios**.
 - En la tablet: Bluetooth HID (página 4 del manual del Tera), "Permanecer activo" en opciones de
   desarrollador y cargador puesto.
+
+### ⏭️ Salto de estación y lote de la coordinadora (2026-11-04, en develop, sin desplegar)
+
+- **Salto:** un par escaneado más adelante entra y deja un evento inferido por cada estación saltada
+  (`EventoTrazabilidad.inferido`, sin operario). Aviso amarillo y "sin pistolazo" por estación en la TV. Un par que
+  ya pasó por la estación no se devuelve (409 `motivo: REPETIDO`). Indicadores ignora los inferidos.
+- **Lote:** en el Tablero por estaciones, ADMIN y GERENTE (la coordinadora usa uno de esos roles) mueven pares hacia
+  adelante o los cierran sin terminar, con motivo. Cerrar deja el par CANCELADO, libera su cupo y no toca inventario
+  ni el estado de la OF.
+- ⚠️ El salto directo a Producto terminado está permitido: carga inventario y no se deshace.
+- Migración `20261104120000_evento_inferido` (se aplica sola al desplegar el backend).

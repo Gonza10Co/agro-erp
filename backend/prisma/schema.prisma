@@ -31,6 +31,7 @@ model User {
   movimientosInventario  MovimientoInventario[]
   recepcionesCompra      RecepcionCompra[]
   devolucionesProveedor  DevolucionProveedor[]
+  eventosRegistrados     EventoTrazabilidad[]
 }
 
 model RefreshToken {
@@ -1135,8 +1136,15 @@ model EventoTrazabilidad {
   // (AMARRE/IMPACTO).
   estacionDestino  String?
   celulaDestino    Celula?
-  operarioId       Int
-  operario         Operario           @relation(fields: [operarioId], references: [id])
+  // NULL solo en un evento inferido: nadie hizo ese pistolazo.
+  operarioId       Int?
+  operario         Operario?          @relation(fields: [operarioId], references: [id])
+  // Sin pistolazo real: la estación se saltó, o la coordinadora movió o cerró el par en lote.
+  inferido         Boolean            @default(false)
+  // Por qué, cuando lo hizo una persona desde el tablero (obligatorio ahí).
+  motivo           String?
+  registradoPorId  Int?
+  registradoPor    User?              @relation(fields: [registradoPorId], references: [id])
   // Opcional desde el piloto: en Bodega o Producto terminado no hay máquina.
   maquinaId        Int?
   maquina          Maquina?           @relation(fields: [maquinaId], references: [id])

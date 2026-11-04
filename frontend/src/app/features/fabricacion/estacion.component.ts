@@ -670,7 +670,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
         ...(this.necesitaFirma(t!) ? { autorizacion: { username: this.autUsuario.trim(), password: this.autClave } } : {}),
       };
     }
-    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, dano).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, dano, true).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => {
         this.hoy.set(r.avance.hoy);
         this.resultado.set(this.resumen(r));
@@ -682,7 +682,14 @@ export class EstacionComponent implements OnInit, OnDestroy {
         this.enfocarScan();
       },
       error: (e) => {
-        this.resultado.set({ ok: false, titulo: cod, detalle: this.msgError(e, 'No se pudo registrar el pistolazo') });
+        // Un doble pistolazo no es un error: no quedó nada mal, se avisa en ámbar.
+        const repetido = e?.status === 409 && e?.error?.motivo === 'REPETIDO';
+        this.resultado.set({
+          ok: repetido,
+          alerta: repetido,
+          titulo: repetido ? `${cod} ya estaba registrado` : cod,
+          detalle: this.msgError(e, 'No se pudo registrar el pistolazo'),
+        });
         this.reanudarCamaraConGracia();
         this.enfocarScan();
       },
@@ -708,6 +715,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
     const grado = segunda ? ' · SEGUNDA' : '';
     const titulo = a.terminado ? `${r.codigo} terminado${segunda ? grado : ' ✓'}` : `${r.codigo} → ${a.nombre}${grado}`;
     const partes: string[] = [];
+    const saltadas = a.saltadas ?? [];
+    if (saltadas.length) partes.push(`Sin pistolazo en ${saltadas.map((x) => x.nombre).join(', ')}`);
     if (inc) partes.push(inc.clase === 'REPROCESO' ? `Reproceso: ${inc.nombre}` : inc.nombre);
     if (a.terminado) partes.push(segunda ? 'Cargado a bodega como segunda: va a saldos' : 'Cargado a producto terminado');
     else partes.push(`van ${a.hoy} hoy`);
@@ -715,7 +724,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
     if (a.parReposicion) partes.push(`lo repone ${a.parReposicion.codigo}, que nace en Preparación`);
     return {
       ok: true,
-      alerta: !!inc || segunda,
+      alerta: !!inc || segunda || saltadas.length > 0,
       titulo,
       detalle: partes.join(' · '),
       sticker: a.terminado ? r.codigo : undefined,

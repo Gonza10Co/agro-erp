@@ -21,6 +21,7 @@ import { NacerDto } from './dto/nacer.dto';
 import { ReservarEtiquetasDto } from './dto/reservar-etiquetas.dto';
 import { ActivarEstacionDto } from './dto/activar-estacion.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
+import { CerrarLoteDto, MoverLoteDto } from './dto/lote-pares.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('fabricacion')
@@ -84,6 +85,22 @@ export class FabricacionController {
     // La sesión solo importa cuando el pistolazo trae un daño (una BAJA la
     // autoriza el gerente y queda firmada con su usuario).
     return this.service.avanzar(codigo, dto, req.user);
+  }
+
+  /** Mover pares a una estación sin pistolazo, con motivo (coordinación de planta). */
+  @Post('pares/mover-lote')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  moverLote(@Body() dto: MoverLoteDto, @Req() req: any) {
+    return this.service.moverLote(dto, req.user.sub);
+  }
+
+  /** Cerrar sin terminar pares perdidos, con motivo (coordinación de planta). */
+  @Post('pares/cerrar-lote')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'GERENTE')
+  cerrarLote(@Body() dto: CerrarLoteDto, @Req() req: any) {
+    return this.service.cerrarLote(dto, req.user.sub);
   }
 
   /** Puntos de control del recorrido (activos e inactivos). */
