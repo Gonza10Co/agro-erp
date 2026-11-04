@@ -480,7 +480,7 @@ describe('FabricacionService.avanzar', () => {
     // Lo que ve el operario: a dónde entró y cuántos van hoy ahí.
     expect(res.avance).toEqual({
       estacion: 'PREPARACION', nombre: 'Preparación', terminado: false, hoy: 41,
-      calidad: 'PRIMERA', incidencia: null, parReposicion: null,
+      calidad: 'PRIMERA', incidencia: null, parReposicion: null, saltadas: [],
     });
   });
 
@@ -496,16 +496,62 @@ describe('FabricacionService.avanzar', () => {
     );
   });
 
-  it('con la estación declarada, rechaza el pistolazo si el par no viene de la anterior', async () => {
+  it('un salto hacia adelante entra, con un evento inferido por cada estación saltada', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
-      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO',
+      id: 50, ofId: 1, celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION', estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    const res: any = await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'MONTAJE' });
+    const eventos = tx.eventoTrazabilidad.create.mock.calls.map((c: any) => c[0].data);
+    expect(eventos).toEqual([
+      expect.objectContaining({ celula: 'GUARNICION', subPaso: 'PREPARACION', estacionDestino: 'BODEGA_CORTE', inferido: true }),
+      expect.objectContaining({ celula: 'ALMACEN', estacionDestino: 'MONTAJE', operarioId: 3 }),
+    ]);
+    // Nadie hizo el pistolazo inferido: no se le atribuye al operario.
+    expect(eventos[0].operarioId).toBeUndefined();
+    expect(eventos[1].inferido).toBeUndefined();
+    expect(tx.par.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ celulaActual: 'INYECCION', subPasoInyeccion: 'MONTAJE' }),
+    }));
+    expect(res.avance.saltadas).toEqual([{ codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte' }]);
+  });
+
+  it('un salto hasta PT termina el par y lo carga a la bodega', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'ALMACEN', estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
+    });
+    prisma.bodega = { findFirst: jest.fn().mockResolvedValue({ id: 2 }) };
+    tx.par.update.mockResolvedValue({ id: 50, estado: 'TERMINADO' });
+    const res: any = await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'PT' });
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledTimes(3);
+    expect(tx.movimientoInventario.create).toHaveBeenCalledTimes(1);
+    expect(res.avance).toMatchObject({ estacion: 'PT', terminado: true });
+    expect(res.avance.saltadas.map((x: any) => x.codigo)).toEqual(['MONTAJE', 'FINIZAJE']);
+  });
+
+  it('no devuelve un par a una estación por la que ya pasó (amarillo, sin evento)', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'INYECCION', subPasoInyeccion: 'FINIZAJE', estado: 'EN_PROCESO',
       productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO' },
     });
     await expect(
       new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'MONTAJE' }),
-    ).rejects.toMatchObject({ message: expect.stringContaining('le toca Bodega de corte') });
+    ).rejects.toMatchObject({ response: expect.objectContaining({ motivo: 'REPETIDO' }) });
     expect(tx.eventoTrazabilidad.create).not.toHaveBeenCalled();
+  });
+
+  it('volver a escanear un par terminado desde una estación es repetido, no error', async () => {
+    const { prisma } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'TERMINADO', of: { estado: 'TERMINADA' },
+    });
+    await expect(
+      new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'PT' }),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ motivo: 'REPETIDO' }) });
   });
 
   it('con la estación declarada correcta, avanza normal', async () => {
@@ -1109,8 +1155,8 @@ describe('FabricacionService.avanzar — con daño tipificado', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('con la estación declarada, un par fuera de orden se rechaza aunque traiga daño (primero el control)', async () => {
-    const { prisma, service } = armar({ celulaActual: 'GUARNICION', subPasoActual: 'PREPARACION' }, tipoSegunda);
+  it('con la estación declarada, un par que ya pasó por ahí se rechaza aunque traiga daño (primero el control)', async () => {
+    const { prisma, service } = armar({ celulaActual: 'INYECCION', subPasoInyeccion: 'FINIZAJE' }, tipoSegunda);
     await expect(
       service.avanzar('OF1-0001', { operarioId: 3, tipoDanoId: 11, estacion: 'MONTAJE' }, operario),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -1248,5 +1294,62 @@ describe('FabricacionService.avanzar: el par terminado queda reservado para su O
 
     expect(tx.ordenProduccionLineaTalla.findFirst).not.toHaveBeenCalled();
     expect(tx.inventarioPT.upsert).toHaveBeenCalled();
+  });
+});
+
+describe('FabricacionService: lote de la coordinadora', () => {
+  const enBodega = {
+    id: 50, codigo: 'OF1-0001', ofId: 1, celulaActual: 'ALMACEN', subPasoActual: null, subPasoInyeccion: null,
+    estado: 'EN_PROCESO', calidad: 'PRIMERA', productoConfiguradoId: 10, tallaId: 1, lineaId: null, of: { estado: 'EN_PROCESO' },
+  };
+
+  it('mover: todos los eventos quedan inferidos, con motivo y quién; cada par por su cuenta', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findMany = jest.fn().mockResolvedValue([
+      enBodega,
+      { ...enBodega, id: 51, codigo: 'OF1-0002', estado: 'CANCELADO' },
+      { ...enBodega, id: 52, codigo: 'OF1-0003', celulaActual: 'INYECCION', subPasoInyeccion: 'FINIZAJE' },
+    ]);
+    const r = await new FabricacionService(prisma).moverLote(
+      { codigos: ['of1-0001', 'OF1-0002', 'OF1-0003', 'OF1-0009'], estacion: 'MONTAJE', motivo: '  Se escanearon tarde  ' },
+      7,
+    );
+    expect(r.movidos).toEqual(['OF1-0001']);
+    expect(r.rechazados.map((x) => x.codigo)).toEqual(['OF1-0002', 'OF1-0003', 'OF1-0009']);
+    expect(tx.eventoTrazabilidad.create).toHaveBeenCalledTimes(1);
+    expect(tx.eventoTrazabilidad.create.mock.calls[0][0].data).toMatchObject({
+      estacionDestino: 'MONTAJE', inferido: true, motivo: 'Se escanearon tarde', registradoPorId: 7,
+    });
+    expect(tx.eventoTrazabilidad.create.mock.calls[0][0].data.operarioId).toBeUndefined();
+  });
+
+  it('mover a PT termina el par y carga la bodega, igual que el pistolazo', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findMany = jest.fn().mockResolvedValue([enBodega]);
+    prisma.bodega = { findFirst: jest.fn().mockResolvedValue({ id: 2 }) };
+    tx.par.update.mockResolvedValue({ id: 50, estado: 'TERMINADO' });
+    const r = await new FabricacionService(prisma).moverLote({ codigos: ['OF1-0001'], estacion: 'PT', motivo: 'Ya empacados' }, 7);
+    expect(r.movidos).toEqual(['OF1-0001']);
+    expect(tx.movimientoInventario.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('mover rechaza una estación apagada', async () => {
+    const { prisma } = makePrisma();
+    await expect(
+      new FabricacionService(prisma).moverLote({ codigos: ['OF1-0001'], estacion: 'CIERRE', motivo: 'Por probar' }, 7),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('cerrar: queda cancelado, sin tocar inventario y sin contar como producción', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findMany = jest.fn().mockResolvedValue([enBodega, { ...enBodega, id: 51, codigo: 'OF1-0002', estado: 'TERMINADO' }]);
+    const r = await new FabricacionService(prisma).cerrarLote({ codigos: ['OF1-0001', 'OF1-0002'], motivo: 'Se perdió el rastro' }, 7);
+    expect(r.cerrados).toEqual(['OF1-0001']);
+    expect(r.rechazados).toEqual([{ codigo: 'OF1-0002', motivo: 'No está en proceso' }]);
+    expect(tx.eventoTrazabilidad.create.mock.calls[0][0].data).toMatchObject({
+      estacionDestino: 'CERRADO', celula: 'ALMACEN', celulaDestino: 'ALMACEN', inferido: true, motivo: 'Se perdió el rastro', registradoPorId: 7,
+    });
+    expect(tx.par.update).toHaveBeenCalledWith({ where: { id: 50 }, data: { estado: 'CANCELADO' } });
+    expect(tx.movimientoInventario.create).not.toHaveBeenCalled();
   });
 });

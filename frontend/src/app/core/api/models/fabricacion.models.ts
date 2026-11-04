@@ -100,8 +100,13 @@ export interface EventoTrazabilidad {
   /** Estación a la que ENTRÓ el par (piloto); null en los escaneos de antes. */
   estacionNombre?: string | null;
   timestamp: string;
-  operario: { nombre: string };
-  maquina: { nombre: string };
+  /** null en un evento inferido: nadie hizo ese pistolazo. */
+  operario: { nombre: string } | null;
+  maquina: { nombre: string } | null;
+  inferido?: boolean;
+  /** Por qué, cuando lo movió o cerró una persona desde el tablero. */
+  motivo?: string | null;
+  registradoPor?: { username: string } | null;
 }
 
 export interface ParDetalle {
@@ -287,6 +292,8 @@ export interface AvanceResultado {
     parReposicion: { codigo: string; celulaActual: Celula } | null;
     /** El código era una etiqueta impresa por adelantado: el par nació con este pistolazo. */
     nacio?: boolean;
+    /** Estaciones por las que pasó sin pistolazo: quedaron como inferidas. */
+    saltadas?: { codigo: string; nombre: string }[];
   };
 }
 
@@ -333,8 +340,18 @@ export interface HoyEstacion {
   celula: Celula;
   hoy: number;
   ultimaHora: number;
+  /** De los de hoy, cuántos pasaron sin pistolazo: la estación que se está saltando. */
+  inferidos?: number;
   meta: number;
 }
+
+/** Resultado de mover o cerrar pares en lote: cada par se resuelve por su cuenta. */
+export interface LoteResultado {
+  movidos?: string[];
+  cerrados?: string[];
+  rechazados: { codigo: string; motivo: string }[];
+}
+
 export interface HoyPlanta {
   fecha: string;
   actualizado: string;

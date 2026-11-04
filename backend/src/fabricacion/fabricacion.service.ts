@@ -18,6 +18,9 @@ import {
   estacionNacimiento,
   validarEstacion,
   esPistolazoRepetido,
+  estacionesSaltadas,
+  tramosDeAvance,
+  DESTINO_CERRADO,
   paresPorEstacion,
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
@@ -27,6 +30,7 @@ import {
 } from './fabricacion-core';
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
+import { CerrarLoteDto, MoverLoteDto } from './dto/lote-pares.dto';
 import { NacerDto } from './dto/nacer.dto';
 import { ReservarEtiquetasDto } from './dto/reservar-etiquetas.dto';
 import { RegistrarConsumoDto } from './dto/registrar-consumo.dto';
@@ -456,14 +460,19 @@ export class FabricacionService {
       if (reserva) return this.nacerDesdeReserva(reserva, dto);
       throw new NotFoundException(`Par ${codigo} no existe`);
     }
-    if (par.estado !== 'EN_PROCESO')
-      throw new ConflictException(
+    if (par.estado !== 'EN_PROCESO') {
+      const message =
         {
           TERMINADO: 'El par ya está terminado',
           CANCELADO: 'El par está cancelado (OP anulada)',
           DADO_DE_BAJA: 'El par fue dado de baja',
-        }[par.estado] ?? 'El par no está en proceso',
-      );
+        }[par.estado] ?? 'El par no está en proceso';
+      // Volver a escanear un par ya terminado es un doble pistolazo, no un error (amarillo).
+      if (par.estado === 'TERMINADO' && dto.estacion) {
+        throw new ConflictException({ statusCode: 409, error: 'Conflict', message, motivo: 'REPETIDO' });
+      }
+      throw new ConflictException(message);
+    }
 
     const celulaActual = par.celulaActual;
     const estado = {
@@ -472,18 +481,23 @@ export class FabricacionService {
       subPasoInyeccion: par.subPasoInyeccion,
     };
     // La siguiente estación ACTIVA decide a dónde va el par; el operario no elige
-    // nada. Si el dispositivo declara su estación, se valida que el par venga de
-    // la anterior (es el control que pedía Mauricio: nada "en un limbo").
+    // nada. Si el dispositivo declara su estación, el par entra ahí: si se saltó
+    // alguna, quedan eventos inferidos (el piloto de octubre perdió el rastro porque
+    // un pistolazo olvidado trababa el par en todas las estaciones siguientes).
     const estaciones = await this.estaciones();
     if (dto.estacion) {
       const rechazo = validarEstacion(estado, dto.estacion, estaciones);
       if (rechazo) {
         // `motivo` deja a la pantalla distinguir el doble pistolazo (amarillo) del error real (rojo).
-        const motivo = esPistolazoRepetido(estado, dto.estacion, estaciones) ? 'REPETIDO' : 'FUERA_DE_ORDEN';
+        const motivo = esPistolazoRepetido(estado, dto.estacion, estaciones) ? 'REPETIDO' : 'ESTACION_INVALIDA';
         throw new ConflictException({ statusCode: 409, error: 'Conflict', message: rechazo, motivo });
       }
     }
-    const next = siguienteEstacion(estado, estaciones);
+    const next = dto.estacion
+      ? estaciones.find((x) => x.codigo === dto.estacion)!
+      : siguienteEstacion(estado, estaciones);
+    const saltadas = next ? estacionesSaltadas(estado, next, estaciones) : [];
+    const tramos = next ? tramosDeAvance(estado, next, estaciones) : [];
     // Entrar a Producto terminado ES terminar (5º pistolazo: carga la bodega).
     const terminar = esEstacionTerminal(next);
     const destino = {
@@ -522,12 +536,27 @@ export class FabricacionService {
     let parReposicion: { codigo: string; celulaActual: Celula } | null = null;
     try {
       resultado = await this.prisma.$transaction(async (tx) => {
+        // Las estaciones saltadas quedan marcadas: nadie hizo ese pistolazo.
+        for (const t of tramos.filter((x) => x.inferido)) {
+          await tx.eventoTrazabilidad.create({
+            data: {
+              parId: par.id,
+              celula: t.desde.celula,
+              subPaso: t.desde.subPaso,
+              subPasoInyeccion: t.desde.subPasoInyeccion ?? null,
+              estacionDestino: t.hacia.codigo,
+              celulaDestino: t.hacia.celula,
+              inferido: true,
+            },
+          });
+        }
+        const ultimo = tramos[tramos.length - 1]?.desde;
         await tx.eventoTrazabilidad.create({
           data: {
             parId: par.id,
-            celula: celulaActual,
-            subPaso: par.subPasoActual,
-            subPasoInyeccion: par.subPasoInyeccion,
+            celula: ultimo?.celula ?? celulaActual,
+            subPaso: ultimo ? ultimo.subPaso : par.subPasoActual,
+            subPasoInyeccion: ultimo ? (ultimo.subPasoInyeccion ?? null) : par.subPasoInyeccion,
             ...destino,
             operarioId: dto.operarioId,
             maquinaId: dto.maquinaId ?? null,
@@ -578,60 +607,7 @@ export class FabricacionService {
         }
 
         if (terminar) {
-          // Producto terminado: terminar el par y sumar a InventarioPT.
-          const updated = await tx.par.update({
-            where: { id: par.id },
-            data: { estado: 'TERMINADO', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null },
-          });
-          // El grado viaja del par al stock: una segunda no engorda el saldo de
-          // primeras (son saldos distintos bajo la misma llave + calidad).
-          const inv = await tx.inventarioPT.upsert({
-            where: {
-              productoConfiguradoId_tallaId_bodegaId_calidad: {
-                productoConfiguradoId: par.productoConfiguradoId,
-                tallaId: par.tallaId,
-                bodegaId: bodegaPT!.id,
-                calidad,
-              },
-            },
-            create: {
-              productoConfiguradoId: par.productoConfiguradoId,
-              tallaId: par.tallaId,
-              bodegaId: bodegaPT!.id,
-              calidad,
-              cantDisponible: 1,
-            },
-            update: { cantDisponible: { increment: 1 } },
-          });
-          // Kardex: cada par terminado es una ENTRADA de PT trazable al par.
-          // La línea del par se sella en el movimiento (kardex PT por línea).
-          await tx.movimientoInventario.create({
-            data: {
-              tipo: 'ENTRADA',
-              motivo: 'PRODUCCION',
-              inventarioPTId: inv.id,
-              cantidad: 1,
-              referencia: par.codigo,
-              lineaId: par.lineaId ?? null,
-            },
-          });
-          // Cierre del ciclo: el par que termina queda reservado para el pedido
-          // que lo mandó a fabricar. Sin esto la OP nunca llega a despacharse:
-          // el despacho sale de las reservas y el stock quedaría suelto en bodega.
-          await this.reservarParaSuOP(tx, par, inv.id, calidad);
-          // El par ya fue marcado TERMINADO en esta misma tx, así que
-          // este count no lo incluye (cuenta solo los que aún siguen en proceso).
-          const restantes = await tx.par.count({
-            where: { ofId: par.ofId, estado: 'EN_PROCESO' },
-          });
-          if (restantes === 0)
-            // Condición sobre el estado para no pisar una OF que otra tx
-            // acaba de ANULAR (anulación de OP concurrente al último escaneo).
-            await tx.ordenFabricacion.updateMany({
-              where: { id: par.ofId, estado: { not: 'ANULADA' } },
-              data: { estado: 'TERMINADA' },
-            });
-          return updated;
+          return this.terminarEnTx(tx, par, calidad, bodegaPT!.id);
         }
 
         // Avance normal a la siguiente estación (la activación de la OF ya se
@@ -674,8 +650,190 @@ export class FabricacionService {
         calidad,
         incidencia: this.resumenIncidencia(incidencia),
         parReposicion,
+        saltadas: saltadas.map((x) => ({ codigo: x.codigo, nombre: x.nombre })),
       },
     };
+  }
+
+  /** Producto terminado: el par queda en bodega, en el kardex y reservado para su OP. */
+  private async terminarEnTx(tx: any, par: any, calidad: 'PRIMERA' | 'SEGUNDA', bodegaId: number) {
+    // Producto terminado: terminar el par y sumar a InventarioPT.
+    const updated = await tx.par.update({
+      where: { id: par.id },
+      data: { estado: 'TERMINADO', celulaActual: 'PT', subPasoActual: null, subPasoInyeccion: null },
+    });
+    // El grado viaja del par al stock: una segunda no engorda el saldo de
+    // primeras (son saldos distintos bajo la misma llave + calidad).
+    const inv = await tx.inventarioPT.upsert({
+      where: {
+        productoConfiguradoId_tallaId_bodegaId_calidad: {
+          productoConfiguradoId: par.productoConfiguradoId,
+          tallaId: par.tallaId,
+          bodegaId: bodegaId,
+          calidad,
+        },
+      },
+      create: {
+        productoConfiguradoId: par.productoConfiguradoId,
+        tallaId: par.tallaId,
+        bodegaId: bodegaId,
+        calidad,
+        cantDisponible: 1,
+      },
+      update: { cantDisponible: { increment: 1 } },
+    });
+    // Kardex: cada par terminado es una ENTRADA de PT trazable al par.
+    // La línea del par se sella en el movimiento (kardex PT por línea).
+    await tx.movimientoInventario.create({
+      data: {
+        tipo: 'ENTRADA',
+        motivo: 'PRODUCCION',
+        inventarioPTId: inv.id,
+        cantidad: 1,
+        referencia: par.codigo,
+        lineaId: par.lineaId ?? null,
+      },
+    });
+    // Cierre del ciclo: el par que termina queda reservado para el pedido
+    // que lo mandó a fabricar. Sin esto la OP nunca llega a despacharse:
+    // el despacho sale de las reservas y el stock quedaría suelto en bodega.
+    await this.reservarParaSuOP(tx, par, inv.id, calidad);
+    // El par ya fue marcado TERMINADO en esta misma tx, así que
+    // este count no lo incluye (cuenta solo los que aún siguen en proceso).
+    const restantes = await tx.par.count({
+      where: { ofId: par.ofId, estado: 'EN_PROCESO' },
+    });
+    if (restantes === 0)
+      // Condición sobre el estado para no pisar una OF que otra tx
+      // acaba de ANULAR (anulación de OP concurrente al último escaneo).
+      await tx.ordenFabricacion.updateMany({
+        where: { id: par.ofId, estado: { not: 'ANULADA' } },
+        data: { estado: 'TERMINADA' },
+      });
+    return updated;
+  }
+
+  private async bodegaDeTerminados() {
+    const bodega = await this.prisma.bodega.findFirst({
+      where: { tipo: 'PROPIA', activo: true },
+      orderBy: { prioridad: 'asc' },
+    });
+    if (!bodega) throw new BadRequestException('No hay bodega PROPIA configurada');
+    return bodega;
+  }
+
+  /**
+   * La coordinadora mueve varios pares a una estación sin pistolazo: pares que
+   * pasaron y nadie escaneó. Todos los eventos quedan inferidos, con el motivo y
+   * quién lo hizo. Cada par va en su transacción: uno rechazado no frena a los demás.
+   */
+  async moverLote(dto: MoverLoteDto, usuarioId: number) {
+    const estaciones = await this.estaciones();
+    const objetivo = estaciones.find((x) => x.codigo === dto.estacion);
+    if (!objetivo || !objetivo.activa)
+      throw new BadRequestException(`La estación "${dto.estacion}" no existe o está apagada`);
+    const terminar = esEstacionTerminal(objetivo);
+    const bodegaPT = terminar ? await this.bodegaDeTerminados() : null;
+    const motivo = dto.motivo.trim();
+    const codigos = [...new Set(dto.codigos.map(normalizarCodigoPar))];
+    const pares = await this.prisma.par.findMany({ where: { codigo: { in: codigos } }, include: { of: true } });
+    const porCodigo = new Map(pares.map((p: any) => [p.codigo, p]));
+    const movidos: string[] = [];
+    const rechazados: { codigo: string; motivo: string }[] = [];
+    for (const codigo of codigos) {
+      const par: any = porCodigo.get(codigo);
+      if (!par) {
+        rechazados.push({ codigo, motivo: 'No existe' });
+        continue;
+      }
+      if (par.estado !== 'EN_PROCESO') {
+        rechazados.push({ codigo, motivo: 'No está en proceso' });
+        continue;
+      }
+      const estado = { celula: par.celulaActual, subPaso: par.subPasoActual, subPasoInyeccion: par.subPasoInyeccion };
+      const rechazo = validarEstacion(estado, objetivo.codigo, estaciones);
+      if (rechazo) {
+        rechazados.push({ codigo, motivo: rechazo });
+        continue;
+      }
+      await this.prisma.$transaction(async (tx) => {
+        for (const t of tramosDeAvance(estado, objetivo, estaciones)) {
+          await tx.eventoTrazabilidad.create({
+            data: {
+              parId: par.id,
+              celula: t.desde.celula,
+              subPaso: t.desde.subPaso,
+              subPasoInyeccion: t.desde.subPasoInyeccion ?? null,
+              estacionDestino: t.hacia.codigo,
+              celulaDestino: t.hacia.celula,
+              inferido: true,
+              motivo,
+              registradoPorId: usuarioId,
+            },
+          });
+        }
+        if (par.of.estado === 'ABIERTA') {
+          await tx.ordenFabricacion.update({ where: { id: par.ofId }, data: { estado: 'EN_PROCESO' } });
+        }
+        if (terminar) {
+          await this.terminarEnTx(tx, par, par.calidad, bodegaPT!.id);
+        } else {
+          await tx.par.update({
+            where: { id: par.id },
+            data: {
+              celulaActual: objetivo.celula,
+              subPasoActual: objetivo.subPaso,
+              subPasoInyeccion: objetivo.subPasoInyeccion ?? null,
+            },
+          });
+        }
+      });
+      movidos.push(codigo);
+    }
+    return { movidos, rechazados };
+  }
+
+  /**
+   * Cierra sin terminar pares que se perdieron o no van a seguir: quedan CANCELADOS,
+   * sin tocar inventario, y su cupo vuelve a quedar libre para nacer otro. El evento
+   * no cuenta como producción (no sale de su célula).
+   */
+  async cerrarLote(dto: CerrarLoteDto, usuarioId: number) {
+    const motivo = dto.motivo.trim();
+    const codigos = [...new Set(dto.codigos.map(normalizarCodigoPar))];
+    const pares = await this.prisma.par.findMany({ where: { codigo: { in: codigos } } });
+    const porCodigo = new Map(pares.map((p: any) => [p.codigo, p]));
+    const cerrados: string[] = [];
+    const rechazados: { codigo: string; motivo: string }[] = [];
+    for (const codigo of codigos) {
+      const par: any = porCodigo.get(codigo);
+      if (!par) {
+        rechazados.push({ codigo, motivo: 'No existe' });
+        continue;
+      }
+      if (par.estado !== 'EN_PROCESO') {
+        rechazados.push({ codigo, motivo: 'No está en proceso' });
+        continue;
+      }
+      await this.prisma.$transaction(async (tx) => {
+        await tx.eventoTrazabilidad.create({
+          data: {
+            parId: par.id,
+            celula: par.celulaActual,
+            subPaso: par.subPasoActual,
+            subPasoInyeccion: par.subPasoInyeccion,
+            estacionDestino: DESTINO_CERRADO,
+            celulaDestino: par.celulaActual,
+            inferido: true,
+            motivo,
+            registradoPorId: usuarioId,
+          },
+        });
+        await tx.par.update({ where: { id: par.id }, data: { estado: 'CANCELADO' } });
+      });
+      cerrados.push(codigo);
+    }
+    return { cerrados, rechazados };
   }
 
   /**
@@ -1033,10 +1191,12 @@ export class FabricacionService {
         },
         linea: { select: { codigo: true, nombre: true } },
         eventos: {
-          orderBy: { timestamp: 'asc' },
+          // El salto crea varios eventos con la misma hora: el id da el orden real.
+          orderBy: [{ timestamp: 'asc' }, { id: 'asc' }],
           include: {
             operario: { select: { nombre: true } },
             maquina: { select: { nombre: true } },
+            registradoPor: { select: { username: true } },
           },
         },
         incidencias: {
@@ -1333,7 +1493,7 @@ export class FabricacionService {
       this.estaciones(),
       this.prisma.eventoTrazabilidad.findMany({
         where: { timestamp: { gte: inicio }, estacionDestino: { not: null } },
-        select: { estacionDestino: true, timestamp: true },
+        select: { estacionDestino: true, timestamp: true, inferido: true },
       }),
       this.metaDiariaPorCelula(ahora),
     ]);

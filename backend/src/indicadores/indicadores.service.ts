@@ -26,6 +26,8 @@ export class IndicadoresService {
         subPasoActual: true,
         estado: true,
         eventos: {
+          // Un evento inferido no es trabajo de nadie: ni operario ni tiempo que medir.
+          where: { inferido: false },
           orderBy: { timestamp: 'asc' },
           select: {
             celula: true,

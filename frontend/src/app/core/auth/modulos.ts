@@ -311,3 +311,13 @@ export const ROLES_PROGRAMAN_CORTE: readonly string[] = ['ADMIN', 'GERENTE', 'JE
 export function puedeProgramarCorte(rol: string | null | undefined): boolean {
   return !!rol && ROLES_PROGRAMAN_CORTE.includes(rol);
 }
+
+/**
+ * Quién mueve o cierra pares en lote desde el tablero. Espejo del `@Roles` de
+ * `pares/mover-lote` y `pares/cerrar-lote`, que es el que de verdad manda.
+ */
+export const ROLES_OPERAN_LOTE: readonly string[] = ['ADMIN', 'GERENTE'];
+
+export function puedeOperarLote(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_OPERAN_LOTE.includes(rol);
+}

@@ -128,3 +128,83 @@ describe('FabricacionTableroComponent', () => {
     http.verify();
   });
 });
+
+describe('FabricacionTableroComponent: lote de la coordinadora', () => {
+  const BASE = 'http://localhost:3001/fabricacion';
+  const PARES = [
+    { id: 1, codigo: 'OF19-0001', talla: { valor: 39 }, estado: 'EN_PROCESO', celulaActual: 'ALMACEN' },
+    { id: 2, codigo: 'OF19-0002', talla: { valor: 40 }, estado: 'EN_PROCESO', celulaActual: 'ALMACEN' },
+  ];
+  const ESTACIONES = [
+    { codigo: 'PREPARACION', nombre: 'Preparación', orden: 1, activa: true },
+    { codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', orden: 3, activa: true },
+    { codigo: 'CIERRE', nombre: 'Cierre', orden: 2, activa: false },
+    { codigo: 'MONTAJE', nombre: 'Inyección · Montaje', orden: 4, activa: true },
+    { codigo: 'PT', nombre: 'Producto terminado', orden: 6, activa: true },
+  ];
+
+  function setRol(role: string): void {
+    localStorage.setItem('accessToken', `x.${btoa(JSON.stringify({ sub: 1, username: 'u', role }))}.y`);
+  }
+  afterEach(() => localStorage.removeItem('accessToken'));
+
+  function abrirColumna(role: string) {
+    setRol(role);
+    const m = montar();
+    m.http.expectOne(`${BASE}/tablero-resumen`).flush(RESUMEN);
+    const c = m.fixture.componentInstance;
+    c.resumen.set({ ...RESUMEN } as never);
+    c.abrir('BODEGA_CORTE');
+    m.http.expectOne((r) => r.url === `${BASE}/tablero`).flush(PARES);
+    m.fixture.detectChanges();
+    return { ...m, c };
+  }
+
+  it('la tablet de estación no ve el botón del lote', () => {
+    const { el } = abrirColumna('ESTACION');
+    expect(el.textContent).not.toContain('Mover o cerrar en lote');
+  });
+
+  it('solo ofrece estaciones activas hacia adelante y exige motivo', () => {
+    const { c, http, el } = abrirColumna('GERENTE');
+    expect(el.textContent).toContain('Mover o cerrar en lote');
+    c.abrirLote();
+    http.expectOne(`${BASE}/estaciones`).flush(ESTACIONES);
+    expect(c.destinos().map((e) => e.codigo)).toEqual(['MONTAJE', 'PT']);
+    c.loteEstacion = 'MONTAJE';
+    c.loteMotivo = 'no';
+    expect(c.puedeMover()).toBeFalse();
+    c.loteMotivo = 'Pasaron sin escanear';
+    expect(c.puedeMover()).toBeTrue();
+  });
+
+  it('mueve solo los seleccionados y deja a la vista los rechazados', () => {
+    const { c, http } = abrirColumna('GERENTE');
+    c.abrirLote();
+    http.expectOne(`${BASE}/estaciones`).flush(ESTACIONES);
+    c.alternar('OF19-0002');
+    c.loteEstacion = 'MONTAJE';
+    c.loteMotivo = 'Pasaron sin escanear';
+    c.mover();
+    const req = http.expectOne(`${BASE}/pares/mover-lote`);
+    expect(req.request.body).toEqual({ codigos: ['OF19-0001'], estacion: 'MONTAJE', motivo: 'Pasaron sin escanear' });
+    req.flush({ movidos: [], rechazados: [{ codigo: 'OF19-0001', motivo: 'No está en proceso' }] });
+    expect(c.rechazados().length).toBe(1);
+    http.expectOne(`${BASE}/tablero-resumen`).flush(RESUMEN);
+    http.expectOne((r) => r.url === `${BASE}/tablero`).flush(PARES);
+  });
+
+  it('cerrar manda los seleccionados con su motivo', () => {
+    const { c, http } = abrirColumna('ADMIN');
+    c.abrirLote();
+    http.expectOne(`${BASE}/estaciones`).flush(ESTACIONES);
+    c.loteMotivo = 'Se perdió el rastro';
+    c.cerrarPares();
+    const req = http.expectOne(`${BASE}/pares/cerrar-lote`);
+    expect(req.request.body).toEqual({ codigos: ['OF19-0001', 'OF19-0002'], motivo: 'Se perdió el rastro' });
+    req.flush({ cerrados: ['OF19-0001', 'OF19-0002'], rechazados: [] });
+    expect(c.modoLote()).toBeFalse();
+    http.expectOne(`${BASE}/tablero-resumen`).flush(RESUMEN);
+    http.expectOne((r) => r.url === `${BASE}/tablero`).flush(PARES);
+  });
+});

@@ -53,7 +53,13 @@ type ItemTimeline =
                   @if (item.kind === 'evento') {
                     <li>
                       <span class="tl-cel">@if (item.evento.estacionNombre) { {{ item.evento.estacionNombre }} } @else { {{ label(item.evento.celula) }}@if (item.evento.subPaso) { · {{ subPasoLabel(item.evento.subPaso) }} }@if (item.evento.subPasoInyeccion) { · {{ subPasoInyeccionLabel(item.evento.subPasoInyeccion) }} } }</span>
-                      <span class="cell-sub">{{ item.evento.operario.nombre }}@if (item.evento.maquina) { · {{ item.evento.maquina.nombre }} }</span>
+                      <span class="cell-sub">
+                        @if (item.evento.inferido) {
+                          <b>Sin pistolazo</b>@if (item.evento.registradoPor) { · lo registró {{ item.evento.registradoPor.username }} }@if (item.evento.motivo) { · {{ item.evento.motivo }} }
+                        } @else {
+                          {{ item.evento.operario?.nombre }}@if (item.evento.maquina) { · {{ item.evento.maquina.nombre }} }
+                        }
+                      </span>
                       <span class="cell-sub mono">{{ item.evento.timestamp | date:'dd MMM HH:mm' }}</span>
                     </li>
                   } @else {

@@ -18,6 +18,8 @@ import {
   estacionDeEstado,
   validarEstacion,
   esPistolazoRepetido,
+  estacionesSaltadas,
+  tramosDeAvance,
   paresPorEstacion,
   avanceHoyPorEstacion,
   inicioDelDiaBogota,
@@ -336,17 +338,23 @@ describe('validarEstacion (el dispositivo está amarrado a una estación)', () =
     expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'BODEGA_CORTE', E)).toBeNull();
     expect(validarEstacion({ celula: 'INYECCION', subPaso: null, subPasoInyeccion: 'FINIZAJE' }, 'PT', E)).toBeNull();
   });
-  it('rechaza saltarse una estación, diciendo de dónde viene y cuál le toca', () => {
-    const msg = validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'MONTAJE', E);
-    expect(msg).toContain('viene de Preparación');
-    expect(msg).toContain('le toca Bodega de corte');
+  it('acepta un salto hacia adelante: si llegó acá, pasó por las anteriores', () => {
+    expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'MONTAJE', E)).toBeNull();
+    expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'PT', E)).toBeNull();
+  });
+  it('rechaza devolver un par a una estación por la que ya pasó', () => {
+    const finizaje = { celula: 'INYECCION' as const, subPaso: null, subPasoInyeccion: 'FINIZAJE' as const };
+    const msg = validarEstacion(finizaje, 'MONTAJE', E);
+    expect(msg).toContain('ya pasó por Inyección · Montaje');
+    expect(msg).toContain('va en Inyección · Finizaje');
+    expect(esPistolazoRepetido(finizaje, 'MONTAJE', E)).toBe(true);
   });
   it('rechaza una estación apagada o inexistente', () => {
     expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'CIERRE', E)).toContain('apagada');
     expect(validarEstacion({ celula: 'GUARNICION', subPaso: 'PREPARACION' }, 'XXX', E)).toContain('no existe');
   });
-  it('un par en PT escaneado en otra estación ya recorrió todo', () => {
-    expect(validarEstacion({ celula: 'PT', subPaso: null }, 'FINIZAJE', E)).toContain('recorrió');
+  it('un par en PT escaneado en otra estación ya pasó por ahí', () => {
+    expect(validarEstacion({ celula: 'PT', subPaso: null }, 'FINIZAJE', E)).toContain('ya pasó');
   });
   it('el mismo par otra vez en la misma estación: "ya registrado", no "fuera de orden"', () => {
     const montaje = { celula: 'INYECCION' as const, subPaso: null, subPasoInyeccion: 'MONTAJE' as const };
@@ -354,6 +362,35 @@ describe('validarEstacion (el dispositivo está amarrado a una estación)', () =
     expect(esPistolazoRepetido(montaje, 'MONTAJE', E)).toBe(true);
     expect(esPistolazoRepetido(montaje, 'FINIZAJE', E)).toBe(false);
     expect(esPistolazoRepetido({ celula: 'PT', subPaso: null }, 'PT', E)).toBe(true);
+  });
+});
+
+describe('salto de estación', () => {
+  const E = ESTACIONES_PILOTO;
+  const objetivo = (codigo: string) => E.find((x) => x.codigo === codigo)!;
+  const preparacion = { celula: 'GUARNICION' as const, subPaso: 'PREPARACION' as const };
+
+  it('sin salto: un solo tramo, el real', () => {
+    const t = tramosDeAvance(preparacion, objetivo('BODEGA_CORTE'), E);
+    expect(t).toEqual([{ desde: preparacion, hacia: objetivo('BODEGA_CORTE'), inferido: false }]);
+    expect(estacionesSaltadas(preparacion, objetivo('BODEGA_CORTE'), E)).toEqual([]);
+  });
+
+  it('con salto: un tramo inferido por estación y encadenados, el último real', () => {
+    const t = tramosDeAvance(preparacion, objetivo('FINIZAJE'), E);
+    expect(t.map((x) => [x.hacia.codigo, x.inferido])).toEqual([
+      ['BODEGA_CORTE', true],
+      ['MONTAJE', true],
+      ['FINIZAJE', false],
+    ]);
+    expect(t[0].desde).toEqual(preparacion);
+    expect(t[1].desde.celula).toBe('ALMACEN');
+    expect(t[2].desde).toMatchObject({ celula: 'INYECCION', subPasoInyeccion: 'MONTAJE' });
+  });
+
+  it('una estación apagada no se infiere', () => {
+    const conMontajeApagado = E.map((x) => (x.codigo === 'MONTAJE' ? { ...x, activa: false } : x));
+    expect(estacionesSaltadas(preparacion, objetivo('FINIZAJE'), conMontajeApagado).map((x) => x.codigo)).toEqual(['BODEGA_CORTE']);
   });
 });
 

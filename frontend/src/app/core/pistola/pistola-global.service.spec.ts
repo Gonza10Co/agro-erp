@@ -58,6 +58,18 @@ describe('PistolaGlobalService', () => {
     expect(t.detalle).toContain('van 12 hoy');
   });
 
+  it('si se saltó una estación entra, pero en amarillo y diciendo cuál', () => {
+    disparar('OF19-0011');
+    httpMock.expectOne(URL).flush({
+      codigo: 'OF19-0011',
+      avance: { nombre: 'Inyección · Montaje', terminado: false, hoy: 12, calidad: 'PRIMERA', saltadas: [{ codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte' }] },
+    });
+    const t = toast.toasts()[0];
+    expect(t.tipo).toBe('alerta');
+    expect(t.mensaje).toContain('OF19-0011 → Inyección · Montaje');
+    expect(t.detalle).toContain('Sin pistolazo en Bodega de corte');
+  });
+
   it('el par repetido sale en amarillo', () => {
     disparar('OF19-0011');
     httpMock.expectOne(URL).flush(

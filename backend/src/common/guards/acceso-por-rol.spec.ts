@@ -90,6 +90,8 @@ describe('ESTACION (la tablet de la estación)', () => {
 
   it('no crea OF, no prende ni apaga estaciones, no registra consumo ni inspecciona en PT', () => {
     expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/pares/mover-lote')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/pares/cerrar-lote')).toBe(false);
     expect(rolPuedeLlamar('ESTACION', 'PATCH', '/fabricacion/estaciones/:codigo')).toBe(false);
     expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/of/:id/consumo')).toBe(false);
     expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of/:id/consumo')).toBe(false);
