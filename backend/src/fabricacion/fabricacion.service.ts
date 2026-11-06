@@ -703,7 +703,9 @@ export class FabricacionService {
     const restantes = await tx.par.count({
       where: { ofId: par.ofId, estado: 'EN_PROCESO' },
     });
-    if (restantes === 0)
+    // Sin pares en proceso no basta: la OF nace vacía y sus pares nacen por tandas, así
+    // que puede quedarse sin nada en proceso con la mayoría de lo programado por nacer.
+    if (restantes === 0 && (await this.faltanPorNacer(tx, par)) === 0)
       // Condición sobre el estado para no pisar una OF que otra tx
       // acaba de ANULAR (anulación de OP concurrente al último escaneo).
       await tx.ordenFabricacion.updateMany({
@@ -711,6 +713,20 @@ export class FabricacionService {
         data: { estado: 'TERMINADA' },
       });
     return updated;
+  }
+
+  /** Lo programado que no ha nacido. Cuenta igual que el cupo de `cupoYSecuencia`. */
+  private async faltanPorNacer(tx: any, par: { ofId: number; of?: { opId?: number } | null }) {
+    const opId = par.of?.opId;
+    if (!opId) return 0;
+    const programado = await tx.ordenProduccionLineaTalla.aggregate({
+      where: { opLinea: { opId } },
+      _sum: { cantAProducir: true },
+    });
+    const nacidos = await tx.par.count({
+      where: { ofId: par.ofId, reponeAParId: null, estado: { not: 'CANCELADO' } },
+    });
+    return Math.max((programado._sum.cantAProducir ?? 0) - nacidos, 0);
   }
 
   private async bodegaDeTerminados() {
