@@ -23,7 +23,10 @@ function makePrisma(overrides: any = {}) {
     inventarioPT: { upsert: jest.fn().mockResolvedValue({ id: 33 }), update: jest.fn().mockResolvedValue({}) },
     movimientoInventario: { create: jest.fn().mockResolvedValue({}) },
     // Cierre del ciclo: por defecto el par no encuentra talla de OP (OF sin opId en los mocks viejos).
-    ordenProduccionLineaTalla: { findFirst: jest.fn().mockResolvedValue(null) },
+    ordenProduccionLineaTalla: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { cantAProducir: 0 } }),
+    },
     reservaInventarioPT: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({}),
@@ -662,6 +665,40 @@ describe('FabricacionService.avanzar', () => {
         data: { estado: 'TERMINADA' },
       }),
     );
+  });
+
+  it('no cierra la OF si todos los nacidos terminaron pero faltan pares por nacer', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO', opId: 7 },
+    });
+    tx.ordenProduccionLineaTalla.aggregate.mockResolvedValue({ _sum: { cantAProducir: 1206 } });
+    // 0 en proceso, 1 nacido de 1.206 programados
+    tx.par.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+
+    expect(tx.par.count).toHaveBeenCalledWith({
+      where: { ofId: 1, reponeAParId: null, estado: { not: 'CANCELADO' } },
+    });
+    expect(tx.ordenFabricacion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('cierra la OF cuando nació todo lo programado y no queda nada en proceso', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue({
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO', opId: 7 },
+    });
+    tx.ordenProduccionLineaTalla.aggregate.mockResolvedValue({ _sum: { cantAProducir: 3 } });
+    tx.par.count.mockResolvedValueOnce(0).mockResolvedValueOnce(3);
+    await new FabricacionService(prisma).avanzar('OF1-0001', dto);
+
+    expect(tx.ordenProduccionLineaTalla.aggregate).toHaveBeenCalledWith({
+      where: { opLinea: { opId: 7 } },
+      _sum: { cantAProducir: true },
+    });
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalled();
   });
 
   it('un par marcado de SEGUNDA entra al saldo de segundas, no al de primeras', async () => {

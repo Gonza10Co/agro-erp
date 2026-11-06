@@ -922,7 +922,7 @@ Primera prueba real con tablet Teclast + lector Tera por Bluetooth (31-oct) y lo
 - En la tablet: Bluetooth HID (página 4 del manual del Tera), "Permanecer activo" en opciones de
   desarrollador y cargador puesto.
 
-### ⏭️ Salto de estación y lote de la coordinadora (2026-11-04, en develop, sin desplegar)
+### ⏭️ Salto de estación y lote de la coordinadora (2026-11-04, en prod)
 
 - **Salto:** un par escaneado más adelante entra y deja un evento inferido por cada estación saltada
   (`EventoTrazabilidad.inferido`, sin operario). Aviso amarillo y "sin pistolazo" por estación en la TV. Un par que
