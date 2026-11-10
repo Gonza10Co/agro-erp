@@ -35,6 +35,8 @@ import { SedesClienteComponent } from './sedes-cliente.component';
         <label class="label" for="tipoCredito">Tipo de crédito</label>
         <select class="select" id="tipoCredito" name="tipoCredito" [(ngModel)]="tipoCredito">
           <option value="CONTADO">Contado</option>
+          <option value="D10">10 días</option>
+          <option value="D15">15 días</option>
           <option value="D30">30 días</option>
           <option value="D60">60 días</option>
           <option value="D90">90 días</option>

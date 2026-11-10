@@ -1,7 +1,7 @@
 export type EstadoOC = 'BORRADOR' | 'CONFIRMADA' | 'EN_PRODUCCION' | 'CERRADA' | 'ANULADA';
 export type EstadoDemora = 'VERDE' | 'AMARILLO' | 'ROJO' | 'RETENIDA_CARTERA';
 export type EstadoOP = 'CREADA' | 'AMARRADA' | 'EN_PRODUCCION' | 'DESPACHADA' | 'ANULADA';
-export type TipoCredito = 'CONTADO' | 'D30' | 'D60' | 'D90';
+export type TipoCredito = 'CONTADO' | 'D10' | 'D15' | 'D30' | 'D60' | 'D90';
 export type EstadoCartera = 'AL_DIA' | 'VENCIDO' | 'BLOQUEADO';
 export type TipoBodega = 'PROPIA' | 'HERMANA';
 

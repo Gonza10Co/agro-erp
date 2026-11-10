@@ -11,6 +11,8 @@ import { Type } from 'class-transformer';
 
 export enum TipoCreditoDto {
   CONTADO = 'CONTADO',
+  D10 = 'D10',
+  D15 = 'D15',
   D30 = 'D30',
   D60 = 'D60',
   D90 = 'D90',
