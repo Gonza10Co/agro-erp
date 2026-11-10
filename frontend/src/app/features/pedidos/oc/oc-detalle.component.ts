@@ -37,6 +37,9 @@ interface LineaEdit {
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Entrega en</span><span class="v">{{ o.direccionDespacho || '—' }}</span></div>
+        @if (o.observaciones) {
+          <div class="kv"><span class="k">Observaciones</span><span class="v obs-oc">{{ o.observaciones }}</span></div>
+        }
         @if (puedeVerLinea) {
           <div class="kv"><span class="k">Línea de producción</span><span class="v">{{ o.linea?.nombre || '—' }}</span></div>
         }
@@ -161,6 +164,7 @@ interface LineaEdit {
     }
   `,
   styles: [`
+    .obs-oc{white-space:pre-wrap}
     /* El grado tiene que verse en el pedido: una segunda va a otro precio. */
     .badge-seg{display:inline-block;margin-left:var(--sp-2);padding:1px 8px;border-radius:99px;font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--warn,#d97706);border:var(--bw) solid currentColor}
   `],

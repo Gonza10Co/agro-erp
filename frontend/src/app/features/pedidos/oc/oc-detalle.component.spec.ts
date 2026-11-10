@@ -34,6 +34,13 @@ describe('OcDetalleComponent', () => {
     return fixture;
   }
 
+  it('muestra la observación también con la OC ya confirmada (no solo al editar)', () => {
+    const fixture = setup();
+    apiMock.obtenerOC.and.returnValue(of({ ...OC_BORRADOR, estado: 'CONFIRMADA', observaciones: 'Entregar con marquilla del cliente' }));
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Entregar con marquilla del cliente');
+  });
+
   it('carga el detalle de la OC al iniciar', () => {
     const fixture = setup();
     fixture.detectChanges();
