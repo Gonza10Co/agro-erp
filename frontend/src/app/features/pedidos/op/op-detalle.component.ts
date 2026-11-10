@@ -41,6 +41,10 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
                 <span>·</span><span>{{ o.oc?.cliente?.nombre }}</span>
                 <span>·</span><span>Generada {{ o.fecha | date:'dd MMM' }}</span>
               </div>
+              <!-- La observación del pedido viaja a producción: la planta la tiene que ver. -->
+              @if (o.oc?.observaciones) {
+                <div class="obs-oc"><b>Observaciones del pedido:</b> {{ o.oc?.observaciones }}</div>
+              }
             </div>
           </div>
           @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || ((puedeOperarProduccion || puedeRecalcular) && requerible())) {
@@ -181,6 +185,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
     </div>
   `,
   styles: [`
+    .obs-oc{margin-top:var(--sp-2);font-size:var(--text-sm);white-space:pre-wrap;color:var(--text)}
     .req-strip{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
     .req-links{display:flex;gap:var(--sp-2);flex-wrap:wrap}
     .req-activo{color:var(--success, #2e9e5b);font-size:var(--text-caption)}

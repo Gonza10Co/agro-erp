@@ -159,3 +159,21 @@ describe('OpDetalleComponent', () => {
     http.verify();
   });
 });
+
+describe('OpDetalleComponent — observación del pedido', () => {
+  it('la planta ve la observación de la OC en la orden de producción', () => {
+    TestBed.configureTestingModule({
+      imports: [OpDetalleComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    const fixture = TestBed.createComponent(OpDetalleComponent);
+    fixture.detectChanges(); // ngOnInit pide la OP: se reemplaza por la de prueba
+    fixture.componentInstance.op.set({
+      id: 7, consecutivo: 1, estado: 'CREADA', ocId: 9, fecha: '2026-11-10T00:00:00.000Z', lineas: [],
+      oc: { consecutivo: 1, observaciones: 'Suela color miel', cliente: { nombre: 'OLPAR' } },
+    } as any);
+    fixture.componentInstance.cargando.set(false);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Suela color miel');
+  });
+});
