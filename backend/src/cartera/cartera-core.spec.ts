@@ -13,6 +13,8 @@ describe('cartera-core', () => {
   describe('diasCredito', () => {
     it('mapea el tipo de crédito a días', () => {
       expect(diasCredito('CONTADO')).toBe(0);
+      expect(diasCredito('D10')).toBe(10);
+      expect(diasCredito('D15')).toBe(15);
       expect(diasCredito('D30')).toBe(30);
       expect(diasCredito('D60')).toBe(60);
       expect(diasCredito('D90')).toBe(90);

@@ -1,7 +1,7 @@
 // Núcleo puro de cartera: vencimientos, saldos y estado de cartera.
 // Sin Prisma ni Nest — testeable en aislamiento. `hoy` se inyecta para que sea determinista.
 
-export type TipoCredito = 'CONTADO' | 'D30' | 'D60' | 'D90';
+export type TipoCredito = 'CONTADO' | 'D10' | 'D15' | 'D30' | 'D60' | 'D90';
 export type EstadoCartera = 'AL_DIA' | 'VENCIDO' | 'BLOQUEADO';
 
 function redondear(n: number): number {
@@ -11,6 +11,8 @@ function redondear(n: number): number {
 /** Días de plazo según el tipo de crédito del cliente. */
 export function diasCredito(tipo: TipoCredito): number {
   switch (tipo) {
+    case 'D10': return 10;
+    case 'D15': return 15;
     case 'D30': return 30;
     case 'D60': return 60;
     case 'D90': return 90;
