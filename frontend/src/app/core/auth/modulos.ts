@@ -98,6 +98,8 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
  * (pedidos, compras) y quedaría a la vista apenas se despliega.
  */
 export type Seccion =
+  // Proyección de pedidos contra la capacidad de la planta (2026-11-12).
+  | 'proyeccion-pedidos'
   // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
   // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
   | 'calidad-en-planta'
@@ -133,6 +135,10 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // Proyección de pedidos (2026-11-12): lo que Gabriel le pide a JP, hasta cuándo hay
+  // trabajo, qué pedido no llega y desde cuándo hay cupo para vender. Solo lectura.
+  // Liberada de una: el cliente ya opera en real y JP la pidió para programar.
+  'proyeccion-pedidos': 'ENTREGADO',
   // Quincena de calidad en planta (2026-09-11): la puerta desde la pantalla de
   // estación para marcar un par como segunda, darlo de baja o registrar un
   // reproceso sin salir de la línea. Liberada el mismo día que se construyó:

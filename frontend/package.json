@@ -21,6 +21,7 @@
     "@angular/router": "^19.2.0",
     "@types/qrcode": "^1.5.5",
     "angularx-qrcode": "^19.0.0",
+    "fflate": "^0.8.3",
     "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
