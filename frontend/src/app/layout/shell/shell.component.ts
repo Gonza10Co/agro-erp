@@ -18,7 +18,7 @@ const GRUPOS_ABIERTOS_INICIO: GrupoNav[] = ['ventas', 'produccion', 'planta', 'c
 const GRUPO_POR_RUTA: [string, GrupoNav][] = [
   ['/pedidos/oc', 'ventas'], ['/clientes', 'ventas'], ['/despachos', 'ventas'],
   ['/facturas', 'ventas'], ['/cartera', 'ventas'],
-  ['/pedidos/op', 'produccion'], ['/corte', 'produccion'], ['/fabricacion/tablero', 'produccion'],
+  ['/pedidos/op', 'produccion'], ['/pedidos/proyeccion', 'produccion'], ['/corte', 'produccion'], ['/fabricacion/tablero', 'produccion'],
   ['/fabricacion/ordenes', 'produccion'], ['/fabricacion/estacion', 'planta'],
   ['/fabricacion', 'produccion'], ['/calidad', 'planta'],
   ['/compras', 'compras'], ['/proveedores', 'compras'], ['/inventario', 'compras'],
@@ -111,6 +111,12 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
           <a class="nav-item" routerLink="/pedidos/op" routerLinkActive="is-active" title="Órdenes de producción (OP)">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></span>
             <span class="nav-label">Órdenes de producción</span>
+          </a>
+          }
+          @if (puedeVer('pedidos') && puedeVerSec('proyeccion-pedidos')) {
+          <a class="nav-item" routerLink="/pedidos/proyeccion" routerLinkActive="is-active" title="Proyección de pedidos contra la capacidad de la planta">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9M4 12h14M4 19h6"/><path d="M17 3v4M21 10v4M13 17v4"/></svg></span>
+            <span class="nav-label">Proyección de pedidos</span>
           </a>
           }
           @if (puedeVer('corte') && puedeVerSec('programacion-corte')) {

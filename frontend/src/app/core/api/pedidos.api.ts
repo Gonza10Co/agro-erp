@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { OrdenCompra, OrdenProduccion, CrearOCDto, ResumenCosteoOC } from './models/pedidos.models';
+import { Proyeccion } from './models/proyeccion.models';
 
 @Injectable({ providedIn: 'root' })
 export class PedidosApi {
@@ -21,4 +22,7 @@ export class PedidosApi {
   listarOP() { return this.http.get<OrdenProduccion[]>(this.op); }
   obtenerOP(id: number) { return this.http.get<OrdenProduccion>(`${this.op}/${id}`); }
   anularOP(id: number) { return this.http.post<OrdenProduccion>(`${this.op}/${id}/anular`, {}); }
+
+  /** Pedidos vivos contra la capacidad de la planta (solo lectura). */
+  proyeccion() { return this.http.get<Proyeccion>(`${environment.apiUrl}/pedidos/proyeccion`); }
 }

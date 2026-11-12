@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'inicio', data: { modulo: 'inicio' }, loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'pedidos/oc', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/oc/oc-list.component').then(m => m.OcListComponent) },
       { path: 'pedidos/oc/nueva', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/oc/oc-crear.component').then(m => m.OcCrearComponent) },
+      { path: 'pedidos/proyeccion', data: { modulo: 'pedidos', seccion: 'proyeccion-pedidos' }, loadComponent: () => import('./features/pedidos/proyeccion/proyeccion.component').then(m => m.ProyeccionComponent) },
       { path: 'pedidos/op', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/op/op-list.component').then(m => m.OpListComponent) },
       { path: 'pedidos/op/:id', data: { modulo: 'pedidos' }, loadComponent: () => import('./features/pedidos/op/op-detalle.component').then(m => m.OpDetalleComponent) },
       { path: 'clientes', data: { modulo: 'clientes' }, loadComponent: () => import('./features/clientes/clientes-list.component').then(m => m.ClientesListComponent) },
