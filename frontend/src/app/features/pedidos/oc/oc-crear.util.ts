@@ -45,6 +45,8 @@ export function construirDto(args: {
   lineaId?: number | null;
   /** Orden de mínimos: su OP no toma de la bodega. */
   paraStock?: boolean;
+  /** 'YYYY-MM-DD' prometida al cliente. */
+  fechaEntrega?: string;
   lineas: LineaWizard[];
 }): CrearOCDto {
   return {
@@ -58,6 +60,7 @@ export function construirDto(args: {
     ...(args.lineaId != null ? { lineaId: args.lineaId } : {}),
     // Solo los pedidos de mínimos llevan la clave; los normales no cambian de forma.
     ...(args.paraStock ? { paraStock: true } : {}),
+    ...(args.fechaEntrega ? { fechaEntrega: args.fechaEntrega } : {}),
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
       // PRIMERA es el default del backend: solo se manda la clave si se pidió otro

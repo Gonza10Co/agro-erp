@@ -14,6 +14,7 @@ import { OcService } from './oc.service';
 import { OcCosteoService } from './oc-costeo.service';
 import { CrearOCDto } from './dto/crear-oc.dto';
 import { ActualizarOCDto } from './dto/actualizar-oc.dto';
+import { CambiarFechaEntregaDto } from './dto/cambiar-fecha-entrega.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pedidos/oc')
@@ -40,6 +41,12 @@ export class OcController {
     @Body() dto: ActualizarOCDto,
   ) {
     return this.oc.actualizar(id, dto);
+  }
+  @Patch(':id/fecha-entrega') cambiarFechaEntrega(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarFechaEntregaDto,
+  ) {
+    return this.oc.cambiarFechaEntrega(id, dto.fechaEntrega);
   }
   @Post(':id/confirmar') confirmar(@Param('id', ParseIntPipe) id: number) {
     return this.oc.confirmar(id);

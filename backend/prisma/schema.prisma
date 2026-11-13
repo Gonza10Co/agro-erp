@@ -323,7 +323,8 @@ model ReglaOverride {
   // referencias cuando el pedido lleva esa marca. Exige marcaId. Una regla de la misma
   // marca ESPECÍFICA de la referencia gana sobre la global para el mismo material objetivo.
   referenciaId       Int?
-  referencia         Referencia?    @relation(fields: [referenciaId], references: [id])
+  // Restrict explícito: así está en la base desde la migración original (el default de Prisma cambió a SetNull).
+  referencia         Referencia?    @relation(fields: [referenciaId], references: [id], onDelete: Restrict)
   opcionId           Int?
   opcion             Opcion?        @relation(fields: [opcionId], references: [id])
   marcaId            Int?
@@ -527,6 +528,9 @@ model OrdenCompra {
   // Pedido para STOCK (orden de mínimos, JP 2026-11-12): se fabrica para reponer la
   // bodega, así que su OP NO amarra PT y lo que produce entra libre para vender.
   paraStock         Boolean      @default(false)
+  // Fecha prometida al cliente (día calendario). Sin ella, la proyección estima
+  // confirmación + 15 días. Se puede cambiar en cualquier estado del pedido.
+  fechaEntrega      DateTime?    @db.Date
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -1143,7 +1147,8 @@ model EventoTrazabilidad {
   celulaDestino    Celula?
   // NULL solo en un evento inferido: nadie hizo ese pistolazo.
   operarioId       Int?
-  operario         Operario?          @relation(fields: [operarioId], references: [id])
+  // Restrict explícito: así está en la base desde la migración original (el default de Prisma cambió a SetNull).
+  operario         Operario?          @relation(fields: [operarioId], references: [id], onDelete: Restrict)
   // Sin pistolazo real: la estación se saltó, o la coordinadora movió o cerró el par en lote.
   inferido         Boolean            @default(false)
   // Por qué, cuando lo hizo una persona desde el tablero (obligatorio ahí).

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsBoolean, IsArray, IsInt, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsBoolean, IsDateString, IsArray, IsInt, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { CrearOCLineaDto } from './crear-oc.dto';
 
 // Edición completa de una OC en BORRADOR: reemplaza cabecera y líneas.
@@ -14,6 +14,8 @@ export class ActualizarOCDto {
   @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
   // Pedido para stock (mínimos): su OP no amarra bodega. Declararlo o el ValidationPipe lo bota.
   @IsOptional() @IsBoolean() paraStock?: boolean;
+  // Fecha prometida al cliente, 'YYYY-MM-DD'.
+  @IsOptional() @IsDateString() fechaEntrega?: string;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

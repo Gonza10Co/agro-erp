@@ -17,13 +17,14 @@ const OC_BORRADOR = {
 };
 
 describe('OcDetalleComponent', () => {
-  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy };
+  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy; cambiarFechaEntregaOC: jasmine.Spy };
   function setup(ocId = 7) {
     apiMock = {
       obtenerOC: jasmine.createSpy('obtenerOC').and.returnValue(of(OC_BORRADOR)),
       obtenerCosteoOC: jasmine.createSpy('obtenerCosteoOC').and.returnValue(of(null)),
       confirmarOC: jasmine.createSpy('confirmarOC').and.returnValue(of({ id: 7, estado: 'CONFIRMADA' })),
       generarOP: jasmine.createSpy('generarOP').and.returnValue(of({ id: 50, consecutivo: 1 })),
+      cambiarFechaEntregaOC: jasmine.createSpy('cambiarFechaEntregaOC').and.returnValue(of({ id: 7 })),
     };
     TestBed.configureTestingModule({
       imports: [OcDetalleComponent],
@@ -39,6 +40,18 @@ describe('OcDetalleComponent', () => {
     apiMock.obtenerOC.and.returnValue(of({ ...OC_BORRADOR, estado: 'CONFIRMADA', observaciones: 'Entregar con marquilla del cliente' }));
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Entregar con marquilla del cliente');
+  });
+
+  it('muestra la fecha de entrega y la guarda al cambiarla, aun con el pedido en producción', () => {
+    const fixture = setup();
+    apiMock.obtenerOC.and.returnValue(of({ ...OC_BORRADOR, estado: 'EN_PRODUCCION', fechaEntrega: '2026-11-30T00:00:00.000Z' }));
+    fixture.detectChanges();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('input.fecha-entrega') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    fixture.componentInstance.guardarFechaEntrega('2026-12-05');
+    expect(apiMock.cambiarFechaEntregaOC).toHaveBeenCalledWith(7, '2026-12-05');
+    fixture.componentInstance.guardarFechaEntrega('');
+    expect(apiMock.cambiarFechaEntregaOC).toHaveBeenCalledWith(7, null);
   });
 
   it('carga el detalle de la OC al iniciar', () => {

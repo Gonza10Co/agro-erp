@@ -29,6 +29,7 @@ export class ProyeccionService {
           fecha: true,
           fechaConfirmacion: true,
           paraStock: true,
+          fechaEntrega: true,
           cliente: { select: { nombre: true } },
           lineas: {
             select: {
@@ -115,7 +116,7 @@ export class ProyeccionService {
         cliente: oc.cliente.nombre,
         ocCliente: oc.ocCliente,
         fechaBase: claveColombia(oc.fechaConfirmacion ?? oc.fecha),
-        fechaEntrega: null,
+        fechaEntrega: oc.fechaEntrega ? oc.fechaEntrega.toISOString().slice(0, 10) : null,
         tieneOP: !!opViva,
         paraStock: oc.paraStock,
         renglones: oc.lineas.flatMap((l) =>
