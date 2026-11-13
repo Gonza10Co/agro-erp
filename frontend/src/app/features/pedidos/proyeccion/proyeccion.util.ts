@@ -1,4 +1,4 @@
-import { DisponibleVenta, EstadoProyeccion, PedidoProyectado, Proyeccion } from '../../../core/api/models/proyeccion.models';
+import { DisponibleVenta, EstadoProyeccion, PedidoProyectado, Proyeccion, EntradaVenta } from '../../../core/api/models/proyeccion.models';
 import { Celda, EstiloCelda, Hoja } from '../../../shared/xlsx/xlsx-mini';
 
 const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -117,18 +117,19 @@ export function hojasProyeccion(p: Proyeccion, pedidos: PedidoProyectado[] = p.p
   return [
     { nombre: 'Proyección', filas: gantt, anchos: [18, 34, 8, 22, 8, 10, 11, 14, 12, 12, 10, 14, ...dias.map(() => 11)], congelar: { filas: 4, columnas: 2 } },
     { nombre: 'Por talla', filas: porTalla, anchos: [18, 34, 8, 22, 14, 12, 12, ...tallas.map(() => 6), 9], congelar: { filas: 4, columnas: 2 } },
-    hojaParaVender(p.hoy, p.disponible),
+    hojaParaVender(p.hoy, p.disponible, p.entraParaVender ?? []),
   ];
 }
 
 /** Tallas presentes en lo disponible, en orden. */
-export function tallasDisponibles(disponible: DisponibleVenta[]): number[] {
+export function tallasDisponibles(disponible: { tallas: { talla: number }[] }[]): number[] {
   return [...new Set(disponible.flatMap((g) => g.tallas.map((t) => t.talla)))].sort((a, b) => a - b);
 }
 
-function hojaParaVender(hoy: string, disponible: DisponibleVenta[]): Hoja {
+function hojaParaVender(hoy: string, disponible: DisponibleVenta[], entra: EntradaVenta[]): Hoja {
   const enc = (t: string) => c(t, 'encabezado');
-  const tallas = tallasDisponibles(disponible);
+  // Las tallas de lo libre y de lo que entra comparten columnas para leerse juntas.
+  const tallas = tallasDisponibles([...disponible, ...entra]);
   const filas: Celda[][] = [
     [c('Producto terminado libre para vender', 'titulo')],
     [c(`Corte al ${fechaCorta(hoy)}. Lo que queda en bodega después de cubrir todos los pedidos confirmados.`, 'tenue')],
@@ -144,5 +145,16 @@ function hojaParaVender(hoy: string, disponible: DisponibleVenta[]): Hoja {
     ...tallas.map((t) => c(disponible.reduce((a, g) => a + (g.tallas.find((x) => x.talla === t)?.pares ?? 0), 0), 'negrita')),
     c(disponible.reduce((a, g) => a + g.total, 0), 'negrita'),
   ]);
+  if (entra.length) {
+    filas.push(
+      [],
+      [c('Entra para vender (proyectado): órdenes de mínimos', 'titulo')],
+      [...['Listo en PT', 'Pedido', 'Ref.', 'Producto'].map(enc), ...tallas.map((t) => enc(String(t))), enc('Total')],
+    );
+    for (const g of entra) {
+      const m = new Map(g.tallas.map((t) => [t.talla, t.pares]));
+      filas.push([fechaCorta(g.fecha) || 'sin cupo', `OC-${g.consecutivo}`, g.referencia ?? '', g.producto, ...tallas.map((t) => m.get(t) || null), c(g.total, 'negrita')]);
+    }
+  }
   return { nombre: 'Para vender', filas, anchos: [8, 22, 34, 10, ...tallas.map(() => 7), 9], congelar: { filas: 4, columnas: 3 } };
 }

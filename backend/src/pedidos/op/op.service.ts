@@ -64,7 +64,9 @@ export class OpService {
             },
             include: { bodega: true },
           });
-          const disponibilidades: DisponibilidadBodega[] = stock.map((s) => ({
+          // Un pedido para stock (mínimos) se fabrica completo: no toma de la bodega
+          // que justamente viene a reponer.
+          const disponibilidades: DisponibilidadBodega[] = oc.paraStock ? [] : stock.map((s) => ({
             bodegaId: s.bodegaId,
             inventarioPTId: s.id,
             disponible: s.cantDisponible - s.cantReservada,

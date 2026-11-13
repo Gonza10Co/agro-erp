@@ -136,6 +136,35 @@ describe('OpService.generarDesdeOC', () => {
     });
   });
 
+  it('pedido PARA STOCK (mínimos): no amarra nada de bodega, todo va a producir', async () => {
+    // JP 2026-11-12: la orden de mínimos se fabrica para reponer el stock; si se
+    // comiera la bodega, la planta no fabricaría nada y el stock bajaría.
+    prisma.ordenCompra.findUnique.mockResolvedValue({
+      id: 1,
+      estado: 'CONFIRMADA',
+      paraStock: true,
+      lineas: [{ id: 11, productoConfiguradoId: 2, calidad: 'PRIMERA', tallas: [{ tallaId: 5, cantidad: 100 }] }],
+    });
+    tx.$queryRawUnsafe.mockResolvedValue([{ v: 801n }]);
+    tx.ordenProduccion.create.mockResolvedValue({ id: 50 });
+    tx.ordenProduccionLinea.create.mockResolvedValue({ id: 60 });
+    tx.inventarioPT.findMany.mockResolvedValue([
+      { id: 70, bodegaId: 1, cantDisponible: 500, cantReservada: 0, bodega: { prioridad: 100 } },
+    ]);
+    tx.ordenProduccionLineaTalla.create.mockResolvedValue({ id: 80 });
+    tx.ordenProduccion.findUnique.mockResolvedValue({ id: 50, estado: 'CREADA' });
+
+    await new OpService(prisma, compras).generarDesdeOC(1);
+
+    expect(tx.ordenProduccionLineaTalla.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ cantPedida: 100, cantAmarrada: 0, cantAProducir: 100 }),
+      }),
+    );
+    expect(tx.inventarioPT.update).not.toHaveBeenCalled();
+    expect(tx.reservaInventarioPT.create).not.toHaveBeenCalled();
+  });
+
   describe('venta de SEGUNDAS', () => {
     function ocDeSegundas(cantidad = 100) {
       return {

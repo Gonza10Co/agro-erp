@@ -35,6 +35,8 @@ export interface PedidoProyectado {
   referencias: string[];
   marcas: string[];
   tieneOP: boolean;
+  /** Orden de mínimos: se fabrica para la bodega, no para un cliente. */
+  paraStock: boolean;
   pares: number;
   deBodega: number;
   aProducir: number;
@@ -61,12 +63,28 @@ export interface DisponibleVenta {
   total: number;
 }
 
+/** Lo que una orden de mínimos deja libre en bodega el día que queda lista. */
+export interface EntradaVenta {
+  ocId: number;
+  consecutivo: number;
+  fecha: string | null;
+  productoConfiguradoId: number;
+  producto: string;
+  referencia: string | null;
+  marca: string | null;
+  calidad: string;
+  tallas: { talla: number; pares: number }[];
+  total: number;
+}
+
 export interface Proyeccion {
   hoy: string;
   paresPorDia: number;
   /** Días hábiles de corte a producto terminado. */
   diasProceso: number;
   disponible: DisponibleVenta[];
+  /** Proyectado: lo que entra libre para vender de las órdenes de mínimos. */
+  entraParaVender: EntradaVenta[];
   dias: DiaProyectado[];
   pedidos: PedidoProyectado[];
   resumen: {
@@ -80,5 +98,6 @@ export interface Proyeccion {
     primerCupoLibre: string | null;
     paresLibresEnVentana: number;
     paresParaVender: number;
+    paresEntranParaVender: number;
   };
 }

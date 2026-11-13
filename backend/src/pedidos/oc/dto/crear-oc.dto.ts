@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  IsBoolean,
   IsArray,
   IsIn,
   IsInt,
@@ -42,6 +43,8 @@ export class CrearOCDto {
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   // Línea de producción del pedido (el mapeo marca→línea no es fijo: se decide acá).
   @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
+  // Pedido para stock (mínimos): su OP no amarra bodega. Declararlo o el ValidationPipe lo bota.
+  @IsOptional() @IsBoolean() paraStock?: boolean;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

@@ -524,6 +524,9 @@ model OrdenCompra {
   // marca→línea NO es fijo). De acá se hereda a la OP y a cada Par.
   lineaId           Int?
   linea             Linea?       @relation(fields: [lineaId], references: [id])
+  // Pedido para STOCK (orden de mínimos, JP 2026-11-12): se fabrica para reponer la
+  // bodega, así que su OP NO amarra PT y lo que produce entra libre para vender.
+  paraStock         Boolean      @default(false)
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

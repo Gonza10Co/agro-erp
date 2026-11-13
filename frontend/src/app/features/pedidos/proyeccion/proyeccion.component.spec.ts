@@ -8,6 +8,7 @@ const URL = 'http://localhost:3001/pedidos/proyeccion';
 
 const datos: Proyeccion = {
   hoy: '2026-11-12', paresPorDia: 1206, diasProceso: 6,
+  entraParaVender: [{ ocId: 30, consecutivo: 26, fecha: '2026-11-28', productoConfiguradoId: 16, producto: 'ALPACA', referencia: '102', marca: 'ALPACA', calidad: 'PRIMERA', tallas: [{ talla: 39, pares: 200 }, { talla: 40, pares: 200 }], total: 400 }],
   disponible: [{ productoConfiguradoId: 20, producto: 'FORTIA', referencia: '107', marca: 'FORTIA', calidad: 'PRIMERA', tallas: [{ talla: 39, pares: 900 }, { talla: 42, pares: 50 }], total: 950 }],
   dias: [
     { fecha: '2026-11-12', capacidad: 1206, usado: 1206, libre: 0, bloques: [{ ocId: 1, consecutivo: 1, cliente: 'CALZATODO SA', pares: 603, tarde: false }, { ocId: 2, consecutivo: 19, cliente: 'CECILIA RENE', pares: 603, tarde: false }] },
@@ -15,10 +16,10 @@ const datos: Proyeccion = {
     { fecha: '2026-11-14', capacidad: 1206, usado: 0, libre: 1206, bloques: [] },
   ],
   pedidos: [
-    { ocId: 1, consecutivo: 1, cliente: 'CALZATODO SA', ocCliente: null, productos: ['PODEROSA'], referencias: ['101'], marcas: ['PODEROSA'], tieneOP: false, pares: 700, deBodega: 97, aProducir: 603, sinCupo: 0, compromiso: '2026-11-27', compromisoEstimado: true, inicio: '2026-11-12', finCorte: '2026-11-12', fin: '2026-11-20', diasAtraso: 0, estado: 'A_TIEMPO', tallas: [] },
-    { ocId: 2, consecutivo: 19, cliente: 'CECILIA RENE', ocCliente: 'AGR-956', productos: ['ALPACA SUELA AZUL'], referencias: ['102'], marcas: ['ALPACA SUELA AZUL'], tieneOP: true, pares: 1206, deBodega: 0, aProducir: 1206, sinCupo: 0, compromiso: '2026-11-12', compromisoEstimado: false, inicio: '2026-11-12', finCorte: '2026-11-13', fin: '2026-11-21', diasAtraso: 9, estado: 'ATRASADO', tallas: [] },
+    { ocId: 1, consecutivo: 1, cliente: 'CALZATODO SA', ocCliente: null, productos: ['PODEROSA'], referencias: ['101'], marcas: ['PODEROSA'], tieneOP: false, paraStock: false, pares: 700, deBodega: 97, aProducir: 603, sinCupo: 0, compromiso: '2026-11-27', compromisoEstimado: true, inicio: '2026-11-12', finCorte: '2026-11-12', fin: '2026-11-20', diasAtraso: 0, estado: 'A_TIEMPO', tallas: [] },
+    { ocId: 2, consecutivo: 19, cliente: 'CECILIA RENE', ocCliente: 'AGR-956', productos: ['ALPACA SUELA AZUL'], referencias: ['102'], marcas: ['ALPACA SUELA AZUL'], tieneOP: true, paraStock: false, pares: 1206, deBodega: 0, aProducir: 1206, sinCupo: 0, compromiso: '2026-11-12', compromisoEstimado: false, inicio: '2026-11-12', finCorte: '2026-11-13', fin: '2026-11-21', diasAtraso: 9, estado: 'ATRASADO', tallas: [] },
   ],
-  resumen: { pedidos: 2, pares: 1906, deBodega: 97, aProducir: 1809, atrasados: 1, sinCupo: 0, hastaCuando: '2026-11-21', primerCupoLibre: '2026-11-13', paresLibresEnVentana: 603, paresParaVender: 950 },
+  resumen: { pedidos: 2, pares: 1906, deBodega: 97, aProducir: 1809, atrasados: 1, sinCupo: 0, hastaCuando: '2026-11-21', primerCupoLibre: '2026-11-13', paresLibresEnVentana: 603, paresParaVender: 950, paresEntranParaVender: 400 },
 };
 
 describe('ProyeccionComponent', () => {
@@ -81,5 +82,17 @@ describe('ProyeccionComponent', () => {
     expect(encabezado).toEqual(['Ref.', 'Producto', '39', '42', 'Total']);
     const celdas = [...el.querySelectorAll('.tabla-venta tbody td')].map((td) => td.textContent!.trim());
     expect(celdas).toEqual(['107', 'FORTIA', '900', '50', '950']);
+  });
+
+  it('proyecta lo que entra para vender de las órdenes de mínimos, con su fecha', () => {
+    const el: HTMLElement = montar().nativeElement;
+    expect(el.textContent).toContain('Entra para vender');
+    const celdas = [...el.querySelectorAll('.tabla-entra tbody td')].map((td) => td.textContent!.trim());
+    expect(celdas).toEqual(['sáb 28 nov', 'OC-26', '102', 'ALPACA', '200', '200', '400']);
+  });
+
+  it('sin órdenes de mínimos no muestra la sección de lo que entra', () => {
+    const el: HTMLElement = montar({ ...datos, entraParaVender: [], resumen: { ...datos.resumen, paresEntranParaVender: 0 } }).nativeElement;
+    expect(el.querySelector('.tabla-entra')).toBeNull();
   });
 });
