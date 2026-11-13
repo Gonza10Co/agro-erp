@@ -71,6 +71,8 @@ export interface OrdenCompra {
   linea?: { id: number; codigo: string; nombre: string } | null;
   /** Orden de mínimos: se fabrica para reponer la bodega, su OP no amarra PT. */
   paraStock?: boolean;
+  /** Fecha prometida al cliente (ISO; el día está en los 10 primeros caracteres). */
+  fechaEntrega?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
   // Semáforo de demora calculado por el backend en el listado (no se persiste).
@@ -124,7 +126,7 @@ export interface CrearSedeDto { nombre: string; ciudad: string; direccion: strin
 export interface CrearOCTallaDto { tallaId: number; cantidad: number; }
 export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
 export interface CrearOCLineaDto { productoConfiguradoId: number; calidad?: CalidadPT; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
-export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineaId?: number; paraStock?: boolean; lineas: CrearOCLineaDto[]; }
+export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineaId?: number; paraStock?: boolean; fechaEntrega?: string; lineas: CrearOCLineaDto[]; }
 
 export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
 export interface DespachoListItem {

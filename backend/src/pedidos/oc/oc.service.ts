@@ -12,6 +12,13 @@ import { estadoDemora } from './oc-demora';
 import { resolverDestinoOC } from './oc-destino';
 import { elegirSedePorDefecto } from '../../clientes/sedes-core';
 
+/** 'YYYY-MM-DD' → día calendario (medianoche UTC, como guarda @db.Date). undefined no toca. */
+function aFecha(s: string | null | undefined): Date | null | undefined {
+  if (s === undefined) return undefined;
+  if (s === null || s === '') return null;
+  return new Date(`${s.slice(0, 10)}T00:00:00Z`);
+}
+
 @Injectable()
 export class OcService {
   constructor(private readonly prisma: PrismaService) {}
@@ -36,6 +43,7 @@ export class OcService {
           direccionDespacho,
           lineaId,
           paraStock: dto.paraStock ?? false,
+          fechaEntrega: aFecha(dto.fechaEntrega),
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -88,6 +96,7 @@ export class OcService {
           lineaId,
           // undefined no lo toca (el drawer viejo no lo reenvía).
           paraStock: dto.paraStock,
+          fechaEntrega: aFecha(dto.fechaEntrega),
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
@@ -164,6 +173,19 @@ export class OcService {
       sedeElegida,
       sedePrincipal: elegirSedePorDefecto(sedes),
       direccionManual: dto.direccionDespacho,
+    });
+  }
+
+  /** La fecha prometida se mueve en cualquier estado: el cliente la renegocia con la OP andando. */
+  async cambiarFechaEntrega(id: number, fechaEntrega: string | null) {
+    const oc = await this.prisma.ordenCompra.findUnique({ where: { id } });
+    if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+    if (oc.estado === 'ANULADA') {
+      throw new BadRequestException('Un pedido anulado no tiene fecha de entrega');
+    }
+    return this.prisma.ordenCompra.update({
+      where: { id },
+      data: { fechaEntrega: aFecha(fechaEntrega) ?? null },
     });
   }
 

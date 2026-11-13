@@ -48,6 +48,42 @@ describe('OcService', () => {
     );
   });
 
+  it('crear guarda la fecha de entrega prometida como día calendario', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    await service.crear({
+      clienteId: 7,
+      fechaEntrega: '2026-11-30',
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    expect(prisma.ordenCompra.create.mock.calls[0][0].data.fechaEntrega).toEqual(new Date('2026-11-30T00:00:00Z'));
+  });
+
+  describe('cambiarFechaEntrega', () => {
+    it('cambia la fecha en cualquier estado del pedido (también con OP)', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'EN_PRODUCCION' });
+      prisma.ordenCompra.update.mockResolvedValue({ id: 9 });
+      await service.cambiarFechaEntrega(9, '2026-12-05');
+      expect(prisma.ordenCompra.update).toHaveBeenCalledWith({
+        where: { id: 9 },
+        data: { fechaEntrega: new Date('2026-12-05T00:00:00Z') },
+      });
+    });
+
+    it('null la borra (vuelve al estimado)', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'CONFIRMADA' });
+      await service.cambiarFechaEntrega(9, null);
+      expect(prisma.ordenCompra.update).toHaveBeenCalledWith({ where: { id: 9 }, data: { fechaEntrega: null } });
+    });
+
+    it('rechaza un pedido anulado y uno que no existe', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'ANULADA' });
+      await expect(service.cambiarFechaEntrega(9, '2026-12-05')).rejects.toBeInstanceOf(BadRequestException);
+      prisma.ordenCompra.findUnique.mockResolvedValue(null);
+      await expect(service.cambiarFechaEntrega(9, '2026-12-05')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   it('crear persiste la línea de producción elegida (línea por pedido)', async () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
     prisma.linea.findFirst.mockResolvedValue({ id: 3, activo: true });

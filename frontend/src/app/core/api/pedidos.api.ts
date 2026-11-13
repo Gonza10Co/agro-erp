@@ -15,6 +15,8 @@ export class PedidosApi {
   obtenerOC(id: number) { return this.http.get<OrdenCompra>(`${this.oc}/${id}`); }
   obtenerCosteoOC(id: number) { return this.http.get<ResumenCosteoOC>(`${this.oc}/${id}/costeo`); }
   actualizarOC(id: number, dto: CrearOCDto) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}`, dto); }
+  /** La fecha prometida se cambia en cualquier estado del pedido; null la borra. */
+  cambiarFechaEntregaOC(id: number, fechaEntrega: string | null) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}/fecha-entrega`, { fechaEntrega }); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
   eliminarOC(id: number) { return this.http.delete<void>(`${this.oc}/${id}`); }
 

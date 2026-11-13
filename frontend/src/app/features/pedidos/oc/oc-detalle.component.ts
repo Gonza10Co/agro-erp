@@ -37,6 +37,15 @@ interface LineaEdit {
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
         @if (o.paraStock) { <div class="kv"><span class="k">Tipo</span><span class="v">Pedido de mínimos (para stock)</span></div> }
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
+        <div class="kv"><span class="k">Fecha de entrega</span><span class="v">
+          @if (o.estado === 'ANULADA') { {{ o.fechaEntrega ? o.fechaEntrega.slice(0, 10) : '—' }} }
+          @else {
+            <input class="input fecha-entrega" type="date" style="max-width:180px" aria-label="Fecha de entrega"
+                   [value]="o.fechaEntrega ? o.fechaEntrega.slice(0, 10) : ''" [disabled]="guardandoFecha()"
+                   (change)="guardarFechaEntrega($any($event.target).value)" />
+            @if (!o.fechaEntrega) { <span class="cell-sub"> sin fecha: se estima a 15 días de confirmado</span> }
+          }
+        </span></div>
         <div class="kv"><span class="k">Entrega en</span><span class="v">{{ o.direccionDespacho || '—' }}</span></div>
         @if (o.observaciones) {
           <div class="kv"><span class="k">Observaciones</span><span class="v obs-oc">{{ o.observaciones }}</span></div>
@@ -315,6 +324,23 @@ export class OcDetalleComponent implements OnInit {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({ next: (c) => this.costeo.set(c), error: () => this.costeo.set(null) });
     }
+  }
+
+  guardandoFecha = signal(false);
+  guardarFechaEntrega(valor: string): void {
+    this.guardandoFecha.set(true);
+    this.api.cambiarFechaEntregaOC(this.ocId(), valor || null)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.guardandoFecha.set(false);
+          const o = this.oc();
+          if (o) this.oc.set({ ...o, fechaEntrega: valor ? `${valor}T00:00:00.000Z` : null });
+          this.toast.exito(valor ? 'Fecha de entrega guardada' : 'Fecha de entrega borrada');
+          this.changed.emit();
+        },
+        error: (e) => { this.guardandoFecha.set(false); this.error.set(this.msg(e)); },
+      });
   }
 
   confirmar(): void {
