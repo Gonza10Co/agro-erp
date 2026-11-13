@@ -14,6 +14,8 @@
  *  4. El pedido queda listo `diasProceso` días hábiles después de su último corte
  *     (lo que tarda un par en pasar por guarnición, almacén e inyección).
  *  5. Lo que sobra en bodega después de cubrir los pedidos es lo que hay para vender.
+ *  6. Un pedido PARA STOCK (orden de mínimos) no toma de la bodega: se fabrica
+ *     completo y lo que produce ENTRA para vender el día que queda listo.
  *
  * No programa la planta: es una simulación para decidir. El corte del día lo sigue
  * armando la gente (mínimos, curvas, consolidar por referencia).
@@ -43,6 +45,8 @@ export interface PedidoEntrada {
   /** 'YYYY-MM-DD' prometida al cliente, si alguien la escribió. */
   fechaEntrega?: string | null;
   tieneOP: boolean;
+  /** Orden de mínimos: se fabrica para reponer la bodega, no para un cliente. */
+  paraStock?: boolean;
   renglones: RenglonPedido[];
 }
 
@@ -104,6 +108,7 @@ export interface PedidoProyectado {
   referencias: string[];
   marcas: string[];
   tieneOP: boolean;
+  paraStock: boolean;
   pares: number;
   deBodega: number;
   aProducir: number;
@@ -124,6 +129,21 @@ export interface PedidoProyectado {
 
 /** Lo que queda libre en bodega de PT después de cubrir los pedidos. */
 export interface DisponibleVenta {
+  productoConfiguradoId: number;
+  producto: string;
+  referencia: string | null;
+  marca: string | null;
+  calidad: string;
+  tallas: { talla: number; pares: number }[];
+  total: number;
+}
+
+/** Lo que un pedido para stock deja libre en bodega el día que queda listo. */
+export interface EntradaVenta {
+  ocId: number;
+  consecutivo: number;
+  /** Día en que entra a producto terminado (null si no cupo en el horizonte). */
+  fecha: string | null;
   productoConfiguradoId: number;
   producto: string;
   referencia: string | null;
@@ -154,8 +174,12 @@ export interface Proyeccion {
     paresLibresEnVentana: number;
     /** Pares de PT que quedan libres en bodega después de cubrir los pedidos. */
     paresParaVender: number;
+    /** Pares que las órdenes de mínimos van a sumar a la bodega (proyectado). */
+    paresEntranParaVender: number;
   };
   disponible: DisponibleVenta[];
+  /** Proyectado: lo que entra libre para vender, por pedido de mínimos y producto. */
+  entraParaVender: EntradaVenta[];
 }
 
 const HORIZONTE_DEFECTO = 180;
@@ -261,6 +285,7 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
 
   const uniq = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x))];
   const pedidos: PedidoProyectado[] = [];
+  const entraParaVender: EntradaVenta[] = [];
 
   for (const { p, compromiso, estimado } of conCompromiso) {
     const tallas = new Map<number, TallaProyectada>();
@@ -270,11 +295,15 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
 
     // 1) Cuánto hay que fabricar de cada talla, después de la bodega.
     const falta = new Map<number, number>();
+    const entra = new Map<string, EntradaVenta>();
     for (const r of [...p.renglones].sort((a, b) => a.talla - b.talla)) {
       let aProducir: number;
       if (p.tieneOP) {
         // La OP ya amarró: lo pendiente es lo que ella dejó por fabricar.
         aProducir = Math.max(0, Math.min(r.pedida, r.pendienteOP ?? 0));
+      } else if (p.paraStock) {
+        // Mínimos: viene a reponer la bodega, no a gastarla.
+        aProducir = r.pedida;
       } else {
         const k = `${r.productoConfiguradoId}|${r.talla}|${r.calidad}`;
         const toma = Math.min(r.pedida, stock.get(k) ?? 0);
@@ -287,6 +316,19 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
       t.aProducir += aProducir;
       tallas.set(r.talla, t);
       if (aProducir > 0) falta.set(r.talla, (falta.get(r.talla) ?? 0) + aProducir);
+      if (p.paraStock && aProducir > 0) {
+        const k = `${r.productoConfiguradoId}|${r.calidad}`;
+        const g = entra.get(k) ?? {
+          ocId: p.ocId, consecutivo: p.consecutivo, fecha: null,
+          productoConfiguradoId: r.productoConfiguradoId, producto: r.producto,
+          referencia: r.referencia, marca: r.marca, calidad: r.calidad, tallas: [], total: 0,
+        };
+        const t = g.tallas.find((x) => x.talla === r.talla);
+        if (t) t.pares += aProducir;
+        else g.tallas.push({ talla: r.talla, pares: aProducir });
+        g.total += aProducir;
+        entra.set(k, g);
+      }
     }
 
     // 2) Día por día: primero cada talla en SU molde y solo después se presta el de
@@ -325,6 +367,7 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
     const diasAtraso = fin ? Math.max(0, diasEntre(compromiso, fin)) : 0;
     const estado: EstadoProyeccion =
       sinCupo > 0 ? 'SIN_CUPO' : aProducir === 0 ? 'EN_BODEGA' : diasAtraso > 0 ? 'ATRASADO' : 'A_TIEMPO';
+    for (const g of entra.values()) entraParaVender.push({ ...g, fecha: sinCupo > 0 ? null : fin });
 
     pedidos.push({
       ocId: p.ocId,
@@ -335,6 +378,7 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
       referencias: uniq(p.renglones.map((r) => r.referencia)),
       marcas: uniq(p.renglones.map((r) => r.marca)),
       tieneOP: p.tieneOP,
+      paraStock: !!p.paraStock,
       pares,
       deBodega: pares - aProducir,
       aProducir,
@@ -407,6 +451,8 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
       primerCupoLibre: diasOut.find((d) => d.libre > 0)?.fecha ?? null,
       paresLibresEnVentana: ocupados.reduce((a, d) => a + d.libre, 0),
       paresParaVender: disponible.reduce((a, g) => a + g.total, 0),
+      paresEntranParaVender: entraParaVender.reduce((a, g) => a + g.total, 0),
     },
+    entraParaVender: entraParaVender.sort((a, b) => (a.fecha ?? '9').localeCompare(b.fecha ?? '9') || a.consecutivo - b.consecutivo),
   };
 }

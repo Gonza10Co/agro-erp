@@ -17,6 +17,12 @@ describe('oc-crear.util', () => {
     expect(tallasDeProducto(PROD, TALLAS).map(t => t.valor)).toEqual([39, 40]);
   });
 
+  it('construirDto marca el pedido para stock (mínimos) solo si se pidió', () => {
+    const lineas: LineaWizard[] = [{ producto: PROD, precio: 0, valores: { 2: 10 } }];
+    expect(construirDto({ clienteId: 3, paraStock: true, lineas }).paraStock).toBe(true);
+    expect('paraStock' in construirDto({ clienteId: 3, lineas })).toBe(false);
+  });
+
   it('construirDto arma el DTO con precio y descarta cantidades 0', () => {
     const lineas: LineaWizard[] = [{ producto: PROD, precio: 85000, valores: { 2: 10, 3: 0, 99: 5 } }];
     const dto = construirDto({ clienteId: 3, ocCliente: 'PO-1', observaciones: '', lineas });

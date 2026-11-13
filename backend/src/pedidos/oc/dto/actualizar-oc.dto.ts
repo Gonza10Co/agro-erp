@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsInt, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsBoolean, IsArray, IsInt, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { CrearOCLineaDto } from './crear-oc.dto';
 
 // Edición completa de una OC en BORRADOR: reemplaza cabecera y líneas.
@@ -12,6 +12,8 @@ export class ActualizarOCDto {
   @IsOptional() @IsString() @MaxLength(240) direccionDespacho?: string;
   // Si no viene, la OC conserva la línea que ya tenía (undefined no toca el campo).
   @IsOptional() @Type(() => Number) @IsInt() lineaId?: number;
+  // Pedido para stock (mínimos): su OP no amarra bodega. Declararlo o el ValidationPipe lo bota.
+  @IsOptional() @IsBoolean() paraStock?: boolean;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

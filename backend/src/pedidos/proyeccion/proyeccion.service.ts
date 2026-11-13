@@ -28,6 +28,7 @@ export class ProyeccionService {
           ocCliente: true,
           fecha: true,
           fechaConfirmacion: true,
+          paraStock: true,
           cliente: { select: { nombre: true } },
           lineas: {
             select: {
@@ -116,6 +117,7 @@ export class ProyeccionService {
         fechaBase: claveColombia(oc.fechaConfirmacion ?? oc.fecha),
         fechaEntrega: null,
         tieneOP: !!opViva,
+        paraStock: oc.paraStock,
         renglones: oc.lineas.flatMap((l) =>
           l.tallas.map((t) => ({
             productoConfiguradoId: l.productoConfiguradoId,

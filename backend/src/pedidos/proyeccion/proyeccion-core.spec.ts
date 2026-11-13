@@ -12,6 +12,7 @@ const pedido = (over: Partial<PedidoEntrada> & { tallas?: Record<number, number>
   fechaBase: over.fechaBase ?? '2026-11-12',
   fechaEntrega: over.fechaEntrega,
   tieneOP: over.tieneOP ?? false,
+  paraStock: over.paraStock,
   renglones:
     over.renglones ??
     Object.entries(over.tallas ?? { 40: 100 }).map(([t, c]) => ({
@@ -187,6 +188,40 @@ describe('proyectarPedidos', () => {
     it('una talla que se agota no aparece; el stock negativo no resta', () => {
       const r = proyectarPedidos(base([], { stock: [...stock, { ...stock[0], talla: 43, libre: -50 }] }));
       expect(r.disponible.find((g) => g.productoConfiguradoId === 16)!.tallas.map((t) => t.talla)).toEqual([40, 41]);
+    });
+  });
+
+  describe('pedido para stock (orden de mínimos)', () => {
+    it('no toma de la bodega: se fabrica completo y la bodega sigue libre para vender', () => {
+      const r = proyectarPedidos(base([pedido({ paraStock: true, tallas: { 40: 100 } })], {
+        stock: [{ productoConfiguradoId: 16, producto: 'ALPACA', talla: 40, calidad: 'PRIMERA', libre: 500 }],
+      }));
+      expect(r.pedidos[0]).toMatchObject({ paraStock: true, deBodega: 0, aProducir: 100 });
+      expect(r.resumen.paresParaVender).toBe(500);
+    });
+
+    it('lo que fabrica entra para vender el día que queda listo', () => {
+      const r = proyectarPedidos(base(
+        [pedido({ ocId: 7, paraStock: true, tallas: { 40: 100, 41: 50 } }), pedido({ ocId: 8, tallas: { 42: 30 } })],
+        { capacidad: CAPACIDAD_AGRO },
+      ));
+      const fin = r.pedidos.find((p) => p.ocId === 7)!.fin;
+      expect(fin).toBeTruthy();
+      expect(r.entraParaVender).toEqual([
+        expect.objectContaining({
+          ocId: 7, fecha: fin, productoConfiguradoId: 16, producto: 'ALPACA', calidad: 'PRIMERA',
+          tallas: [{ talla: 40, pares: 100 }, { talla: 41, pares: 50 }], total: 150,
+        }),
+      ]);
+      expect(r.resumen.paresEntranParaVender).toBe(150);
+    });
+
+    it('con OP usa lo que la OP dejó pendiente (lo ya terminado ya está en bodega)', () => {
+      const r = proyectarPedidos(base([pedido({
+        paraStock: true, tieneOP: true,
+        renglones: [{ productoConfiguradoId: 16, producto: 'ALPACA', referencia: '102', marca: 'ALPACA', talla: 40, calidad: 'PRIMERA', pedida: 100, pendienteOP: 60 }],
+      })]));
+      expect(r.entraParaVender[0].total).toBe(60);
     });
   });
 });

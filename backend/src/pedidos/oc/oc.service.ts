@@ -35,6 +35,7 @@ export class OcService {
           sedeEntregaId,
           direccionDespacho,
           lineaId,
+          paraStock: dto.paraStock ?? false,
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -85,6 +86,8 @@ export class OcService {
           sedeEntregaId,
           direccionDespacho,
           lineaId,
+          // undefined no lo toca (el drawer viejo no lo reenvía).
+          paraStock: dto.paraStock,
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,

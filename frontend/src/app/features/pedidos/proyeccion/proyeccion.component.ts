@@ -68,7 +68,7 @@ interface Segmento {
             <div class="kpi">
               <div class="kpi-label">Queda en bodega para vender</div>
               <div class="kpi-value">{{ d.resumen.paresParaVender | number }}</div>
-              <div class="kpi-delta t-muted">pares de producto terminado libres después de cubrir los pedidos</div>
+              <div class="kpi-delta t-muted">pares de producto terminado libres después de cubrir los pedidos@if (d.resumen.paresEntranParaVender) { · entran {{ d.resumen.paresEntranParaVender | number }} más de mínimos }</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Pedidos por entregar</div>
@@ -145,7 +145,7 @@ interface Segmento {
                     <tr [class.fila-resaltada]="resaltar() === p.ocId" (mouseenter)="resaltar.set(p.ocId)" (mouseleave)="resaltar.set(null)">
                       <td class="cell-mono">OC-{{ p.consecutivo }}
                         @if (p.ocCliente) { <div class="cell-sub">{{ p.ocCliente }}</div> }</td>
-                      <td>{{ p.cliente }}</td>
+                      <td>{{ p.cliente }}@if (p.paraStock) { <span class="badge badge-info">Mínimos</span> }</td>
                       <td class="cell-mono">{{ p.referencias.join(', ') }}</td>
                       <td>{{ p.marcas.join(', ') }}</td>
                       <td class="num">{{ p.pares | number }}</td>
@@ -201,10 +201,43 @@ interface Segmento {
             }
           </div>
 
+          @if (d.entraParaVender.length) {
+            <div class="card bloque">
+              <div class="card-head">
+                <div>
+                  <div class="ph-title sm">Entra para vender</div>
+                  <div class="t-caption t-muted">Proyectado: lo que fabrican las órdenes de mínimos y queda libre en bodega el día que entra a producto terminado.</div>
+                </div>
+                <div class="t-caption t-muted">{{ d.resumen.paresEntranParaVender | number }} pares</div>
+              </div>
+              <div class="table-scroll">
+                <table class="data tabla-entra">
+                  <thead><tr>
+                    <th>Listo en PT</th><th>Pedido</th><th>Ref.</th><th>Producto</th>
+                    @for (t of tallasEntra(); track t) { <th class="num">{{ t }}</th> }
+                    <th class="num">Total</th>
+                  </tr></thead>
+                  <tbody>
+                    @for (g of d.entraParaVender; track g.ocId + '-' + g.productoConfiguradoId + g.calidad) {
+                      <tr>
+                        <td class="nw">{{ fecha(g.fecha) || 'sin cupo' }}</td>
+                        <td class="cell-mono">OC-{{ g.consecutivo }}</td>
+                        <td class="cell-mono">{{ g.referencia }}</td>
+                        <td>{{ g.producto }}</td>
+                        @for (t of tallasEntra(); track t) { <td class="num" [class.t-muted]="!pares(g, t)">{{ pares(g, t) ? (pares(g, t) | number) : '·' }}</td> }
+                        <td class="num"><strong>{{ g.total | number }}</strong></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
           <div class="notas t-caption t-muted">
             <p><strong>Cómo leerla.</strong> Los pedidos se atienden por fecha de compromiso. A cada uno se le descuenta lo que hay en bodega de producto terminado y lo que falta se reparte en días de corte, sin pasar de {{ d.paresPorDia | number }} pares al día ni de lo que dan los moldes de inyección de cada talla (70 pares por molde). Cada pedido queda listo {{ d.diasProceso }} días hábiles después de su último corte; ese dato es provisional y falta que producción lo confirme.</p>
             <p>* El compromiso con asterisco es estimado: la confirmación del pedido más 15 días, porque los pedidos todavía no llevan fecha de entrega escrita.</p>
-            <p>Todavía no tiene en cuenta los cortes, la guarnición ni las capelladas que ya están en proceso, ni las órdenes de mínimos. Es una simulación para decidir: el corte del día lo sigue armando producción.</p>
+            <p>Las órdenes de mínimos no toman de la bodega: se fabrican completas y lo que producen aparece en "Entra para vender" con su fecha. Todavía no tiene en cuenta los cortes, la guarnición ni las capelladas que ya están en proceso. Es una simulación para decidir: el corte del día lo sigue armando producción.</p>
           </div>
         }
       }
@@ -264,7 +297,8 @@ export class ProyeccionComponent implements OnInit {
   visibles = computed<PedidoProyectado[]>(() => filtrarPedidos(this.datos()?.pedidos ?? [], this.texto(), this.estado()));
   paresVisibles = computed(() => this.visibles().reduce((a, p) => a + p.aProducir, 0));
   tallasVenta = computed(() => tallasDisponibles(this.datos()?.disponible ?? []));
-  pares = (g: DisponibleVenta, talla: number) => g.tallas.find((t) => t.talla === talla)?.pares ?? 0;
+  tallasEntra = computed(() => tallasDisponibles(this.datos()?.entraParaVender ?? []));
+  pares = (g: { tallas: { talla: number; pares: number }[] }, talla: number) => g.tallas.find((t) => t.talla === talla)?.pares ?? 0;
 
   fecha = fechaCorta;
   etiqueta = (e: EstadoProyeccion) => ETIQUETA_ESTADO[e];

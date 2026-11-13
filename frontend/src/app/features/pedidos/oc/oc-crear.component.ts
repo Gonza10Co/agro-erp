@@ -49,6 +49,11 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             <div><label class="label">OC del cliente (opcional)</label><input class="input" [ngModel]="ocCliente()" (ngModelChange)="ocCliente.set($event)" /></div>
             <div><label class="label">Observaciones (opcional)</label><input class="input" [ngModel]="observaciones()" (ngModelChange)="observaciones.set($event)" /></div>
           </div>
+          <label class="check" style="margin-top:var(--sp-4)">
+            <input type="checkbox" [checked]="paraStock()" (change)="paraStock.set(!paraStock())" />
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+            Pedido de mínimos (para stock): se fabrica completo y no toma de la bodega
+          </label>
           <div style="margin-top:var(--sp-4)">
             <label class="label">Entregar en</label>
             @if (sedes().length > 0) {
@@ -247,6 +252,8 @@ export class OcCrearComponent implements OnInit {
   clienteSel = signal<Cliente | null>(null);
   ocCliente = signal('');
   observaciones = signal('');
+  /** Orden de mínimos: se fabrica para reponer la bodega. */
+  paraStock = signal(false);
   sedes = signal<SedeCliente[]>([]);
   // null = "Otra dirección…": el usuario escribe una entrega puntual a mano.
   sedeEntregaId = signal<number | null>(null);
@@ -426,7 +433,7 @@ export class OcCrearComponent implements OnInit {
     const cl = this.clienteSel();
     if (!cl || this.enviando() || !this.pasoValido()) return;
     this.enviando.set(true); this.error.set('');
-    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), lineas: this.lineas() });
+    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), paraStock: this.paraStock(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
       error: (e) => { this.enviando.set(false); this.error.set(this.msg(e, 'No se pudo crear la OC')); },

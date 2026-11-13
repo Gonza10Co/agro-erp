@@ -35,6 +35,7 @@ interface LineaEdit {
         <div class="kv"><span class="k">Cliente</span><span class="v">{{ o.cliente?.nombre }}</span></div>
         <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ o.cliente?.nit }}</span></div>
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
+        @if (o.paraStock) { <div class="kv"><span class="k">Tipo</span><span class="v">Pedido de mínimos (para stock)</span></div> }
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Entrega en</span><span class="v">{{ o.direccionDespacho || '—' }}</span></div>
         @if (o.observaciones) {

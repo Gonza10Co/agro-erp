@@ -3,19 +3,19 @@ import { fechaCorta, filtrarPedidos, hojasProyeccion } from './proyeccion.util';
 
 const ped = (over: Partial<PedidoProyectado>): PedidoProyectado => ({
   ocId: 1, consecutivo: 1, cliente: 'CALZATODO SA', ocCliente: null, productos: ['PODEROSA · Con puntera'],
-  referencias: ['101'], marcas: ['PODEROSA'], tieneOP: false, pares: 100, deBodega: 0, aProducir: 100, sinCupo: 0,
+  referencias: ['101'], marcas: ['PODEROSA'], tieneOP: false, paraStock: false, pares: 100, deBodega: 0, aProducir: 100, sinCupo: 0,
   compromiso: '2026-11-27', compromisoEstimado: true, inicio: '2026-11-12', finCorte: '2026-11-12', fin: '2026-11-12', diasAtraso: 0,
   estado: 'A_TIEMPO', tallas: [{ talla: 40, pedida: 100, deBodega: 0, aProducir: 100 }], ...over,
 });
 
-const proy = (pedidos: PedidoProyectado[]): Proyeccion => ({
-  hoy: '2026-11-12', paresPorDia: 1206, diasProceso: 0, pedidos,
+const proy = (pedidos: PedidoProyectado[], entraParaVender: Proyeccion['entraParaVender'] = []): Proyeccion => ({
+  hoy: '2026-11-12', paresPorDia: 1206, diasProceso: 0, pedidos, entraParaVender,
   disponible: [{ productoConfiguradoId: 20, producto: 'FORTIA', referencia: '107', marca: 'FORTIA', calidad: 'PRIMERA', tallas: [{ talla: 39, pares: 900 }, { talla: 42, pares: 50 }], total: 950 }],
   dias: [
     { fecha: '2026-11-12', capacidad: 1206, usado: 1206, libre: 0, bloques: [{ ocId: 1, consecutivo: 1, cliente: 'CALZATODO SA', pares: 100, tarde: false }, { ocId: 2, consecutivo: 2, cliente: 'CECILIA RENÉ', pares: 1106, tarde: false }] },
     { fecha: '2026-11-13', capacidad: 1206, usado: 100, libre: 1106, bloques: [{ ocId: 2, consecutivo: 2, cliente: 'CECILIA RENÉ', pares: 100, tarde: true }] },
   ],
-  resumen: { pedidos: pedidos.length, pares: 0, deBodega: 0, aProducir: 0, atrasados: 0, sinCupo: 0, hastaCuando: '2026-11-13', primerCupoLibre: '2026-11-13', paresLibresEnVentana: 1106, paresParaVender: 950 },
+  resumen: { pedidos: pedidos.length, pares: 0, deBodega: 0, aProducir: 0, atrasados: 0, sinCupo: 0, hastaCuando: '2026-11-13', primerCupoLibre: '2026-11-13', paresLibresEnVentana: 1106, paresParaVender: 950, paresEntranParaVender: entraParaVender.reduce((a, g) => a + g.total, 0) },
 });
 
 describe('proyeccion.util', () => {
@@ -68,5 +68,18 @@ describe('proyeccion.util', () => {
     expect(v.filas[3].map((x: any) => x.v)).toEqual(['Ref.', 'Marca', 'Producto', 'Calidad', '39', '42', 'Total']);
     expect(v.filas[4]).toEqual(['107', 'FORTIA', 'FORTIA', 'Primera', 900, 50, { v: 950, estilo: 'negrita' }]);
     expect(v.filas[5].slice(-1)).toEqual([{ v: 950, estilo: 'negrita' }]);
+    expect(v.filas.length).toBe(6);
+  });
+
+  it('debajo de lo libre, la hoja para vender proyecta lo que entra de mínimos con su fecha', () => {
+    const v = hojasProyeccion(proy([ped({})], [
+      { ocId: 30, consecutivo: 26, fecha: '2026-11-28', productoConfiguradoId: 16, producto: 'ALPACA', referencia: '102', marca: 'ALPACA', calidad: 'PRIMERA', tallas: [{ talla: 39, pares: 200 }, { talla: 40, pares: 200 }], total: 400 },
+    ]))[2];
+    // Las tallas de los dos bloques quedan alineadas en las mismas columnas.
+    expect(v.filas[3].map((x: any) => x.v)).toEqual(['Ref.', 'Marca', 'Producto', 'Calidad', '39', '40', '42', 'Total']);
+    const titulo = v.filas.findIndex((f) => (f[0] as any)?.v?.startsWith?.('Entra para vender'));
+    expect(titulo).toBeGreaterThan(5);
+    expect(v.filas[titulo + 1].map((x: any) => x.v)).toEqual(['Listo en PT', 'Pedido', 'Ref.', 'Producto', '39', '40', '42', 'Total']);
+    expect(v.filas[titulo + 2]).toEqual(['sáb 28 nov', 'OC-26', '102', 'ALPACA', 200, 200, null, { v: 400, estilo: 'negrita' }]);
   });
 });
