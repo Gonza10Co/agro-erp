@@ -4,8 +4,10 @@ import { ParNacido, ParDetalle } from '../../core/api/models/fabricacion.models'
  * Etiquetas del piloto (2026-09-09), pensadas para impresora de etiquetas con
  * guillotina: una etiqueta por página, no la hoja carta troquelada de of-etiquetas.
  *
- *  - Etiqueta de la LENGUA (40×25 mm; era de 50×30 y Valen la pidió más pequeña
- *    el 2026-10-07): nace con el par en Preparación. Solo QR
+ *  - Etiqueta de la LENGUA (30×20 mm; era de 50×30, Valen la pidió más pequeña
+ *    el 2026-10-07 y quedó en 40×25; el 2026-11-17 bajó a 30×20 porque el rollo
+ *    de la TSC TTP-247 mide 3 cm de ancho, continuo, y la de 4 cm salía girada y
+ *    reducida): nace con el par en Preparación. Solo QR
  *    (Mauricio: "de aquí en adelante solo QR, por facilidad"), talla grande para
  *    que se lea a un metro, código y referencia/marca.
  *  - Sticker de la CAJA (60×40 mm): sale al terminar el par en PT. Reemplaza los
@@ -16,7 +18,7 @@ import { ParNacido, ParDetalle } from '../../core/api/models/fabricacion.models'
 
 const TINTA: [number, number, number] = [20, 20, 20];
 
-export const ETIQUETA_LENGUA = { ancho: 40, alto: 25 } as const;
+export const ETIQUETA_LENGUA = { ancho: 30, alto: 20 } as const;
 export const STICKER_CAJA = { ancho: 60, alto: 40 } as const;
 
 async function libs() {
@@ -70,7 +72,7 @@ export function nombrePdfLenguas(pares: ParNacido[]): string {
   return `etiquetas-OF${pares[0].of}${talla}-${pares.length}.pdf`;
 }
 
-/** Arma el PDF de las lenguas (40×25 mm, una por página) sin bajarlo. */
+/** Arma el PDF de las lenguas (30×20 mm, una por página) sin bajarlo. */
 export async function pdfEtiquetasLengua(pares: ParNacido[]) {
   const { jsPDF, toDataURL } = await libs();
   const { ancho, alto } = ETIQUETA_LENGUA;
@@ -82,31 +84,46 @@ export async function pdfEtiquetasLengua(pares: ParNacido[]) {
   pares.forEach((p, i) => {
     if (i > 0) doc.addPage([ancho, alto], 'landscape');
     // QR a la izquierda, casi toda la altura: lo lee la cámara del celular torcido y arrugado.
-    doc.addImage(qrs[i], 'PNG', 1.5, 1.5, 22, 22);
+    doc.addImage(qrs[i], 'PNG', 1.5, 1.5, 17, 17);
 
     doc.setTextColor(...TINTA);
-    const centro = 32; // columna de datos, a la derecha del QR
+    const centro = 24.5; // columna de datos, a la derecha del QR (de 19,5 a 29,5 mm)
+    const anchoColumna = 10;
     // La talla es lo que el operario busca a un metro: gigante.
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
-    doc.text(p.talla, centro, 10.5, { align: 'center' });
-    doc.setFontSize(5);
+    doc.setFontSize(20);
+    doc.text(p.talla, centro, 8.5, { align: 'center' });
+    doc.setFontSize(4.5);
     doc.setFont('helvetica', 'normal');
-    doc.text('TALLA', centro, 13.5, { align: 'center' });
+    doc.text('TALLA', centro, 11, { align: 'center' });
 
+    // El código crece con la OF (OF2-0001, OF120-0001): se achica hasta caber.
     doc.setFont('courier', 'bold');
-    doc.setFontSize(7);
-    doc.text(p.codigo, centro, 18, { align: 'center' });
+    ajustarFuente(doc, p.codigo, anchoColumna, 6, 3.5);
+    doc.text(p.codigo, centro, 14.5, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5);
+    doc.setFontSize(4.5);
     const detalle = [p.referencia, p.marca].filter(Boolean).join(' · ');
-    doc.splitTextToSize(detalle, 15).slice(0, 1).forEach((linea: string) => {
-      doc.text(linea, centro, 22, { align: 'center' });
+    doc.splitTextToSize(detalle, anchoColumna).slice(0, 1).forEach((linea: string) => {
+      doc.text(linea, centro, 18, { align: 'center' });
     });
   });
 
   return doc;
+}
+
+/** Baja la fuente desde `max` hasta que el texto quepa en `ancho` mm (sin pasar de `min`). */
+function ajustarFuente(
+  doc: { setFontSize(n: number): unknown; getTextWidth(t: string): number },
+  texto: string, ancho: number, max: number, min: number,
+): void {
+  let tam = max;
+  doc.setFontSize(tam);
+  while (tam > min && doc.getTextWidth(texto) > ancho) {
+    tam -= 0.25;
+    doc.setFontSize(tam);
+  }
 }
 
 /**
