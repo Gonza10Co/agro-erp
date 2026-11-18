@@ -57,10 +57,10 @@ export function pctMeta(hoy: number, meta: number): number {
     .tv-meta{flex:1;color:var(--text-subtle)}
     .tv-err{color:var(--error)}
     .grid{flex:1;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:var(--sp-4)}
-    .tarjeta{display:flex;flex-direction:column;justify-content:center;gap:var(--sp-2);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);text-align:center;min-height:42vh}
+    .tarjeta{display:flex;flex-direction:column;justify-content:center;gap:var(--sp-2);padding:var(--sp-5);background:var(--surface);border:var(--bw) solid var(--border);border-radius:var(--r-lg);text-align:center;min-height:42vh;min-width:0;container-type:inline-size}
     .tarjeta.cumplida{border-color:var(--success);background:var(--success-subtle)}
     .nombre{font-size:clamp(16px,2vw,28px);font-weight:var(--fw-semibold);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
-    .num{font-size:clamp(64px,11vw,200px);line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--text)}
+    .num{font-size:min(36cqi,200px);white-space:nowrap;line-height:1;font-weight:var(--fw-bold);font-variant-numeric:tabular-nums;color:var(--text)}
     .tarjeta.cumplida .num{color:var(--success)}
     .meta{font-size:clamp(14px,1.8vw,26px);color:var(--text-subtle)}
     .sin-pistolazo{font-size:clamp(13px,1.4vw,20px);font-weight:var(--fw-semibold);color:var(--warning)}
@@ -69,7 +69,7 @@ export function pctMeta(hoy: number, meta: number): number {
     .tarjeta.cumplida .fill{background:var(--success)}
     .pie{display:flex;justify-content:space-between;font-size:clamp(13px,1.4vw,20px);color:var(--text-muted)}
     .pct{font-weight:var(--fw-bold)}
-    @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr} .tarjeta{min-height:auto} .num{font-size:clamp(48px,14vw,120px)} }
+    @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr} .tarjeta{min-height:auto} .num{font-size:min(36cqi,120px)} }
   `],
 })
 export class TvPlantaComponent implements OnInit {
