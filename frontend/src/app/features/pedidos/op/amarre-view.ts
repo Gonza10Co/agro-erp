@@ -57,6 +57,20 @@ export function resumenAmarre(op: OrdenProduccion): ResumenAmarre {
   return { pedido, stock, producir, pctStock, bodegas: bodegasDeOP(op) };
 }
 
+/**
+ * Pares que todavía no están en bodega para este pedido: lo que necesita (amarrado +
+ * a producir) menos lo ya reservado en PT. `cantAProducir` no baja al fabricar, así
+ * que lo que dice si se puede despachar es esto, no "a producir".
+ */
+export function pendientesDeBodega(op: OrdenProduccion): number {
+  let faltan = 0;
+  for (const t of tallas(op)) {
+    const reservado = (t.reservas ?? []).reduce((a, r) => a + r.cantidad, 0);
+    faltan += Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - reservado, 0);
+  }
+  return faltan;
+}
+
 function agregarPorTalla(op: OrdenProduccion) {
   const map = new Map<number, { valor: number; pedido: number; stock: number; producir: number }>();
   for (const t of tallas(op)) {
