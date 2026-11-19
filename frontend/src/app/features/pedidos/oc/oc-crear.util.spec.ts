@@ -1,4 +1,4 @@
-import { tallasDeProducto, construirDto, destinoAlEditar, seleccionInicialEjes, LineaWizard } from './oc-crear.util';
+import { tallasDeProducto, construirDto, destinoAlEditar, seleccionInicialEjes, hoyColombia, LineaWizard } from './oc-crear.util';
 import { Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 
@@ -21,6 +21,17 @@ describe('oc-crear.util', () => {
     const lineas: LineaWizard[] = [{ producto: PROD, precio: 0, valores: { 2: 10 } }];
     expect(construirDto({ clienteId: 3, fechaEntrega: '2026-11-30', lineas }).fechaEntrega).toBe('2026-11-30');
     expect('fechaEntrega' in construirDto({ clienteId: 3, fechaEntrega: '', lineas })).toBe(false);
+  });
+
+  it('construirDto manda la fecha del pedido del cliente solo si se escribió', () => {
+    const lineas: LineaWizard[] = [{ producto: PROD, precio: 0, valores: { 2: 10 } }];
+    expect(construirDto({ clienteId: 3, fechaPedidoCliente: '2026-11-10', lineas }).fechaPedidoCliente).toBe('2026-11-10');
+    expect('fechaPedidoCliente' in construirDto({ clienteId: 3, fechaPedidoCliente: '', lineas })).toBe(false);
+  });
+
+  it('hoyColombia usa UTC-5 (a las 2 a. m. UTC todavía es el día anterior)', () => {
+    expect(hoyColombia(new Date('2026-11-20T02:00:00Z'))).toBe('2026-11-19');
+    expect(hoyColombia(new Date('2026-11-20T06:00:00Z'))).toBe('2026-11-20');
   });
 
   it('construirDto marca el pedido para stock (mínimos) solo si se pidió', () => {

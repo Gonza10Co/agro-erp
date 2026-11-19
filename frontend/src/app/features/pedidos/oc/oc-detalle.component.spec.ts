@@ -17,7 +17,7 @@ const OC_BORRADOR = {
 };
 
 describe('OcDetalleComponent', () => {
-  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy; cambiarFechaEntregaOC: jasmine.Spy };
+  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy; cambiarFechaEntregaOC: jasmine.Spy; cambiarFechaPedidoClienteOC: jasmine.Spy };
   function setup(ocId = 7) {
     apiMock = {
       obtenerOC: jasmine.createSpy('obtenerOC').and.returnValue(of(OC_BORRADOR)),
@@ -25,6 +25,7 @@ describe('OcDetalleComponent', () => {
       confirmarOC: jasmine.createSpy('confirmarOC').and.returnValue(of({ id: 7, estado: 'CONFIRMADA' })),
       generarOP: jasmine.createSpy('generarOP').and.returnValue(of({ id: 50, consecutivo: 1 })),
       cambiarFechaEntregaOC: jasmine.createSpy('cambiarFechaEntregaOC').and.returnValue(of({ id: 7 })),
+      cambiarFechaPedidoClienteOC: jasmine.createSpy('cambiarFechaPedidoClienteOC').and.returnValue(of({ id: 7 })),
     };
     TestBed.configureTestingModule({
       imports: [OcDetalleComponent],
@@ -52,6 +53,21 @@ describe('OcDetalleComponent', () => {
     expect(apiMock.cambiarFechaEntregaOC).toHaveBeenCalledWith(7, '2026-12-05');
     fixture.componentInstance.guardarFechaEntrega('');
     expect(apiMock.cambiarFechaEntregaOC).toHaveBeenCalledWith(7, null);
+  });
+
+  it('muestra la fecha del pedido del cliente (con tope hoy) junto a la de subida al ERP y la guarda al cambiarla', () => {
+    const fixture = setup();
+    apiMock.obtenerOC.and.returnValue(of({ ...OC_BORRADOR, estado: 'EN_PRODUCCION', fechaPedidoCliente: '2026-11-02T00:00:00.000Z' }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const input = el.querySelector('input.fecha-pedido-cliente') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.max).toBe(fixture.componentInstance.hoy);
+    expect(el.querySelector('.subido-erp')?.textContent).toContain('Subido al ERP');
+    fixture.componentInstance.guardarFechaPedidoCliente('2026-11-01');
+    expect(apiMock.cambiarFechaPedidoClienteOC).toHaveBeenCalledWith(7, '2026-11-01');
+    fixture.componentInstance.guardarFechaPedidoCliente('');
+    expect(apiMock.cambiarFechaPedidoClienteOC).toHaveBeenCalledWith(7, null);
   });
 
   it('carga el detalle de la OC al iniciar', () => {

@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { ToastService } from '../../../core/notificaciones/toast.service';
 import { badgeOC, badgeOP } from './estado-badge';
-import { destinoAlEditar } from './oc-crear.util';
+import { destinoAlEditar, hoyColombia } from './oc-crear.util';
 import { armarProforma } from './oc-proforma.util';
 import { descargarProformaPdf } from './oc-proforma-pdf';
 
@@ -36,7 +36,15 @@ interface LineaEdit {
         <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ o.cliente?.nit }}</span></div>
         <div class="kv"><span class="k">OC cliente</span><span class="v">{{ o.ocCliente || '—' }}</span></div>
         @if (o.paraStock) { <div class="kv"><span class="k">Tipo</span><span class="v">Pedido de mínimos (para stock)</span></div> }
-        <div class="kv"><span class="k">Fecha</span><span class="v">{{ o.fecha | date:'dd/MM/yyyy' }}</span></div>
+        <div class="kv"><span class="k">Fecha del pedido del cliente</span><span class="v">
+          @if (o.estado === 'ANULADA') { {{ o.fechaPedidoCliente ? o.fechaPedidoCliente.slice(0, 10) : '—' }} }
+          @else {
+            <input class="input fecha-pedido-cliente" type="date" style="max-width:180px" aria-label="Fecha del pedido del cliente"
+                   [max]="hoy" [value]="o.fechaPedidoCliente ? o.fechaPedidoCliente.slice(0, 10) : ''" [disabled]="guardandoFechaPedido()"
+                   (change)="guardarFechaPedidoCliente($any($event.target).value)" />
+          }
+          <span class="cell-sub subido-erp"> Subido al ERP: {{ o.fecha | date:'dd/MM/yyyy' }}</span>
+        </span></div>
         <div class="kv"><span class="k">Fecha de entrega</span><span class="v">
           @if (o.estado === 'ANULADA') { {{ o.fechaEntrega ? o.fechaEntrega.slice(0, 10) : '—' }} }
           @else {
@@ -340,6 +348,25 @@ export class OcDetalleComponent implements OnInit {
           this.changed.emit();
         },
         error: (e) => { this.guardandoFecha.set(false); this.error.set(this.msg(e)); },
+      });
+  }
+
+  /** Tope del input: el cliente no pudo poner el pedido en el futuro. */
+  readonly hoy = hoyColombia();
+  guardandoFechaPedido = signal(false);
+  guardarFechaPedidoCliente(valor: string): void {
+    this.guardandoFechaPedido.set(true);
+    this.api.cambiarFechaPedidoClienteOC(this.ocId(), valor || null)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.guardandoFechaPedido.set(false);
+          const o = this.oc();
+          if (o) this.oc.set({ ...o, fechaPedidoCliente: valor ? `${valor}T00:00:00.000Z` : null });
+          this.toast.exito(valor ? 'Fecha del pedido del cliente guardada' : 'Fecha del pedido del cliente borrada');
+          this.changed.emit();
+        },
+        error: (e) => { this.guardandoFechaPedido.set(false); this.error.set(this.msg(e)); },
       });
   }
 

@@ -12,7 +12,7 @@ import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.mo
 import { MarcaOpt, ProductoConfiguradoFull, ReferenciaConfig, ReferenciaListItem } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
 import { TallaGridComponent } from '../../../shared/ui/talla-grid/talla-grid.component';
-import { LineaWizard, tallasDeProducto, construirDto, seleccionInicialEjes } from './oc-crear.util';
+import { LineaWizard, tallasDeProducto, construirDto, seleccionInicialEjes, hoyColombia } from './oc-crear.util';
 import { obligatoriosFaltantes, opcionIdsSel } from '../../catalog/configurador/configurador.util';
 import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
 
@@ -52,6 +52,10 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
           <div style="margin-top:var(--sp-4);max-width:240px">
             <label class="label">Fecha de entrega (opcional)</label>
             <input class="input" type="date" [ngModel]="fechaEntrega()" (ngModelChange)="fechaEntrega.set($event)" />
+          </div>
+          <div style="margin-top:var(--sp-4);max-width:240px">
+            <label class="label">Fecha del pedido del cliente</label>
+            <input class="input" type="date" [max]="hoy" [ngModel]="fechaPedidoCliente()" (ngModelChange)="fechaPedidoCliente.set($event)" />
           </div>
           <label class="check" style="margin-top:var(--sp-4)">
             <input type="checkbox" [checked]="paraStock()" (change)="paraStock.set(!paraStock())" />
@@ -260,6 +264,9 @@ export class OcCrearComponent implements OnInit {
   paraStock = signal(false);
   /** Fecha prometida al cliente; sin ella la proyección estima confirmación + 15 días. */
   fechaEntrega = signal('');
+  /** Día en que el cliente puso el pedido (no el de hoy, que es cuando se sube al ERP). */
+  fechaPedidoCliente = signal('');
+  readonly hoy = hoyColombia();
   sedes = signal<SedeCliente[]>([]);
   // null = "Otra dirección…": el usuario escribe una entrega puntual a mano.
   sedeEntregaId = signal<number | null>(null);
@@ -439,7 +446,7 @@ export class OcCrearComponent implements OnInit {
     const cl = this.clienteSel();
     if (!cl || this.enviando() || !this.pasoValido()) return;
     this.enviando.set(true); this.error.set('');
-    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), paraStock: this.paraStock(), fechaEntrega: this.fechaEntrega(), lineas: this.lineas() });
+    const dto = construirDto({ clienteId: cl.id, ocCliente: this.ocCliente(), observaciones: this.observaciones(), sedeEntregaId: this.sedeEntregaId(), direccionDespacho: this.direccionDespacho(), lineaId: this.lineaProdId(), paraStock: this.paraStock(), fechaEntrega: this.fechaEntrega(), fechaPedidoCliente: this.fechaPedidoCliente(), lineas: this.lineas() });
     this.pedidosApi.crearOC(dto).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.enviando.set(false); this.router.navigateByUrl('/pedidos/oc'); },
       error: (e) => { this.enviando.set(false); this.error.set(this.msg(e, 'No se pudo crear la OC')); },

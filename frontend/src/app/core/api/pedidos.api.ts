@@ -17,6 +17,8 @@ export class PedidosApi {
   actualizarOC(id: number, dto: CrearOCDto) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}`, dto); }
   /** La fecha prometida se cambia en cualquier estado del pedido; null la borra. */
   cambiarFechaEntregaOC(id: number, fechaEntrega: string | null) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}/fecha-entrega`, { fechaEntrega }); }
+  /** El día en que el cliente puso el pedido (no futuro); null la borra. */
+  cambiarFechaPedidoClienteOC(id: number, fechaPedidoCliente: string | null) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}/fecha-pedido-cliente`, { fechaPedidoCliente }); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
   eliminarOC(id: number) { return this.http.delete<void>(`${this.oc}/${id}`); }
 
