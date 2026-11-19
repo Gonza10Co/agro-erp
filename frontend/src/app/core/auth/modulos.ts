@@ -124,6 +124,7 @@ export type Seccion =
   // Entrega 5 — facturación de servicios (maquila Feroz) y venta de segundas.
   | 'factura-servicio'
   | 'venta-segundas'
+  | 'reasignar-pares'
   // Quincena 1 del rediseño lote↔par — programación y control de corte.
   | 'programacion-corte'
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
@@ -200,6 +201,8 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // que lo que no alcance no se fabrica — las segundas salen de un defecto, no de
   // una orden.
   'venta-segundas': 'ENTREGADO',
+  // Pasar pares reservados de un pedido a otro (JP, 2026-11-19): lo pidió el cliente.
+  'reasignar-pares': 'ENTREGADO',
 };
 
 /**
@@ -326,4 +329,15 @@ export const ROLES_OPERAN_LOTE: readonly string[] = ['ADMIN', 'GERENTE'];
 
 export function puedeOperarLote(rol: string | null | undefined): boolean {
   return !!rol && ROLES_OPERAN_LOTE.includes(rol);
+}
+
+/**
+ * Quién pasa o libera pares reservados en PT entre pedidos. Espejo de
+ * `ROLES_REASIGNAN_PARES` en `backend/src/pedidos/reassignment/pt-reassignment.service.ts`,
+ * que es el que de verdad manda (403 al resto).
+ */
+export const ROLES_REASIGNAN_PARES: readonly string[] = ['ADMIN', 'GERENTE'];
+
+export function puedeReasignarPares(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_REASIGNAN_PARES.includes(rol) && puedeVerSeccion(rol, 'reasignar-pares');
 }

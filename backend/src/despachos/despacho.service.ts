@@ -10,6 +10,7 @@ import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { liberarReservasDeOp } from '../compras/reserva-insumos';
 import { DespacharDto } from './dto/despachar.dto';
 import { construirLineasDespacho, ReservaPlana } from './despacho-lineas';
+import { pendingOf } from '../pedidos/op/op-need';
 
 interface Usuario {
   sub: number;
@@ -40,16 +41,12 @@ export class DespachoService {
     if (op.estado !== 'AMARRADA' && op.estado !== 'EN_PRODUCCION')
       throw new BadRequestException('Solo se puede despachar una OP amarrada o en producción');
     // Producción pendiente = lo que el pedido necesita (amarrado de bodega +
-    // programado a fabricar) menos lo que ya tiene reservado (el amarre inicial
-    // más cada par que entró a PT). `cantAProducir` no baja al producir: es lo
-    // programado, y así lo leen el corte y los tableros.
+    // programado a fabricar − lo cedido a otro pedido) menos lo que ya tiene
+    // reservado (el amarre inicial más cada par que entró a PT). `cantAProducir`
+    // no baja al producir: es lo programado, y así lo leen el corte y los tableros.
+    // Un pedido al que gerencia le pasó pares a otro queda debiendo y falla acá.
     const faltan = op.lineas.reduce(
-      (acc: number, l: any) =>
-        acc +
-        l.tallas.reduce((a: number, t: any) => {
-          const reservado = (t.reservas ?? []).reduce((x: number, r: any) => x + r.cantidad, 0);
-          return a + Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - reservado, 0);
-        }, 0),
+      (acc: number, l: any) => acc + l.tallas.reduce((a: number, t: any) => a + pendingOf(t), 0),
       0,
     );
     if (faltan > 0)

@@ -32,6 +32,7 @@ model User {
   recepcionesCompra      RecepcionCompra[]
   devolucionesProveedor  DevolucionProveedor[]
   eventosRegistrados     EventoTrazabilidad[]
+  ptReassignments        PtReassignment[]
 }
 
 model RefreshToken {
@@ -155,6 +156,7 @@ model Talla {
   etiquetasReservadas EtiquetaReservada[]
   lineasCorte         OrdenCorteLinea[]
   materiales          Material[]
+  ptReassignments     PtReassignment[]
 }
 
 model Referencia {
@@ -400,6 +402,7 @@ model ProductoConfigurado {
   lineasFactura       FacturaLinea[]
   pares               Par[]
   etiquetasReservadas EtiquetaReservada[]
+  ptReassignments     PtReassignment[]
 }
 
 model ProductoConfiguradoOpcion {
@@ -506,36 +509,36 @@ model Bodega {
 }
 
 model OrdenCompra {
-  id                Int          @id @default(autoincrement())
-  consecutivo       Int          @unique
-  ocCliente         String?
-  clienteId         Int
-  cliente           Cliente      @relation(fields: [clienteId], references: [id])
-  fecha             DateTime     @default(now())
-  fechaConfirmacion DateTime? // se sella al confirmar; el reloj de demora corre desde acá
-  estado            EstadoOC     @default(BORRADOR)
-  observaciones     String?
+  id                 Int          @id @default(autoincrement())
+  consecutivo        Int          @unique
+  ocCliente          String?
+  clienteId          Int
+  cliente            Cliente      @relation(fields: [clienteId], references: [id])
+  fecha              DateTime     @default(now())
+  fechaConfirmacion  DateTime? // se sella al confirmar; el reloj de demora corre desde acá
+  estado             EstadoOC     @default(BORRADOR)
+  observaciones      String?
   // A qué sede va este pedido (trazabilidad y filtros). Si se omite, la sede principal.
-  sedeEntregaId     Int?
-  sedeEntrega       SedeCliente? @relation(fields: [sedeEntregaId], references: [id])
+  sedeEntregaId      Int?
+  sedeEntrega        SedeCliente? @relation(fields: [sedeEntregaId], references: [id])
   // Copia congelada de la dirección al momento de crear la OC: si mañana el cliente
   // corrige la dirección de la sede, los remitos ya despachados NO deben cambiar.
-  direccionDespacho String?
+  direccionDespacho  String?
   // La línea de producción se decide POR PEDIDO (cliente 2026-07-06: el mapeo
   // marca→línea NO es fijo). De acá se hereda a la OP y a cada Par.
-  lineaId           Int?
-  linea             Linea?       @relation(fields: [lineaId], references: [id])
+  lineaId            Int?
+  linea              Linea?       @relation(fields: [lineaId], references: [id])
   // Pedido para STOCK (orden de mínimos, JP 2026-11-12): se fabrica para reponer la
   // bodega, así que su OP NO amarra PT y lo que produce entra libre para vender.
-  paraStock         Boolean      @default(false)
+  paraStock          Boolean      @default(false)
   // Fecha prometida al cliente (día calendario). Sin ella, la proyección estima
   // confirmación + 15 días. Se puede cambiar en cualquier estado del pedido.
-  fechaEntrega      DateTime?    @db.Date
+  fechaEntrega       DateTime?    @db.Date
   // Día en que el cliente puso el pedido (JP 2026-11-19). Distinta de `fecha`, que es
   // cuando se subió al ERP: así se mide cuánto tarda en cargarse. No puede ser futura.
-  fechaPedidoCliente DateTime?   @db.Date
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  fechaPedidoCliente DateTime?    @db.Date
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   lineas          OrdenCompraLinea[]
   ordenProduccion OrdenProduccion?
@@ -611,6 +614,9 @@ model OrdenProduccion {
   despacho           Despacho?
   requerimientos     RequerimientoCompra[]
   ordenesFabricacion OrdenFabricacion[]
+  // Pares de PT que gerencia sacó de este pedido (a otro o liberados) y los que recibió.
+  ptReassignmentsOut PtReassignment[]       @relation("PtReassignmentFrom")
+  ptReassignmentsIn  PtReassignment[]       @relation("PtReassignmentTo")
 
   @@index([lineaId])
 }
@@ -638,10 +644,42 @@ model OrdenProduccionLineaTalla {
   cantPedida    Int
   cantAmarrada  Int                  @default(0)
   cantAProducir Int                  @default(0)
+  // Pares de esta talla que gerencia pasó a otro pedido o liberó (PtReassignment).
+  // Al ceder, `cantAProducir` sube lo mismo (A vuelve a deberlos y se pueden
+  // reprogramar) y este campo lo compensa: la necesidad del pedido es
+  // cantAmarrada + cantAProducir − reassignedOut (ver pedidos/op/op-need.ts).
+  reassignedOut Int                  @default(0)
 
   reservas ReservaInventarioPT[]
 
   @@unique([opLineaId, tallaId])
+}
+
+/// Gerencia pasa pares RESERVADOS en PT de un pedido (fromOp) a otro (toOp) o los
+/// libera en bodega (toOp NULL). Caso de JP (2026-11-19): el pedido de un cliente está
+/// listo pero no se despacha y llega otro que sí hay que despachar ya. Los pares no se
+/// mueven de bodega ni cambian de código: solo cambia de quién es la reserva.
+/// Cascade con la OP: en la operación una OP nunca se borra (se anula); solo la borran
+/// los scripts de limpieza de demo, y ahí el registro se va con ella.
+model PtReassignment {
+  id                    Int                 @id @default(autoincrement())
+  fromOpId              Int
+  fromOp                OrdenProduccion     @relation("PtReassignmentFrom", fields: [fromOpId], references: [id], onDelete: Cascade)
+  toOpId                Int?
+  toOp                  OrdenProduccion?    @relation("PtReassignmentTo", fields: [toOpId], references: [id], onDelete: Cascade)
+  productoConfiguradoId Int
+  productoConfigurado   ProductoConfigurado @relation(fields: [productoConfiguradoId], references: [id])
+  tallaId               Int
+  talla                 Talla               @relation(fields: [tallaId], references: [id])
+  calidad               CalidadPT
+  quantity              Int
+  reason                String
+  userId                Int
+  user                  User                @relation(fields: [userId], references: [id])
+  createdAt             DateTime            @default(now())
+
+  @@index([fromOpId])
+  @@index([toOpId])
 }
 
 model ReservaInventarioPT {

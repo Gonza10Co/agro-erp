@@ -13,11 +13,12 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { badgeOP } from '../oc/estado-badge';
 import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from './amarre-view';
+import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component';
 
 @Component({
   selector: 'app-op-detalle',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, RouterLink, FormsModule],
+  imports: [DatePipe, DecimalPipe, RouterLink, FormsModule, PtReassignmentPanelComponent],
   template: `
     <div class="page page-wide">
       @if (cargando()) {
@@ -92,7 +93,8 @@ import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from
           <div class="ring" [style.--p]="resumen().pctStock.toString()"><b>{{ resumen().pctStock }}%</b></div>
           <div class="ov-text">
             <h3>Cumplimiento por inventario</h3>
-            <p>De los {{ resumen().pedido | number:'1.0-0' }} pares pedidos, {{ resumen().stock | number:'1.0-0' }} ya están en bodega y se amarraron al pedido. Faltan {{ resumen().producir | number:'1.0-0' }} por fabricar.</p>
+            <p>De los {{ resumen().pedido | number:'1.0-0' }} pares pedidos, {{ resumen().stock | number:'1.0-0' }} ya están en bodega y se amarraron al pedido. Faltan {{ resumen().producir | number:'1.0-0' }} por fabricar.
+              @if (resumen().cedidos) { <b class="cedidos">{{ resumen().cedidos | number:'1.0-0' }} de esos reponen pares que gerencia pasó a otro pedido o liberó: el pedido los debe.</b> }</p>
             <div class="ov-bar" style="margin-top:14px">
               <div class="stack-bar">
                 <div class="s-stock" [style.width.%]="resumen().pctStock"></div>
@@ -177,6 +179,11 @@ import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from
           </div>
         </div>
 
+        <!-- Pares cedidos y recibidos (sección 'reasignar-pares'): pedido de JP, 2026-11-19 -->
+        @if (verReasignacion) {
+          <app-pt-reassignment-panel [opId]="o.id" [opConsecutivo]="o.consecutivo" [viva]="o.estado !== 'ANULADA' && o.estado !== 'DESPACHADA'" (changed)="cargar(o.id)" />
+        }
+
         @if (error() && !carteraBloqueada()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
         }
       } @else {
@@ -185,6 +192,7 @@ import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from
     </div>
   `,
   styles: [`
+    .cedidos{display:block;margin-top:4px;color:var(--text);font-weight:var(--fw-medium)}
     .obs-oc{margin-top:var(--sp-2);font-size:var(--text-sm);white-space:pre-wrap;color:var(--text)}
     .req-strip{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
     .req-links{display:flex;gap:var(--sp-2);flex-wrap:wrap}
@@ -263,7 +271,7 @@ export class OpDetalleComponent implements OnInit {
 
   resumen = computed(() => {
     const o = this.op();
-    return o ? resumenAmarre(o) : { pedido: 0, stock: 0, producir: 0, pctStock: 0, bodegas: [] };
+    return o ? resumenAmarre(o) : { pedido: 0, stock: 0, producir: 0, pctStock: 0, bodegas: [], cedidos: 0 };
   });
   nombresBodegas = computed(() => this.resumen().bodegas.map(b => b.nombre).join(' · ') || '—');
 
@@ -279,6 +287,7 @@ export class OpDetalleComponent implements OnInit {
   readonly puedeOperarProduccion = puedeVerSeccion(this.auth.rol(), 'operar-produccion');
   readonly puedeVerAmarre = puedeVerSeccion(this.auth.rol(), 'amarre-insumos');
   readonly puedeRecalcular = puedeVerSeccion(this.auth.rol(), 'recalcular-requerimiento');
+  readonly verReasignacion = puedeVerSeccion(this.auth.rol(), 'reasignar-pares');
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {

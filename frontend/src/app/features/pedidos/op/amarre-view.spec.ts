@@ -79,4 +79,12 @@ describe('amarre-view', () => {
     op.lineas[0].tallas[1].reservas.push({ cantidad: 2 });
     expect(pendientesDeBodega(op)).toBe(0);
   });
+
+  it('resumenAmarre cuenta los pares cedidos a otro pedido (ya sumados en producir)', () => {
+    const op = { ...OP, lineas: [{ ...OP.lineas![0], tallas: [{ ...OP.lineas![0].tallas[0], cantAmarrada: 60, cantAProducir: 5, reassignedOut: 5 }] }] };
+    const r = resumenAmarre(op);
+    expect(r.cedidos).toBe(5);
+    expect(r.producir).toBe(5);
+    expect(resumenAmarre(OP).cedidos).toBe(0);
+  });
 });
