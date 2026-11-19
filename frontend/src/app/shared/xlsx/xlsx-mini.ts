@@ -11,7 +11,7 @@ import { strToU8, zipSync } from 'fflate';
 
 export type EstiloCelda =
   | 'titulo' | 'encabezado' | 'negrita' | 'tenue'
-  | 'ok' | 'atrasado' | 'alerta' | 'libre' | 'bodega';
+  | 'ok' | 'atrasado' | 'alerta' | 'libre' | 'bodega' | 'fecha';
 
 export type Celda = string | number | null | undefined | { v: string | number | null; estilo?: EstiloCelda };
 
@@ -25,11 +25,12 @@ export interface Hoja {
 }
 
 // El orden es el índice del estilo en styles.xml (0 = sin estilo).
-const ESTILOS: EstiloCelda[] = ['titulo', 'encabezado', 'negrita', 'tenue', 'ok', 'atrasado', 'alerta', 'libre', 'bodega'];
+const ESTILOS: EstiloCelda[] = ['titulo', 'encabezado', 'negrita', 'tenue', 'ok', 'atrasado', 'alerta', 'libre', 'bodega', 'fecha'];
 
 const STYLES_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+  '<numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts>' +
   '<fonts count="5">' +
   '<font><sz val="11"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="14"/><name val="Calibri"/></font>' +
@@ -53,7 +54,7 @@ const STYLES_XML =
   '<top style="thin"><color rgb="FFB8C0CC"/></top><bottom style="thin"><color rgb="FFB8C0CC"/></bottom><diagonal/></border>' +
   '</borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="10">' +
+  '<cellXfs count="11">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' + // titulo
   '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' + // encabezado
@@ -64,9 +65,23 @@ const STYLES_XML =
   '<xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>' + // alerta
   '<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>' + // libre
   '<xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>' + // bodega
+  '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' + // fecha
   '</cellXfs>' +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   '</styleSheet>';
+
+const MS_DIA = 86_400_000;
+const EPOCA_EXCEL = Date.UTC(1899, 11, 30);
+
+/**
+ * 'YYYY-MM-DD' → celda de fecha real de Excel (número de serie con formato
+ * yyyy-mm-dd), así Power Query la reconoce como fecha. Vacío o inválido → null.
+ */
+export function celdaFecha(dia: string | null | undefined): Celda {
+  const m = dia ? /^(\d{4})-(\d{2})-(\d{2})/.exec(dia) : null;
+  if (!m) return null;
+  return { v: (Date.UTC(+m[1], +m[2] - 1, +m[3]) - EPOCA_EXCEL) / MS_DIA, estilo: 'fecha' };
+}
 
 export function escaparXml(s: string): string {
   return s

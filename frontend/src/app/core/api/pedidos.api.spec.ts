@@ -20,6 +20,13 @@ describe('PedidosApi', () => {
     req.flush([]);
   });
 
+  it('exportarOC hace GET /pedidos/oc/export', () => {
+    api.exportarOC().subscribe((r) => expect(r.pedidos.length).toBe(0));
+    const req = http.expectOne('http://localhost:3001/pedidos/oc/export');
+    expect(req.request.method).toBe('GET');
+    req.flush({ pedidos: [], tallas: [] });
+  });
+
   it('confirmarOC hace POST /pedidos/oc/:id/confirmar', () => {
     api.confirmarOC(5).subscribe();
     const req = http.expectOne('http://localhost:3001/pedidos/oc/5/confirmar');

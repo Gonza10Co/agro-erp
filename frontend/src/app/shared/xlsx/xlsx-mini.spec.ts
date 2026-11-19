@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from 'fflate';
-import { crearXlsx, escaparXml, letraColumna, xmlHoja } from './xlsx-mini';
+import { celdaFecha, crearXlsx, escaparXml, letraColumna, xmlHoja } from './xlsx-mini';
 
 describe('xlsx-mini', () => {
   it('nombra las columnas como Excel', () => {
@@ -41,5 +41,14 @@ describe('xlsx-mini', () => {
       const doc = new DOMParser().parseFromString(strFromU8(bytes), 'application/xml');
       expect(doc.getElementsByTagName('parsererror').length).withContext(ruta).toBe(0);
     }
+  });
+
+  it('escribe fechas como número de serie de Excel con estilo de fecha', () => {
+    expect(celdaFecha('1900-03-01')).toEqual({ v: 61, estilo: 'fecha' });
+    expect(celdaFecha('2026-11-19')).toEqual({ v: 46345, estilo: 'fecha' });
+    expect(celdaFecha(null)).toBeNull();
+    expect(celdaFecha('')).toBeNull();
+    const xml = xmlHoja({ nombre: 'x', filas: [[celdaFecha('2026-11-19')]] });
+    expect(xml).toContain('<c r="A1" s="10"><v>46345</v></c>');
   });
 });

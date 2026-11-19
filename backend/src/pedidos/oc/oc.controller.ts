@@ -31,6 +31,10 @@ export class OcController {
   @Get() listar() {
     return this.oc.listar();
   }
+  // Va antes de ':id' para que 'export' no caiga en el ParseIntPipe.
+  @Get('export') exportar() {
+    return this.oc.exportar();
+  }
   @Get(':id') obtener(@Param('id', ParseIntPipe) id: number) {
     return this.oc.obtener(id);
   }
