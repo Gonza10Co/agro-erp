@@ -531,6 +531,9 @@ model OrdenCompra {
   // Fecha prometida al cliente (día calendario). Sin ella, la proyección estima
   // confirmación + 15 días. Se puede cambiar en cualquier estado del pedido.
   fechaEntrega      DateTime?    @db.Date
+  // Día en que el cliente puso el pedido (JP 2026-11-19). Distinta de `fecha`, que es
+  // cuando se subió al ERP: así se mide cuánto tarda en cargarse. No puede ser futura.
+  fechaPedidoCliente DateTime?   @db.Date
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

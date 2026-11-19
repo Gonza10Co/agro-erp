@@ -47,6 +47,8 @@ export function construirDto(args: {
   paraStock?: boolean;
   /** 'YYYY-MM-DD' prometida al cliente. */
   fechaEntrega?: string;
+  /** 'YYYY-MM-DD' en que el cliente puso el pedido. */
+  fechaPedidoCliente?: string;
   lineas: LineaWizard[];
 }): CrearOCDto {
   return {
@@ -61,6 +63,7 @@ export function construirDto(args: {
     // Solo los pedidos de mínimos llevan la clave; los normales no cambian de forma.
     ...(args.paraStock ? { paraStock: true } : {}),
     ...(args.fechaEntrega ? { fechaEntrega: args.fechaEntrega } : {}),
+    ...(args.fechaPedidoCliente ? { fechaPedidoCliente: args.fechaPedidoCliente } : {}),
     lineas: args.lineas.map((l) => ({
       productoConfiguradoId: l.producto.id,
       // PRIMERA es el default del backend: solo se manda la clave si se pidió otro
@@ -80,4 +83,9 @@ export function construirDto(args: {
  */
 export function seleccionInicialEjes(ejes: EjeConfig[]): Map<number, number | null> {
   return new Map(ejes.map((e) => [e.grupo.id, e.opciones.length === 1 ? e.opciones[0].id : null]));
+}
+
+/** Hoy 'YYYY-MM-DD' en hora Colombia (UTC-5): tope de la fecha del pedido del cliente. */
+export function hoyColombia(ahora: Date = new Date()): string {
+  return new Date(ahora.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
 }

@@ -19,6 +19,17 @@ function aFecha(s: string | null | undefined): Date | null | undefined {
   return new Date(`${s.slice(0, 10)}T00:00:00Z`);
 }
 
+/** Como aFecha, pero el día en que el cliente puso el pedido no puede ser futuro (hora Colombia, UTC-5). */
+function aFechaPedidoCliente(s: string | null | undefined, ahora = new Date()): Date | null | undefined {
+  const f = aFecha(s);
+  if (!f) return f;
+  const hoy = new Date(ahora.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
+  if (f.toISOString().slice(0, 10) > hoy) {
+    throw new BadRequestException('La fecha del pedido del cliente no puede ser futura');
+  }
+  return f;
+}
+
 @Injectable()
 export class OcService {
   constructor(private readonly prisma: PrismaService) {}
@@ -44,6 +55,7 @@ export class OcService {
           lineaId,
           paraStock: dto.paraStock ?? false,
           fechaEntrega: aFecha(dto.fechaEntrega),
+          fechaPedidoCliente: aFechaPedidoCliente(dto.fechaPedidoCliente),
           estado: 'BORRADOR',
           lineas: {
             create: dto.lineas.map((l) => ({
@@ -97,6 +109,7 @@ export class OcService {
           // undefined no lo toca (el drawer viejo no lo reenvía).
           paraStock: dto.paraStock,
           fechaEntrega: aFecha(dto.fechaEntrega),
+          fechaPedidoCliente: aFechaPedidoCliente(dto.fechaPedidoCliente),
           lineas: {
             create: dto.lineas.map((l) => ({
               productoConfiguradoId: l.productoConfiguradoId,
@@ -186,6 +199,19 @@ export class OcService {
     return this.prisma.ordenCompra.update({
       where: { id },
       data: { fechaEntrega: aFecha(fechaEntrega) ?? null },
+    });
+  }
+
+  /** El día en que el cliente puso el pedido se corrige en cualquier estado, salvo anulado. */
+  async cambiarFechaPedidoCliente(id: number, fechaPedidoCliente: string | null) {
+    const oc = await this.prisma.ordenCompra.findUnique({ where: { id } });
+    if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+    if (oc.estado === 'ANULADA') {
+      throw new BadRequestException('Un pedido anulado no se edita');
+    }
+    return this.prisma.ordenCompra.update({
+      where: { id },
+      data: { fechaPedidoCliente: aFechaPedidoCliente(fechaPedidoCliente) ?? null },
     });
   }
 

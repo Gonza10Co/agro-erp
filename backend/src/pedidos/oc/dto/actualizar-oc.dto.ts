@@ -16,6 +16,8 @@ export class ActualizarOCDto {
   @IsOptional() @IsBoolean() paraStock?: boolean;
   // Fecha prometida al cliente, 'YYYY-MM-DD'.
   @IsOptional() @IsDateString() fechaEntrega?: string;
+  // Día en que el cliente puso el pedido, 'YYYY-MM-DD' (no futura).
+  @IsOptional() @IsDateString() fechaPedidoCliente?: string;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

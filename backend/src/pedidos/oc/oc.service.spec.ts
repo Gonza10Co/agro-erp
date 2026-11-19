@@ -59,6 +59,59 @@ describe('OcService', () => {
     expect(prisma.ordenCompra.create.mock.calls[0][0].data.fechaEntrega).toEqual(new Date('2026-11-30T00:00:00Z'));
   });
 
+  it('crear guarda la fecha del pedido del cliente como día calendario', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.ordenCompra.create.mockResolvedValue({ id: 1, consecutivo: 1 });
+    await service.crear({
+      clienteId: 7,
+      fechaPedidoCliente: '2026-11-10',
+      lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+    });
+    expect(prisma.ordenCompra.create.mock.calls[0][0].data.fechaPedidoCliente).toEqual(new Date('2026-11-10T00:00:00Z'));
+  });
+
+  it('crear rechaza una fecha del pedido del cliente futura', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    await expect(
+      service.crear({
+        clienteId: 7,
+        fechaPedidoCliente: '2999-01-01',
+        lineas: [{ productoConfiguradoId: 2, tallas: [{ tallaId: 5, cantidad: 10 }] }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  describe('cambiarFechaPedidoCliente', () => {
+    it('cambia la fecha en cualquier estado del pedido (también con OP)', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'EN_PRODUCCION' });
+      prisma.ordenCompra.update.mockResolvedValue({ id: 9 });
+      await service.cambiarFechaPedidoCliente(9, '2026-11-02');
+      expect(prisma.ordenCompra.update).toHaveBeenCalledWith({
+        where: { id: 9 },
+        data: { fechaPedidoCliente: new Date('2026-11-02T00:00:00Z') },
+      });
+    });
+
+    it('null la borra', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'CONFIRMADA' });
+      await service.cambiarFechaPedidoCliente(9, null);
+      expect(prisma.ordenCompra.update).toHaveBeenCalledWith({ where: { id: 9 }, data: { fechaPedidoCliente: null } });
+    });
+
+    it('rechaza una fecha futura', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'CONFIRMADA' });
+      await expect(service.cambiarFechaPedidoCliente(9, '2999-01-01')).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ordenCompra.update).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un pedido anulado y uno que no existe', async () => {
+      prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'ANULADA' });
+      await expect(service.cambiarFechaPedidoCliente(9, '2026-11-02')).rejects.toBeInstanceOf(BadRequestException);
+      prisma.ordenCompra.findUnique.mockResolvedValue(null);
+      await expect(service.cambiarFechaPedidoCliente(9, '2026-11-02')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe('cambiarFechaEntrega', () => {
     it('cambia la fecha en cualquier estado del pedido (también con OP)', async () => {
       prisma.ordenCompra.findUnique.mockResolvedValue({ id: 9, estado: 'EN_PRODUCCION' });
