@@ -42,6 +42,7 @@ import {
 import { BomLoaderService } from '../catalog/bom/bom-loader.service';
 import { resolverBom } from '../catalog/bom/bom-resolver';
 import { EntradaResolucion } from '../catalog/bom/bom-resolver.types';
+import { pendingOf } from '../pedidos/op/op-need';
 
 type DecimalLike = { toNumber(): number } | number | null | undefined;
 const num = (d: DecimalLike): number =>
@@ -855,7 +856,7 @@ export class FabricacionService {
   /**
    * Un par PRIMERA que entra a PT se reserva para la talla de la OP que lo
    * programó (misma OP, producto y grado), hasta cubrir lo amarrado + lo
-   * a producir. `cantAProducir` NO se toca: es lo programado y lo leen el
+   * a producir − lo cedido a otro pedido (`pendingOf`). `cantAProducir` NO se toca: es lo programado y lo leen el
    * corte y los tableros. Lo que sobre (reposiciones de más, segundas) queda
    * libre en bodega para otro pedido.
    */
@@ -875,8 +876,8 @@ export class FabricacionService {
       include: { reservas: { select: { id: true, inventarioPTId: true, cantidad: true } } },
     });
     if (!talla) return;
-    const reservado = (talla.reservas ?? []).reduce((acc: number, r: any) => acc + r.cantidad, 0);
-    if (reservado >= (talla.cantAmarrada ?? 0) + (talla.cantAProducir ?? 0)) return;
+    // Lo cedido a otro pedido no cuenta: la OP lo reprogramó, pero el cliente no pidió más.
+    if (pendingOf(talla) <= 0) return;
 
     const existente = await tx.reservaInventarioPT.findFirst({
       where: { opLineaTallaId: talla.id, inventarioPTId },

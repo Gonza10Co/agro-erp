@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CAPACIDAD_AGRO, PLAZO_ENTREGA_DIAS } from './capacidad-planta';
 import { PedidoEntrada, Proyeccion, proyectarPedidos } from './proyeccion-core';
+import { pendingToProduce } from '../op/op-need';
 
 /** 'YYYY-MM-DD' en hora Colombia (UTC-5, sin horario de verano). */
 export function claveColombia(d: Date): string {
@@ -18,7 +19,7 @@ export class ProyeccionService {
    */
   async proyectar(ahora: Date = new Date()): Promise<Proyeccion> {
     const hoy = claveColombia(ahora);
-    const [ocs, stock, terminados, calLaboral, noHabiles] = await Promise.all([
+    const [ocs, stock, calLaboral, noHabiles] = await Promise.all([
       this.prisma.ordenCompra.findMany({
         where: { estado: { in: ['CONFIRMADA', 'EN_PRODUCCION'] } },
         orderBy: { consecutivo: 'asc' },
@@ -53,7 +54,15 @@ export class ProyeccionService {
                 select: {
                   productoConfiguradoId: true,
                   calidad: true,
-                  tallas: { select: { tallaId: true, cantAProducir: true } },
+                  tallas: {
+                    select: {
+                      tallaId: true,
+                      cantAmarrada: true,
+                      cantAProducir: true,
+                      reassignedOut: true,
+                      reservas: { select: { cantidad: true } },
+                    },
+                  },
                 },
               },
             },
@@ -63,11 +72,6 @@ export class ProyeccionService {
       this.prisma.inventarioPT.groupBy({
         by: ['productoConfiguradoId', 'tallaId', 'calidad'],
         _sum: { cantDisponible: true, cantReservada: true },
-      }),
-      // Lo que cada OP ya terminó: se resta de lo que le falta por fabricar.
-      this.prisma.par.findMany({
-        where: { estado: 'TERMINADO', of: { op: { estado: { in: ['CREADA', 'AMARRADA', 'EN_PRODUCCION'] } } } },
-        select: { productoConfiguradoId: true, tallaId: true, of: { select: { opId: true } } },
       }),
       this.prisma.calendarioLaboral.findUnique({ where: { id: 1 } }),
       this.prisma.diaNoHabil.findMany({
@@ -86,12 +90,6 @@ export class ProyeccionService {
     const valorTalla = new Map(tallas.map((t) => [t.id, t.valor]));
     const producto = new Map(productos.map((p) => [p.id, p]));
 
-    const hechos = new Map<string, number>();
-    for (const p of terminados) {
-      const k = `${p.of.opId}|${p.productoConfiguradoId}|${p.tallaId}`;
-      hechos.set(k, (hechos.get(k) ?? 0) + 1);
-    }
-
     const pedidos: PedidoEntrada[] = [];
     for (const oc of ocs) {
       const op = oc.ordenProduccion;
@@ -99,13 +97,17 @@ export class ProyeccionService {
       if (op?.estado === 'DESPACHADA') continue;
       const opViva = op && op.estado !== 'ANULADA' ? op : null;
 
+      // Lo que la OP todavía debe fabricar = lo que necesita menos lo que ya tiene
+      // reservado en bodega (mismo cálculo que el despacho). Hasta el 2026-11-19 era
+      // `cantAProducir − pares TERMINADOS de su OF`, que no ve la reasignación de
+      // gerencia: el pedido que cedía pares seguía contando como hechos los que se
+      // fueron, y el que los recibía los volvía a poner a producir.
       const pendienteOP = new Map<string, number>();
       if (opViva) {
         for (const l of opViva.lineas) {
           for (const t of l.tallas) {
             const k = `${l.productoConfiguradoId}|${t.tallaId}|${l.calidad}`;
-            const hecho = hechos.get(`${opViva.id}|${l.productoConfiguradoId}|${t.tallaId}`) ?? 0;
-            pendienteOP.set(k, (pendienteOP.get(k) ?? 0) + Math.max(0, t.cantAProducir - hecho));
+            pendienteOP.set(k, (pendienteOP.get(k) ?? 0) + pendingToProduce(l.calidad, t));
           }
         }
       }

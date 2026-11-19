@@ -69,6 +69,30 @@ describe('DespachoService', () => {
     expect(prisma.despacho.create).toHaveBeenCalled();
   });
 
+  it('un pedido que cedió pares a otro queda debiendo: el despacho falla por faltante', async () => {
+    const op = opBase();
+    // Pedido de 20 fabricado completo; gerencia pasó 5 a otro pedido: se reprogramaron
+    // (25 a producir, 5 cedidos) y quedan 15 reservados → faltan 5.
+    (op.lineas[0].tallas[0] as any).cantAmarrada = 0;
+    op.lineas[0].tallas[0].cantAProducir = 25;
+    (op.lineas[0].tallas[0] as any).reassignedOut = 5;
+    op.lineas[0].tallas[0].reservas[0].cantidad = 15;
+    prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+    await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(/faltan 5 pares/);
+  });
+
+  it('cuando el pedido que cedió vuelve a completar sus 20, despacha (lo cedido no se le suma)', async () => {
+    const op = opBase();
+    (op.lineas[0].tallas[0] as any).cantAmarrada = 0;
+    op.lineas[0].tallas[0].cantAProducir = 25;
+    (op.lineas[0].tallas[0] as any).reassignedOut = 5;
+    op.lineas[0].tallas[0].reservas[0].cantidad = 20;
+    prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 7n }]);
+    prisma.despacho.create.mockResolvedValue({ id: 3, consecutivo: 7 });
+    await expect(service.despachar({ opId: 1 }, operario)).resolves.toBeDefined();
+  });
+
   it('409 si cartera VENCIDO y no se autoriza', async () => {
     prisma.ordenProduccion.findUnique.mockResolvedValue(opBase({ oc: { cliente: { estadoCartera: 'VENCIDO' } } }));
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(ConflictException);
