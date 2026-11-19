@@ -551,6 +551,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
         const elegida = actual && this.libres(actual) > 0 ? actual : programa.find((l) => this.libres(l) > 0) ?? programa[0];
         this.adelantoClave = elegida ? this.clave(elegida) : '';
         this.onAdelantoTalla();
+        this.enfocarScan(); // el foco sale del selector de OF: el siguiente pistolazo va al campo
       },
       error: () => this.resultado.set({ ok: false, titulo: 'No se pudo cargar la OF' }),
     });
@@ -856,8 +857,10 @@ export class EstacionComponent implements OnInit, OnDestroy {
     if (!input || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     // Si el foco quedó en un botón, el Enter final de la pistola lo "clicaría":
     // solo se respeta el foco cuando el operario está escribiendo en otro campo.
+    // Un SELECT no cuenta: ahí las teclas de la pistola saltan de opción (la OF
+    // cambiaba sola con cada pistolazo después de elegirla, 19-nov) y el código se perdía.
     const activo = document.activeElement as HTMLElement | null;
-    const escribiendo = !!activo && (['INPUT', 'TEXTAREA', 'SELECT'].includes(activo.tagName) || activo.isContentEditable);
+    const escribiendo = !!activo && (['INPUT', 'TEXTAREA'].includes(activo.tagName) || activo.isContentEditable);
     if (escribiendo || ev.key.length !== 1) return;
     input.focus();
     // La tecla que despertó el foco ya pasó: se agrega para no perder el primer carácter.

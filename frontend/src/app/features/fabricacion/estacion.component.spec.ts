@@ -127,6 +127,26 @@ describe('EstacionComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Volver a imprimir las 2 etiquetas de esta tanda');
     http.verify();
   });
+  it('con el foco en el selector de OF, el pistolazo va al campo de escaneo y no cambia la OF', () => {
+    guardarConfig({ estacion: 'PREPARACION', operarioId: 2 });
+    const { fixture, http, comp } = crear();
+    http.expectOne(`${BASE}/operarios?celula=GUARNICION`).flush([]);
+    http.expectOne(`${BASE}/maquinas?celula=GUARNICION`).flush([]);
+    http.expectOne(`${BASE}/hoy`).flush({ fecha: '', actualizado: '', estaciones: [] });
+    http.expectOne(`${BASE}/of`).flush([{ id: 16, consecutivo: 1, estado: 'EN_PROCESO', fecha: '', op: { consecutivo: 1 }, _count: { pares: 0 } }]);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    document.body.appendChild(el);
+    const sel = el.querySelector('.of-sel select') as HTMLSelectElement;
+    sel.focus();
+    const ev = new KeyboardEvent('keydown', { key: 'O', cancelable: true, bubbles: true });
+    sel.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBeTrue();
+    expect(document.activeElement).toBe(el.querySelector('.scan-input'));
+    expect(comp.codigo).toBe('O');
+    el.remove();
+    http.verify();
+  });
 });
 
 describe('EstacionComponent: imprimir por adelantado', () => {
