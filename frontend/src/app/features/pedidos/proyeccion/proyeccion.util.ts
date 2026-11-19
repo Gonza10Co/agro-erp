@@ -82,7 +82,7 @@ export function hojasProyeccion(p: Proyeccion, pedidos: PedidoProyectado[] = p.p
   gantt.push([c('Cortado en el día', 'negrita'), ...vacias(fijas.length - 1), ...dias.map((d) => c(d.usado || null, d.usado >= d.capacidad ? 'alerta' : undefined))]);
   gantt.push([c('Cupo libre de corte', 'negrita'), ...vacias(fijas.length - 1), ...dias.map((d) => c(d.libre, d.libre > 0 ? 'libre' : undefined))]);
   gantt.push([]);
-  gantt.push([c('* Compromiso estimado: confirmación del pedido más 15 días, porque el pedido todavía no tiene fecha de entrega escrita.', 'tenue')]);
+  gantt.push([c('* Compromiso estimado: último día de corte más 15 días, porque el pedido todavía no tiene fecha de entrega escrita.', 'tenue')]);
   gantt.push([c(`Las columnas de días son días de CORTE. Cada pedido queda listo ${p.diasProceso} días hábiles después de su último corte (dato provisional, por confirmar con producción).`, 'tenue')]);
   gantt.push([c('La proyección descuenta el producto terminado en bodega; todavía no conoce los cortes, la guarnición ni las capelladas en proceso.', 'tenue')]);
 

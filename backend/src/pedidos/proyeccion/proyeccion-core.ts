@@ -6,7 +6,10 @@
  * cuáles no llegan a su fecha y desde qué día queda cupo para vender?
  *
  * Cómo calcula:
- *  1. Ordena los pedidos por fecha de compromiso (el más urgente primero).
+ *  1. Ordena los pedidos por fecha de compromiso (el más urgente primero). Si el
+ *     pedido no tiene fecha de entrega escrita, el orden lo da confirmación + plazo,
+ *     pero el compromiso que se muestra es su ÚLTIMO día de corte + plazo: así lo
+ *     promete comercial (JP, 2026-11-19: "día de corte + 15 días").
  *  2. A cada uno le descuenta lo que ya hay en bodega (simula el amarre de la OP;
  *     si la OP ya existe usa lo que esa OP dejó pendiente de producir).
  *  3. Lo que falta lo reparte en días de CORTE a partir de hoy, sin pasar del lote
@@ -114,7 +117,7 @@ export interface PedidoProyectado {
   aProducir: number;
   sinCupo: number;
   compromiso: string;
-  /** true = nadie escribió la fecha: es confirmación + plazo estándar. */
+  /** true = nadie escribió la fecha: es el último día de corte + plazo estándar. */
   compromisoEstimado: boolean;
   /** Primer y último día de corte. */
   inicio: string | null;
@@ -287,7 +290,7 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
   const pedidos: PedidoProyectado[] = [];
   const entraParaVender: EntradaVenta[] = [];
 
-  for (const { p, compromiso, estimado } of conCompromiso) {
+  for (const { p, compromiso: orden, estimado } of conCompromiso) {
     const tallas = new Map<number, TallaProyectada>();
     let inicio: string | null = null;
     let fin: string | null = null;
@@ -358,6 +361,8 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
     const pares = lista.reduce((a, t) => a + t.pedida, 0);
     const aProducir = lista.reduce((a, t) => a + t.aProducir, 0);
     const finCorte = fin;
+    // Sin fecha escrita, se promete desde el día en que se termina de cortar.
+    const compromiso = estimado && finCorte ? sumarDias(finCorte, e.plazoDias) : orden;
     const listo = (corte: string) => masHabiles(corte, cap.diasProceso, e.calendario);
     fin = finCorte ? listo(finCorte) : null;
     for (const d of dias) {

@@ -151,7 +151,7 @@ interface Segmento {
                       <td class="num">{{ p.pares | number }}</td>
                       <td class="num t-muted">{{ p.deBodega | number }}</td>
                       <td class="num"><strong>{{ p.aProducir | number }}</strong></td>
-                      <td class="nw">{{ fecha(p.compromiso) }}@if (p.compromisoEstimado) { <span class="t-muted" title="Estimado: confirmación más 15 días"> *</span> }</td>
+                      <td class="nw">{{ fecha(p.compromiso) }}@if (p.compromisoEstimado) { <span class="t-muted" title="Estimado: último día de corte más 15 días"> *</span> }</td>
                       <td class="nw t-muted">{{ fecha(p.finCorte) }}</td>
                       <td class="nw">
                         @if (p.fin) { {{ fecha(p.fin) }} } @else if (p.estado === 'EN_BODEGA') { <span class="t-muted">ya está</span> }
@@ -236,7 +236,7 @@ interface Segmento {
 
           <div class="notas t-caption t-muted">
             <p><strong>Cómo leerla.</strong> Los pedidos se atienden por fecha de compromiso. A cada uno se le descuenta lo que hay en bodega de producto terminado y lo que falta se reparte en días de corte, sin pasar de {{ d.paresPorDia | number }} pares al día ni de lo que dan los moldes de inyección de cada talla (70 pares por molde). Cada pedido queda listo {{ d.diasProceso }} días hábiles después de su último corte; ese dato es provisional y falta que producción lo confirme.</p>
-            <p>* El compromiso con asterisco es estimado: la confirmación del pedido más 15 días, porque ese pedido no tiene fecha de entrega. Se escribe al crear el pedido o en su detalle, en cualquier estado.</p>
+            <p>* El compromiso con asterisco es estimado: el último día de corte más 15 días, porque ese pedido no tiene fecha de entrega. Se escribe al crear el pedido o en su detalle, en cualquier estado.</p>
             <p>Las órdenes de mínimos no toman de la bodega: se fabrican completas y lo que producen aparece en "Entra para vender" con su fecha. Todavía no tiene en cuenta los cortes, la guarnición ni las capelladas que ya están en proceso. Es una simulación para decidir: el corte del día lo sigue armando producción.</p>
           </div>
         }

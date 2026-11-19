@@ -92,7 +92,17 @@ describe('proyectarPedidos', () => {
     const ocupados = r.dias.filter((d) => d.usado > 0);
     expect(ocupados[0].usado).toBe(70);
     expect(ocupados.length).toBe(15); // 14 días de 70 + 1 de 20
-    expect(r.pedidos[0].estado).toBe('ATRASADO'); // 15 hábiles no caben en 15 calendario
+    // Sin fecha escrita se promete desde el último corte: llega, pero tarde para el cliente.
+    expect(r.pedidos[0]).toMatchObject({ finCorte: '2026-11-28', compromiso: '2026-12-13', estado: 'A_TIEMPO' });
+    // Con fecha escrita a 15 días, 15 hábiles de corte no caben.
+    const conFecha = proyectarPedidos(base([pedido({ fechaEntrega: '2026-11-27', tallas: { 45: 1000 } })]));
+    expect(conFecha.pedidos[0].estado).toBe('ATRASADO');
+  });
+
+  it('sin fecha escrita el compromiso es día de corte + 15, no confirmación + 15 (JP, 19-nov)', () => {
+    // Confirmado hace más de un mes y cortado hoy: antes salía atrasado sin estarlo.
+    const r = proyectarPedidos(base([pedido({ fechaBase: '2026-10-01' })]));
+    expect(r.pedidos[0]).toMatchObject({ finCorte: '2026-11-12', compromiso: '2026-11-27', compromisoEstimado: true, estado: 'A_TIEMPO', diasAtraso: 0 });
   });
 
   it('una talla usa su molde y el de la talla siguiente (la 37 monta en el 37 y el 38)', () => {
