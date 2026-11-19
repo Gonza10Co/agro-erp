@@ -108,6 +108,9 @@ describe('PtReassignmentPanelComponent', () => {
     expect(cmp.destinoId()).toBe(2);
     expect(cmp.tope()).toBe(8); // reservado 20, al destino le faltan 8
     expect(texto(fixture)).toContain('le faltan 8');
+    // Avisa la consecuencia para A, incluida la OF que se reabre.
+    expect(texto(fixture)).toContain('OP-101 queda debiendo');
+    expect(texto(fixture)).toContain('si su OF ya estaba terminada, se reabre');
 
     cmp.cantidad.set(9);
     cmp.motivo.set('Vozincol paga de contado');

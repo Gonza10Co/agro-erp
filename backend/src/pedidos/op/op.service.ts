@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -153,19 +154,28 @@ export class OpService {
     if (op.estado === 'ANULADA')
       throw new BadRequestException('La OP ya está anulada');
 
+    // Orden canónico de locks (por fila de inventario), igual que el despacho.
+    const reservas = op.lineas
+      .flatMap((l: any) => l.tallas.flatMap((t: any) => t.reservas ?? []))
+      .sort((a: any, b: any) => a.inventarioPTId - b.inventarioPTId || a.id - b.id);
+    const tallaIds: number[] = op.lineas.flatMap((l: any) => l.tallas.map((t: any) => t.id));
+    const cambio = 'El pedido cambió mientras se anulaba, vuelve a intentar';
+
     return this.prisma.$transaction(async (tx) => {
-      for (const linea of op.lineas) {
-        for (const t of linea.tallas) {
-          for (const r of t.reservas) {
-            await tx.inventarioPT.update({
-              where: { id: r.inventarioPTId },
-              data: { cantReservada: { decrement: r.cantidad } },
-            });
-          }
-          await tx.reservaInventarioPT.deleteMany({
-            where: { opLineaTallaId: t.id },
-          });
-        }
+      // Las reservas se leyeron fuera de la transacción: cada una se borra solo si
+      // sigue como se leyó (una reasignación de pares en paralelo la pudo cambiar),
+      // y si apareció una nueva tampoco se anula: quedaría ocupando stock.
+      for (const r of reservas) {
+        const borrada = await tx.reservaInventarioPT.deleteMany({ where: { id: r.id, cantidad: r.cantidad } });
+        if (borrada.count === 0) throw new ConflictException(cambio);
+        await tx.inventarioPT.update({
+          where: { id: r.inventarioPTId },
+          data: { cantReservada: { decrement: r.cantidad } },
+        });
+      }
+      if (tallaIds.length > 0) {
+        const quedan = await tx.reservaInventarioPT.count({ where: { opLineaTallaId: { in: tallaIds } } });
+        if (quedan > 0) throw new ConflictException(cambio);
       }
       // Una OP anulada no puede seguir fabricándose: se cancelan pares y OFs vivas.
       // Decisión de negocio: las OF TERMINADAS no se tocan — lo ya producido

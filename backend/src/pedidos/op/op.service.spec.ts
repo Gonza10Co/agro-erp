@@ -311,7 +311,7 @@ describe('OpService.anular', () => {
   it('devuelve las reservas al inventario y deja la OC CONFIRMADA', async () => {
     const tx = {
       inventarioPT: { update: jest.fn() },
-      reservaInventarioPT: { deleteMany: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -328,7 +328,7 @@ describe('OpService.anular', () => {
           lineas: [
             {
               tallas: [
-                { id: 80, reservas: [{ inventarioPTId: 70, cantidad: 30 }] },
+                { id: 80, reservas: [{ id: 300, inventarioPTId: 70, cantidad: 30 }] },
               ],
             },
           ],
@@ -342,8 +342,9 @@ describe('OpService.anular', () => {
       where: { id: 70 },
       data: { cantReservada: { decrement: 30 } },
     });
+    // Borra cada reserva solo si sigue como se leyó.
     expect(tx.reservaInventarioPT.deleteMany).toHaveBeenCalledWith({
-      where: { opLineaTallaId: 80 },
+      where: { id: 300, cantidad: 30 },
     });
     expect(tx.ordenProduccion.update).toHaveBeenCalledWith({
       where: { id: 50 },
@@ -355,10 +356,49 @@ describe('OpService.anular', () => {
     });
   });
 
+  describe('carrera con una reasignación de pares', () => {
+    function armar() {
+      const tx: any = {
+        inventarioPT: { update: jest.fn() },
+        reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
+        ordenProduccion: { update: jest.fn() },
+        ordenCompra: { update: jest.fn() },
+        par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+        inventarioMaterial: { update: jest.fn() },
+      };
+      const prisma: any = {
+        ordenProduccion: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 50, ocId: 1, estado: 'AMARRADA',
+            lineas: [{ tallas: [{ id: 80, reservas: [{ id: 300, inventarioPTId: 70, cantidad: 30 }] }] }],
+          }),
+        },
+        $transaction: jest.fn((cb: any) => cb(tx)),
+      };
+      return { tx, prisma };
+    }
+
+    it('409 si una reserva cambió entre la lectura y la anulación', async () => {
+      const { tx, prisma } = armar();
+      tx.reservaInventarioPT.deleteMany.mockResolvedValue({ count: 0 });
+      await expect(new OpService(prisma, compras).anular(50)).rejects.toThrow(/cambió mientras se anulaba/);
+      expect(tx.ordenProduccion.update).not.toHaveBeenCalled();
+    });
+
+    it('409 si le llegaron reservas nuevas a la OP mientras se anulaba', async () => {
+      const { tx, prisma } = armar();
+      tx.reservaInventarioPT.count.mockResolvedValue(2);
+      await expect(new OpService(prisma, compras).anular(50)).rejects.toThrow(/cambió mientras se anulaba/);
+      expect(tx.ordenProduccion.update).not.toHaveBeenCalled();
+    });
+  });
+
   it('al anular cancela los pares en proceso y anula las OFs de la OP', async () => {
     const tx = {
       inventarioPT: { update: jest.fn() },
-      reservaInventarioPT: { deleteMany: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -375,7 +415,7 @@ describe('OpService.anular', () => {
           lineas: [
             {
               tallas: [
-                { id: 80, reservas: [{ inventarioPTId: 70, cantidad: 30 }] },
+                { id: 80, reservas: [{ id: 300, inventarioPTId: 70, cantidad: 30 }] },
               ],
             },
           ],
@@ -398,7 +438,7 @@ describe('OpService.anular', () => {
   it('al anular NO toca pares DADO_DE_BAJA (solo cancela EN_PROCESO)', async () => {
     const tx = {
       inventarioPT: { update: jest.fn() },
-      reservaInventarioPT: { deleteMany: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -415,7 +455,7 @@ describe('OpService.anular', () => {
           lineas: [
             {
               tallas: [
-                { id: 80, reservas: [{ inventarioPTId: 70, cantidad: 30 }] },
+                { id: 80, reservas: [{ id: 300, inventarioPTId: 70, cantidad: 30 }] },
               ],
             },
           ],
@@ -434,7 +474,7 @@ describe('OpService.anular', () => {
   it('al anular libera el amarre de insumos (requerimientos con reserva activa)', async () => {
     const tx = {
       inventarioPT: { update: jest.fn() },
-      reservaInventarioPT: { deleteMany: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
       ordenProduccion: { update: jest.fn() },
       ordenCompra: { update: jest.fn() },
       par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },

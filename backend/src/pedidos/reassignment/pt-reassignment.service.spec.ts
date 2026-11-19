@@ -34,6 +34,9 @@ function filaB(over: any = {}) {
 function makePrisma(ops: Record<number, any>, filas: Record<number, any[]>) {
   const tx: any = {
     $queryRaw: jest.fn().mockResolvedValue([]),
+    // El estado de las OP se valida DENTRO de la transacción, con la fila bloqueada.
+    ordenProduccion: { findUnique: jest.fn((a: any) => Promise.resolve(ops[a.where.id] ?? null)) },
+    ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     ordenProduccionLineaTalla: {
       findMany: jest.fn((args: any) => Promise.resolve(filas[args.where.opLinea.opId] ?? [])),
       update: jest.fn(),
@@ -45,7 +48,7 @@ function makePrisma(ops: Record<number, any>, filas: Record<number, any[]>) {
     ptReassignment: { create: jest.fn((a: any) => Promise.resolve({ id: 1, ...a.data })) },
   };
   const prisma: any = {
-    ordenProduccion: { findUnique: jest.fn((a: any) => Promise.resolve(ops[a.where.id] ?? null)) },
+    ordenProduccion: { findUnique: jest.fn() },
     ptReassignment: { findMany: jest.fn().mockResolvedValue([]) },
     ordenProduccionLineaTalla: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((cb: any) => cb(tx)),
@@ -85,6 +88,35 @@ describe('PtReassignmentService.reassign: pasar pares de A a B', () => {
     expect(r).toMatchObject({ fromOpId: 1, toOpId: 2, quantity: 5 });
   });
 
+  it('bloquea las dos OP (FOR UPDATE, orden por id) y valida su estado dentro de la transacción', async () => {
+    const { prisma, tx } = makePrisma(OPS, { 1: [filaA()], 2: [filaB()] });
+    await new PtReassignmentService(prisma).reassign(1, { ...base, toOpId: 2 }, gerente);
+    const primera = tx.$queryRaw.mock.calls[0];
+    const sql = primera[0].join('?');
+    expect(sql).toContain('FROM "OrdenProduccion"');
+    expect(sql).toContain('ORDER BY id FOR UPDATE');
+    expect(tx.ordenProduccion.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 2 } }));
+    expect(prisma.ordenProduccion.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('si la OF de A ya estaba TERMINADA la reabre para que nazcan los pares que debe', async () => {
+    const { prisma, tx } = makePrisma(OPS, { 1: [filaA()], 2: [filaB()] });
+    await new PtReassignmentService(prisma).reassign(1, { ...base, toOpId: 2 }, gerente);
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith({
+      where: { opId: 1, estado: 'TERMINADA' },
+      data: { estado: 'EN_PROCESO' },
+    });
+  });
+
+  it('liberar también reabre la OF terminada de A', async () => {
+    const { prisma, tx } = makePrisma(OPS, { 1: [filaA()] });
+    await new PtReassignmentService(prisma).release(1, base, gerente);
+    expect(tx.ordenFabricacion.updateMany).toHaveBeenCalledWith({
+      where: { opId: 1, estado: 'TERMINADA' },
+      data: { estado: 'EN_PROCESO' },
+    });
+  });
+
   it('si B ya tenía reserva sobre esa fila, la engorda; si se vacía la de A, se borra', async () => {
     const { prisma, tx } = makePrisma(OPS, { 1: [filaA()], 2: [filaB()] });
     tx.reservaInventarioPT.findFirst.mockResolvedValue({ id: 900 });
@@ -109,6 +141,8 @@ describe('PtReassignmentService.reassign: pasar pares de A a B', () => {
     });
     await new PtReassignmentService(prisma).reassign(1, { ...base, calidad: 'SEGUNDA', toOpId: 2 }, gerente);
     expect(tx.ordenProduccionLineaTalla.update).not.toHaveBeenCalled();
+    // No se reprograma nada: tampoco hay OF que reabrir.
+    expect(tx.ordenFabricacion.updateMany).not.toHaveBeenCalled();
     expect(tx.reservaInventarioPT.create).toHaveBeenCalled();
   });
 
