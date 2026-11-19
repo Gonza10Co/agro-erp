@@ -7,7 +7,7 @@ function opBase(over: any = {}) {
     oc: { cliente: { estadoCartera: 'AL_DIA' } },
     lineas: [
       { productoConfiguradoId: 7, tallas: [
-        { tallaId: 10, cantAProducir: 0, reservas: [
+        { id: 30, tallaId: 10, cantAProducir: 0, reservas: [
           { id: 100, inventarioPTId: 50, cantidad: 5, inventarioPT: { bodegaId: 2 } },
         ] },
       ] },
@@ -22,7 +22,7 @@ describe('DespachoService', () => {
     ordenProduccion: { findUnique: jest.fn(), update: jest.fn() },
     despacho: { create: jest.fn() },
     inventarioPT: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-    reservaInventarioPT: { delete: jest.fn() },
+    reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
     ordenCompra: { update: jest.fn() },
     movimientoInventario: { createMany: jest.fn() },
     requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
@@ -32,7 +32,12 @@ describe('DespachoService', () => {
   const service = new DespachoService(prisma);
   const gerente = { sub: 3, role: 'GERENTE' };
   const operario = { sub: 4, role: 'OPERARIO' };
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.inventarioPT.updateMany.mockResolvedValue({ count: 1 });
+    prisma.reservaInventarioPT.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.reservaInventarioPT.count.mockResolvedValue(0);
+  });
 
   it('404 si la OP no existe', async () => {
     prisma.ordenProduccion.findUnique.mockResolvedValue(null);
@@ -112,7 +117,8 @@ describe('DespachoService', () => {
       where: { id: 50, cantDisponible: { gte: 5 }, cantReservada: { gte: 5 } },
       data: { cantDisponible: { decrement: 5 }, cantReservada: { decrement: 5 } },
     });
-    expect(prisma.reservaInventarioPT.delete).toHaveBeenCalledWith({ where: { id: 100 } });
+    // Borra la reserva solo si sigue como se leyó (una reasignación en paralelo la pudo cambiar).
+    expect(prisma.reservaInventarioPT.deleteMany).toHaveBeenCalledWith({ where: { id: 100, cantidad: 5 } });
     const createArg = prisma.despacho.create.mock.calls[0][0];
     expect(createArg.data.consecutivo).toBe(5);
     expect(createArg.data.opId).toBe(1);
@@ -182,5 +188,37 @@ describe('DespachoService', () => {
     prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
     prisma.inventarioPT.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  describe('carrera con una reasignación de pares', () => {
+    it('409 si una reserva cambió entre la lectura y el despacho (no descuenta de más)', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opBase());
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+      prisma.reservaInventarioPT.deleteMany.mockResolvedValue({ count: 0 });
+      await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(/cambió mientras se despachaba/);
+      expect(prisma.despacho.create).not.toHaveBeenCalled();
+    });
+
+    it('409 si le llegaron reservas nuevas a la OP mientras se despachaba', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opBase());
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+      prisma.reservaInventarioPT.count.mockResolvedValue(1);
+      await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(/cambió mientras se despachaba/);
+      expect(prisma.despacho.create).not.toHaveBeenCalled();
+    });
+
+    it('descuenta el inventario en orden de inventarioPTId (orden canónico de locks)', async () => {
+      const op = opBase();
+      op.lineas[0].tallas[0].reservas = [
+        { id: 101, inventarioPTId: 60, cantidad: 2, inventarioPT: { bodegaId: 3 } },
+        { id: 100, inventarioPTId: 50, cantidad: 3, inventarioPT: { bodegaId: 2 } },
+      ];
+      prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 5n }]);
+      prisma.despacho.create.mockResolvedValue({ id: 1, consecutivo: 5 });
+      await service.despachar({ opId: 1 }, operario);
+      const ids = prisma.inventarioPT.updateMany.mock.calls.map((c: any) => c[0].where.id);
+      expect(ids).toEqual([50, 60]);
+    });
   });
 });

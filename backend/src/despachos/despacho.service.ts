@@ -12,6 +12,8 @@ import { DespacharDto } from './dto/despachar.dto';
 import { construirLineasDespacho, ReservaPlana } from './despacho-lineas';
 import { pendingOf } from '../pedidos/op/op-need';
 
+const CAMBIO_EN_CURSO = 'El pedido cambió mientras se despachaba, vuelve a intentar';
+
 interface Usuario {
   sub: number;
   role: string;
@@ -81,6 +83,10 @@ export class DespachoService {
           })),
         ),
       );
+    // Orden canónico de locks (por fila de inventario): dos despachos o un despacho y
+    // una reasignación que tocan las mismas filas las bloquean en el mismo orden.
+    reservas.sort((a, b) => a.inventarioPTId - b.inventarioPTId || a.reservaId - b.reservaId);
+    const tallaIds: number[] = op.lineas.flatMap((l: any) => l.tallas.map((t: any) => t.id)).filter((id: any) => id != null);
     const lineas = construirLineasDespacho(reservas);
 
     return this.prisma.$transaction(async (tx) => {
@@ -102,7 +108,16 @@ export class DespachoService {
           throw new ConflictException(
             `Inventario insuficiente al despachar (producto ${r.productoConfiguradoId}, talla ${r.tallaId}, bodega ${r.bodegaId}) — reintentá o revisá reservas`,
           );
-        await tx.reservaInventarioPT.delete({ where: { id: r.reservaId } });
+        // Las reservas se leyeron fuera de la transacción: si una reasignación de pares
+        // la cambió en el medio, no se despacha con datos viejos.
+        const borrada = await tx.reservaInventarioPT.deleteMany({ where: { id: r.reservaId, cantidad: r.cantidad } });
+        if (borrada.count === 0) throw new ConflictException(CAMBIO_EN_CURSO);
+      }
+      // Y si le llegó una reserva nueva (recibió pares) tampoco: quedaría colgando de
+      // una OP despachada, ocupando stock para siempre.
+      if (tallaIds.length > 0) {
+        const quedan = await tx.reservaInventarioPT.count({ where: { opLineaTallaId: { in: tallaIds } } });
+        if (quedan > 0) throw new ConflictException(CAMBIO_EN_CURSO);
       }
 
       // Kardex: una SALIDA por reserva despachada, trazable al despacho.

@@ -30,7 +30,8 @@ type Calidad = 'PRIMERA' | 'SEGUNDA';
  * - A: su reserva baja X. Si son primeras, `cantAProducir` sube X y `reassignedOut`
  *   sube X: la necesidad del pedido no cambia, así que A queda DEBIENDO X (el
  *   despacho falla por faltante, la proyección lo muestra por producir y los pares
- *   que sigan saliendo de su OF se le vuelven a reservar). No se crean OF ni pares.
+ *   que sigan saliendo de su OF se le vuelven a reservar). No se crean OF ni pares;
+ *   si su OF ya estaba TERMINADA se reabre para que puedan nacer los que debe.
  *   Las segundas no se fabrican: A queda debiendo sin reprogramar nada.
  * - B: su reserva sube X sobre la MISMA fila de InventarioPT (los pares no cambian
  *   de bodega ni de código). Lo que B tenía programado a producir de esa talla baja
@@ -58,16 +59,20 @@ export class PtReassignmentService {
     if (toOpId != null && toOpId === fromOpId)
       throw new BadRequestException('El pedido destino tiene que ser otro');
 
-    const from = await this.opViva(fromOpId);
-    const to = toOpId != null ? await this.opViva(toOpId) : null;
     const { productoConfiguradoId, tallaId } = dto;
     const calidad = dto.calidad as Calidad;
-    const opIds = to ? [from.id, to.id] : [from.id];
+    const opIds = toOpId != null ? [fromOpId, toOpId] : [fromOpId];
 
     return this.prisma.$transaction(async (tx) => {
-      // Locks en orden canónico (ORDER BY id): primero el saldo de PT, como el amarre
-      // de la OP; luego las tallas de las dos OP, para que una reserva concurrente de
-      // fabricación o un despacho no lean una necesidad a medio cambiar.
+      // Locks en orden canónico (ORDER BY id): primero las OP (su estado se valida acá
+      // adentro, así un despacho o una anulación en paralelo no se cuela entre la
+      // validación y la escritura); luego el saldo de PT, como el amarre de la OP; y
+      // las tallas de las dos OP, para que una reserva concurrente de fabricación no
+      // lea una necesidad a medio cambiar.
+      await tx.$queryRaw`SELECT id FROM "OrdenProduccion" WHERE id IN (${Prisma.join(opIds)}) ORDER BY id FOR UPDATE`;
+      const from = await this.opViva(tx, fromOpId);
+      const to = toOpId != null ? await this.opViva(tx, toOpId) : null;
+
       await tx.$queryRaw`SELECT id FROM "InventarioPT" WHERE "productoConfiguradoId" = ${productoConfiguradoId} AND "tallaId" = ${tallaId} AND "calidad" = ${calidad}::"CalidadPT" ORDER BY id FOR UPDATE`;
       await tx.$queryRaw`SELECT olt.id FROM "OrdenProduccionLineaTalla" olt JOIN "OrdenProduccionLinea" ol ON ol.id = olt."opLineaId" WHERE ol."opId" IN (${Prisma.join(opIds)}) AND ol."productoConfiguradoId" = ${productoConfiguradoId} AND ol."calidad" = ${calidad}::"CalidadPT" AND olt."tallaId" = ${tallaId} ORDER BY olt.id FOR UPDATE`;
 
@@ -123,6 +128,13 @@ export class PtReassignmentService {
             where: { id },
             data: { cantAProducir: { increment: c }, reassignedOut: { increment: c } },
           });
+        // Si la OF de A ya se había cerrado, se reabre: sin esto los pares que debe no
+        // pueden nacer (una OF TERMINADA no nace más pares y la OP no admite otra OF).
+        // Se vuelve a cerrar sola cuando nazca y termine lo que falta (terminarEnTx).
+        await tx.ordenFabricacion.updateMany({
+          where: { opId: from.id, estado: 'TERMINADA' },
+          data: { estado: 'EN_PROCESO' },
+        });
       }
 
       if (to) {
@@ -283,8 +295,8 @@ export class PtReassignmentService {
     });
   }
 
-  private async opViva(id: number) {
-    const op = await this.prisma.ordenProduccion.findUnique({
+  private async opViva(tx: any, id: number) {
+    const op = await tx.ordenProduccion.findUnique({
       where: { id },
       select: { id: true, consecutivo: true, estado: true },
     });

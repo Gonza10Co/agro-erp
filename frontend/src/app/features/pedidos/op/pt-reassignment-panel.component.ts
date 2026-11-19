@@ -106,7 +106,7 @@ type Modo = 'pass' | 'release';
         <p class="hint aviso" style="margin-top:var(--sp-4)">
           OP-{{ opConsecutivo() }} queda debiendo {{ cantidad() || 0 }} par{{ cantidad() === 1 ? '' : 'es' }}:
           @if (item()?.calidad === 'SEGUNDA') { las segundas no se fabrican, así que el pedido no se despacha completo hasta que se resuelva. }
-          @else { vuelven a quedar por fabricar y el pedido no se despacha hasta reponerlos. }
+          @else { vuelven a quedar por fabricar (si su OF ya estaba terminada, se reabre) y el pedido no se despacha hasta reponerlos. }
           Los pares conservan su código y siguen en la misma bodega.
         </p>
 
