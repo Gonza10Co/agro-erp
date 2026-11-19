@@ -102,6 +102,8 @@ export interface OPLineaTalla {
   cantPedida: number;
   cantAmarrada: number;
   cantAProducir: number;
+  /** Pares que gerencia pasó a otro pedido o liberó: ya están sumados en cantAProducir. */
+  reassignedOut?: number;
   talla?: Talla;
   reservas?: ReservaInventarioPT[];
 }

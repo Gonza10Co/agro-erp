@@ -1,4 +1,4 @@
-import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeOperarLote, puedeProgramarCorte, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
+import { NIVEL_SECCION, Seccion, puedeVerModulo, puedeVerNivel, puedeOperarLote, puedeReasignarPares, puedeProgramarCorte, puedeVerRuta, puedeVerSeccion, rutaInicial } from './modulos';
 
 describe('puedeVerModulo', () => {
   it('CLIENTE ve clientes, pedidos, catálogo y sus datos maestros', () => {
@@ -289,5 +289,18 @@ describe('puedeOperarLote', () => {
     for (const rol of ['ESTACION', 'STAGE', 'CLIENTE', 'OPERARIO', 'CALIDAD', 'JEFE_CORTE', null, undefined]) {
       expect(puedeOperarLote(rol)).withContext(String(rol)).toBeFalse();
     }
+  });
+});
+
+describe('puedeReasignarPares (pasar pares reservados entre pedidos)', () => {
+  it('solo gerencia y admin', () => {
+    expect(puedeReasignarPares('GERENTE')).toBeTrue();
+    expect(puedeReasignarPares('ADMIN')).toBeTrue();
+    for (const r of ['CLIENTE', 'STAGE', 'OPERARIO', 'CALIDAD', 'JEFE_CORTE', 'ESTACION', null, undefined])
+      expect(puedeReasignarPares(r)).withContext(String(r)).toBeFalse();
+  });
+
+  it('la sección nace ENTREGADA: la pidió el cliente', () => {
+    expect(NIVEL_SECCION['reasignar-pares']).toBe('ENTREGADO');
   });
 });

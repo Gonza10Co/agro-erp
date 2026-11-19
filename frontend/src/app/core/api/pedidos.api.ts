@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { OrdenCompra, OrdenProduccion, CrearOCDto, ResumenCosteoOC } from './models/pedidos.models';
 import { Proyeccion } from './models/proyeccion.models';
+import { PtReassignment, ReassignPtBody, ReassignmentOption, ReleasePtBody } from './models/pt-reassignment.models';
 
 @Injectable({ providedIn: 'root' })
 export class PedidosApi {
@@ -26,6 +27,15 @@ export class PedidosApi {
   listarOP() { return this.http.get<OrdenProduccion[]>(this.op); }
   obtenerOP(id: number) { return this.http.get<OrdenProduccion>(`${this.op}/${id}`); }
   anularOP(id: number) { return this.http.post<OrdenProduccion>(`${this.op}/${id}/anular`, {}); }
+
+  /** Lo reservado de la OP y a qué pedidos se puede pasar (solo gerencia). */
+  reassignmentOptions(opId: number) { return this.http.get<ReassignmentOption[]>(`${this.op}/${opId}/reassignment-options`); }
+  /** Pares que la OP cedió, liberó o recibió. */
+  reassignments(opId: number) { return this.http.get<PtReassignment[]>(`${this.op}/${opId}/reassignments`); }
+  /** Pasar pares reservados de esta OP a otra (solo gerencia, motivo obligatorio). */
+  reassignPairs(opId: number, body: ReassignPtBody) { return this.http.post<PtReassignment>(`${this.op}/${opId}/reassign`, body); }
+  /** Liberar pares reservados de esta OP: quedan libres en bodega para otra venta. */
+  releasePairs(opId: number, body: ReleasePtBody) { return this.http.post<PtReassignment>(`${this.op}/${opId}/release`, body); }
 
   /** Pedidos vivos contra la capacidad de la planta (solo lectura). */
   proyeccion() { return this.http.get<Proyeccion>(`${environment.apiUrl}/pedidos/proyeccion`); }
