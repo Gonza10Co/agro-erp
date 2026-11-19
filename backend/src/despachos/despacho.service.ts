@@ -35,8 +35,10 @@ export class DespachoService {
     });
     if (!op) throw new NotFoundException(`OP ${dto.opId} no existe`);
     if (op.despacho) throw new BadRequestException('La OP ya fue despachada');
-    if (op.estado !== 'AMARRADA')
-      throw new BadRequestException('Solo se puede despachar una OP AMARRADA');
+    // AMARRADA = salió toda de bodega; EN_PRODUCCION = se fabricó y su estado no
+    // cambia al terminar: lo que manda es que cada par ya esté reservado en PT (abajo).
+    if (op.estado !== 'AMARRADA' && op.estado !== 'EN_PRODUCCION')
+      throw new BadRequestException('Solo se puede despachar una OP amarrada o en producción');
     // Producción pendiente = lo que el pedido necesita (amarrado de bodega +
     // programado a fabricar) menos lo que ya tiene reservado (el amarre inicial
     // más cada par que entró a PT). `cantAProducir` no baja al producir: es lo

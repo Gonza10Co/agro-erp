@@ -226,3 +226,65 @@ export interface CarteraCliente {
   resumen: ResumenCartera;
   facturas: CarteraClienteFactura[];
 }
+
+/** GET /pedidos/oc/export: una fila por pedido. Fechas en 'YYYY-MM-DD'. */
+export interface FilaPedidoExport {
+  consecutivo: number;
+  ocCliente: string | null;
+  cliente: string;
+  nit: string | null;
+  sede: string | null;
+  ciudadEntrega: string | null;
+  linea: string | null;
+  paraStock: boolean;
+  estado: EstadoOC;
+  fechaPedidoCliente: string | null;
+  fechaSubida: string;
+  fechaConfirmacion: string | null;
+  fechaEntrega: string | null;
+  opConsecutivo: number | null;
+  opEstado: EstadoOP | null;
+  referencias: string;
+  marcas: string;
+  productos: string;
+  totalPares: number;
+  deBodega: number;
+  aProducir: number;
+  despachados: number;
+  pendientes: number;
+  valor: number | null;
+  observaciones: string | null;
+}
+
+/** GET /pedidos/oc/export: una fila por pedido × producto × talla. */
+export interface FilaPedidoTallaExport {
+  consecutivo: number;
+  ocCliente: string | null;
+  cliente: string;
+  nit: string | null;
+  linea: string | null;
+  paraStock: boolean;
+  estado: EstadoOC;
+  fechaPedidoCliente: string | null;
+  fechaSubida: string;
+  fechaConfirmacion: string | null;
+  fechaEntrega: string | null;
+  referencia: string;
+  marca: string;
+  producto: string;
+  codigo: string;
+  calidad: CalidadPT;
+  talla: number;
+  cantidad: number;
+  deBodega: number;
+  aProducir: number;
+  despachados: number;
+  pendientes: number;
+  opConsecutivo: number | null;
+  opEstado: EstadoOP | null;
+  precioUnitario: number | null;
+  valor: number | null;
+  observaciones: string | null;
+}
+
+export interface PedidosExport { pedidos: FilaPedidoExport[]; tallas: FilaPedidoTallaExport[]; }

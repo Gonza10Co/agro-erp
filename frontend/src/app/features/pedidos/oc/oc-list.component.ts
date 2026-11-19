@@ -6,6 +6,8 @@ import { EstadoDemora, OrdenCompra } from '../../../core/api/models/pedidos.mode
 import { DrawerComponent } from '../../../shared/ui/drawer/drawer.component';
 import { OcDetalleComponent } from './oc-detalle.component';
 import { badgeOC } from './estado-badge';
+import { descargarXlsx } from '../../../shared/xlsx/xlsx-mini';
+import { hojasPedidos, nombreArchivoPedidos } from './oc-export.util';
 
 @Component({
   selector: 'app-oc-list',
@@ -26,12 +28,25 @@ import { badgeOC } from './estado-badge';
           >
             Solo demoradas ({{ demoradas() }})
           </button>
+          <button
+            class="btn"
+            type="button"
+            [disabled]="descargando() || ocs().length === 0"
+            (click)="descargarExcel()"
+            title="Baja todos los pedidos (también los anulados) en dos hojas planas para Excel o Power Query"
+          >
+            {{ descargando() ? 'Preparando…' : 'Descargar Excel' }}
+          </button>
           <a class="btn btn-primary" routerLink="/pedidos/oc/nueva">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Nueva OC
           </a>
         </div>
       </div>
+
+      @if (errorDescarga()) {
+        <div style="background:color-mix(in srgb, var(--error) 8%, transparent);border:var(--bw) solid var(--error);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-4);color:var(--error)">{{ errorDescarga() }}</div>
+      }
 
       @if (cargando()) {
         <div class="card"><div class="card-body">Cargando órdenes…</div></div>
@@ -89,6 +104,8 @@ export class OcListComponent {
   cargando = signal(true);
   seleccionada = signal<OrdenCompra | null>(null);
   soloDemoradas = signal(false);
+  descargando = signal(false);
+  errorDescarga = signal<string | null>(null);
   tituloDrawer = computed(() => {
     const s = this.seleccionada();
     return s ? `OC #${s.consecutivo}` : '';
@@ -123,6 +140,22 @@ export class OcListComponent {
     this.api.listarOC().subscribe({
       next: (os) => { this.ocs.set(os); this.cargando.set(false); },
       error: () => this.cargando.set(false),
+    });
+  }
+
+  /** Una sola llamada al backend con todo aplanado; el .xlsx se arma acá. */
+  descargarExcel(): void {
+    this.descargando.set(true);
+    this.errorDescarga.set(null);
+    this.api.exportarOC().subscribe({
+      next: (d) => {
+        descargarXlsx(nombreArchivoPedidos(), hojasPedidos(d));
+        this.descargando.set(false);
+      },
+      error: () => {
+        this.errorDescarga.set('No se pudo bajar el Excel de pedidos. Intenta de nuevo.');
+        this.descargando.set(false);
+      },
     });
   }
 

@@ -397,4 +397,26 @@ describe('OcService', () => {
     prisma.ordenCompra.findUnique.mockResolvedValue(null);
     await expect(service.eliminar(99)).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('exportar hace UNA consulta con todos los pedidos (sin filtrar estado) y la aplana', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        consecutivo: 1, ocCliente: null, estado: 'ANULADA', paraStock: false,
+        fecha: new Date('2026-11-10T15:00:00Z'), fechaConfirmacion: null, fechaEntrega: null, fechaPedidoCliente: null,
+        observaciones: null, cliente: { nit: '1', nombre: 'ACME' }, sedeEntrega: null, linea: null,
+        lineas: [{
+          productoConfiguradoId: 2, calidad: 'PRIMERA', precioUnitario: null,
+          productoConfigurado: { codigo: 'P2', nombreComercial: 'FORTIA', referencia: { codigo: '107' }, marca: { nombre: 'FORTIA' } },
+          tallas: [{ cantidad: 4, talla: { valor: 40, orden: 7 } }],
+        }],
+        ordenProduccion: null,
+      },
+    ]);
+    const r = await service.exportar();
+    expect(prisma.ordenCompra.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.ordenCompra.findMany.mock.calls[0][0].where).toBeUndefined();
+    expect(r.pedidos).toHaveLength(1);
+    expect(r.pedidos[0]).toEqual(expect.objectContaining({ estado: 'ANULADA', totalPares: 4, fechaSubida: '2026-11-10' }));
+    expect(r.tallas).toHaveLength(1);
+  });
 });

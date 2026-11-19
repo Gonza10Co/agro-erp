@@ -1,5 +1,5 @@
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
-import { resumenAmarre, filasPorTalla, filasPorBodega, bodegasDeOP } from './amarre-view';
+import { resumenAmarre, filasPorTalla, filasPorBodega, bodegasDeOP, pendientesDeBodega } from './amarre-view';
 
 // OP mock: 1 producto, 2 tallas. T36 completa en stock (Ibagué). T39 mitad stock (Ibagué+Bogotá), mitad a producir.
 const OP: OrdenProduccion = {
@@ -69,5 +69,14 @@ describe('amarre-view', () => {
     expect(f[1].porBodega[2]).toBe(30); // T39 Bogotá
     expect(f[1].stock).toBe(120);
     expect(f[1].producir).toBe(120);
+  });
+  it('pendientesDeBodega descuenta lo reservado en PT (cantAProducir no baja al fabricar)', () => {
+    const op = { lineas: [{ tallas: [
+      { tallaId: 1, cantPedida: 10, cantAmarrada: 4, cantAProducir: 6, reservas: [{ cantidad: 4 }, { cantidad: 6 }] },
+      { tallaId: 2, cantPedida: 5, cantAmarrada: 0, cantAProducir: 5, reservas: [{ cantidad: 3 }] },
+    ] }] } as any;
+    expect(pendientesDeBodega(op)).toBe(2);
+    op.lineas[0].tallas[1].reservas.push({ cantidad: 2 });
+    expect(pendientesDeBodega(op)).toBe(0);
   });
 });

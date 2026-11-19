@@ -12,7 +12,7 @@ import { FabricacionApi } from '../../../core/api/fabricacion.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { badgeOP } from '../oc/estado-badge';
-import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
+import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from './amarre-view';
 
 @Component({
   selector: 'app-op-detalle',
@@ -47,7 +47,7 @@ import { resumenAmarre, filasPorTalla, filasPorBodega } from './amarre-view';
               }
             </div>
           </div>
-          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || ((puedeOperarProduccion || puedeRecalcular) && requerible())) {
+          @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || despachable() || ((puedeOperarProduccion || puedeRecalcular) && requerible())) {
             <div class="page-actions">
               @if (despachable() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
@@ -319,7 +319,8 @@ export class OpDetalleComponent implements OnInit {
 
   despachable = computed(() => {
     const o = this.op();
-    return !!o && o.estado === 'AMARRADA' && this.resumen().producir === 0;
+    // Se despacha cuando todos los pares están en bodega, salieran de stock o se fabricaran.
+    return !!o && (o.estado === 'AMARRADA' || o.estado === 'EN_PRODUCCION') && pendientesDeBodega(o) === 0;
   });
 
   requerible = computed(() => {

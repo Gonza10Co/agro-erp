@@ -49,6 +49,18 @@ describe('DespachoService', () => {
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(BadRequestException);
   });
 
+  it('despacha una OP EN_PRODUCCION cuando todos sus pares ya entraron a PT (19-nov)', async () => {
+    const op = opBase({ estado: 'EN_PRODUCCION' });
+    // Nada de bodega, 5 fabricados y los 5 ya reservados al entrar a PT.
+    (op.lineas[0].tallas[0] as any).cantAmarrada = 0;
+    op.lineas[0].tallas[0].cantAProducir = 5;
+    prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+    prisma.$queryRawUnsafe.mockResolvedValue([{ v: 1n }]);
+    prisma.despacho.create.mockResolvedValue({ id: 1 });
+    await service.despachar({ opId: 1 }, operario);
+    expect(prisma.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { estado: 'DESPACHADA' } });
+  });
+
   it('400 si la OP tiene producción pendiente (lo reservado no cubre amarrado + a producir)', async () => {
     const op = opBase();
     // 5 amarrados de bodega + 2 por fabricar; solo hay 5 reservados → faltan 2 pares.

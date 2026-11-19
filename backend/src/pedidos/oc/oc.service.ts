@@ -11,6 +11,7 @@ import { validarConfirmacionOC, OCParaValidar } from './oc-validacion';
 import { estadoDemora } from './oc-demora';
 import { resolverDestinoOC } from './oc-destino';
 import { elegirSedePorDefecto } from '../../clientes/sedes-core';
+import { aplanarPedidos, PedidosExport } from './oc-export';
 
 /** 'YYYY-MM-DD' → día calendario (medianoche UTC, como guarda @db.Date). undefined no toca. */
 function aFecha(s: string | null | undefined): Date | null | undefined {
@@ -275,6 +276,56 @@ export class OcService {
       const demora = estadoDemora(oc.fechaConfirmacion, ahora, oc.cliente.estadoCartera, oc.estado);
       return { ...oc, diasDemora: demora.dias, estadoDemora: demora.estado };
     });
+  }
+
+  /**
+   * Todos los pedidos (también anulados) aplanados para Excel/Power Query.
+   * Una sola consulta con los include; el aplanado vive en oc-export.ts.
+   */
+  async exportar(): Promise<PedidosExport> {
+    const ocs = await this.prisma.ordenCompra.findMany({
+      orderBy: { consecutivo: 'asc' },
+      include: {
+        cliente: { select: { nit: true, nombre: true } },
+        sedeEntrega: { select: { nombre: true, ciudad: true } },
+        linea: { select: { nombre: true } },
+        lineas: {
+          orderBy: { id: 'asc' },
+          include: {
+            productoConfigurado: {
+              select: {
+                codigo: true,
+                nombreComercial: true,
+                referencia: { select: { codigo: true } },
+                marca: { select: { nombre: true } },
+              },
+            },
+            tallas: { include: { talla: { select: { valor: true, orden: true } } } },
+          },
+        },
+        ordenProduccion: {
+          select: {
+            consecutivo: true,
+            estado: true,
+            lineas: {
+              select: {
+                productoConfiguradoId: true,
+                calidad: true,
+                tallas: { select: { cantAmarrada: true, cantAProducir: true, talla: { select: { valor: true } } } },
+              },
+            },
+            despacho: {
+              select: {
+                lineas: {
+                  select: { productoConfiguradoId: true, calidad: true, cantidad: true, talla: { select: { valor: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return aplanarPedidos(ocs);
   }
 
   async obtener(id: number) {
