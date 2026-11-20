@@ -564,6 +564,33 @@ describe('OpService lectura', () => {
     expect(r).toHaveLength(2);
   });
 
+  it('listar adjunta el resumen de despacho (entregas y pares) sin mandar las tallas', async () => {
+    const prisma: any = {
+      ordenProduccion: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 3, estado: 'EN_PRODUCCION', _count: { despachos: 1 },
+            lineas: [{ tallas: [{ cantAmarrada: 5, cantAProducir: 5, reassignedOut: 0, dispatched: 4 }] }],
+          },
+        ]),
+      },
+    };
+    const service = new OpService(prisma, compras);
+    const r: any[] = await service.listar();
+    expect(r[0].dispatch).toEqual({ deliveries: 1, dispatchedPairs: 4, neededPairs: 10, partial: true });
+    expect(r[0].lineas).toBeUndefined();
+    expect(r[0]._count).toBeUndefined();
+  });
+
+  it('obtener incluye las entregas de la OP en orden de número', async () => {
+    const prisma: any = { ordenProduccion: { findUnique: jest.fn().mockResolvedValue({ id: 1 }) } };
+    const service = new OpService(prisma, compras);
+    await service.obtener(1);
+    const args = prisma.ordenProduccion.findUnique.mock.calls[0][0];
+    expect(args.include.despachos.orderBy).toEqual({ deliveryNumber: 'asc' });
+    expect(args.include.despachos.select).toEqual(expect.objectContaining({ deliveryNumber: true, isFinal: true }));
+  });
+
   it('obtener lanza NotFound si la OP no existe', async () => {
     const prisma: any = {
       ordenProduccion: { findUnique: jest.fn().mockResolvedValue(null) },

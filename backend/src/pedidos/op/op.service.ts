@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DISPATCH_SUMMARY_SELECT, dispatchSummary } from '../../despachos/dispatch-summary';
 import { PrismaService } from '../../prisma/prisma.service';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { ComprasService } from '../../compras/compras.service';
@@ -210,8 +211,8 @@ export class OpService {
     });
   }
 
-  listar() {
-    return this.prisma.ordenProduccion.findMany({
+  async listar() {
+    const ops = await this.prisma.ordenProduccion.findMany({
       orderBy: { consecutivo: 'desc' },
       include: {
         oc: {
@@ -221,8 +222,12 @@ export class OpService {
             cliente: { select: { id: true, nombre: true } },
           },
         },
+        // Una sola consulta para el chip "Despacho parcial" (sin N+1).
+        ...DISPATCH_SUMMARY_SELECT,
       },
     });
+    // Las tallas solo sirven para el resumen: no viajan a la lista.
+    return ops.map(({ lineas, _count, ...op }) => ({ ...op, dispatch: dispatchSummary({ ...op, lineas, _count }) }));
   }
 
   async obtener(id: number) {
@@ -246,6 +251,19 @@ export class OpService {
                 },
               },
             },
+          },
+        },
+        // Las entregas del pedido, en orden: "Entrega 1", "Entrega 2"… y cuál la cerró.
+        despachos: {
+          orderBy: { deliveryNumber: 'asc' },
+          select: {
+            id: true,
+            consecutivo: true,
+            fecha: true,
+            deliveryNumber: true,
+            isFinal: true,
+            lineas: { select: { cantidad: true } },
+            factura: { select: { id: true, consecutivo: true } },
           },
         },
       },

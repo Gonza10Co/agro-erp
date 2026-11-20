@@ -9,7 +9,7 @@ const comun = {
 };
 const pedido: FilaPedidoExport = {
   ...comun, sede: 'Principal', ciudadEntrega: 'Bogotá', referencias: '101', marcas: 'PODEROSA', productos: 'PODEROSA · Con puntera',
-  totalPares: 50, deBodega: 5, aProducir: 45, despachados: 0, pendientes: 50, valor: 2150000,
+  totalPares: 50, deBodega: 5, aProducir: 45, despachados: 0, entregas: 2, pendientes: 50, valor: 2150000,
 };
 const talla: FilaPedidoTallaExport = {
   ...comun, referencia: '101', marca: 'PODEROSA', producto: 'PODEROSA · Con puntera', codigo: 'PC-5', calidad: 'SEGUNDA',
@@ -48,6 +48,7 @@ describe('oc-export.util', () => {
     expect(fila['Fecha pedido cliente']).toEqual({ v: 46336, estilo: 'fecha' });
     expect(fila['Fecha entrega']).toBeNull();
     expect(fila['Total pares']).toBe(50);
+    expect(fila['Entregas']).toBe(2);
     expect(fila['Valor']).toBe(2150000);
 
     const anulado = Object.fromEntries(COLUMNAS_PEDIDOS.map((c, i) => [c, p.filas[2][i]]));

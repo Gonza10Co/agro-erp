@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FacturasApi } from '../../core/api/facturas.api';
 import { Factura } from '../../core/api/models/pedidos.models';
+import { deliveryLabel } from '../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-factura-detalle',
@@ -16,6 +17,9 @@ import { Factura } from '../../core/api/models/pedidos.models';
         <div class="kv"><span class="k">Cliente</span><span class="v">{{ f.cliente?.nombre ?? f.despacho?.op?.oc?.cliente?.nombre }}</span></div>
         <div class="kv"><span class="k">NIT</span><span class="v cell-mono">{{ f.cliente?.nit ?? f.despacho?.op?.oc?.cliente?.nit }}</span></div>
         <div class="kv"><span class="k">Despacho</span><span class="v cell-mono">DSP-{{ f.despacho?.consecutivo }} · OP-{{ f.despacho?.op?.consecutivo }}</span></div>
+        @if (entrega(); as e) {
+          <div class="kv"><span class="k">Entrega</span><span class="v"><span class="badge" [class.badge-success]="f.despacho?.isFinal" [class.badge-accent]="!f.despacho?.isFinal"><span class="dot"></span>{{ e }}</span></span></div>
+        }
         <div class="kv"><span class="k">Fecha</span><span class="v">{{ f.fecha | date:'dd/MM/yyyy' }}</span></div>
         <div class="kv"><span class="k">Estado</span><span class="v"><span class="badge badge-neutral"><span class="dot"></span>{{ f.estado }}</span></span></div>
       </div>
@@ -59,6 +63,12 @@ export class FacturaDetalleComponent implements OnInit {
         next: (f) => { this.factura.set(f); this.cargando.set(false); },
         error: () => this.cargando.set(false),
       });
+  }
+
+  /** Número de entrega del despacho facturado ("Entrega 2", "Entrega 3 (final)"). */
+  entrega(): string | null {
+    const d = this.factura()?.despacho;
+    return d ? deliveryLabel(d.deliveryNumber, d.isFinal) : null;
   }
 
   moneda(n: string | number): string { return '$' + Math.round(Number(n)).toLocaleString('es-CO'); }

@@ -76,6 +76,8 @@ export interface FilaPedidoExport {
   deBodega: number;
   aProducir: number;
   despachados: number;
+  /** Cuántas entregas (despachos) lleva el pedido: con despacho parcial pueden ser varias. */
+  entregas: number;
   pendientes: number;
   valor: number | null;
   observaciones: string | null;
@@ -225,6 +227,7 @@ export function aplanarPedidos(ocs: OCParaExportar[]): PedidosExport {
       deBodega: suma((x) => x.deBodega),
       aProducir: suma((x) => x.aProducir),
       despachados: suma((x) => x.despachados),
+      entregas: op?.despachos?.length ?? 0,
       pendientes: suma((x) => x.pendientes),
       valor: conPrecio.length ? conPrecio.reduce((acc, x) => acc + x.valor!, 0) : null,
       observaciones: oc.observaciones,

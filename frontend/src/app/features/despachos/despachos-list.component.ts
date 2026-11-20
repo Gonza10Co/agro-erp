@@ -5,6 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DespachosApi } from '../../core/api/despachos.api';
 import { FacturasApi } from '../../core/api/facturas.api';
 import { DespachoListItem } from '../../core/api/models/pedidos.models';
+import { deliveryLabel } from '../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-despachos-list',
@@ -16,12 +17,13 @@ import { DespachoListItem } from '../../core/api/models/pedidos.models';
       <div class="card"><div class="card-body">
         @if (despachos().length) {
           <table class="tbl">
-            <thead><tr><th>Despacho</th><th>OP</th><th>Cliente</th><th class="num">Pares</th><th>Entrega en</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
+            <thead><tr><th>Despacho</th><th>OP</th><th>Entrega</th><th>Cliente</th><th class="num">Pares</th><th>Entrega en</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
             <tbody>
               @for (d of despachos(); track d.id) {
                 <tr>
                   <td class="mono">DSP-{{ d.consecutivo }}</td>
                   <td class="mono">OP-{{ d.op.consecutivo }}@if (esParcial(d)) { <span class="badge badge-accent">parcial</span> }</td>
+                  <td>@if (entrega(d); as e) { <span class="badge" [class.badge-success]="d.isFinal" [class.badge-neutral]="!d.isFinal">{{ e }}</span> } @else { <span class="cell-sub">—</span> }</td>
                   <td>{{ d.op.oc.cliente.nombre }}</td>
                   <td class="mono num">{{ pares(d) }}</td>
                   <td>{{ d.direccionEntrega || '—' }}</td>
@@ -82,6 +84,11 @@ export class DespachosListComponent implements OnInit {
   /** Parte de un despacho parcial: la OP salió en varios despachos o sigue abierta. */
   esParcial(d: DespachoListItem): boolean {
     return (d.op._count?.despachos ?? 1) > 1 || (!!d.op.estado && d.op.estado !== 'DESPACHADA');
+  }
+
+  /** "Entrega 2" o "Entrega 3 (final)": el número del despacho dentro de su pedido. */
+  entrega(d: DespachoListItem): string | null {
+    return deliveryLabel(d.deliveryNumber, d.isFinal);
   }
 
   pares(d: DespachoListItem): number {

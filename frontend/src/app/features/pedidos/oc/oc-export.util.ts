@@ -12,7 +12,7 @@ export const COLUMNAS_PEDIDOS = [
   'Pedido', 'OC cliente', 'Cliente', 'NIT', 'Sede', 'Ciudad entrega', 'Línea', 'Tipo', 'Estado',
   'Fecha pedido cliente', 'Subido al ERP', 'Confirmado', 'Fecha entrega', 'OP', 'Estado OP',
   'Referencias', 'Marcas', 'Productos', 'Total pares', 'De bodega', 'A producir', 'Despachados',
-  'Pendientes', 'Valor', 'Observaciones',
+  'Entregas', 'Pendientes', 'Valor', 'Observaciones',
 ];
 
 export const COLUMNAS_TALLAS = [
@@ -38,7 +38,7 @@ export function hojasPedidos(d: PedidosExport): Hoja[] {
       celdaFecha(p.fechaPedidoCliente), celdaFecha(p.fechaSubida), celdaFecha(p.fechaConfirmacion), celdaFecha(p.fechaEntrega),
       op(p.opConsecutivo), p.opEstado ? badgeOP(p.opEstado)?.label ?? p.opEstado : null,
       p.referencias, p.marcas, p.productos,
-      p.totalPares, p.deBodega, p.aProducir, p.despachados, p.pendientes, p.valor, p.observaciones,
+      p.totalPares, p.deBodega, p.aProducir, p.despachados, p.entregas, p.pendientes, p.valor, p.observaciones,
     ]);
   }
 
@@ -58,7 +58,7 @@ export function hojasPedidos(d: PedidosExport): Hoja[] {
     {
       nombre: 'Pedidos',
       filas: pedidos,
-      anchos: [9, 14, 34, 13, 14, 14, 11, 9, 14, 12, 12, 12, 12, 8, 14, 14, 24, 34, 9, 9, 9, 11, 10, 13, 40],
+      anchos: [9, 14, 34, 13, 14, 14, 11, 9, 14, 12, 12, 12, 12, 8, 14, 14, 24, 34, 9, 9, 9, 11, 9, 10, 13, 40],
       congelar: { filas: 1 },
     },
     {

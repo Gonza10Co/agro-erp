@@ -171,6 +171,20 @@ export class DespachoService {
         })),
       });
 
+      // ¿Ya salió todo? Se decide con lo despachado leído DESPUÉS del lock (un despacho
+      // parcial anterior pudo terminar entre la lectura de afuera y el lock).
+      const actuales = await tx.ordenProduccionLineaTalla.findMany({
+        where: { opLinea: { opId: op.id } },
+        select: { id: true, cantAmarrada: true, cantAProducir: true, reassignedOut: true, dispatched: true },
+      });
+      const cierra = actuales.every((t: any) => undispatchedOf(t) === 0);
+
+      // Número de entrega dentro de la OP: la OP está bloqueada (FOR UPDATE arriba), así
+      // que dos despachos simultáneos no sacan el mismo número; el @@unique(opId,
+      // deliveryNumber) lo respalda. No es un consecutivo global: es el ordinal del pedido.
+      const previas = await tx.despacho.aggregate({ where: { opId: op.id }, _max: { deliveryNumber: true } });
+      const deliveryNumber = (previas._max.deliveryNumber ?? 0) + 1;
+
       const despacho = await tx.despacho.create({
         data: {
           consecutivo,
@@ -180,17 +194,12 @@ export class DespachoService {
           direccionEntrega: op.oc.direccionDespacho ?? null,
           autorizadoPorId: bloqueada ? user.sub : null,
           motivoAutorizacion: bloqueada ? (dto.motivo ?? null) : null,
+          deliveryNumber,
+          isFinal: cierra,
           lineas: { create: lineas },
         },
       });
 
-      // ¿Ya salió todo? Se decide con lo despachado leído DESPUÉS del lock (un despacho
-      // parcial anterior pudo terminar entre la lectura de afuera y el lock).
-      const actuales = await tx.ordenProduccionLineaTalla.findMany({
-        where: { opLinea: { opId: op.id } },
-        select: { id: true, cantAmarrada: true, cantAProducir: true, reassignedOut: true, dispatched: true },
-      });
-      const cierra = actuales.every((t: any) => undispatchedOf(t) === 0);
       if (!cierra) return { ...despacho, opClosed: false };
 
       // Si al cerrar queda algo reservado (más de lo que el pedido necesitaba), se
@@ -231,6 +240,8 @@ export class DespachoService {
         fecha: true,
         direccionEntrega: true,
         autorizadoPorId: true,
+        deliveryNumber: true,
+        isFinal: true,
         factura: { select: { id: true, consecutivo: true } },
         // Para la lista: cuántos pares salieron y si es parte de un despacho parcial
         // (la OP sigue abierta o salió en más de un despacho).

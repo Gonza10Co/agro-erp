@@ -22,7 +22,7 @@ describe('DespachoService', () => {
     $queryRaw: jest.fn(),
     ordenProduccion: { findUnique: jest.fn(), update: jest.fn() },
     ordenProduccionLineaTalla: { update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
-    despacho: { create: jest.fn() },
+    despacho: { create: jest.fn(), aggregate: jest.fn().mockResolvedValue({ _max: { deliveryNumber: null } }) },
     inventarioPT: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     reservaInventarioPT: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -47,6 +47,7 @@ describe('DespachoService', () => {
     prisma.reservaInventarioPT.count.mockResolvedValue(0);
     prisma.reservaInventarioPT.updateMany.mockResolvedValue({ count: 1 });
     prisma.reservaInventarioPT.findMany.mockResolvedValue([]);
+    prisma.despacho.aggregate.mockResolvedValue({ _max: { deliveryNumber: null } });
     // Lo que se relee adentro de la transacción para decidir si la OP se cierra:
     // sin tallas = todo despachado (los tests del despacho total).
     prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([]);
@@ -352,6 +353,34 @@ describe('DespachoService', () => {
       await expect(
         service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario),
       ).rejects.toThrow(/cambió mientras se despachaba/);
+    });
+
+    it('numera la entrega dentro de la OP: la primera es Entrega 1 y no es final si queda abierta', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([
+        { id: 30, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 5 },
+      ]);
+      await service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario);
+      expect(prisma.despacho.aggregate).toHaveBeenCalledWith({ where: { opId: 1 }, _max: { deliveryNumber: true } });
+      // El número se saca con la OP ya bloqueada.
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(prisma.despacho.aggregate.mock.invocationCallOrder[0]);
+      expect(prisma.despacho.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({ deliveryNumber: 1, isFinal: false }),
+      );
+    });
+
+    it('la entrega que cierra la OP sigue la numeración y queda marcada como final', async () => {
+      const op = opParcial();
+      (op.lineas[0].tallas[0] as any).dispatched = 8;
+      prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+      prisma.despacho.aggregate.mockResolvedValue({ _max: { deliveryNumber: 2 } });
+      prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([
+        { id: 30, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 20 },
+      ]);
+      await service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 12 }] }, operario);
+      expect(prisma.despacho.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({ deliveryNumber: 3, isFinal: true }),
+      );
     });
 
     it('al cerrar suelta en bodega lo que haya quedado reservado de más', async () => {
