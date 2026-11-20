@@ -60,6 +60,8 @@ export class ProyeccionService {
                       cantAmarrada: true,
                       cantAProducir: true,
                       reassignedOut: true,
+                      // Lo que ya salió en despachos parciales no se vuelve a fabricar.
+                      dispatched: true,
                       reservas: { select: { cantidad: true } },
                     },
                   },

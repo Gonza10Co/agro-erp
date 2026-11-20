@@ -253,6 +253,30 @@ describe('A queda honesto después de ceder', () => {
   });
 });
 
+describe('PtReassignmentService con pedidos despachados en parte', () => {
+  it('A solo puede ceder lo que sigue reservado: lo ya despachado no se toca', async () => {
+    // A: pedido de 20, salieron 15 en un despacho parcial y quedan 5 reservados.
+    const a = filaA({
+      dispatched: 15,
+      reservas: [{ id: 100, inventarioPTId: 500, cantidad: 5, inventarioPT: { id: 500, bodegaId: 1, bodega: { prioridad: 10 } } }],
+    });
+    const { prisma, tx } = makePrisma(OPS, { 1: [a], 2: [filaB()] });
+    await expect(
+      new PtReassignmentService(prisma).reassign(1, { ...base, quantity: 6, toOpId: 2 }, gerente),
+    ).rejects.toThrow(/solo tiene 5 pares reservados/);
+    await new PtReassignmentService(prisma).reassign(1, { ...base, quantity: 5, toOpId: 2 }, gerente);
+    expect(tx.reservaInventarioPT.delete).toHaveBeenCalledWith({ where: { id: 100 } });
+  });
+
+  it('B solo recibe lo que le falta descontando lo que ya se le despachó', async () => {
+    // B: pedido de 30, ya le despacharon 26 → le faltan 4.
+    const { prisma } = makePrisma(OPS, { 1: [filaA()], 2: [filaB({ dispatched: 26 })] });
+    await expect(
+      new PtReassignmentService(prisma).reassign(1, { ...base, quantity: 5, toOpId: 2 }, gerente),
+    ).rejects.toThrow(/solo le faltan 4 pares/);
+  });
+});
+
 describe('PtReassignmentService.options', () => {
   it('lista lo reservado de la OP y los pedidos vivos que pueden recibirlo, con lo que les falta', async () => {
     const { prisma } = makePrisma({}, {});

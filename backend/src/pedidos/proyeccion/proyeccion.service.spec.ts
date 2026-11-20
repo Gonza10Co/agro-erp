@@ -67,6 +67,16 @@ describe('ProyeccionService: lo pendiente de una OP sale de sus reservas', () =>
     expect(r.pedidos[0].aProducir).toBe(12);
   });
 
+  it('lo ya despachado en parte no vuelve a ponerse a producir', async () => {
+    // Pedido de 20: salieron 12 en un despacho parcial, 3 siguen reservados → faltan 5.
+    const prisma = prismaCon([oc(4, [{ tallaId: 3, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 12, reservas: [{ cantidad: 3 }] }], 'PRIMERA', 'EN_PRODUCCION')]);
+    const r = await new ProyeccionService(prisma as any).proyectar(AHORA);
+    expect(r.pedidos[0].aProducir).toBe(5);
+    // Y la consulta pide la columna: sin ella lo despachado contaría como pendiente.
+    const args = prisma.ordenCompra.findMany.mock.calls[0][0];
+    expect(JSON.stringify(args)).toContain('"dispatched":true');
+  });
+
   it('una línea de segundas nunca se pone a producir', async () => {
     const prisma = prismaCon([oc(3, [{ tallaId: 3, cantAmarrada: 20, cantAProducir: 0, reassignedOut: 0, reservas: [{ cantidad: 15 }] }], 'SEGUNDA')]);
     const r = await new ProyeccionService(prisma as any).proyectar(AHORA);

@@ -1,4 +1,4 @@
-import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
+import { OPLineaTalla, OrdenProduccion } from '../../../core/api/models/pedidos.models';
 
 export interface BodegaRef { id: number; codigo: string; nombre: string; }
 
@@ -68,11 +68,70 @@ export function resumenAmarre(op: OrdenProduccion): ResumenAmarre {
 export function pendientesDeBodega(op: OrdenProduccion): number {
   let faltan = 0;
   for (const t of tallas(op)) {
-    const reservado = (t.reservas ?? []).reduce((a, r) => a + r.cantidad, 0);
-    // Lo cedido a otro pedido ya está sumado en cantAProducir y no se le debe.
-    faltan += Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - (t.reassignedOut ?? 0) - reservado, 0);
+    // Lo cedido a otro pedido ya está sumado en cantAProducir y no se le debe; lo ya
+    // despachado (despacho parcial) salió de bodega y tampoco se le debe.
+    faltan += Math.max(necesidad(t) - reservadoDe(t) - (t.dispatched ?? 0), 0);
   }
   return faltan;
+}
+
+/** Mismo cálculo que `needOf` del backend: amarrado + a producir − cedido. */
+function necesidad(t: OPLineaTalla): number {
+  return (t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - (t.reassignedOut ?? 0);
+}
+
+function reservadoDe(t: OPLineaTalla): number {
+  return (t.reservas ?? []).reduce((a, r) => a + r.cantidad, 0);
+}
+
+/** Pares de la OP que ya salieron en despachos (parciales o el total). */
+export function despachadoTotal(op: OrdenProduccion): number {
+  return tallas(op).reduce((a, t) => a + (t.dispatched ?? 0), 0);
+}
+
+/** Pares reservados en bodega PT para la OP: es lo único que se puede despachar. */
+export function reservadoTotal(op: OrdenProduccion): number {
+  return tallas(op).reduce((a, t) => a + reservadoDe(t), 0);
+}
+
+/** Un renglón del formulario de despacho: una talla de un producto de la OP. */
+export interface FilaDespacho {
+  opLineaTallaId: number;
+  producto: string;
+  calidad: 'PRIMERA' | 'SEGUNDA';
+  talla: number;
+  /** Lo que la OP necesita de la talla y todavía no ha salido. */
+  porDespachar: number;
+  /** Tope de lo que se puede despachar ahora (lo que está en bodega para la OP). */
+  reservado: number;
+  /** Ya despachado en despachos anteriores. */
+  despachado: number;
+}
+
+/** Tallas con algo reservado en bodega, en orden de producto y talla. */
+export function filasDespacho(op: OrdenProduccion): FilaDespacho[] {
+  const filas: FilaDespacho[] = [];
+  for (const l of op.lineas ?? []) {
+    for (const t of l.tallas ?? []) {
+      const reservado = reservadoDe(t);
+      if (reservado <= 0) continue;
+      filas.push({
+        opLineaTallaId: t.id,
+        producto: l.productoConfigurado?.nombreComercial ?? `Producto ${l.productoConfiguradoId}`,
+        calidad: l.calidad ?? 'PRIMERA',
+        talla: t.talla?.valor ?? t.tallaId,
+        porDespachar: Math.max(necesidad(t) - (t.dispatched ?? 0), 0),
+        reservado,
+        despachado: t.dispatched ?? 0,
+      });
+    }
+  }
+  return filas.sort((a, b) => a.producto.localeCompare(b.producto) || a.calidad.localeCompare(b.calidad) || a.talla - b.talla);
+}
+
+/** ¿Con estas cantidades (opLineaTallaId → pares) sale todo lo que la OP debe? Así decide el backend si la cierra. */
+export function despachoCierraOP(op: OrdenProduccion, cantidades: Record<number, number>): boolean {
+  return tallas(op).every((t) => (t.dispatched ?? 0) + (cantidades[t.id] ?? 0) >= necesidad(t));
 }
 
 function agregarPorTalla(op: OrdenProduccion) {

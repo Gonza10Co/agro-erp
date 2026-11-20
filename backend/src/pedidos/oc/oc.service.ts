@@ -314,7 +314,8 @@ export class OcService {
                 tallas: { select: { cantAmarrada: true, cantAProducir: true, talla: { select: { valor: true } } } },
               },
             },
-            despacho: {
+            // Una OP puede tener varios despachos (parciales): suman todos.
+            despachos: {
               select: {
                 lineas: {
                   select: { productoConfiguradoId: true, calidad: true, cantidad: true, talla: { select: { valor: true } } },

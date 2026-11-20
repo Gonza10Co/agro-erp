@@ -42,10 +42,11 @@ const oc = (over: Partial<OCParaExportar> = {}): OCParaExportar => ({
         { cantAmarrada: 0, cantAProducir: 30, talla: { valor: 42 } },
       ] },
     ],
-    despacho: { lineas: [
-      { productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 3, talla: { valor: 40 } },
-      { productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 2, talla: { valor: 40 } },
-    ] },
+    // Dos despachos parciales de la misma OP: suman.
+    despachos: [
+      { lineas: [{ productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 3, talla: { valor: 40 } }] },
+      { lineas: [{ productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 2, talla: { valor: 40 } }] },
+    ],
   },
   ...over,
 });
@@ -100,8 +101,26 @@ describe('oc-export', () => {
 
   it('una OP anulada no cuenta amarre ni lo que iba a producir, pero sí se nombra', () => {
     const base = oc();
-    const { tallas } = aplanarPedidos([oc({ ordenProduccion: { ...base.ordenProduccion!, estado: 'ANULADA', despacho: null } })]);
+    const { tallas } = aplanarPedidos([oc({ ordenProduccion: { ...base.ordenProduccion!, estado: 'ANULADA', despachos: [] } })]);
     expect(tallas[0]).toEqual(expect.objectContaining({ opConsecutivo: 1, opEstado: 'ANULADA', deBodega: 0, aProducir: 0 }));
+  });
+
+  it('despacho parcial: lo despachado suma todos los despachos y lo pendiente es el resto', () => {
+    const base = oc();
+    const { tallas } = aplanarPedidos([oc({
+      ordenProduccion: {
+        ...base.ordenProduccion!,
+        despachos: [
+          { lineas: [{ productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 8, talla: { valor: 40 } }] },
+          { lineas: [
+            { productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 4, talla: { valor: 40 } },
+            { productoConfiguradoId: 5, calidad: 'PRIMERA', cantidad: 30, talla: { valor: 42 } },
+          ] },
+        ],
+      },
+    })]);
+    expect(tallas[0]).toEqual(expect.objectContaining({ talla: 40, despachados: 12, pendientes: 8 }));
+    expect(tallas[1]).toEqual(expect.objectContaining({ talla: 42, despachados: 30, pendientes: 0 }));
   });
 
   it('incluye los pedidos anulados (Power Query filtra)', () => {

@@ -153,6 +153,11 @@ export class OpService {
     if (!op) throw new NotFoundException(`OP ${opId} no existe`);
     if (op.estado === 'ANULADA')
       throw new BadRequestException('La OP ya está anulada');
+    // Ya salió completa: no hay nada que soltar y el pedido quedó cerrado. Una OP
+    // despachada por partes sí se puede anular: suelta solo lo que sigue reservado
+    // (lo despachado ya se entregó y sus despachos quedan como están).
+    if (op.estado === 'DESPACHADA')
+      throw new BadRequestException('La OP ya fue despachada: no se puede anular');
 
     // Orden canónico de locks (por fila de inventario), igual que el despacho.
     const reservas = op.lineas
@@ -195,9 +200,12 @@ export class OpService {
         where: { id: opId },
         data: { estado: 'ANULADA' },
       });
+      // Si ya salió una parte, el pedido no vuelve a CONFIRMADA: quedaría como si
+      // no se hubiera entregado nada. Se cierra con lo que alcanzó a salir.
+      const yaSalio = op.lineas.some((l: any) => l.tallas.some((t: any) => (t.dispatched ?? 0) > 0));
       return tx.ordenCompra.update({
         where: { id: op.ocId },
-        data: { estado: 'CONFIRMADA' },
+        data: { estado: yaSalio ? 'CERRADA' : 'CONFIRMADA' },
       });
     });
   }

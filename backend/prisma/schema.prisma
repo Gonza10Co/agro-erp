@@ -611,7 +611,9 @@ model OrdenProduccion {
   updatedAt   DateTime    @updatedAt
 
   lineas             OrdenProduccionLinea[]
-  despacho           Despacho?
+  // Una OP puede salir en varios despachos (despacho parcial, JP 2026-11-19): se
+  // cierra cuando lo despachado cubre lo que el pedido necesita.
+  despachos          Despacho[]
   requerimientos     RequerimientoCompra[]
   ordenesFabricacion OrdenFabricacion[]
   // Pares de PT que gerencia sacó de este pedido (a otro o liberados) y los que recibió.
@@ -649,6 +651,11 @@ model OrdenProduccionLineaTalla {
   // reprogramar) y este campo lo compensa: la necesidad del pedido es
   // cantAmarrada + cantAProducir − reassignedOut (ver pedidos/op/op-need.ts).
   reassignedOut Int                  @default(0)
+  // Pares de esta talla que ya salieron en despachos (parciales o el total). Al
+  // despachar, la reserva baja y esto sube lo mismo: lo despachado deja de contar
+  // como pendiente (ver pedidos/op/op-need.ts) y la OP se cierra cuando cubre la
+  // necesidad de todas sus tallas.
+  dispatched    Int                  @default(0)
 
   reservas ReservaInventarioPT[]
 
@@ -699,7 +706,8 @@ model ReservaInventarioPT {
 model Despacho {
   id                 Int             @id @default(autoincrement())
   consecutivo        Int             @unique
-  opId               Int             @unique
+  // Ya no es @unique: una OP puede despacharse por partes.
+  opId               Int
   op                 OrdenProduccion @relation(fields: [opId], references: [id])
   fecha              DateTime        @default(now())
   direccionEntrega   String? // destino sellado en el remito (viene de la OC/cliente)
@@ -710,6 +718,8 @@ model Despacho {
 
   lineas  DespachoLinea[]
   factura Factura?
+
+  @@index([opId])
 }
 
 model DespachoLinea {

@@ -5,7 +5,10 @@
  *
  *   necesidad = cantAmarrada + cantAProducir − reassignedOut
  *   pendiente = necesidad − lo reservado (amarre inicial + pares que entraron a PT
- *               + pares recibidos de otro pedido − pares cedidos)
+ *               + pares recibidos de otro pedido − pares cedidos) − lo despachado
+ *
+ * `dispatched` existe por el despacho parcial: al despachar, la reserva baja y lo
+ * despachado sube lo mismo, así que lo que ya salió no vuelve a quedar pendiente.
  *
  * `reassignedOut` existe porque al ceder pares a otro pedido la OP los vuelve a
  * programar (`cantAProducir` sube) sin que el cliente haya pedido más.
@@ -14,6 +17,7 @@ export interface TallaNeed {
   cantAmarrada?: number | null;
   cantAProducir?: number | null;
   reassignedOut?: number | null;
+  dispatched?: number | null;
 }
 
 export interface TallaConReservas extends TallaNeed {
@@ -28,8 +32,17 @@ export function reservedOf(t: TallaConReservas): number {
   return (t.reservas ?? []).reduce((acc, r) => acc + r.cantidad, 0);
 }
 
+export function dispatchedOf(t: TallaNeed): number {
+  return t.dispatched ?? 0;
+}
+
 export function pendingOf(t: TallaConReservas): number {
-  return Math.max(needOf(t) - reservedOf(t), 0);
+  return Math.max(needOf(t) - reservedOf(t) - dispatchedOf(t), 0);
+}
+
+/** Lo que falta por despachar de la talla (esté o no en bodega). */
+export function undispatchedOf(t: TallaNeed): number {
+  return Math.max(needOf(t) - dispatchedOf(t), 0);
 }
 
 /**
