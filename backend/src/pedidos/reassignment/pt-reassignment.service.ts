@@ -241,6 +241,7 @@ export class PtReassignmentService {
         cantAmarrada: true,
         cantAProducir: true,
         reassignedOut: true,
+        dispatched: true,
         reservas: { select: { cantidad: true } },
         opLinea: {
           select: {

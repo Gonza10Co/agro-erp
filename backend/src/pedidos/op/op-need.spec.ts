@@ -1,4 +1,4 @@
-import { needOf, pendingOf, pendingToProduce } from './op-need';
+import { needOf, pendingOf, pendingToProduce, undispatchedOf } from './op-need';
 
 describe('needOf / pendingOf (lo que un pedido necesita de una talla)', () => {
   it('la necesidad es amarrado + a producir', () => {
@@ -27,5 +27,22 @@ describe('pendingToProduce (lo que la proyección pone a fabricar)', () => {
 
   it('segundas: nunca se fabrican, aunque el pedido deba pares', () => {
     expect(pendingToProduce('SEGUNDA', { cantAmarrada: 4, cantAProducir: 0, reservas: [{ cantidad: 1 }] })).toBe(0);
+  });
+});
+
+describe('despacho parcial: lo despachado deja de ser pendiente', () => {
+  it('pedido de 20: 8 despachados y 4 reservados → faltan 8 por fabricar', () => {
+    const t = { cantAmarrada: 0, cantAProducir: 20, dispatched: 8, reservas: [{ cantidad: 4 }] };
+    expect(pendingOf(t)).toBe(8);
+    expect(pendingToProduce('PRIMERA', t)).toBe(8);
+  });
+
+  it('todo despachado: nada pendiente aunque ya no haya reservas', () => {
+    expect(pendingOf({ cantAmarrada: 5, cantAProducir: 15, dispatched: 20, reservas: [] })).toBe(0);
+  });
+
+  it('undispatchedOf: lo que falta por salir, esté o no en bodega', () => {
+    expect(undispatchedOf({ cantAmarrada: 5, cantAProducir: 15, dispatched: 8 })).toBe(12);
+    expect(undispatchedOf({ cantAmarrada: 0, cantAProducir: 25, reassignedOut: 5, dispatched: 20 })).toBe(0);
   });
 });

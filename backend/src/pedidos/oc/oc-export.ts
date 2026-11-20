@@ -31,9 +31,10 @@ interface OPExport {
     calidad: string;
     tallas: { cantAmarrada: number; cantAProducir: number; talla: { valor: number } }[];
   }[];
-  despacho: {
+  /** Todos los despachos de la OP: con despacho parcial puede haber varios. */
+  despachos: {
     lineas: { productoConfiguradoId: number; calidad: string; cantidad: number; talla: { valor: number } }[];
-  } | null;
+  }[];
 }
 export interface OCParaExportar {
   consecutivo: number;
@@ -154,7 +155,7 @@ export function aplanarPedidos(ocs: OCParaExportar[]): PedidosExport {
       }
     }
     const despachado = new Map<string, number>();
-    for (const d of op?.despacho?.lineas ?? []) {
+    for (const d of (op?.despachos ?? []).flatMap((x) => x.lineas)) {
       const k = clave(d.productoConfiguradoId, d.calidad, d.talla.valor);
       despachado.set(k, (despachado.get(k) ?? 0) + d.cantidad);
     }

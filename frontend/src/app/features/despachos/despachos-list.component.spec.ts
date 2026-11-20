@@ -22,4 +22,26 @@ describe('DespachosListComponent', () => {
     expect(text).toContain('Minera El Roble');
     http.verify();
   });
+
+  it('marca como parcial el despacho de una OP abierta o con varios despachos y suma sus pares', () => {
+    TestBed.configureTestingModule({
+      imports: [DespachosListComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(DespachosListComponent);
+    http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/despachos').flush([
+      { id: 2, consecutivo: 6, fecha: '2026-11-19', autorizadoPorId: null, lineas: [{ cantidad: 8 }, { cantidad: 4 }],
+        op: { consecutivo: 13, estado: 'EN_PRODUCCION', _count: { despachos: 1 }, oc: { cliente: { nombre: 'Vozincol' } } } },
+      { id: 1, consecutivo: 5, fecha: '2026-11-18', autorizadoPorId: null, lineas: [{ cantidad: 20 }],
+        op: { consecutivo: 12, estado: 'DESPACHADA', _count: { despachos: 1 }, oc: { cliente: { nombre: 'Terry' } } } },
+    ]);
+    fixture.detectChanges();
+    const filas = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr');
+    expect(filas[0].textContent).toContain('parcial');
+    expect(filas[0].textContent).toContain('12');
+    expect(filas[1].textContent).not.toContain('parcial');
+    http.verify();
+  });
 });

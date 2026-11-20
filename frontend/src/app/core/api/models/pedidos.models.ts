@@ -104,6 +104,8 @@ export interface OPLineaTalla {
   cantAProducir: number;
   /** Pares que gerencia pasó a otro pedido o liberó: ya están sumados en cantAProducir. */
   reassignedOut?: number;
+  /** Pares de esta talla que ya salieron en despachos (parciales o el total). */
+  dispatched?: number;
   talla?: Talla;
   reservas?: ReservaInventarioPT[];
 }
@@ -132,7 +134,10 @@ export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
 export interface CrearOCLineaDto { productoConfiguradoId: number; calidad?: CalidadPT; precioUnitario?: number; tallas: CrearOCTallaDto[]; }
 export interface CrearOCDto { clienteId: number; ocCliente?: string; observaciones?: string; sedeEntregaId?: number; direccionDespacho?: string; lineaId?: number; paraStock?: boolean; fechaEntrega?: string; fechaPedidoCliente?: string; lineas: CrearOCLineaDto[]; }
 
-export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; }
+/** Cuántos pares de una talla de la OP salen en el despacho (despacho parcial). */
+export interface DispatchLine { opLineaTallaId: number; quantity: number; }
+/** Sin `lines` sale todo lo reservado (la OP tiene que estar completa). */
+export interface DespacharParams { opId: number; autorizar?: boolean; motivo?: string; lines?: DispatchLine[]; }
 export interface DespachoListItem {
   id: number;
   consecutivo: number;
@@ -140,9 +145,11 @@ export interface DespachoListItem {
   direccionEntrega?: string | null;
   autorizadoPorId: number | null;
   factura: { id: number; consecutivo: number } | null;
-  op: { consecutivo: number; oc: { cliente: { nombre: string } } };
+  lineas?: { cantidad: number }[];
+  op: { consecutivo: number; estado?: EstadoOP; _count?: { despachos: number }; oc: { cliente: { nombre: string } } };
 }
-export interface Despacho { id: number; consecutivo: number; }
+/** `opClosed`: con este despacho la OP quedó completa y se cerró. */
+export interface Despacho { id: number; consecutivo: number; opClosed?: boolean; }
 
 // ─── Facturación ───────────────────────────────────────────────────────────
 export type EstadoFactura = 'EMITIDA' | 'ANULADA';

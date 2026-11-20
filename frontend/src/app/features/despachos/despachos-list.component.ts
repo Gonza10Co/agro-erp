@@ -16,13 +16,14 @@ import { DespachoListItem } from '../../core/api/models/pedidos.models';
       <div class="card"><div class="card-body">
         @if (despachos().length) {
           <table class="tbl">
-            <thead><tr><th>Despacho</th><th>OP</th><th>Cliente</th><th>Entrega en</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
+            <thead><tr><th>Despacho</th><th>OP</th><th>Cliente</th><th class="num">Pares</th><th>Entrega en</th><th>Fecha</th><th>Autorizado</th><th>Factura</th></tr></thead>
             <tbody>
               @for (d of despachos(); track d.id) {
                 <tr>
                   <td class="mono">DSP-{{ d.consecutivo }}</td>
-                  <td class="mono">OP-{{ d.op.consecutivo }}</td>
+                  <td class="mono">OP-{{ d.op.consecutivo }}@if (esParcial(d)) { <span class="badge badge-accent">parcial</span> }</td>
                   <td>{{ d.op.oc.cliente.nombre }}</td>
+                  <td class="mono num">{{ pares(d) }}</td>
                   <td>{{ d.direccionEntrega || '—' }}</td>
                   <td>{{ d.fecha | date:'dd MMM y' }}</td>
                   <td>@if (d.autorizadoPorId) { <span class="badge badge-accent">autorizado</span> } @else { <span class="cell-sub">—</span> }</td>
@@ -49,6 +50,7 @@ import { DespachoListItem } from '../../core/api/models/pedidos.models';
     .tbl th{text-align:left;font-size:var(--text-caption);color:var(--text-subtle);font-weight:var(--fw-medium);padding:0 0 var(--sp-2);border-bottom:var(--bw) solid var(--border)}
     .tbl td{padding:var(--sp-3) var(--sp-3) var(--sp-3) 0;border-bottom:var(--bw) solid var(--border);font-size:var(--text-sm)}
     .mono{font-family:var(--font-mono)}
+    .tbl th.num,.tbl td.num{text-align:right;padding-right:var(--sp-4)}
   `],
 })
 export class DespachosListComponent implements OnInit {
@@ -75,6 +77,15 @@ export class DespachosListComponent implements OnInit {
         next: () => { this.facturando.set(null); this.router.navigateByUrl('/facturas'); },
         error: (e) => { this.facturando.set(null); this.error.set(this.msg(e)); },
       });
+  }
+
+  /** Parte de un despacho parcial: la OP salió en varios despachos o sigue abierta. */
+  esParcial(d: DespachoListItem): boolean {
+    return (d.op._count?.despachos ?? 1) > 1 || (!!d.op.estado && d.op.estado !== 'DESPACHADA');
+  }
+
+  pares(d: DespachoListItem): number {
+    return (d.lineas ?? []).reduce((a, l) => a + l.cantidad, 0);
   }
 
   verFactura(): void { this.router.navigateByUrl('/facturas'); }
