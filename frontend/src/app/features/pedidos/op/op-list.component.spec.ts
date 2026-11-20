@@ -41,4 +41,23 @@ describe('OpListComponent', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sin órdenes de producción');
     http.verify();
   });
+
+  it('marca "Despacho parcial" con entregas y pares en las OPs abiertas que ya despacharon algo', () => {
+    const { fixture, http } = setup();
+    fixture.detectChanges();
+    const oc = { id: 1, consecutivo: 1, clienteId: 3, fecha: '2026-06-04T00:00:00.000Z', estado: 'EN_PRODUCCION',
+      cliente: { id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } };
+    http.expectOne('http://localhost:3001/pedidos/op').flush([
+      { id: 2, consecutivo: 2, ocId: 1, fecha: '2026-06-04T00:00:00.000Z', estado: 'EN_PRODUCCION', oc,
+        dispatch: { deliveries: 2, dispatchedPairs: 12, neededPairs: 20, partial: true } },
+      { id: 1, consecutivo: 1, ocId: 1, fecha: '2026-06-04T00:00:00.000Z', estado: 'DESPACHADA', oc,
+        dispatch: { deliveries: 3, dispatchedPairs: 20, neededPairs: 20, partial: false } },
+    ]);
+    fixture.detectChanges();
+    const filas = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr');
+    expect(filas[0].textContent).toContain('Despacho parcial');
+    expect(filas[0].textContent).toContain('2 entregas · 12 de 20 pares');
+    expect(filas[1].textContent).not.toContain('Despacho parcial');
+    http.verify();
+  });
 });

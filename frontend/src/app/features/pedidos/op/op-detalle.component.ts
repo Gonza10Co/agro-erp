@@ -17,6 +17,7 @@ import {
   filasDespacho, despachoCierraOP, FilaDespacho,
 } from './amarre-view';
 import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component';
+import { deliveryLabel } from '../../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-op-detalle',
@@ -73,6 +74,31 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
           <div class="desp-strip">
             <b>Despachado:</b> {{ despachado() | number:'1.0-0' }} de {{ resumen().pedido | number:'1.0-0' }} pares
             @if (o.estado !== 'DESPACHADA' && o.estado !== 'ANULADA') { <span class="cell-sub">· despacho parcial, el pedido sigue abierto</span> }
+          </div>
+        }
+
+        <!-- Entregas del pedido: cuántas veces se le ha despachado y cuál lo cerró -->
+        @if (o.despachos?.length) {
+          <div class="card desp-entregas">
+            <div class="card-body">
+              <h3 style="font-size:var(--text-h3);font-weight:var(--fw-semibold)">Entregas ({{ o.despachos!.length }})</h3>
+              <table class="data">
+                <thead><tr><th>Entrega</th><th>Despacho</th><th>Fecha</th><th class="num">Pares</th><th>Factura</th></tr></thead>
+                <tbody>
+                  @for (d of o.despachos; track d.id) {
+                    <tr>
+                      <td>
+                        <span class="badge" [class.badge-success]="d.isFinal" [class.badge-accent]="!d.isFinal"><span class="dot"></span>{{ entrega(d.deliveryNumber, d.isFinal) }}</span>
+                      </td>
+                      <td class="cell-mono">DSP-{{ d.consecutivo }}</td>
+                      <td class="cell-sub">{{ d.fecha | date:'dd/MM/yyyy' }}</td>
+                      <td class="num cell-mono">{{ paresEntrega(d) | number:'1.0-0' }}</td>
+                      <td class="cell-mono">{{ d.factura ? 'FAC-' + d.factura.consecutivo : '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
         }
 
@@ -303,6 +329,9 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
     .bod-zero{color:var(--text-subtle)}
     @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}}
     .desp-strip{margin:0 0 var(--sp-4);font-size:var(--text-sm)}
+    .desp-entregas{margin-bottom:var(--sp-4)}
+    .desp-entregas h3{margin-bottom:var(--sp-3)}
+    .desp-entregas th.num,.desp-entregas td.num{text-align:right}
     .desp-card{margin-bottom:var(--sp-5)}
     .desp-table th.num,.desp-table td.num{text-align:right}
     .desp-input{width:90px;text-align:right}
@@ -398,6 +427,10 @@ export class OpDetalleComponent implements OnInit {
   });
 
   despachado = computed(() => { const o = this.op(); return o ? despachadoTotal(o) : 0; });
+  entrega = deliveryLabel;
+  paresEntrega(d: { lineas?: { cantidad: number }[] }): number {
+    return (d.lineas ?? []).reduce((a, l) => a + l.cantidad, 0);
+  }
 
   // Formulario de despacho: opLineaTallaId → pares que salen.
   despachoAbierto = signal(false);

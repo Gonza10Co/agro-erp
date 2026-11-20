@@ -47,4 +47,27 @@ describe('FacturaDetalleComponent', () => {
     expect(texto).toContain('Minera El Roble');
     expect(texto).toContain('900.111.222-3');
   });
+
+  it('muestra el número de entrega del despacho facturado', () => {
+    const el = setup({
+      id: 1, consecutivo: 1, fecha: '2026-10-13T00:00:00.000Z', estado: 'EMITIDA',
+      subtotal: '1000', ivaPct: '19', iva: '190', total: '1190',
+      cliente: { id: 5, nombre: 'CALZATODO SA', nit: '890.300.123-4' },
+      despacho: { consecutivo: 9, deliveryNumber: 3, isFinal: true, op: { consecutivo: 3, oc: { consecutivo: 21 } } },
+      lineas: [],
+    });
+    expect(el.textContent).toContain('Entrega 3 (final)');
+  });
+
+  it('una entrega intermedia no se marca como final', () => {
+    const el = setup({
+      id: 1, consecutivo: 1, fecha: '2026-10-13T00:00:00.000Z', estado: 'EMITIDA',
+      subtotal: '1000', ivaPct: '19', iva: '190', total: '1190',
+      cliente: { id: 5, nombre: 'CALZATODO SA', nit: '890.300.123-4' },
+      despacho: { consecutivo: 8, deliveryNumber: 1, isFinal: false, op: { consecutivo: 3, oc: { consecutivo: 21 } } },
+      lineas: [],
+    });
+    expect(el.textContent).toContain('Entrega 1');
+    expect(el.textContent).not.toContain('(final)');
+  });
 });
