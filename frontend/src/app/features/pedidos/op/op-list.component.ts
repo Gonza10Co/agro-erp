@@ -5,6 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
 import { badgeOP } from '../oc/estado-badge';
+import { dispatchDetail, partialDispatch } from '../../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-op-list',
@@ -38,7 +39,15 @@ import { badgeOP } from '../oc/estado-badge';
                     <td class="cell-sub">#{{ op.oc?.consecutivo }}</td>
                     <td>{{ op.oc?.cliente?.nombre }}</td>
                     <td class="cell-sub">{{ op.fecha | date:'dd/MM/yyyy' }}</td>
-                    <td><span class="badge {{ badge(op).clase }}"><span class="dot"></span>{{ badge(op).label }}</span></td>
+                    <td>
+                      <span class="badge {{ badge(op).clase }}"><span class="dot"></span>{{ badge(op).label }}</span>
+                      @if (parcial(op); as p) {
+                        <div class="desp-parcial">
+                          <span class="badge badge-accent" [title]="'Ya salió una parte del pedido: ' + detalle(p)"><span class="dot"></span>Despacho parcial</span>
+                          <span class="cell-sub">{{ detalle(p) }}</span>
+                        </div>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -48,6 +57,9 @@ import { badgeOP } from '../oc/estado-badge';
       }
     </div>
   `,
+  styles: [`
+    .desp-parcial{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);margin-top:var(--sp-1)}
+  `],
 })
 export class OpListComponent implements OnInit {
   private readonly api = inject(PedidosApi);
@@ -69,4 +81,6 @@ export class OpListComponent implements OnInit {
   }
 
   badge(op: OrdenProduccion) { return badgeOP(op.estado); }
+  parcial(op: OrdenProduccion) { return partialDispatch(op.dispatch); }
+  detalle = dispatchDetail;
 }

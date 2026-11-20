@@ -77,6 +77,8 @@ export interface OrdenCompra {
   fechaPedidoCliente?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
+  /** Solo en la lista: cómo va el despacho de su OP (null si no tiene OP). */
+  dispatch?: DispatchSummary | null;
   // Semáforo de demora calculado por el backend en el listado (no se persiste).
   diasDemora?: number | null;
   estadoDemora?: EstadoDemora | null;
@@ -125,6 +127,30 @@ export interface OrdenProduccion {
   fecha: string;
   estado: EstadoOP;
   lineas?: OPLinea[];
+  /** Solo en la lista: cómo va el despacho. */
+  dispatch?: DispatchSummary | null;
+  /** Solo en el detalle: las entregas del pedido en orden. */
+  despachos?: OPDelivery[];
+}
+
+/** Resumen del despacho de una OP para las listas de pedidos. */
+export interface DispatchSummary {
+  deliveries: number;
+  dispatchedPairs: number;
+  neededPairs: number;
+  /** Ya salió algo pero el pedido sigue abierto. */
+  partial: boolean;
+}
+
+/** Una entrega (despacho) de la OP, con su número dentro del pedido. */
+export interface OPDelivery {
+  id: number;
+  consecutivo: number;
+  fecha: string;
+  deliveryNumber: number;
+  isFinal: boolean;
+  lineas?: { cantidad: number }[];
+  factura?: { id: number; consecutivo: number } | null;
 }
 
 export interface CrearClienteDto { nit: string; nombre: string; ciudad?: string; telefono?: string; direccion?: string; tipoCredito?: TipoCredito; cupo?: number; }
@@ -144,6 +170,9 @@ export interface DespachoListItem {
   fecha: string;
   direccionEntrega?: string | null;
   autorizadoPorId: number | null;
+  /** Número de entrega dentro de la OP ("Entrega 2") y si fue la que la cerró. */
+  deliveryNumber?: number;
+  isFinal?: boolean;
   factura: { id: number; consecutivo: number } | null;
   lineas?: { cantidad: number }[];
   op: { consecutivo: number; estado?: EstadoOP; _count?: { despachos: number }; oc: { cliente: { nombre: string } } };
@@ -168,7 +197,7 @@ export interface FacturaListItem {
   /** Denormalizado: una factura de servicio no tiene despacho que navegar. */
   cliente: { nombre: string };
   linea: { codigo: string; nombre: string } | null;
-  despacho: { consecutivo: number; op: { consecutivo: number } } | null;
+  despacho: { consecutivo: number; deliveryNumber?: number; isFinal?: boolean; op: { consecutivo: number } } | null;
 }
 
 export interface FacturaLinea {
@@ -195,7 +224,7 @@ export interface Factura {
   estado: EstadoFactura;
   /** El detalle trae el cliente en la factura misma (las de servicio no tienen despacho). */
   cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'>;
-  despacho?: { consecutivo: number; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
+  despacho?: { consecutivo: number; deliveryNumber?: number; isFinal?: boolean; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
   lineas?: FacturaLinea[];
 }
 
@@ -260,6 +289,8 @@ export interface FilaPedidoExport {
   deBodega: number;
   aProducir: number;
   despachados: number;
+  /** Cuántas entregas (despachos) lleva el pedido. */
+  entregas: number;
   pendientes: number;
   valor: number | null;
   observaciones: string | null;

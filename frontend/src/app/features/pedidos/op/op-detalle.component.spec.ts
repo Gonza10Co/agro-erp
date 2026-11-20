@@ -287,6 +287,35 @@ describe('OpDetalleComponent', () => {
     expect(text).toContain('5 de esos reponen pares que gerencia pasó a otro pedido');
     http.verify();
   });
+
+  it('lista las entregas del pedido con su número y marca la final', () => {
+    const { fixture, http } = setup('12');
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
+    http.expectOne('http://localhost:3001/pedidos/op/12').flush({
+      id: 12, consecutivo: 1187, ocId: 41, fecha: '2026-05-28T00:00:00.000Z', estado: 'DESPACHADA',
+      oc: { id: 41, consecutivo: 2041, clienteId: 3, fecha: '2026-05-28T00:00:00.000Z', estado: 'CERRADA',
+            cliente: { id: 3, nit: '900', nombre: 'Minera El Roble', tipoCredito: 'D30', estadoCartera: 'AL_DIA', activo: true } },
+      lineas: [],
+      despachos: [
+        { id: 1, consecutivo: 30, fecha: '2026-11-18T00:00:00.000Z', deliveryNumber: 1, isFinal: false, lineas: [{ cantidad: 8 }, { cantidad: 4 }], factura: { id: 2, consecutivo: 77 } },
+        { id: 2, consecutivo: 31, fecha: '2026-11-19T00:00:00.000Z', deliveryNumber: 2, isFinal: true, lineas: [{ cantidad: 8 }], factura: null },
+      ],
+    });
+    fixture.detectChanges();
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
+    const el = fixture.nativeElement as HTMLElement;
+    const filas = el.querySelectorAll('.desp-entregas tbody tr');
+    expect(el.textContent).toContain('Entregas (2)');
+    expect(filas.length).toBe(2);
+    expect(filas[0].textContent).toContain('Entrega 1');
+    expect(filas[0].textContent).not.toContain('final');
+    expect(filas[0].textContent).toContain('12');
+    expect(filas[0].textContent).toContain('FAC-77');
+    expect(filas[1].textContent).toContain('Entrega 2 (final)');
+    expect(filas[1].textContent).toContain('DSP-31');
+    http.verify();
+  });
 });
 
 describe('OpDetalleComponent — observación del pedido', () => {

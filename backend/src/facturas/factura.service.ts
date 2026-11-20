@@ -209,6 +209,9 @@ export class FacturaService {
         despacho: {
           select: {
             consecutivo: true,
+            // Número de entrega dentro del pedido ("Entrega 2", "Entrega 3 (final)").
+            deliveryNumber: true,
+            isFinal: true,
             op: { select: { consecutivo: true } },
           },
         },
@@ -225,6 +228,9 @@ export class FacturaService {
         despacho: {
           select: {
             consecutivo: true,
+            // Número de entrega dentro del pedido ("Entrega 2", "Entrega 3 (final)").
+            deliveryNumber: true,
+            isFinal: true,
             op: { select: { consecutivo: true, oc: { select: { consecutivo: true } } } },
           },
         },

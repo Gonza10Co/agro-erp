@@ -714,11 +714,17 @@ model Despacho {
   autorizadoPorId    Int?
   autorizadoPor      User?           @relation(fields: [autorizadoPorId], references: [id])
   motivoAutorizacion String?
+  // Número de entrega dentro de la OP (1, 2, 3… por orden de creación). Se asigna en la
+  // transacción del despacho con la OP bloqueada, así la factura lo muestra estable.
+  deliveryNumber     Int             @default(1)
+  // Este despacho completó el pedido y cerró la OP ("Entrega 3 (final)").
+  isFinal            Boolean         @default(false)
   createdAt          DateTime        @default(now())
 
   lineas  DespachoLinea[]
   factura Factura?
 
+  @@unique([opId, deliveryNumber])
   @@index([opId])
 }
 

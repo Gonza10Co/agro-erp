@@ -8,6 +8,7 @@ import { OcDetalleComponent } from './oc-detalle.component';
 import { badgeOC } from './estado-badge';
 import { descargarXlsx } from '../../../shared/xlsx/xlsx-mini';
 import { hojasPedidos, nombreArchivoPedidos } from './oc-export.util';
+import { dispatchDetail, partialDispatch } from '../../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-oc-list',
@@ -27,6 +28,16 @@ import { hojasPedidos, nombreArchivoPedidos } from './oc-export.util';
             [title]="'Filtrar las órdenes quedadas (amarillas y rojas)'"
           >
             Solo demoradas ({{ demoradas() }})
+          </button>
+          <button
+            class="btn"
+            type="button"
+            [class.btn-primary]="soloParciales()"
+            [disabled]="parciales() === 0 && !soloParciales()"
+            (click)="soloParciales.set(!soloParciales())"
+            title="Pedidos a los que ya se les empezó a despachar y siguen abiertos"
+          >
+            Con despacho parcial ({{ parciales() }})
           </button>
           <button
             class="btn"
@@ -76,12 +87,20 @@ import { hojasPedidos, nombreArchivoPedidos } from './oc-export.util';
                         <span class="cell-sub">—</span>
                       }
                     </td>
-                    <td><span class="badge {{ badge(oc).clase }}"><span class="dot"></span>{{ badge(oc).label }}</span></td>
+                    <td>
+                      <span class="badge {{ badge(oc).clase }}"><span class="dot"></span>{{ badge(oc).label }}</span>
+                      @if (parcial(oc); as p) {
+                        <div class="desp-parcial">
+                          <span class="badge badge-accent" [title]="'Ya salió una parte del pedido: ' + detalle(p)"><span class="dot"></span>Despacho parcial</span>
+                          <span class="cell-sub">{{ detalle(p) }}</span>
+                        </div>
+                      }
+                    </td>
                     <td class="cell-sub">{{ oc.ordenProduccion ? 'OP #' + oc.ordenProduccion.consecutivo : '—' }}</td>
                   </tr>
                 } @empty {
                   <tr><td colspan="6" class="cell-sub" style="text-align:center;padding:1.25rem">
-                    {{ soloDemoradas() ? 'No hay órdenes demoradas 🎉' : 'Sin órdenes' }}
+                    {{ soloDemoradas() ? 'No hay órdenes demoradas 🎉' : soloParciales() ? 'No hay pedidos con despacho parcial' : 'Sin órdenes' }}
                   </td></tr>
                 }
               </tbody>
@@ -97,6 +116,9 @@ import { hojasPedidos, nombreArchivoPedidos } from './oc-export.util';
       }
     </app-drawer>
   `,
+  styles: [`
+    .desp-parcial{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);margin-top:var(--sp-1)}
+  `],
 })
 export class OcListComponent {
   private readonly api = inject(PedidosApi);
@@ -104,6 +126,8 @@ export class OcListComponent {
   cargando = signal(true);
   seleccionada = signal<OrdenCompra | null>(null);
   soloDemoradas = signal(false);
+  /** Filtro rápido: pedidos que ya empezaron a despacharse y siguen abiertos. */
+  soloParciales = signal(false);
   descargando = signal(false);
   errorDescarga = signal<string | null>(null);
   tituloDrawer = computed(() => {
@@ -116,9 +140,13 @@ export class OcListComponent {
     () => this.ocs().filter((o) => o.estadoDemora === 'AMARILLO' || o.estadoDemora === 'ROJO').length,
   );
 
-  /** Vista de la tabla: todas, o solo las demoradas ordenadas por días (más quedada arriba). */
+  /** Cuántos pedidos van con despacho parcial. */
+  parciales = computed(() => this.ocs().filter((o) => !!partialDispatch(o.dispatch)).length);
+
+  /** Vista de la tabla: todas, o filtradas (demoradas ordenadas por días, más quedada arriba). */
   ocsVista = computed(() => {
-    const lista = this.ocs();
+    let lista = this.ocs();
+    if (this.soloParciales()) lista = lista.filter((o) => !!partialDispatch(o.dispatch));
     if (!this.soloDemoradas()) return lista;
     return lista
       .filter((o) => o.estadoDemora === 'AMARILLO' || o.estadoDemora === 'ROJO')
@@ -166,6 +194,8 @@ export class OcListComponent {
   onEliminada(): void { this.cerrar(); this.cargar(); }
 
   badge(oc: OrdenCompra) { return badgeOC(oc.estado); }
+  parcial(oc: OrdenCompra) { return partialDispatch(oc.dispatch); }
+  detalle = dispatchDetail;
 
   badgeDemora(oc: OrdenCompra): { clase: string; label: string; titulo: string } | null {
     if (oc.diasDemora == null || !oc.estadoDemora) return null;

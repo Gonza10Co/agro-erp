@@ -8,6 +8,7 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
 import { FacturaListItem } from '../../core/api/models/pedidos.models';
 import { DrawerComponent } from '../../shared/ui/drawer/drawer.component';
 import { FacturaDetalleComponent } from './factura-detalle.component';
+import { deliveryLabel } from '../../shared/dispatch/dispatch-labels';
 
 @Component({
   selector: 'app-facturas-list',
@@ -48,6 +49,7 @@ import { FacturaDetalleComponent } from './factura-detalle.component';
                         @if (f.linea) { <span class="cell-sub">· {{ f.linea.nombre }}</span> }
                       } @else if (f.despacho) {
                         OP-{{ f.despacho.op.consecutivo }}
+                        @if (entrega(f); as e) { <span class="cell-sub">· {{ e }}</span> }
                       }
                     </td>
                     <td class="cell-sub">{{ f.fecha | date:'dd/MM/yyyy' }}</td>
@@ -99,5 +101,10 @@ export class FacturasListComponent implements OnInit {
 
   abrir(f: FacturaListItem): void { this.seleccionada.set(f); }
   cerrar(): void { this.seleccionada.set(null); }
+  /** "Entrega 2" del despacho facturado (las de servicio no tienen). */
+  entrega(f: FacturaListItem): string | null {
+    return f.despacho ? deliveryLabel(f.despacho.deliveryNumber, f.despacho.isFinal) : null;
+  }
+
   moneda(n: string | number): string { return '$' + Math.round(Number(n)).toLocaleString('es-CO'); }
 }
