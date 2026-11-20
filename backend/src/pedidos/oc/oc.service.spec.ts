@@ -333,6 +333,25 @@ describe('OcService', () => {
     expect(r[0].estadoDemora).toBe('RETENIDA_CARTERA');
   });
 
+  it('listar trae el resumen de despacho de la OP en la misma consulta y no manda las tallas', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1, estado: 'EN_PRODUCCION', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' },
+        ordenProduccion: {
+          id: 4, consecutivo: 7, estado: 'EN_PRODUCCION', _count: { despachos: 2 },
+          lineas: [{ tallas: [{ cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 12 }] }],
+        },
+      },
+      { id: 2, estado: 'BORRADOR', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' }, ordenProduccion: null },
+    ]);
+    const r: any[] = await service.listar();
+    const args = prisma.ordenCompra.findMany.mock.calls.at(-1)[0];
+    expect(args.include.ordenProduccion.select._count).toEqual({ select: { despachos: true } });
+    expect(r[0].dispatch).toEqual({ deliveries: 2, dispatchedPairs: 12, neededPairs: 20, partial: true });
+    expect(r[0].ordenProduccion).toEqual({ id: 4, consecutivo: 7, estado: 'EN_PRODUCCION' });
+    expect(r[1].dispatch).toBeNull();
+  });
+
   it('obtener lanza NotFound si la OC no existe', async () => {
     prisma.ordenCompra.findUnique.mockResolvedValue(null);
     await expect(service.obtener(99)).rejects.toThrow('OC 99 no existe');

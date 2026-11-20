@@ -96,6 +96,7 @@ describe('oc-export', () => {
     expect(pedidos[0]).toEqual(expect.objectContaining({
       estado: 'BORRADOR', paraStock: true, opConsecutivo: null, opEstado: null, linea: null, sede: null,
       fechaConfirmacion: null, fechaPedidoCliente: null, deBodega: 0, aProducir: 0, valor: null, totalPares: 10,
+      entregas: 0,
     }));
   });
 
@@ -107,7 +108,7 @@ describe('oc-export', () => {
 
   it('despacho parcial: lo despachado suma todos los despachos y lo pendiente es el resto', () => {
     const base = oc();
-    const { tallas } = aplanarPedidos([oc({
+    const { tallas, pedidos } = aplanarPedidos([oc({
       ordenProduccion: {
         ...base.ordenProduccion!,
         despachos: [
@@ -121,6 +122,8 @@ describe('oc-export', () => {
     })]);
     expect(tallas[0]).toEqual(expect.objectContaining({ talla: 40, despachados: 12, pendientes: 8 }));
     expect(tallas[1]).toEqual(expect.objectContaining({ talla: 42, despachados: 30, pendientes: 0 }));
+    // Número de entregas del pedido (JP 20-nov: cuántas veces se le ha despachado).
+    expect(pedidos[0].entregas).toBe(2);
   });
 
   it('incluye los pedidos anulados (Power Query filtra)', () => {

@@ -208,4 +208,15 @@ describe('FacturaService', () => {
     expect(Number(arg.data.iva)).toBe(0);
     expect(Number(arg.data.total)).toBe(425000);
   });
+
+  describe('número de entrega en la factura', () => {
+    it('obtener y listar traen el número de entrega y si fue la final', async () => {
+      prisma.factura.findUnique.mockResolvedValue({ id: 1 });
+      await service.obtener(1);
+      await service.listar();
+      const det = prisma.factura.findUnique.mock.calls[0][0].include.despacho.select;
+      const lista = prisma.factura.findMany.mock.calls[0][0].select.despacho.select;
+      for (const sel of [det, lista]) expect(sel).toEqual(expect.objectContaining({ deliveryNumber: true, isFinal: true }));
+    });
+  });
 });

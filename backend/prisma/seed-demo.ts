@@ -741,6 +741,7 @@ async function main() {
     data: {
       consecutivo: await siguienteConsecutivo(prisma, 'despacho'),
       opId: opHist.id,
+      isFinal: true, // única entrega de una OP despachada
       lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, bodegaId: ibg.id, cantidad: 10 }] },
     },
   });
@@ -1236,6 +1237,7 @@ async function main() {
         consecutivo: await siguienteConsecutivo(prisma, 'despacho'),
         opId: opv.id,
         fecha: diaUTC(v.d, 15),
+        isFinal: true, // única entrega de una OP despachada
         lineas: { create: [{ productoConfiguradoId: prodDiel.id, tallaId: tallaA.id, bodegaId: ibg.id, cantidad: v.cant }] },
       },
     });

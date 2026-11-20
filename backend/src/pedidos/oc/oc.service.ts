@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DISPATCH_SUMMARY_SELECT, dispatchSummary } from '../../despachos/dispatch-summary';
 import { PrismaService } from '../../prisma/prisma.service';
 import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { CrearOCDto } from './dto/crear-oc.dto';
@@ -265,7 +266,9 @@ export class OcService {
         cliente: { select: { id: true, nit: true, nombre: true, estadoCartera: true } },
         linea: { select: { id: true, codigo: true, nombre: true } },
         ordenProduccion: {
-          select: { id: true, consecutivo: true, estado: true },
+          // Conteo de despachos y tallas en la misma consulta: el chip "Despacho
+          // parcial" de la lista sale de acá sin una consulta por pedido.
+          select: { id: true, consecutivo: true, estado: true, ...DISPATCH_SUMMARY_SELECT },
         },
       },
     });
@@ -274,7 +277,15 @@ export class OcService {
     const ahora = new Date();
     return ocs.map((oc) => {
       const demora = estadoDemora(oc.fechaConfirmacion, ahora, oc.cliente.estadoCartera, oc.estado);
-      return { ...oc, diasDemora: demora.dias, estadoDemora: demora.estado };
+      const op = oc.ordenProduccion;
+      return {
+        ...oc,
+        // Las tallas solo sirven para el resumen: no viajan a la lista.
+        ordenProduccion: op ? { id: op.id, consecutivo: op.consecutivo, estado: op.estado } : null,
+        dispatch: op ? dispatchSummary(op) : null,
+        diasDemora: demora.dias,
+        estadoDemora: demora.estado,
+      };
     });
   }
 
