@@ -200,9 +200,12 @@ export class OpService {
         where: { id: opId },
         data: { estado: 'ANULADA' },
       });
+      // Si ya salió una parte, el pedido no vuelve a CONFIRMADA: quedaría como si
+      // no se hubiera entregado nada. Se cierra con lo que alcanzó a salir.
+      const yaSalio = op.lineas.some((l: any) => l.tallas.some((t: any) => (t.dispatched ?? 0) > 0));
       return tx.ordenCompra.update({
         where: { id: op.ocId },
-        data: { estado: 'CONFIRMADA' },
+        data: { estado: yaSalio ? 'CERRADA' : 'CONFIRMADA' },
       });
     });
   }

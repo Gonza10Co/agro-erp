@@ -71,7 +71,7 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
 
         @if (despachado() > 0) {
           <div class="desp-strip">
-            <b>Despachado:</b> {{ despachado() | number:'1.0-0' }} de {{ resumen().pedido - resumen().cedidos | number:'1.0-0' }} pares
+            <b>Despachado:</b> {{ despachado() | number:'1.0-0' }} de {{ resumen().pedido | number:'1.0-0' }} pares
             @if (o.estado !== 'DESPACHADA' && o.estado !== 'ANULADA') { <span class="cell-sub">· despacho parcial, el pedido sigue abierto</span> }
           </div>
         }

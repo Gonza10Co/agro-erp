@@ -390,6 +390,8 @@ describe('OpService.anular', () => {
     expect(tx.inventarioPT.update).toHaveBeenCalledTimes(1);
     expect(tx.inventarioPT.update).toHaveBeenCalledWith({ where: { id: 70 }, data: { cantReservada: { decrement: 4 } } });
     expect(tx.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 50 }, data: { estado: 'ANULADA' } });
+    // Ya salió una parte: el pedido se cierra, no vuelve a CONFIRMADA.
+    expect(tx.ordenCompra.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { estado: 'CERRADA' } });
   });
 
   describe('carrera con una reasignación de pares', () => {
