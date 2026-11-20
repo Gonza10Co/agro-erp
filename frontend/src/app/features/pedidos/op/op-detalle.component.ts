@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { PedidosApi } from '../../../core/api/pedidos.api';
-import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
+import { DespacharParams, OrdenProduccion } from '../../../core/api/models/pedidos.models';
 import { DespachosApi } from '../../../core/api/despachos.api';
 import { ComprasApi } from '../../../core/api/compras.api';
 import { RequerimientoResumen } from '../../../core/api/models/compras.models';
@@ -12,7 +12,10 @@ import { FabricacionApi } from '../../../core/api/fabricacion.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../../core/auth/modulos';
 import { badgeOP } from '../oc/estado-badge';
-import { resumenAmarre, pendientesDeBodega, filasPorTalla, filasPorBodega } from './amarre-view';
+import {
+  resumenAmarre, filasPorTalla, filasPorBodega, despachadoTotal, reservadoTotal,
+  filasDespacho, despachoCierraOP, FilaDespacho,
+} from './amarre-view';
 import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component';
 
 @Component({
@@ -50,8 +53,8 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
           </div>
           @if (o.estado === 'AMARRADA' || o.estado === 'CREADA' || despachable() || ((puedeOperarProduccion || puedeRecalcular) && requerible())) {
             <div class="page-actions">
-              @if (despachable() && puedeOperarProduccion) {
-                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="despachar()">Despachar</button>
+              @if (despachable() && puedeOperarProduccion && !despachoAbierto()) {
+                <button class="btn btn-primary" type="button" [disabled]="accion()" (click)="abrirDespacho()">Despachar</button>
               }
               @if (requerible() && puedeOperarProduccion) {
                 <button class="btn btn-primary" type="button" [class.is-loading]="generandoOF()" [disabled]="generandoOF()" (click)="generarOF(o.id)">{{ generandoOF() ? 'Generando…' : 'Generar OF' }}</button>
@@ -65,6 +68,59 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
             </div>
           }
         </div>
+
+        @if (despachado() > 0) {
+          <div class="desp-strip">
+            <b>Despachado:</b> {{ despachado() | number:'1.0-0' }} de {{ resumen().pedido - resumen().cedidos | number:'1.0-0' }} pares
+            @if (o.estado !== 'DESPACHADA' && o.estado !== 'ANULADA') { <span class="cell-sub">· despacho parcial, el pedido sigue abierto</span> }
+          </div>
+        }
+
+        <!-- DESPACHO (total o parcial): por talla, hasta lo reservado en bodega para la OP -->
+        @if (despachoAbierto()) {
+          <div class="card desp-card"><div class="card-body">
+            <h3 style="font-size:var(--text-h3);font-weight:var(--fw-semibold)">Despachar</h3>
+            <p class="cell-sub">Solo sale lo que ya está en bodega para este pedido. Cambia las cantidades para despachar una parte; lo demás queda pendiente para otro despacho.</p>
+            <div class="table-scroll">
+              <table class="data desp-table">
+                <thead><tr><th>Producto</th><th>Talla</th><th class="num">Ya despachado</th><th class="num">Por despachar</th><th class="num">En bodega</th><th class="num">A despachar</th></tr></thead>
+                <tbody>
+                  @for (f of filasDesp(); track f.opLineaTallaId) {
+                    <tr>
+                      <td>{{ f.producto }}@if (f.calidad === 'SEGUNDA') { <span class="badge badge-accent">segunda</span> }</td>
+                      <td class="cell-mono">{{ f.talla }}</td>
+                      <td class="num cell-mono">{{ f.despachado | number:'1.0-0' }}</td>
+                      <td class="num cell-mono">{{ f.porDespachar | number:'1.0-0' }}</td>
+                      <td class="num cell-mono">{{ f.reservado | number:'1.0-0' }}</td>
+                      <td class="num">
+                        <input class="cb-input desp-input" type="number" min="0" [max]="f.reservado" step="1"
+                          [attr.aria-label]="'Pares a despachar de la talla ' + f.talla"
+                          [ngModel]="cantidades()[f.opLineaTallaId]" (ngModelChange)="setCantidad(f, $event)" />
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (error() && !carteraBloqueada()) { <p style="color:var(--error);font-size:var(--text-sm);margin-top:var(--sp-3)">{{ error() }}</p> }
+            <div class="desp-foot">
+              <div>
+                <b>{{ totalDespacho() | number:'1.0-0' }} pares</b>
+                @if (despachoInvalido()) {
+                  <span style="color:var(--error)"> · cada talla va de 0 a lo que hay en bodega</span>
+                } @else if (cierraOP()) {
+                  <span class="cell-sub"> · sale todo lo pedido: la OP se cierra</span>
+                } @else {
+                  <span class="cell-sub"> · despacho parcial: la OP queda abierta con lo que falta</span>
+                }
+              </div>
+              <div style="display:flex;gap:var(--sp-2)">
+                <button class="btn btn-secondary" type="button" [disabled]="accion()" (click)="cerrarDespacho()">Cancelar</button>
+                <button class="btn btn-primary" type="button" [class.is-loading]="accion()" [disabled]="accion() || despachoInvalido() || totalDespacho() === 0" (click)="despachar()">Confirmar despacho</button>
+              </div>
+            </div>
+          </div></div>
+        }
 
         @if (carteraBloqueada()) {
           <div class="card cartera-banner"><div class="card-body">
@@ -184,7 +240,7 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
           <app-pt-reassignment-panel [opId]="o.id" [opConsecutivo]="o.consecutivo" [viva]="o.estado !== 'ANULADA' && o.estado !== 'DESPACHADA'" (changed)="cargar(o.id)" />
         }
 
-        @if (error() && !carteraBloqueada()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
+        @if (error() && !carteraBloqueada() && !despachoAbierto()) { <p style="color:var(--error);font-size:var(--text-sm);margin:var(--sp-3) 0">{{ error() }}</p> }
         }
       } @else {
         <div class="card"><div class="card-body"><div class="empty"><h4>No se encontró la orden de producción</h4></div></div></div>
@@ -246,6 +302,11 @@ import { PtReassignmentPanelComponent } from './pt-reassignment-panel.component'
     .bod-cell{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
     .bod-zero{color:var(--text-subtle)}
     @media(max-width:1100px){.summary{grid-template-columns:repeat(2,1fr)}}
+    .desp-strip{margin:0 0 var(--sp-4);font-size:var(--text-sm)}
+    .desp-card{margin-bottom:var(--sp-5)}
+    .desp-table th.num,.desp-table td.num{text-align:right}
+    .desp-input{width:90px;text-align:right}
+    .desp-foot{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-4)}
     .cartera-banner{border-color:color-mix(in oklch,var(--error) 40%,var(--border));margin-bottom:var(--sp-5)}
     .cb-input{padding:var(--sp-2) var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text)}
   `],
@@ -300,6 +361,7 @@ export class OpDetalleComponent implements OnInit {
     this.cargando.set(true);
     this.op.set(null);
     this.carteraBloqueada.set(false);
+    this.despachoAbierto.set(false);
     this.motivo.set('');
     this.api.obtenerOP(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: o => { this.op.set(o); this.cargando.set(false); },
@@ -326,11 +388,48 @@ export class OpDetalleComponent implements OnInit {
     });
   }
 
+  /**
+   * Hay algo que despachar: la OP está viva y tiene pares reservados en bodega. Desde el
+   * despacho parcial (JP, 2026-11-19) no hace falta que esté completa: sale lo que hay.
+   */
   despachable = computed(() => {
     const o = this.op();
-    // Se despacha cuando todos los pares están en bodega, salieran de stock o se fabricaran.
-    return !!o && (o.estado === 'AMARRADA' || o.estado === 'EN_PRODUCCION') && pendientesDeBodega(o) === 0;
+    return !!o && (o.estado === 'AMARRADA' || o.estado === 'EN_PRODUCCION') && reservadoTotal(o) > 0;
   });
+
+  despachado = computed(() => { const o = this.op(); return o ? despachadoTotal(o) : 0; });
+
+  // Formulario de despacho: opLineaTallaId → pares que salen.
+  despachoAbierto = signal(false);
+  cantidades = signal<Record<number, number>>({});
+  filasDesp = computed(() => { const o = this.op(); return o ? filasDespacho(o) : []; });
+  totalDespacho = computed(() => Object.values(this.cantidades()).reduce((a, c) => a + (Number(c) || 0), 0));
+  despachoInvalido = computed(() => this.filasDesp().some((f) => {
+    const c = this.cantidades()[f.opLineaTallaId];
+    return !Number.isInteger(c) || c < 0 || c > f.reservado;
+  }));
+  cierraOP = computed(() => { const o = this.op(); return !!o && despachoCierraOP(o, this.cantidades()); });
+
+  /** Abre el formulario precargado con todo lo reservado (el despacho de siempre). */
+  abrirDespacho(): void {
+    const c: Record<number, number> = {};
+    for (const f of this.filasDesp()) c[f.opLineaTallaId] = f.reservado;
+    this.cantidades.set(c);
+    this.error.set('');
+    this.carteraBloqueada.set(false);
+    this.despachoAbierto.set(true);
+  }
+
+  cerrarDespacho(): void {
+    this.despachoAbierto.set(false);
+    this.carteraBloqueada.set(false);
+    this.error.set('');
+  }
+
+  setCantidad(f: FilaDespacho, v: unknown): void {
+    const n = v === '' || v === null || v === undefined ? NaN : Number(v);
+    this.cantidades.update((c) => ({ ...c, [f.opLineaTallaId]: n }));
+  }
 
   requerible = computed(() => {
     const o = this.op();
@@ -361,12 +460,20 @@ export class OpDetalleComponent implements OnInit {
     if (!o || this.accion()) return;
     this.carteraBloqueada.set(false);
     this.accion.set(true); this.error.set('');
-    const body = autorizar ? { opId: o.id, autorizar: true, motivo: this.motivo() } : { opId: o.id };
+    const body: DespacharParams = autorizar ? { opId: o.id, autorizar: true, motivo: this.motivo() } : { opId: o.id };
+    // Con el formulario abierto viajan las cantidades por talla (las en cero no salen).
+    if (this.despachoAbierto()) {
+      body.lines = Object.entries(this.cantidades())
+        .map(([id, q]) => ({ opLineaTallaId: Number(id), quantity: Number(q) }))
+        .filter((l) => l.quantity > 0);
+    }
     this.despachosApi.despachar(body).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.accion.set(false); this.router.navigateByUrl('/despachos'); },
       error: (e) => {
         this.accion.set(false);
-        if (e?.status === 409) { this.carteraBloqueada.set(true); this.error.set(this.msg(e)); }
+        // Un 409 también puede ser "el pedido cambió mientras se despachaba": ese no
+        // es de cartera y no debe ofrecer autorizar.
+        if (e?.status === 409 && /cartera/i.test(this.msg(e))) { this.carteraBloqueada.set(true); this.error.set(this.msg(e)); }
         else { this.error.set(this.msg(e)); }
       },
     });

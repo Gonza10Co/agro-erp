@@ -1,5 +1,8 @@
 import { OrdenProduccion } from '../../../core/api/models/pedidos.models';
-import { resumenAmarre, filasPorTalla, filasPorBodega, bodegasDeOP, pendientesDeBodega } from './amarre-view';
+import {
+  resumenAmarre, filasPorTalla, filasPorBodega, bodegasDeOP, pendientesDeBodega,
+  despachadoTotal, reservadoTotal, filasDespacho, despachoCierraOP,
+} from './amarre-view';
 
 // OP mock: 1 producto, 2 tallas. T36 completa en stock (Ibagué). T39 mitad stock (Ibagué+Bogotá), mitad a producir.
 const OP: OrdenProduccion = {
@@ -86,5 +89,45 @@ describe('amarre-view', () => {
     expect(r.cedidos).toBe(5);
     expect(r.producir).toBe(5);
     expect(resumenAmarre(OP).cedidos).toBe(0);
+  });
+
+  describe('despacho parcial', () => {
+    // T36: 60 pedidos, ya salieron 50, quedan 10 reservados. T39: 240, salieron 0, 120 reservados.
+    function opParcial(): OrdenProduccion {
+      const o = structuredClone(OP);
+      const [t36, t39] = o.lineas![0].tallas;
+      t36.dispatched = 50;
+      t36.reservas = [{ id: 9, inventarioPTId: 1, cantidad: 10 }];
+      t39.dispatched = 0;
+      return o;
+    }
+
+    it('lo despachado no cuenta como pendiente de bodega', () => {
+      // T39 necesita 240 y tiene 120 reservados → faltan 120; T36 completa (50 + 10).
+      expect(pendientesDeBodega(opParcial())).toBe(120);
+    });
+
+    it('totales de lo despachado y lo reservado', () => {
+      expect(despachadoTotal(opParcial())).toBe(50);
+      expect(reservadoTotal(opParcial())).toBe(130);
+    });
+
+    it('filasDespacho: una fila por talla con algo en bodega, con tope y lo que falta por salir', () => {
+      expect(filasDespacho(opParcial())).toEqual([
+        { opLineaTallaId: 500, producto: 'Bota Dieléctrica PU Negro', calidad: 'PRIMERA', talla: 36, porDespachar: 10, reservado: 10, despachado: 50 },
+        { opLineaTallaId: 501, producto: 'Bota Dieléctrica PU Negro', calidad: 'PRIMERA', talla: 39, porDespachar: 240, reservado: 120, despachado: 0 },
+      ]);
+      const sinBodega = opParcial();
+      sinBodega.lineas![0].tallas[1].reservas = [];
+      expect(filasDespacho(sinBodega).map((f) => f.talla)).toEqual([36]);
+    });
+
+    it('despachoCierraOP solo cuando lo despachado más lo de ahora cubre cada talla', () => {
+      const o = opParcial();
+      expect(despachoCierraOP(o, { 500: 10, 501: 120 })).toBe(false);
+      o.lineas![0].tallas[1].dispatched = 120;
+      expect(despachoCierraOP(o, { 500: 10, 501: 120 })).toBe(true);
+      expect(despachoCierraOP(o, { 500: 9, 501: 120 })).toBe(false);
+    });
   });
 });

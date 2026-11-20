@@ -66,6 +66,103 @@ describe('OpDetalleComponent — despacho', () => {
   });
 });
 
+describe('OpDetalleComponent — despacho parcial', () => {
+  let http: HttpTestingController;
+  // Pedido de 20 (talla 40): 12 en bodega para la OP, nada despachado.
+  const opBodega = () => ({
+    id: 7, consecutivo: 12, estado: 'EN_PRODUCCION', ocId: 9,
+    lineas: [{
+      id: 1, productoConfiguradoId: 3, calidad: 'PRIMERA', productoConfigurado: { nombreComercial: 'Alpaca' },
+      tallas: [{ id: 30, tallaId: 40, cantPedida: 20, cantAmarrada: 0, cantAProducir: 20, dispatched: 0,
+        talla: { id: 40, valor: 40 }, reservas: [{ id: 100, inventarioPTId: 50, cantidad: 12 }] }],
+    }],
+  } as any);
+  function crear() {
+    TestBed.configureTestingModule({
+      imports: [OpDetalleComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    const fixture = TestBed.createComponent(OpDetalleComponent);
+    http = TestBed.inject(HttpTestingController);
+    return fixture;
+  }
+  afterEach(() => {
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
+    localStorage.clear();
+  });
+
+  it('se puede despachar aunque falte producción: basta con tener pares en bodega', () => {
+    const cmp = crear().componentInstance;
+    cmp.op.set(opBodega());
+    expect(cmp.despachable()).toBe(true);
+    const sinBodega = opBodega();
+    sinBodega.lineas[0].tallas[0].reservas = [];
+    cmp.op.set(sinBodega);
+    expect(cmp.despachable()).toBe(false);
+  });
+
+  it('abre el formulario precargado con todo lo reservado y avisa que la OP queda abierta', () => {
+    const cmp = crear().componentInstance;
+    cmp.op.set(opBodega());
+    cmp.abrirDespacho();
+    expect(cmp.despachoAbierto()).toBe(true);
+    expect(cmp.cantidades()).toEqual({ 30: 12 });
+    expect(cmp.totalDespacho()).toBe(12);
+    expect(cmp.cierraOP()).toBe(false);
+  });
+
+  it('valida que cada talla vaya de 0 a lo reservado', () => {
+    const cmp = crear().componentInstance;
+    cmp.op.set(opBodega());
+    cmp.abrirDespacho();
+    const fila = cmp.filasDesp()[0];
+    cmp.setCantidad(fila, 13);
+    expect(cmp.despachoInvalido()).toBe(true);
+    cmp.setCantidad(fila, '');
+    expect(cmp.despachoInvalido()).toBe(true);
+    cmp.setCantidad(fila, 5);
+    expect(cmp.despachoInvalido()).toBe(false);
+  });
+
+  it('POSTea solo las tallas con cantidad y navega a despachos', () => {
+    const fixture = crear();
+    const cmp = fixture.componentInstance;
+    const navSpy = spyOn(TestBed.inject(Router), 'navigateByUrl');
+    cmp.op.set(opBodega());
+    cmp.abrirDespacho();
+    cmp.setCantidad(cmp.filasDesp()[0], 5);
+    cmp.despachar();
+    const req = http.expectOne('http://localhost:3001/despachos');
+    expect(req.request.body).toEqual({ opId: 7, lines: [{ opLineaTallaId: 30, quantity: 5 }] });
+    req.flush({ id: 1, consecutivo: 3, opClosed: false });
+    expect(navSpy).toHaveBeenCalledWith('/despachos');
+  });
+
+  it('la autorización de cartera viaja con las mismas cantidades', () => {
+    const cmp = crear().componentInstance;
+    cmp.op.set(opBodega());
+    cmp.abrirDespacho();
+    cmp.setCantidad(cmp.filasDesp()[0], 4);
+    cmp.motivo.set('paga el viernes');
+    cmp.despachar(true);
+    const req = http.expectOne('http://localhost:3001/despachos');
+    expect(req.request.body).toEqual({ opId: 7, autorizar: true, motivo: 'paga el viernes', lines: [{ opLineaTallaId: 30, quantity: 4 }] });
+    req.flush({ id: 1, consecutivo: 3 });
+  });
+
+  it('un 409 que no es de cartera no ofrece autorizar', () => {
+    const cmp = crear().componentInstance;
+    cmp.op.set(opBodega());
+    cmp.abrirDespacho();
+    cmp.despachar();
+    http.expectOne('http://localhost:3001/despachos').flush(
+      { message: 'El pedido cambió mientras se despachaba, vuelve a intentar' }, { status: 409, statusText: 'Conflict' },
+    );
+    expect(cmp.carteraBloqueada()).toBe(false);
+    expect(cmp.error()).toContain('cambió');
+  });
+});
+
 describe('OpDetalleComponent', () => {
   function setup(opId = '12') {
     TestBed.configureTestingModule({
