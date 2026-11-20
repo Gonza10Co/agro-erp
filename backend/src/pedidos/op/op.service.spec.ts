@@ -356,6 +356,42 @@ describe('OpService.anular', () => {
     });
   });
 
+  it('una OP ya despachada completa no se anula', async () => {
+    const prisma: any = {
+      ordenProduccion: { findUnique: jest.fn().mockResolvedValue({ id: 50, ocId: 1, estado: 'DESPACHADA', lineas: [] }) },
+      $transaction: jest.fn(),
+    };
+    await expect(new OpService(prisma, compras).anular(50)).rejects.toThrow(/ya fue despachada/);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('una OP despachada en parte se anula soltando solo lo que sigue reservado', async () => {
+    const tx: any = {
+      inventarioPT: { update: jest.fn() },
+      reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
+      ordenProduccion: { update: jest.fn() },
+      ordenCompra: { update: jest.fn() },
+      par: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      ordenFabricacion: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      inventarioMaterial: { update: jest.fn() },
+    };
+    const prisma: any = {
+      ordenProduccion: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 50, ocId: 1, estado: 'EN_PRODUCCION',
+          // Pedido de 30: salieron 20 en un despacho parcial y quedan 4 reservados.
+          lineas: [{ tallas: [{ id: 80, cantAProducir: 30, dispatched: 20, reservas: [{ id: 300, inventarioPTId: 70, cantidad: 4 }] }] }],
+        }),
+      },
+      $transaction: jest.fn((cb: any) => cb(tx)),
+    };
+    await new OpService(prisma, compras).anular(50);
+    expect(tx.inventarioPT.update).toHaveBeenCalledTimes(1);
+    expect(tx.inventarioPT.update).toHaveBeenCalledWith({ where: { id: 70 }, data: { cantReservada: { decrement: 4 } } });
+    expect(tx.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 50 }, data: { estado: 'ANULADA' } });
+  });
+
   describe('carrera con una reasignación de pares', () => {
     function armar() {
       const tx: any = {

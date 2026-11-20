@@ -19,10 +19,18 @@ function opBase(over: any = {}) {
 describe('DespachoService', () => {
   const prisma: any = {
     $queryRawUnsafe: jest.fn(),
+    $queryRaw: jest.fn(),
     ordenProduccion: { findUnique: jest.fn(), update: jest.fn() },
+    ordenProduccionLineaTalla: { update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     despacho: { create: jest.fn() },
     inventarioPT: { update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-    reservaInventarioPT: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }), count: jest.fn().mockResolvedValue(0) },
+    reservaInventarioPT: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+      delete: jest.fn(),
+    },
     ordenCompra: { update: jest.fn() },
     movimientoInventario: { createMany: jest.fn() },
     requerimientoCompra: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
@@ -37,6 +45,11 @@ describe('DespachoService', () => {
     prisma.inventarioPT.updateMany.mockResolvedValue({ count: 1 });
     prisma.reservaInventarioPT.deleteMany.mockResolvedValue({ count: 1 });
     prisma.reservaInventarioPT.count.mockResolvedValue(0);
+    prisma.reservaInventarioPT.updateMany.mockResolvedValue({ count: 1 });
+    prisma.reservaInventarioPT.findMany.mockResolvedValue([]);
+    // Lo que se relee adentro de la transacción para decidir si la OP se cierra:
+    // sin tallas = todo despachado (los tests del despacho total).
+    prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([]);
   });
 
   it('404 si la OP no existe', async () => {
@@ -44,8 +57,8 @@ describe('DespachoService', () => {
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(NotFoundException);
   });
 
-  it('409 si la OP ya tiene despacho', async () => {
-    prisma.ordenProduccion.findUnique.mockResolvedValue(opBase({ despacho: { id: 1 } }));
+  it('400 si la OP ya fue despachada', async () => {
+    prisma.ordenProduccion.findUnique.mockResolvedValue(opBase({ estado: 'DESPACHADA' }));
     await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(BadRequestException);
   });
 
@@ -231,6 +244,128 @@ describe('DespachoService', () => {
       await service.despachar({ opId: 1 }, operario);
       const ids = prisma.inventarioPT.updateMany.mock.calls.map((c: any) => c[0].where.id);
       expect(ids).toEqual([50, 60]);
+    });
+  });
+  describe('despacho parcial (JP, 2026-11-19)', () => {
+    // Pedido de 20 (todo a producir), 12 ya en bodega reservados, nada despachado.
+    function opParcial(over: any = {}) {
+      const op = opBase({ estado: 'EN_PRODUCCION', ...over });
+      Object.assign(op.lineas[0].tallas[0], { cantAmarrada: 0, cantAProducir: 20, dispatched: 0 });
+      op.lineas[0].tallas[0].reservas[0].cantidad = 12;
+      return op;
+    }
+    beforeEach(() => {
+      prisma.$queryRawUnsafe.mockResolvedValue([{ v: 8n }]);
+      prisma.despacho.create.mockResolvedValue({ id: 9, consecutivo: 8 });
+    });
+
+    it('sin lines, una OP incompleta sigue sin poder despacharse completa', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      await expect(service.despachar({ opId: 1 }, operario)).rejects.toThrow(/faltan 8 pares/);
+    });
+
+    it('despacha una parte: baja la reserva, sube lo despachado y la OP queda abierta', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([
+        { id: 30, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 5 },
+      ]);
+      const res = await service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario);
+      // Lock de la OP adentro de la transacción (mismo orden que la reasignación).
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.inventarioPT.updateMany).toHaveBeenCalledWith({
+        where: { id: 50, cantDisponible: { gte: 5 }, cantReservada: { gte: 5 } },
+        data: { cantDisponible: { decrement: 5 }, cantReservada: { decrement: 5 } },
+      });
+      // La reserva baja solo si sigue como se leyó.
+      expect(prisma.reservaInventarioPT.updateMany).toHaveBeenCalledWith({
+        where: { id: 100, cantidad: 12 },
+        data: { cantidad: { decrement: 5 } },
+      });
+      expect(prisma.reservaInventarioPT.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.ordenProduccionLineaTalla.update).toHaveBeenCalledWith({
+        where: { id: 30 },
+        data: { dispatched: { increment: 5 } },
+      });
+      expect(prisma.despacho.create.mock.calls[0][0].data.lineas.create).toEqual([
+        { productoConfiguradoId: 7, tallaId: 10, bodegaId: 2, calidad: 'PRIMERA', cantidad: 5 },
+      ]);
+      expect(prisma.movimientoInventario.createMany.mock.calls[0][0].data[0]).toEqual(
+        expect.objectContaining({ cantidad: 5, referencia: 'DSP-8' }),
+      );
+      // Abierta: ni DESPACHADA ni OC cerrada ni se suelta el amarre de insumos.
+      expect(prisma.ordenProduccion.update).not.toHaveBeenCalled();
+      expect(prisma.ordenCompra.update).not.toHaveBeenCalled();
+      expect(prisma.requerimientoCompra.findMany).not.toHaveBeenCalled();
+      expect(res).toEqual(expect.objectContaining({ id: 9, opClosed: false }));
+    });
+
+    it('el despacho que completa lo pedido cierra la OP como el total', async () => {
+      const op = opParcial();
+      (op.lineas[0].tallas[0] as any).dispatched = 8; // ya salieron 8 antes
+      prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+      prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([
+        { id: 30, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 20 },
+      ]);
+      const res = await service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 12 }] }, operario);
+      expect(prisma.reservaInventarioPT.deleteMany).toHaveBeenCalledWith({ where: { id: 100, cantidad: 12 } });
+      expect(prisma.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { estado: 'DESPACHADA' } });
+      expect(prisma.ordenCompra.update).toHaveBeenCalledWith({ where: { id: 9 }, data: { estado: 'CERRADA' } });
+      expect(res).toEqual(expect.objectContaining({ opClosed: true }));
+    });
+
+    it('sin lines, una OP con parciales previos y el resto en bodega se despacha completa', async () => {
+      const op = opParcial();
+      (op.lineas[0].tallas[0] as any).dispatched = 8;
+      prisma.ordenProduccion.findUnique.mockResolvedValue(op);
+      await service.despachar({ opId: 1 }, operario);
+      expect(prisma.ordenProduccion.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { estado: 'DESPACHADA' } });
+    });
+
+    it('400 si pide más de lo reservado de la talla', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      await expect(
+        service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 13 }] }, operario),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('la cartera vencida bloquea también el despacho parcial', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial({ oc: { cliente: { estadoCartera: 'VENCIDO' } } }));
+      await expect(
+        service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('409 si la reserva cambió entre la lectura y el despacho parcial', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      prisma.reservaInventarioPT.updateMany.mockResolvedValue({ count: 0 });
+      await expect(
+        service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario),
+      ).rejects.toThrow(/cambió mientras se despachaba/);
+      expect(prisma.despacho.create).not.toHaveBeenCalled();
+    });
+
+    it('409 si otra transacción cerró o anuló la OP antes del lock', async () => {
+      prisma.ordenProduccion.findUnique
+        .mockResolvedValueOnce(opParcial())
+        .mockResolvedValueOnce({ estado: 'ANULADA' });
+      await expect(
+        service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 5 }] }, operario),
+      ).rejects.toThrow(/cambió mientras se despachaba/);
+    });
+
+    it('al cerrar suelta en bodega lo que haya quedado reservado de más', async () => {
+      prisma.ordenProduccion.findUnique.mockResolvedValue(opParcial());
+      prisma.ordenProduccionLineaTalla.findMany.mockResolvedValue([
+        { id: 30, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, dispatched: 20 },
+      ]);
+      prisma.reservaInventarioPT.findMany.mockResolvedValue([{ id: 100, inventarioPTId: 50, cantidad: 2 }]);
+      await service.despachar({ opId: 1, lines: [{ opLineaTallaId: 30, quantity: 10 }] }, operario);
+      expect(prisma.reservaInventarioPT.delete).toHaveBeenCalledWith({ where: { id: 100 } });
+      expect(prisma.inventarioPT.update).toHaveBeenCalledWith({
+        where: { id: 50 },
+        data: { cantReservada: { decrement: 2 } },
+      });
     });
   });
 });
