@@ -7,6 +7,17 @@
 > Última actualización: **2026-10-05** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
+> **🔁 PASAR PARES RESERVADOS ENTRE PEDIDOS (2026-11-19), sin desplegar.** Pedido de JP: un pedido
+> listo que no se despacha (Guantes Terry) y otro que sí hay que despachar (Vozincol). En el
+> detalle de la OP, solo ADMIN/GERENTE (sección `reasignar-pares`, ENTREGADO): **"Pasar pares a
+> otro pedido"** y **"Liberar para otra venta"**, con motivo obligatorio; el historial lo ve todo
+> el que ve la OP. Tabla `PtReassignment` + `OrdenProduccionLineaTalla.reassignedOut` (migración
+> `20261119214259_pt_reassignment`). A queda debiendo: `cantAProducir` sube lo cedido y
+> `reassignedOut` lo compensa (necesidad = amarrado + a producir − cedido, en `pedidos/op/op-need.ts`);
+> su despacho falla por faltante. B recibe la reserva sobre la MISMA fila de `InventarioPT` (no
+> cambia de bodega) y des-programa lo recibido sin bajar de lo ya nacido. La proyección ahora
+> calcula lo pendiente de la OP con sus reservas (como el despacho), no con los pares TERMINADOS.
+>
 > **🖨️ IMPRIMIR POR ADELANTADO (2026-10-05), en `develop`, sin desplegar.** En `/fabricacion/estacion` (Preparación) se imprimen las lenguas mientras las botas siguen en corte: `POST /fabricacion/of/:id/reservar-etiquetas` reserva el código (tabla `EtiquetaReservada`, misma secuencia que los pares) sin que nazca el par; nace en su primer pistolazo en Preparación (en otra estación se rechaza). Migración `20261005150000_etiqueta_reservada`.
 
 > **✂️ ROL JEFE_CORTE (2026-10-05), en `develop`, sin desplegar.** Usuario propio para el jefe

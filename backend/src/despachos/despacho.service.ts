@@ -10,6 +10,9 @@ import { siguienteConsecutivo } from '../prisma/consecutivo';
 import { liberarReservasDeOp } from '../compras/reserva-insumos';
 import { DespacharDto } from './dto/despachar.dto';
 import { construirLineasDespacho, ReservaPlana } from './despacho-lineas';
+import { pendingOf } from '../pedidos/op/op-need';
+
+const CAMBIO_EN_CURSO = 'El pedido cambió mientras se despachaba, vuelve a intentar';
 
 interface Usuario {
   sub: number;
@@ -40,16 +43,12 @@ export class DespachoService {
     if (op.estado !== 'AMARRADA' && op.estado !== 'EN_PRODUCCION')
       throw new BadRequestException('Solo se puede despachar una OP amarrada o en producción');
     // Producción pendiente = lo que el pedido necesita (amarrado de bodega +
-    // programado a fabricar) menos lo que ya tiene reservado (el amarre inicial
-    // más cada par que entró a PT). `cantAProducir` no baja al producir: es lo
-    // programado, y así lo leen el corte y los tableros.
+    // programado a fabricar − lo cedido a otro pedido) menos lo que ya tiene
+    // reservado (el amarre inicial más cada par que entró a PT). `cantAProducir`
+    // no baja al producir: es lo programado, y así lo leen el corte y los tableros.
+    // Un pedido al que gerencia le pasó pares a otro queda debiendo y falla acá.
     const faltan = op.lineas.reduce(
-      (acc: number, l: any) =>
-        acc +
-        l.tallas.reduce((a: number, t: any) => {
-          const reservado = (t.reservas ?? []).reduce((x: number, r: any) => x + r.cantidad, 0);
-          return a + Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - reservado, 0);
-        }, 0),
+      (acc: number, l: any) => acc + l.tallas.reduce((a: number, t: any) => a + pendingOf(t), 0),
       0,
     );
     if (faltan > 0)
@@ -86,6 +85,10 @@ export class DespachoService {
           })),
         ),
       );
+    // Orden canónico de locks (por fila de inventario): dos despachos o un despacho y
+    // una reasignación que tocan las mismas filas las bloquean en el mismo orden.
+    reservas.sort((a, b) => a.inventarioPTId - b.inventarioPTId || a.reservaId - b.reservaId);
+    const tallaIds: number[] = op.lineas.flatMap((l: any) => l.tallas.map((t: any) => t.id)).filter((id: any) => id != null);
     const lineas = construirLineasDespacho(reservas);
 
     return this.prisma.$transaction(async (tx) => {
@@ -107,7 +110,16 @@ export class DespachoService {
           throw new ConflictException(
             `Inventario insuficiente al despachar (producto ${r.productoConfiguradoId}, talla ${r.tallaId}, bodega ${r.bodegaId}) — reintentá o revisá reservas`,
           );
-        await tx.reservaInventarioPT.delete({ where: { id: r.reservaId } });
+        // Las reservas se leyeron fuera de la transacción: si una reasignación de pares
+        // la cambió en el medio, no se despacha con datos viejos.
+        const borrada = await tx.reservaInventarioPT.deleteMany({ where: { id: r.reservaId, cantidad: r.cantidad } });
+        if (borrada.count === 0) throw new ConflictException(CAMBIO_EN_CURSO);
+      }
+      // Y si le llegó una reserva nueva (recibió pares) tampoco: quedaría colgando de
+      // una OP despachada, ocupando stock para siempre.
+      if (tallaIds.length > 0) {
+        const quedan = await tx.reservaInventarioPT.count({ where: { opLineaTallaId: { in: tallaIds } } });
+        if (quedan > 0) throw new ConflictException(CAMBIO_EN_CURSO);
       }
 
       // Kardex: una SALIDA por reserva despachada, trazable al despacho.

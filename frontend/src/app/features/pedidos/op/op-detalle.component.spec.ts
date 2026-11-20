@@ -28,6 +28,8 @@ describe('OpDetalleComponent — despacho', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ opId: 7 });
     req.flush({ id: 1, consecutivo: 1 });
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -45,6 +47,8 @@ describe('OpDetalleComponent — despacho', () => {
     expect(req.request.method).toBe('POST');
     req.flush({ id: 99, consecutivo: 1, opId: 7, fecha: '', grupos: [] });
     expect(navSpy).toHaveBeenCalledWith('/compras/requerimiento/99');
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -56,6 +60,8 @@ describe('OpDetalleComponent — despacho', () => {
     const req = http.expectOne('http://localhost:3001/despachos');
     req.flush({ message: 'Cliente con cartera VENCIDO — requiere autorización del gerente' }, { status: 409, statusText: 'Conflict' });
     expect(cmp.carteraBloqueada()).toBe(true);
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 });
@@ -91,6 +97,8 @@ describe('OpDetalleComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('OP-1187');
     expect(text).toContain('Minera El Roble');
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -114,6 +122,8 @@ describe('OpDetalleComponent', () => {
     c.vista.set('bodega');
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Total stock');
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -136,6 +146,8 @@ describe('OpDetalleComponent', () => {
     // tras anular, recarga (segundo GET de OP + requerimientos)
     http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
     http.expectOne('http://localhost:3001/pedidos/op/12').flush({ ...base, estado: 'ANULADA' });
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -156,6 +168,26 @@ describe('OpDetalleComponent', () => {
     expect(text).toContain('Insumos del pedido');
     expect(text).toContain('REQ-3');
     expect(text).toContain('amarre activo');
+    // El panel de pares cedidos/recibidos pide su historial apenas se pinta la OP.
+    http.match((r) => r.url.endsWith('/reassignments')).forEach((r) => r.flush([]));
+    http.verify();
+  });
+
+  it('muestra el panel de pares cedidos y recibidos con el historial de la OP', () => {
+    const { fixture, http } = setup('12');
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/requerimientos?opId=12').flush([]);
+    http.expectOne('http://localhost:3001/pedidos/op/12').flush({
+      id: 12, consecutivo: 1187, ocId: 41, fecha: '2026-05-28T00:00:00.000Z', estado: 'AMARRADA',
+      lineas: [{ id: 1, productoConfiguradoId: 7, tallas: [{ id: 5, tallaId: 3, cantPedida: 20, cantAmarrada: 0, cantAProducir: 25, reassignedOut: 5, talla: { id: 3, valor: 40 } }] }],
+    });
+    fixture.detectChanges();
+    http.expectOne('http://localhost:3001/pedidos/op/12/reassignments').flush([]);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Pares cedidos y recibidos');
+    // El resumen explica por qué "a producir" supera lo pendiente de lo pedido.
+    expect(text).toContain('5 de esos reponen pares que gerencia pasó a otro pedido');
     http.verify();
   });
 });

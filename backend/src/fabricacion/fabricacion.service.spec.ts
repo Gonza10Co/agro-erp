@@ -701,6 +701,31 @@ describe('FabricacionService.avanzar', () => {
     expect(tx.ordenFabricacion.updateMany).toHaveBeenCalled();
   });
 
+  it('OF reabierta porque su pedido cedió 5 pares: sigue abierta hasta que nazcan y terminen esos 5', async () => {
+    const par = {
+      id: 50, ofId: 1, celulaActual: 'PT', estado: 'EN_PROCESO', calidad: 'PRIMERA',
+      productoConfiguradoId: 10, tallaId: 1, of: { estado: 'EN_PROCESO', opId: 7 },
+    };
+    // 20 programados + 5 reprogramados al ceder = 25; solo han nacido los 20 originales.
+    const a = makePrisma();
+    a.prisma.par.findUnique.mockResolvedValue(par);
+    a.tx.ordenProduccionLineaTalla.aggregate.mockResolvedValue({ _sum: { cantAProducir: 25 } });
+    a.tx.par.count.mockResolvedValueOnce(0).mockResolvedValueOnce(20);
+    await new FabricacionService(a.prisma).avanzar('OF1-0001', dto);
+    expect(a.tx.ordenFabricacion.updateMany).not.toHaveBeenCalled();
+
+    // Nacieron los 5 que faltaban y terminó el último: se vuelve a cerrar.
+    const b = makePrisma();
+    b.prisma.par.findUnique.mockResolvedValue(par);
+    b.tx.ordenProduccionLineaTalla.aggregate.mockResolvedValue({ _sum: { cantAProducir: 25 } });
+    b.tx.par.count.mockResolvedValueOnce(0).mockResolvedValueOnce(25);
+    await new FabricacionService(b.prisma).avanzar('OF1-0001', dto);
+    expect(b.tx.ordenFabricacion.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, estado: { not: 'ANULADA' } },
+      data: { estado: 'TERMINADA' },
+    });
+  });
+
   it('un par marcado de SEGUNDA entra al saldo de segundas, no al de primeras', async () => {
     const { prisma, tx } = makePrisma();
     prisma.par.findUnique.mockResolvedValue({
@@ -1307,6 +1332,33 @@ describe('FabricacionService.avanzar: el par terminado queda reservado para su O
     expect(tx.reservaInventarioPT.create).not.toHaveBeenCalled();
     expect(tx.reservaInventarioPT.update).not.toHaveBeenCalled();
     expect(tx.inventarioPT.update).not.toHaveBeenCalled();
+  });
+
+  it('lo cedido a otro pedido no infla la necesidad: con 20 de 20 reservados el par sobra', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnFinizaje());
+    // Pedido de 20: se cedieron 5 (reprogramados: 25 a producir) y ya repuso los 20.
+    tx.ordenProduccionLineaTalla.findFirst.mockResolvedValue({
+      id: 7, cantAmarrada: 0, cantAProducir: 25, reassignedOut: 5, reservas: [{ id: 2, inventarioPTId: 33, cantidad: 20 }],
+    });
+
+    await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'PT' });
+
+    expect(tx.reservaInventarioPT.update).not.toHaveBeenCalled();
+    expect(tx.inventarioPT.update).not.toHaveBeenCalled();
+  });
+
+  it('el pedido que cedió pares recupera los que siguen saliendo de su OF', async () => {
+    const { prisma, tx } = makePrisma();
+    prisma.par.findUnique.mockResolvedValue(parEnFinizaje());
+    tx.ordenProduccionLineaTalla.findFirst.mockResolvedValue({
+      id: 7, cantAmarrada: 0, cantAProducir: 25, reassignedOut: 5, reservas: [{ id: 2, inventarioPTId: 33, cantidad: 15 }],
+    });
+    tx.reservaInventarioPT.findFirst.mockResolvedValue({ id: 2, cantidad: 15 });
+
+    await new FabricacionService(prisma).avanzar('OF1-0001', { ...dto, estacion: 'PT' });
+
+    expect(tx.reservaInventarioPT.update).toHaveBeenCalledWith({ where: { id: 2 }, data: { cantidad: { increment: 1 } } });
   });
 
   it('una segunda no cubre un pedido de primeras: se busca la línea de su propio grado', async () => {

@@ -79,4 +79,37 @@ describe('PedidosApi', () => {
     expect(req.request.method).toBe('GET');
     req.flush({ id: 50 });
   });
+  describe('reasignación de pares reservados', () => {
+    const body = { productoConfiguradoId: 7, tallaId: 3, calidad: 'PRIMERA' as const, quantity: 5, reason: 'Vozincol paga de contado' };
+
+    it('reassignmentOptions hace GET /pedidos/op/:id/reassignment-options', () => {
+      api.reassignmentOptions(4).subscribe();
+      const req = http.expectOne('http://localhost:3001/pedidos/op/4/reassignment-options');
+      expect(req.request.method).toBe('GET');
+      req.flush([]);
+    });
+
+    it('reassignments hace GET /pedidos/op/:id/reassignments', () => {
+      api.reassignments(4).subscribe();
+      const req = http.expectOne('http://localhost:3001/pedidos/op/4/reassignments');
+      expect(req.request.method).toBe('GET');
+      req.flush([]);
+    });
+
+    it('reassignPairs hace POST /pedidos/op/:id/reassign con el destino', () => {
+      api.reassignPairs(4, { ...body, toOpId: 9 }).subscribe();
+      const req = http.expectOne('http://localhost:3001/pedidos/op/4/reassign');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ ...body, toOpId: 9 });
+      req.flush({ id: 1 });
+    });
+
+    it('releasePairs hace POST /pedidos/op/:id/release', () => {
+      api.releasePairs(4, body).subscribe();
+      const req = http.expectOne('http://localhost:3001/pedidos/op/4/release');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(body);
+      req.flush({ id: 2 });
+    });
+  });
 });

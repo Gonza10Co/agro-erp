@@ -10,6 +10,7 @@ import { InventarioModule } from './inventario/inventario.module';
 import { OcModule } from './pedidos/oc/oc.module';
 import { OpModule } from './pedidos/op/op.module';
 import { ProyeccionModule } from './pedidos/proyeccion/proyeccion.module';
+import { PtReassignmentModule } from './pedidos/reassignment/pt-reassignment.module';
 import { DespachoModule } from './despachos/despacho.module';
 import { ComprasModule } from './compras/compras.module';
 import { FabricacionModule } from './fabricacion/fabricacion.module';
@@ -37,6 +38,7 @@ import { OperariosModule } from './operarios/operarios.module';
     OcModule,
     OpModule,
     ProyeccionModule,
+    PtReassignmentModule,
     DespachoModule,
     ComprasModule,
     FabricacionModule,

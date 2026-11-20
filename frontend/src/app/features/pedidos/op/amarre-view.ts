@@ -8,6 +8,8 @@ export interface ResumenAmarre {
   producir: number;
   pctStock: number; // 0..100 redondeado
   bodegas: BodegaRef[];
+  /** Pares que gerencia pasó a otro pedido o liberó: ya van sumados en `producir`. */
+  cedidos: number;
 }
 
 export interface TallaFila {
@@ -47,14 +49,15 @@ export function bodegasDeOP(op: OrdenProduccion): BodegaRef[] {
 }
 
 export function resumenAmarre(op: OrdenProduccion): ResumenAmarre {
-  let pedido = 0, stock = 0, producir = 0;
+  let pedido = 0, stock = 0, producir = 0, cedidos = 0;
   for (const t of tallas(op)) {
     pedido += t.cantPedida;
     stock += t.cantAmarrada;
     producir += t.cantAProducir;
+    cedidos += t.reassignedOut ?? 0;
   }
   const pctStock = pedido > 0 ? Math.round((stock / pedido) * 100) : 0;
-  return { pedido, stock, producir, pctStock, bodegas: bodegasDeOP(op) };
+  return { pedido, stock, producir, pctStock, bodegas: bodegasDeOP(op), cedidos };
 }
 
 /**
@@ -66,7 +69,8 @@ export function pendientesDeBodega(op: OrdenProduccion): number {
   let faltan = 0;
   for (const t of tallas(op)) {
     const reservado = (t.reservas ?? []).reduce((a, r) => a + r.cantidad, 0);
-    faltan += Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - reservado, 0);
+    // Lo cedido a otro pedido ya está sumado en cantAProducir y no se le debe.
+    faltan += Math.max((t.cantAmarrada ?? 0) + (t.cantAProducir ?? 0) - (t.reassignedOut ?? 0) - reservado, 0);
   }
   return faltan;
 }
