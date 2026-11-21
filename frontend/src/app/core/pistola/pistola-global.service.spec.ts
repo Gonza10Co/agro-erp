@@ -7,6 +7,14 @@ import { ToastService } from '../notificaciones/toast.service';
 import { CLAVE_CONFIG } from '../../features/fabricacion/config-estacion';
 import { PistolaGlobalService } from './pistola-global.service';
 
+/** El pistolazo siempre lleva su hora real y su id (cola sin internet): se validan y se quitan para comparar el resto. */
+function sinSello(body: any): any {
+  const { scannedAt, clientScanId, ...resto } = body;
+  expect(Number.isNaN(Date.parse(scannedAt))).toBeFalse();
+  expect(typeof clientScanId).toBe('string');
+  return resto;
+}
+
 describe('PistolaGlobalService', () => {
   let svc: PistolaGlobalService;
   let httpMock: HttpTestingController;
@@ -50,7 +58,7 @@ describe('PistolaGlobalService', () => {
     const enter = disparar('OF19-0011');
     expect(enter.preventDefault).toHaveBeenCalled();
     const req = httpMock.expectOne(URL);
-    expect(req.request.body).toEqual({ operarioId: 3, estacion: 'MONTAJE' });
+    expect(sinSello(req.request.body)).toEqual({ operarioId: 3, estacion: 'MONTAJE' });
     req.flush({ codigo: 'OF19-0011', avance: { nombre: 'Inyección · Montaje', terminado: false, hoy: 12, calidad: 'PRIMERA' } });
     const t = toast.toasts()[0];
     expect(t.tipo).toBe('exito');

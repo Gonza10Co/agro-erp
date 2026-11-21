@@ -42,6 +42,13 @@ describe('FabricacionApi', () => {
     req.flush({});
   });
 
+  it('avanzar manda la hora real y el id del pistolazo cuando vienen (cola sin internet)', () => {
+    api.avanzar('OF5-0001', 3, undefined, 'BODEGA_CORTE', undefined, true, { scannedAt: '2026-11-21T14:00:00.000Z', clientScanId: 'abc' }).subscribe();
+    const req = httpMock.expectOne(`${base}/fabricacion/par/OF5-0001/avanzar`);
+    expect(req.request.body).toEqual({ operarioId: 3, estacion: 'BODEGA_CORTE', scannedAt: '2026-11-21T14:00:00.000Z', clientScanId: 'abc' });
+    req.flush({});
+  });
+
   it('nacer hace POST a /fabricacion/of/:id/nacer con la tanda', () => {
     const dto = { productoConfiguradoId: 10, tallaId: 1, cantidad: 20, operarioId: 3 };
     api.nacer(7, dto).subscribe();

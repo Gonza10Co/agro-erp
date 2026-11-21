@@ -18,6 +18,9 @@ import {
 import { agruparPrograma } from './programa-of';
 import { normalizarCodigoPar } from './codigo-par';
 import { mantenerPantallaEncendida } from './pantalla-encendida';
+import { OfflineScanQueueService, ResultadoPistolazo, esFalloDeRed } from '../../core/offline/offline-scan-queue.service';
+import { conRespaldoLocal } from '../../core/offline/respaldo-local';
+import { sonar } from '../../core/pistola/sonido-pistola';
 
 /** Lo que ve el operario después de un pistolazo o un nacimiento: grande, de reojo. */
 interface Resultado {
@@ -35,6 +38,10 @@ interface Resultado {
   /** La etiqueta no salió: el par ya existe, solo falta imprimir. */
   errorImpresion?: string;
 }
+
+/** Nacer pares sin señal no se puede: el código lo da el servidor. */
+const SIN_RED_NACER =
+  'Sin señal: nacer pares necesita internet porque el servidor asigna los códigos. Usa las etiquetas impresas por adelantado y escanéalas: esas sí se guardan sin señal.';
 
 /** Orden del catálogo en la estación: lo que más pasa primero, la baja al final. */
 const ORDEN_CLASE: Record<TipoDano['clase'], number> = { SEGUNDA: 0, REPROCESO: 1, BAJA: 2 };
@@ -106,6 +113,40 @@ import { ConfigEstacion, leerConfig, guardarConfig } from './config-estacion';
           </div>
           <button class="btn btn-cfg" type="button" title="Cambiar estación u operario" aria-label="Cambiar estación u operario" (click)="abrirConfig()">⚙</button>
         </div>
+
+        <!-- ── Sin señal: lo guardado en la tablet y lo que el servidor no aceptó ── -->
+        @if (pendientes().length) {
+          <div class="cola" [class.sin-senal]="!enLinea()" role="status">
+            <span class="cola-icono">{{ enLinea() ? '⟳' : '⚠' }}</span>
+            <span>
+              @if (enLinea()) {
+                <b>{{ pendientes().length }} {{ pendientes().length === 1 ? 'pistolazo guardado' : 'pistolazos guardados' }}</b>, se envían en segundo plano.
+              } @else {
+                <b>Sin señal: {{ pendientes().length }} {{ pendientes().length === 1 ? 'pistolazo guardado' : 'pistolazos guardados' }}</b>, se envían solos cuando vuelva.
+              }
+            </span>
+          </div>
+        }
+        @if (rechazados().length) {
+          <div class="rechazados" role="alert">
+            <div class="rech-cab">
+              <div class="ph-title">Pistolazos rechazados al sincronizar ({{ rechazados().length }})</div>
+              @if (rechazados().length > 1) {
+                <button class="btn btn-sm" type="button" (click)="descartarRechazados()">Descartar todos</button>
+              }
+            </div>
+            <p class="cell-sub">Se guardaron sin señal, pero el servidor no los aceptó. Revisa cada par.</p>
+            @for (r of rechazados(); track r.id) {
+              <div class="rech-fila">
+                <div class="rech-txt">
+                  <div class="mono"><b>{{ r.codigo }}</b> · {{ nombreEstacion(r.estacion) }} · {{ horaCorta(r.scannedAt) }}</div>
+                  <div class="rech-motivo">{{ r.motivo }}</div>
+                </div>
+                <button class="btn btn-sm" type="button" (click)="descartarRechazo(r.id)">Descartar</button>
+              </div>
+            }
+          </div>
+        }
 
         @if (esNacimiento()) {
           <!-- ── Preparación: nacen los pares ── -->
@@ -346,6 +387,14 @@ import { ConfigEstacion, leerConfig, guardarConfig } from './config-estacion';
     .firma-titulo{font-weight:var(--fw-bold);margin-bottom:var(--sp-2)}
     .firma-campos{display:flex;gap:var(--sp-2);flex-wrap:wrap}
     .firma-campos input{flex:1;min-width:120px;min-height:44px;padding:var(--sp-2);border:var(--bw) solid var(--border);border-radius:var(--r-md);font-size:var(--text-body)}
+    .cola{display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-lg);border:2px solid var(--primary);background:var(--surface)}
+    .cola.sin-senal{border-color:var(--warning);background:var(--warning-subtle)}
+    .cola-icono{font-size:28px;line-height:1}
+    .rechazados{margin-bottom:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--r-lg);border:2px solid var(--error);background:var(--error-subtle)}
+    .rech-cab{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2)}
+    .rech-fila{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:var(--bw) solid var(--border)}
+    .rech-txt{flex:1;min-width:0}
+    .rech-motivo{color:var(--error);font-size:var(--text-caption)}
     .res-titulo{font-size:var(--text-h2);font-weight:var(--fw-bold)}
     .res-detalle{color:var(--text-muted);margin-top:var(--sp-1)}
     @media (max-width:640px){
@@ -375,6 +424,12 @@ export class EstacionComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
+  private readonly cola = inject(OfflineScanQueueService);
+
+  // Modo sin internet (2026-11-21): lo guardado en la tablet y lo rechazado al sincronizar.
+  readonly pendientes = this.cola.pendientes;
+  readonly rechazados = this.cola.rechazados;
+  readonly enLinea = this.cola.enLinea;
 
   // "Algo pasó con este par" — gate EN_STAGE hasta la demo de la quincena.
   readonly puedeReportar = puedeVerSeccion(this.auth.rol(), 'calidad-en-planta');
@@ -445,7 +500,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     precargarGeneradorEtiquetas();
     this.soltarPantalla = mantenerPantallaEncendida();
-    this.api.estaciones().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.escucharCola();
+    this.api.estaciones().pipe(conRespaldoLocal('estaciones'), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (es) => {
         this.estaciones.set(es);
         this.cargando.set(false);
@@ -484,14 +540,14 @@ export class EstacionComponent implements OnInit, OnDestroy {
   onEstacion(): void {
     const est = this.estaciones().find((e) => e.codigo === this.selEstacion);
     if (!est) return;
-    this.api.operarios(est.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.operarios(est.celula).pipe(conRespaldoLocal(`operarios.${est.celula}`), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (o) => {
         this.operarios.set(o);
         if (!o.some((x) => x.id === this.selOperario)) this.selOperario = o[0]?.id;
       },
       error: () => this.operarios.set([]),
     });
-    this.api.maquinas(est.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.maquinas(est.celula).pipe(conRespaldoLocal(`maquinas.${est.celula}`), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (m) => {
         this.maquinas.set(m);
         if (!m.some((x) => x.id === this.selMaquina)) this.selMaquina = undefined;
@@ -521,7 +577,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
       error: () => { /* el contador arranca en 0 y se corrige con el primer pistolazo */ },
     });
     if (this.esNacimiento()) {
-      this.api.listarOF().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      this.api.listarOF().pipe(conRespaldoLocal('ofs'), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: (ofs) => this.ofs.set(ofs.filter((o) => o.estado === 'ABIERTA' || o.estado === 'EN_PROCESO')),
         error: () => this.ofs.set([]),
       });
@@ -529,8 +585,8 @@ export class EstacionComponent implements OnInit, OnDestroy {
   }
 
   private onEstacionActual(est: Estacion): void {
-    this.api.operarios(est.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ next: (o) => this.operarios.set(o), error: () => {} });
-    this.api.maquinas(est.celula).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ next: (m) => this.maquinas.set(m), error: () => {} });
+    this.api.operarios(est.celula).pipe(conRespaldoLocal(`operarios.${est.celula}`), takeUntilDestroyed(this.destroyRef)).subscribe({ next: (o) => this.operarios.set(o), error: () => {} });
+    this.api.maquinas(est.celula).pipe(conRespaldoLocal(`maquinas.${est.celula}`), takeUntilDestroyed(this.destroyRef)).subscribe({ next: (m) => this.maquinas.set(m), error: () => {} });
   }
 
   // ─────────────── Preparación: nacer pares ───────────────
@@ -538,7 +594,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
   cargarOf(): void {
     this.of.set(null);
     if (this.ofId == null) return;
-    this.api.obtenerOF(this.ofId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.api.obtenerOF(this.ofId).pipe(conRespaldoLocal(`of.${this.ofId}`), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (d) => {
         this.of.set(d);
         for (const l of d.programa ?? []) {
@@ -590,7 +646,11 @@ export class EstacionComponent implements OnInit, OnDestroy {
         },
         error: (e) => {
           this.naciendo.set(false);
-          this.resultado.set({ ok: false, titulo: 'No nacieron', detalle: this.msgError(e, 'No se pudo crear la tanda') });
+          this.resultado.set({
+            ok: false,
+            titulo: 'No nacieron',
+            detalle: esFalloDeRed(e) ? SIN_RED_NACER : this.msgError(e, 'No se pudo crear la tanda'),
+          });
         },
       });
   }
@@ -628,7 +688,11 @@ export class EstacionComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.naciendo.set(false);
-          this.resultado.set({ ok: false, titulo: 'No se imprimieron', detalle: this.msgError(err, 'No se pudieron reservar las etiquetas') });
+          this.resultado.set({
+            ok: false,
+            titulo: 'No se imprimieron',
+            detalle: esFalloDeRed(err) ? SIN_RED_NACER : this.msgError(err, 'No se pudieron reservar las etiquetas'),
+          });
         },
       });
   }
@@ -656,6 +720,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
     if (!c || !cod) return;
     this.codigo = '';
     let dano: DanoEscaneo | undefined;
+    let tipo: TipoDano | undefined;
     if (this.modoCalidad()) {
       const t = this.tipoActual();
       const falta = this.faltaParaReportar(t);
@@ -665,18 +730,32 @@ export class EstacionComponent implements OnInit, OnDestroy {
         this.enfocarScan();
         return;
       }
+      tipo = t!;
       dano = {
         tipoDanoId: t!.id,
         descripcion: this.nota,
         ...(this.necesitaFirma(t!) ? { autorizacion: { username: this.autUsuario.trim(), password: this.autClave } } : {}),
       };
     }
-    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, dano, true).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    // Una segunda o una baja paren una reposición cuya etiqueta se imprime ya, y la
+    // firma no se guarda en la tablet: esas necesitan señal. Un reproceso sí se guarda.
+    const encolable = !tipo || (tipo.clase === 'REPROCESO' && !dano?.autorizacion);
+    if (!encolable && this.pendientes().length) {
+      this.resultado.set({
+        ok: false,
+        titulo: cod,
+        detalle: `Hay ${this.pendientes().length} pistolazos guardados sin enviar. Una ${tipo!.clase === 'BAJA' ? 'baja' : 'segunda'} se reporta cuando se hayan enviado.`,
+      });
+      this.reanudarCamaraConGracia();
+      this.enfocarScan();
+      return;
+    }
+    this.cola.registrar(
+      { codigo: cod, operarioId: c.operarioId, maquinaId: c.maquinaId, estacion: c.estacion, ...(dano ? { dano } : {}) },
+      { encolable },
+    ).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => {
-        this.hoy.set(r.avance.hoy);
-        this.resultado.set(this.resumen(r));
-        // Nació una impresa por adelantado: los números de la OF cambiaron.
-        if (r.avance.nacio && this.of()) this.cargarOf();
+        this.alRegistrar(cod, r);
         // Una lectura por reporte: el siguiente escaneo vuelve a ser normal.
         if (dano) this.cerrarCalidad();
         this.reanudarCamaraConGracia();
@@ -689,13 +768,67 @@ export class EstacionComponent implements OnInit, OnDestroy {
           ok: repetido,
           alerta: repetido,
           titulo: repetido ? `${cod} ya estaba registrado` : cod,
-          detalle: this.msgError(e, 'No se pudo registrar el pistolazo'),
+          detalle: !encolable && esFalloDeRed(e)
+            ? 'Sin señal: reportar una segunda o una baja necesita internet. Espera la señal y vuelve a escanear.'
+            : this.msgError(e, 'No se pudo registrar el pistolazo'),
         });
         this.reanudarCamaraConGracia();
         this.enfocarScan();
       },
     });
   }
+
+  /** Lo que ve el operario según cómo quedó el pistolazo: en el servidor o guardado en la tablet. */
+  private alRegistrar(cod: string, r: ResultadoPistolazo): void {
+    if (r.tipo === 'servidor') {
+      this.hoy.set(r.resultado.avance.hoy);
+      this.resultado.set(this.resumen(r.resultado));
+      // Nació una impresa por adelantado: los números de la OF cambiaron.
+      if (r.resultado.avance.nacio && this.of()) this.cargarOf();
+      return;
+    }
+    if (r.tipo === 'repetido-en-cola') {
+      this.resultado.set({ ok: true, alerta: true, titulo: `${cod} ya estaba guardado`, detalle: 'Ya está en la cola de esta estación: no se guarda dos veces.' });
+      return;
+    }
+    // Aceptado en la tablet: el contador sube ya; el servidor lo corrige al sincronizar.
+    this.hoy.update((h) => h + 1);
+    const n = r.pendientes;
+    const cuantos = `${n} ${n === 1 ? 'pendiente' : 'pendientes'}`;
+    this.resultado.set({
+      ok: true,
+      titulo: `${cod} guardado ✓`,
+      detalle: r.porque === 'sin-red' || !this.enLinea()
+        ? `Sin señal: se envía solo cuando vuelva (${cuantos})`
+        : `Guardado, se envía en segundo plano (${cuantos})`,
+    });
+  }
+
+  /** Lo que pasa con la cola mientras la pantalla está abierta. */
+  private escucharCola(): void {
+    this.cola.aceptado$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(({ item, resultado }) => {
+      if (item.estacion === this.config()?.estacion) this.hoy.set(resultado.avance.hoy);
+    });
+    this.cola.rechazo$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((r) => {
+      if (r.estacion === this.config()?.estacion) this.hoy.update((h) => Math.max(0, h - 1));
+      sonar('error');
+      this.resultado.set({ ok: false, titulo: `${r.codigo} no quedó al sincronizar`, detalle: r.motivo });
+    });
+  }
+
+  descartarRechazo(id: string): void {
+    this.cola.descartarRechazo(id);
+  }
+
+  descartarRechazados(): void {
+    this.cola.descartarRechazados();
+  }
+
+  nombreEstacion = (codigo: string) => this.estaciones().find((e) => e.codigo === codigo)?.nombre ?? codigo;
+  horaCorta = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   /** Lo que ve el operario después del pistolazo. Una segunda o una baja van en ámbar. */
   private resumen(r: AvanceResultado): Resultado {
@@ -741,7 +874,7 @@ export class EstacionComponent implements OnInit, OnDestroy {
     this.nota = '';
     this.resultado.set(null);
     if (this.tipos().length) return;
-    this.calidadApi.tiposDano().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.calidadApi.tiposDano().pipe(conRespaldoLocal('tipos-dano'), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (t) => this.tipos.set([...t].sort((a, b) => ORDEN_CLASE[a.clase] - ORDEN_CLASE[b.clase] || a.nombre.localeCompare(b.nombre))),
       error: () => {
         this.modoCalidad.set(false);
