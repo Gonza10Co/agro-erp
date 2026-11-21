@@ -295,8 +295,8 @@ export class OfflineScanQueueService implements OnDestroy {
       } catch (e: unknown) {
         if (esFalloDeRed(e)) {
           // Sin red: se espera lo que haga falta, la cola queda como está.
+          // Sin red no cuenta como intento: el tope es para errores del servidor.
           this.enLinea.set(false);
-          this.actualizar(item.id, { intentos: item.intentos + 1 });
           return;
         }
         this.enLinea.set(true);

@@ -194,7 +194,7 @@ describe('OfflineScanQueueService', () => {
     flushMicrotasks();
     http.expectNone(url('OF1-0002')); // no sigue con el siguiente
     expect(svc.pendientes().map((p) => p.codigo)).toEqual(['OF1-0001', 'OF1-0002']);
-    expect(svc.pendientes()[0].intentos).toBe(1);
+    expect(svc.pendientes()[0].intentos).toBe(0); // sin red no gasta reintentos
     expect(svc.sincronizando()).toBeFalse();
   }));
 
@@ -203,6 +203,13 @@ describe('OfflineScanQueueService', () => {
     void svc.sincronizar();
     flushMicrotasks();
     http.expectOne(url('OF1-0001')).flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    flushMicrotasks();
+    expect(svc.pendientes().length).toBe(1);
+    expect(svc.rechazados()).toEqual([]);
+    // Al volver la red, un 500 pasajero todavía tiene sus reintentos completos.
+    void svc.sincronizar();
+    flushMicrotasks();
+    http.expectOne(url('OF1-0001')).flush({}, { status: 500, statusText: 'Error' });
     flushMicrotasks();
     expect(svc.pendientes().length).toBe(1);
     expect(svc.rechazados()).toEqual([]);
