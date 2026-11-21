@@ -55,7 +55,9 @@ export class AvanzarDto {
    * de 5 minutos en el futuro o tiene más de 7 días.
    */
   @IsOptional()
-  @IsISO8601()
+  @IsISO8601({ strict: true })
+  // Con zona explícita: una hora "suelta" se leería en la zona del servidor.
+  @Matches(/(Z|[+-]\d{2}:\d{2})$/, { message: 'scannedAt debe traer zona horaria (Z o ±hh:mm)' })
   scannedAt?: string;
 
   /**

@@ -11,7 +11,8 @@ async function bootstrap() {
   const corsOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:4200')
     .split(',')
     .map((o) => o.trim());
-  app.enableCors({ origin: corsOrigins, credentials: true });
+  // Date expuesto: la tablet mide el desfase de su reloj para la hora de los pistolazos sin señal.
+  app.enableCors({ origin: corsOrigins, credentials: true, exposedHeaders: ['Date'] });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(process.env.PORT ?? 3000);
 }
