@@ -16,13 +16,31 @@ export const errorToastInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
       const esLogin = req.url.endsWith('/auth/login');
-      if (err.status !== 401 && !esLogin && !req.context.get(SIN_TOAST_ERROR)) {
+      if (err.status !== 401 && !esLogin && !req.context.get(SIN_TOAST_ERROR) && !esRafagaSinRed(err)) {
         toast.error(mensajeDeError(err));
       }
       return throwError(() => err);
     }),
   );
 };
+
+/**
+ * Sin red, todas las lecturas de la pantalla fallan a la vez: un solo aviso
+ * "Sin conexión" cada tanto basta (la tablet de planta muestra su propio aviso).
+ */
+export const PAUSA_AVISO_SIN_RED_MS = 15_000;
+let ultimoAvisoSinRed = -Infinity;
+function esRafagaSinRed(err: HttpErrorResponse): boolean {
+  if (err.status !== 0) return false;
+  const ahora = Date.now();
+  if (ahora - ultimoAvisoSinRed < PAUSA_AVISO_SIN_RED_MS) return true;
+  ultimoAvisoSinRed = ahora;
+  return false;
+}
+/** Solo para pruebas. */
+export function reiniciarAvisoSinRed(): void {
+  ultimoAvisoSinRed = -Infinity;
+}
 
 /** Extrae un mensaje legible del error: prioriza el del backend NestJS. */
 function mensajeDeError(err: HttpErrorResponse): string {

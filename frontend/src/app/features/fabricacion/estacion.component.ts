@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, NgZone, OnDestroy, OnInit, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FabricacionApi } from '../../core/api/fabricacion.api';
@@ -37,6 +37,19 @@ interface Resultado {
   tanda?: ParNacido[];
   /** La etiqueta no salió: el par ya existe, solo falta imprimir. */
   errorImpresion?: string;
+}
+
+/** Contador de hoy por estación y día de Bogotá (sin horario de verano: UTC-5). */
+function claveHoy(estacion: string): string {
+  const dia = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  return `agro.hoy.${estacion}.${dia}`;
+}
+function leerHoy(estacion: string): number {
+  try {
+    return Number(localStorage.getItem(claveHoy(estacion))) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** Nacer pares sin señal no se puede: el código lo da el servidor. */
@@ -497,6 +510,24 @@ export class EstacionComponent implements OnInit, OnDestroy {
   /** Suelta el candado de pantalla al salir de la estación. */
   private soltarPantalla: () => void = () => {};
 
+  /** El contador de hoy queda en la tablet: si recargan sin señal, no vuelve a 0. */
+  /** El contador ya vino del servidor (o del respaldo): antes de eso no se guarda un 0. */
+  private readonly hoyListo = signal(false);
+  private readonly guardarHoy = effect(() => {
+    const n = this.hoy();
+    const est = this.config()?.estacion;
+    if (!est || !this.hoyListo()) return;
+    try {
+      const k = claveHoy(est);
+      localStorage.setItem(k, String(n));
+      // Los de días anteriores ya no sirven.
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const x = localStorage.key(i);
+        if (x?.startsWith('agro.hoy.') && x !== k) localStorage.removeItem(x);
+      }
+    } catch { /* sin storage */ }
+  });
+
   ngOnInit(): void {
     precargarGeneradorEtiquetas();
     this.soltarPantalla = mantenerPantallaEncendida();
@@ -572,9 +603,17 @@ export class EstacionComponent implements OnInit, OnDestroy {
     const est = this.estacionActual();
     if (!est) return;
     if (!this.operarios().length) this.onEstacionActual(est);
+    this.hoyListo.set(false);
     this.api.hoy().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (h) => this.hoy.set(h.estaciones.find((e) => e.codigo === est.codigo)?.hoy ?? 0),
-      error: () => { /* el contador arranca en 0 y se corrige con el primer pistolazo */ },
+      next: (h) => {
+        this.hoy.set(h.estaciones.find((e) => e.codigo === est.codigo)?.hoy ?? 0);
+        this.hoyListo.set(true);
+      },
+      // Sin señal: lo último que contó esta tablet hoy; si no, 0 y se corrige con el primer pistolazo.
+      error: () => {
+        this.hoy.set(leerHoy(est.codigo));
+        this.hoyListo.set(true);
+      },
     });
     if (this.esNacimiento()) {
       this.api.listarOF().pipe(conRespaldoLocal('ofs'), takeUntilDestroyed(this.destroyRef)).subscribe({

@@ -428,6 +428,10 @@ describe('EstacionComponent: modo sin internet', () => {
     localStorage.removeItem(CLAVE_PENDIENTES);
     localStorage.removeItem(CLAVE_RECHAZADOS);
     borrarRespaldos();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('agro.hoy.')) localStorage.removeItem(k);
+    }
   }
   beforeEach(limpiar);
   afterEach(limpiar);
@@ -562,7 +566,8 @@ describe('EstacionComponent: modo sin internet', () => {
     const a = crear();
     a.http.expectOne(`${BASE}/operarios?celula=ALMACEN`).flush([{ id: 4, nombre: 'Aldo', celula: 'ALMACEN' }]);
     a.http.expectOne(`${BASE}/maquinas?celula=ALMACEN`).flush([{ id: 9, nombre: 'Robot 1', celula: 'ALMACEN' }]);
-    a.http.expectOne(`${BASE}/hoy`).flush({ fecha: '', actualizado: '', estaciones: [] });
+    a.http.expectOne(`${BASE}/hoy`).flush({ fecha: '', actualizado: '', estaciones: [{ codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', celula: 'ALMACEN', hoy: 5, ultimaHora: 1, meta: 1206 }] });
+    a.fixture.detectChanges();
     a.fixture.destroy();
     TestBed.resetTestingModule();
 
@@ -585,6 +590,7 @@ describe('EstacionComponent: modo sin internet', () => {
     expect(comp.operarioNombre()).toBe('Aldo');
     expect(comp.maquinas().map((m) => m.nombre)).toEqual(['Robot 1']);
     expect(comp.configurando()).toBeFalse();
+    expect(comp.hoy()).toBe(5); // el contador de hoy no vuelve a 0
     http.verify();
   });
 });
