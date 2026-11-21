@@ -3,9 +3,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { environment } from '../../../environments/environment';
 import {
-  CLAVE_PENDIENTES, CLAVE_RECHAZADOS, ESPERA_SERVIDOR_MS, INTERVALO_SYNC_MS, OfflineScanQueueService,
-  PistolazoRechazado, ResultadoPistolazo, esFalloDeRed, nuevoIdPistolazo,
+  CLAVE_CANDADO, CLAVE_PENDIENTES, CLAVE_RECHAZADOS, ESPERA_SERVIDOR_MS, INTERVALO_SYNC_MS, MAX_INTENTOS, OfflineScanQueueService,
+  PistolazoPendiente, PistolazoRechazado, ResultadoPistolazo, candadoLocalStorage, candadoNavegador, esFalloDeRed, nuevoIdPistolazo,
 } from './offline-scan-queue.service';
+import { reiniciarReloj } from './reloj-servidor';
 
 const BASE = `${environment.apiUrl}/fabricacion/par`;
 const url = (codigo: string) => `${BASE}/${codigo}/avanzar`;
@@ -23,12 +24,15 @@ describe('OfflineScanQueueService', () => {
   function montar() {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     svc = TestBed.inject(OfflineScanQueueService);
+    // El candado real (navigator.locks) es asíncrono de verdad: en estas pruebas, directo.
+    svc.candado = (fn) => fn();
     http = TestBed.inject(HttpTestingController);
   }
 
   beforeEach(() => {
     localStorage.removeItem(CLAVE_PENDIENTES);
     localStorage.removeItem(CLAVE_RECHAZADOS);
+    reiniciarReloj();
     montar();
   });
 
@@ -54,7 +58,8 @@ describe('OfflineScanQueueService', () => {
     const req = http.expectOne(url('OF1-0004'));
     // El id viaja desde el primer intento: si esta petición sí llega, el reintento no duplica.
     expect(req.request.body.clientScanId).toEqual(jasmine.any(String));
-    expect(Number.isNaN(Date.parse(req.request.body.scannedAt))).toBeFalse();
+    // Con red la hora la pone el servidor: el envío directo no lleva scannedAt.
+    expect(req.request.body.scannedAt).toBeUndefined();
     req.flush(okDe('OF1-0004', 3));
     expect(r).toEqual(jasmine.objectContaining({ tipo: 'servidor' }));
     expect(svc.pendientes()).toEqual([]);
@@ -114,7 +119,8 @@ describe('OfflineScanQueueService', () => {
     flushMicrotasks();
     const reintento = http.expectOne(url('OF1-0004'));
     expect(reintento.request.body.clientScanId).toBe(id);
-    expect(reintento.request.body.scannedAt).toBe(original.request.body.scannedAt);
+    expect(original.request.body.scannedAt).toBeUndefined();
+    expect(reintento.request.body.scannedAt).toBe(svc.pendientes()[0].scannedAt); // desde la cola sí va la hora
     // La petición original sí había llegado: el servidor responde lo ya registrado, sin duplicar.
     reintento.flush(okDe('OF1-0004', 5, { repetido: true }));
     flushMicrotasks();
@@ -279,5 +285,103 @@ describe('OfflineScanQueueService', () => {
   it('nuevoIdPistolazo da ids distintos', () => {
     const ids = new Set(Array.from({ length: 50 }, () => nuevoIdPistolazo()));
     expect(ids.size).toBe(50);
+  });
+
+  it('desde la cola la hora se corrige con el desfase del reloj de la tablet', fakeAsync(() => {
+    reiniciarReloj(10 * 60_000); // la tablet va 10 min atrasada
+    encolarSinRed('OF1-0001');
+    const local = svc.pendientes()[0].scannedAt;
+    expect(svc.pendientes()[0].desfaseMs).toBe(600_000);
+    void svc.sincronizar();
+    flushMicrotasks();
+    const req = http.expectOne(url('OF1-0001'));
+    expect(Date.parse(req.request.body.scannedAt) - Date.parse(local)).toBe(600_000);
+    req.flush(okDe('OF1-0001'));
+    flushMicrotasks();
+  }));
+
+  it(`un 500 se reintenta hasta ${MAX_INTENTOS} veces y luego va a rechazados; la cola sigue`, fakeAsync(() => {
+    encolarSinRed('OF1-0001');
+    tick(5);
+    encolarSinRed('OF1-0002');
+    for (let i = 1; i < MAX_INTENTOS; i++) {
+      void svc.sincronizar();
+      flushMicrotasks();
+      http.expectOne(url('OF1-0001')).flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+      flushMicrotasks();
+      http.expectNone(url('OF1-0002'));
+      expect(svc.pendientes()[0].intentos).toBe(i);
+    }
+    void svc.sincronizar();
+    flushMicrotasks();
+    http.expectOne(url('OF1-0001')).flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
+    flushMicrotasks();
+    // Ya no traba: pasa a rechazados y sale el siguiente.
+    http.expectOne(url('OF1-0002')).flush(okDe('OF1-0002'));
+    flushMicrotasks();
+    expect(svc.pendientes()).toEqual([]);
+    expect(svc.rechazados()).toEqual([jasmine.objectContaining({ codigo: 'OF1-0001', motivo: `boom (falló ${MAX_INTENTOS} veces)` })]);
+  }));
+
+  it('sin red nunca pasa a rechazados, por muchos intentos que lleve', fakeAsync(() => {
+    encolarSinRed('OF1-0001');
+    for (let i = 0; i < MAX_INTENTOS + 3; i++) {
+      void svc.sincronizar();
+      flushMicrotasks();
+      sinRed(http.expectOne(url('OF1-0001')));
+      flushMicrotasks();
+    }
+    expect(svc.pendientes().length).toBe(1);
+    expect(svc.rechazados()).toEqual([]);
+  }));
+
+  it('dos pestañas: lo que encola la otra no se pisa y el evento storage refresca la pantalla', () => {
+    encolarSinRed('OF1-0001');
+    // La otra pestaña escribe su pistolazo directo en localStorage.
+    const otra: PistolazoPendiente = { id: 'otra-1', codigo: 'OF1-0050', operarioId: 4, estacion: 'BODEGA_CORTE', scannedAt: new Date(Date.now() + 1).toISOString(), intentos: 0 };
+    localStorage.setItem(CLAVE_PENDIENTES, JSON.stringify([...svc.pendientes(), otra]));
+    window.dispatchEvent(new StorageEvent('storage', { key: CLAVE_PENDIENTES }));
+    expect(svc.pendientes().map((p) => p.codigo)).toEqual(['OF1-0001', 'OF1-0050']);
+
+    // Y si esta pestaña escribe sin haber oído el evento, relee y fusiona.
+    const tercera: PistolazoPendiente = { ...otra, id: 'otra-2', codigo: 'OF1-0051', scannedAt: new Date(Date.now() + 2).toISOString() };
+    localStorage.setItem(CLAVE_PENDIENTES, JSON.stringify([...svc.pendientes(), tercera]));
+    let r: ResultadoPistolazo | undefined;
+    svc.registrar(scan('OF1-0051'), { encolable: true }).subscribe((x) => (r = x));
+    expect(r?.tipo).toBe('repetido-en-cola'); // la vio aunque no hubo evento
+    expect(JSON.parse(localStorage.getItem(CLAVE_PENDIENTES)!).map((p: PistolazoPendiente) => p.codigo)).toEqual(['OF1-0001', 'OF1-0050', 'OF1-0051']);
+  });
+
+  it('candado de respaldo (localStorage): si otra pestaña lo tiene vigente, no se sincroniza', async () => {
+    let t = 1_000;
+    const a = candadoLocalStorage(() => t, 'A');
+    const b = candadoLocalStorage(() => t, 'B');
+    let corrioB = false;
+    await a(async () => {
+      await b(async () => { corrioB = true; });
+    });
+    expect(corrioB).toBeFalse();
+    expect(localStorage.getItem(CLAVE_CANDADO)).toBeNull(); // A lo soltó
+    await b(async () => { corrioB = true; });
+    expect(corrioB).toBeTrue();
+    // Un candado vencido (pestaña muerta) no traba.
+    localStorage.setItem(CLAVE_CANDADO, JSON.stringify({ duenio: 'muerta', hasta: t - 1 }));
+    let corrioA = false;
+    await a(async () => { corrioA = true; });
+    expect(corrioA).toBeTrue();
+  });
+
+  it('candado real (navigator.locks): dos sincronizaciones a la vez, solo corre una', async () => {
+    const c1 = candadoNavegador();
+    const c2 = candadoNavegador();
+    let corridas = 0;
+    let soltar!: () => void;
+    const espera = new Promise<void>((r) => (soltar = r));
+    const p1 = c1(async () => { corridas++; await espera; });
+    await new Promise((r) => setTimeout(r, 20));
+    await c2(async () => { corridas++; });
+    soltar();
+    await p1;
+    expect(corridas).toBe(1);
   });
 });

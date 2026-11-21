@@ -15,10 +15,10 @@ const ESTACIONES = [
   { codigo: 'PT', nombre: 'Producto terminado', orden: 6, celula: 'PT', subPaso: null, subPasoInyeccion: null, activa: true },
 ];
 
-/** El pistolazo siempre lleva su hora real y su id (cola sin internet): se validan y se quitan para comparar el resto. */
+/** El pistolazo siempre lleva su id (cola sin internet); con red va sin hora (la pone el servidor). */
 function sinSello(body: any): any {
   const { scannedAt, clientScanId, ...resto } = body;
-  expect(Number.isNaN(Date.parse(scannedAt))).toBeFalse();
+  expect(scannedAt).toBeUndefined();
   expect(typeof clientScanId).toBe('string');
   return resto;
 }
@@ -443,7 +443,9 @@ describe('EstacionComponent: modo sin internet', () => {
     ctx.http.expectOne(`${BASE}/maquinas?celula=ALMACEN`).flush([]);
     ctx.http.expectOne(`${BASE}/hoy`).flush({ fecha: '', actualizado: '', estaciones: [{ codigo: 'BODEGA_CORTE', nombre: 'Bodega de corte', celula: 'ALMACEN', hoy: 2, ultimaHora: 2, meta: 1206 }] });
     ctx.fixture.detectChanges();
-    return { ...ctx, cola: TestBed.inject(OfflineScanQueueService) };
+    const cola = TestBed.inject(OfflineScanQueueService);
+    cola.candado = (fn) => fn(); // navigator.locks es asíncrono de verdad: no cabe en fakeAsync
+    return { ...ctx, cola };
   }
 
   it('sin señal el pistolazo queda guardado, el operario sigue y la pantalla lo dice', () => {

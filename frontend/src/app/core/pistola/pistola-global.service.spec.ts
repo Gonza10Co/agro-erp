@@ -7,10 +7,10 @@ import { ToastService } from '../notificaciones/toast.service';
 import { CLAVE_CONFIG } from '../../features/fabricacion/config-estacion';
 import { PistolaGlobalService } from './pistola-global.service';
 
-/** El pistolazo siempre lleva su hora real y su id (cola sin internet): se validan y se quitan para comparar el resto. */
+/** El pistolazo siempre lleva su id (cola sin internet); con red va sin hora (la pone el servidor). */
 function sinSello(body: any): any {
   const { scannedAt, clientScanId, ...resto } = body;
-  expect(Number.isNaN(Date.parse(scannedAt))).toBeFalse();
+  expect(scannedAt).toBeUndefined();
   expect(typeof clientScanId).toBe('string');
   return resto;
 }

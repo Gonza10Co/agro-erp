@@ -5,30 +5,37 @@
  * señal. Guarda el "app shell" (index.html y los .js/.css con hash que se van
  * pidiendo). NUNCA toca la API: el backend vive en otro dominio (Railway) y en
  * modo movil va por /api; los pistolazos sin señal los guarda la app en su cola.
+ * Solo se registra en las tablets (rol ESTACION o /fabricacion/estacion, /tv).
  *
- * - Navegación: primero la red (con tope de espera); sin red, el index guardado.
+ * - Navegación: siempre la red; la caché SOLO si la red falla de verdad (sin señal).
  * - Assets con hash: primero la caché (el nombre cambia en cada build).
  * - Otros archivos del mismo origen (favicon, logo): la caché y se refresca atrás.
+ * - Solo se guarda lo que el servidor sirve como JavaScript, CSS o imagen: nunca un
+ *   HTML disfrazado de asset (el rewrite del SPA responde index.html a todo).
  *
  * Subir VERSION borra las cachés viejas al activarse. Un build nuevo de la app no
  * lo necesita: el index se pide a la red primero y trae los nombres nuevos.
+ *
+ * ⚠️ NUNCA borrar este archivo: las tablets que ya lo tienen lo seguirían usando.
+ * Para apagarlo, copiar encima frontend/sw-kill.js (ver CLAUDE.md).
  */
 const VERSION = 'v1';
 const CACHE = `agro-shell-${VERSION}`;
 const INDEX = '/index.html';
-/** Con internet lento, cuánto se espera el index antes de abrir el guardado. */
-const ESPERA_NAVEGACION_MS = 4000;
 /** Tope de archivos guardados: los builds viejos se van saliendo. */
 const MAX_ENTRADAS = 200;
 
 const ES_ASSET_CON_HASH = /-[A-Z0-9]{8,}\.(?:js|css)$/i;
-const ES_ESTATICO = /\.(?:js|css|svg|png|ico|woff2?|webmanifest|json)$/i;
+const ES_ESTATICO = /\.(?:js|css|svg|png|ico)$/i;
+const TIPO_ASSET = /javascript|text\/css|^image\//i;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.add(new Request(INDEX, { cache: 'reload' })))
+      .then((c) =>
+        fetch(new Request(INDEX, { cache: 'reload' })).then((r) => (esHtml(r) ? c.put(INDEX, r) : undefined)),
+      )
       .catch(() => undefined)
       .then(() => self.skipWaiting()),
   );
@@ -59,7 +66,7 @@ self.addEventListener('message', (event) => {
     caches.open(CACHE).then((c) =>
       Promise.all(
         urls.map((u) =>
-          c.match(u).then((hit) => hit || fetch(u, { credentials: 'same-origin' }).then((r) => (r.ok ? c.put(u, r) : undefined)).catch(() => undefined)),
+          c.match(u).then((hit) => hit || fetch(u, { credentials: 'same-origin' }).then((r) => (esAsset(r) ? c.put(u, r) : undefined)).catch(() => undefined)),
         ),
       ).then(() => recortar(c)),
     ),
@@ -74,6 +81,19 @@ function esCacheable(url) {
   return !esApi(url) && ES_ESTATICO.test(url.pathname);
 }
 
+function tipo(res) {
+  return (res && res.headers.get('content-type')) || '';
+}
+
+/** Un asset de verdad: respuesta buena y JavaScript, CSS o imagen (nunca HTML). */
+function esAsset(res) {
+  return !!res && res.ok && TIPO_ASSET.test(tipo(res)) && !/html/i.test(tipo(res));
+}
+
+function esHtml(res) {
+  return !!res && res.ok && /text\/html/i.test(tipo(res));
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -82,51 +102,57 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin || esApi(url)) return;
 
   if (req.mode === 'navigate') {
-    event.respondWith(navegacion(req));
+    event.respondWith(navegacion(event));
     return;
   }
   if (!esCacheable(url)) return;
-  event.respondWith(ES_ASSET_CON_HASH.test(url.pathname) ? primeroCache(req) : cacheYRefresca(req));
+  event.respondWith(ES_ASSET_CON_HASH.test(url.pathname) ? primeroCache(event) : cacheYRefresca(event));
 });
 
-async function navegacion(req) {
-  const cache = await caches.open(CACHE);
+async function navegacion(event) {
+  let res;
   try {
-    const res = await conTope(fetch(req), ESPERA_NAVEGACION_MS);
-    // El SPA responde index.html en cualquier ruta (rewrite de Vercel): ese es el shell.
-    if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
-      await cache.put(INDEX, res.clone());
-    }
-    return res;
+    res = await fetch(event.request);
   } catch (e) {
-    const guardado = await cache.match(INDEX);
-    if (guardado) return guardado;
-    // Sin shell guardado todavía: que el navegador muestre su error normal.
-    return fetch(req);
+    // Sin señal de verdad: el shell guardado. Con internet lento se espera a la red.
+    const guardado = await caches.match(INDEX, { cacheName: CACHE });
+    return guardado || Response.error();
   }
-}
-
-async function primeroCache(req) {
-  const cache = await caches.open(CACHE);
-  const hit = await cache.match(req);
-  if (hit) return hit;
-  const res = await fetch(req);
-  if (res.ok) {
-    await cache.put(req, res.clone());
-    recortar(cache);
+  // El SPA responde index.html en cualquier ruta (rewrite de Vercel): ese es el shell.
+  if (esHtml(res)) {
+    const copia = res.clone();
+    event.waitUntil(caches.open(CACHE).then((c) => c.put(INDEX, copia)));
   }
   return res;
 }
 
-async function cacheYRefresca(req) {
+async function primeroCache(event) {
+  const req = event.request;
+  const cache = await caches.open(CACHE);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (esAsset(res)) {
+    const copia = res.clone();
+    event.waitUntil(cache.put(req, copia).then(() => recortar(cache)));
+  }
+  return res;
+}
+
+async function cacheYRefresca(event) {
+  const req = event.request;
   const cache = await caches.open(CACHE);
   const hit = await cache.match(req);
   const red = fetch(req)
     .then((res) => {
-      if (res.ok) cache.put(req, res.clone());
+      if (esAsset(res)) {
+        const copia = res.clone();
+        return cache.put(req, copia).then(() => res);
+      }
       return res;
     })
     .catch(() => undefined);
+  event.waitUntil(red);
   return hit || (await red) || Response.error();
 }
 
@@ -137,20 +163,4 @@ async function recortar(cache) {
   if (sobran <= 0) return;
   const borrables = keys.filter((k) => new URL(k.url).pathname !== INDEX).slice(0, sobran);
   await Promise.all(borrables.map((k) => cache.delete(k)));
-}
-
-function conTope(promesa, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('timeout')), ms);
-    promesa.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
 }
