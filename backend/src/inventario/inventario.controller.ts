@@ -65,6 +65,13 @@ export class InventarioController {
     return this.inventario.consolidado(lineaId);
   }
 
+  // Detalle del inventario en proceso para el Excel de inventarios (2026-11-21).
+  @Get('wip-detail') wipDetail(
+    @Query('lineaId', new ParseIntPipe({ optional: true })) lineaId?: number,
+  ) {
+    return this.inventario.wipDetail(lineaId);
+  }
+
   @Get('movimientos') movimientos(
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ) {

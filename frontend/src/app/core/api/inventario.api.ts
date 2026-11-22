@@ -15,6 +15,7 @@ import {
   InventarioPTRow,
   MovimientoKardex,
   MovimientoMaterialInput,
+  WipDetailRow,
 } from './models/inventario.models';
 
 @Injectable({ providedIn: 'root' })
@@ -31,6 +32,12 @@ export class InventarioApi {
 
   consolidado(lineaId?: number) {
     return this.http.get<InventarioConsolidado>(`${this.base}/consolidado`, {
+      params: lineaId ? { lineaId } : {},
+    });
+  }
+
+  wipDetail(lineaId?: number) {
+    return this.http.get<WipDetailRow[]>(`${this.base}/wip-detail`, {
       params: lineaId ? { lineaId } : {},
     });
   }
