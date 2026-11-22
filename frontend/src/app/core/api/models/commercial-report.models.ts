@@ -49,4 +49,5 @@ export interface CommercialQuery {
   referenceIds?: number[];
   lineIds?: number[];
   statuses?: OrderStatus[];
+  includeStock?: boolean;
 }

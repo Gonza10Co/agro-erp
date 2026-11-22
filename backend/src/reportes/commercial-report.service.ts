@@ -49,6 +49,7 @@ export class CommercialReportService {
       select: {
         id: true,
         estado: true,
+        paraStock: true,
         fecha: true,
         fechaPedidoCliente: true,
         clienteId: true,
@@ -86,6 +87,7 @@ export class CommercialReportService {
 export interface OrderRow {
   id: number;
   estado: string;
+  paraStock: boolean;
   fecha: Date;
   fechaPedidoCliente: Date | null;
   clienteId: number;
@@ -132,6 +134,7 @@ export function ordersToFacts(orders: OrderRow[]): CommercialFact[] {
         orderId: oc.id,
         month,
         status: oc.estado as OrderStatus,
+        forStock: oc.paraStock,
         clientId: oc.clienteId,
         clientName: oc.cliente.nombre,
         brandId: brand.id,

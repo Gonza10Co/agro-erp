@@ -37,6 +37,7 @@ export class ReportesApi {
     list('referenceIds', q.referenceIds);
     list('lineIds', q.lineIds);
     list('statuses', q.statuses);
+    if (q.includeStock) params['includeStock'] = 'true';
     return this.http.get<CommercialReport>(`${environment.apiUrl}/reports/commercial`, { params });
   }
 }

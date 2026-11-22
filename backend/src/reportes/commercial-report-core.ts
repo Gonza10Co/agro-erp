@@ -13,7 +13,10 @@
  *   para que nadie lea el valor como completo.
  * - Pedidos (número) es un conteo de pedidos DISTINTOS: un pedido con dos marcas
  *   cuenta una vez en el total y una vez en cada marca.
- * - Sin filtro de estado, las anuladas quedan fuera.
+ * - Sin filtro de estado solo cuentan las ventas en firme (confirmadas, en producción y
+ *   cerradas): BORRADOR y ANULADA solo entran si se piden explícito.
+ * - Los pedidos de mínimos de stock (`paraStock`) no son ventas: quedan fuera salvo
+ *   `includeStock`.
  */
 
 export const COMMERCIAL_DIMENSIONS = ['client', 'brand', 'reference', 'line'] as const;
@@ -22,14 +25,16 @@ export type CommercialDimension = (typeof COMMERCIAL_DIMENSIONS)[number];
 export const ORDER_STATUSES = ['BORRADOR', 'CONFIRMADA', 'EN_PRODUCCION', 'CERRADA', 'ANULADA'] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-/** Estados por defecto: todo menos lo anulado. */
-export const DEFAULT_STATUSES: OrderStatus[] = ['BORRADOR', 'CONFIRMADA', 'EN_PRODUCCION', 'CERRADA'];
+/** Estados por defecto: las ventas en firme (sin borradores ni anuladas). */
+export const DEFAULT_STATUSES: OrderStatus[] = ['CONFIRMADA', 'EN_PRODUCCION', 'CERRADA'];
 
 export interface CommercialFact {
   orderId: number;
   /** 'YYYY-MM' */
   month: string;
   status: OrderStatus;
+  /** Pedido de mínimos de stock (no es venta). */
+  forStock: boolean;
   clientId: number;
   clientName: string;
   brandId: number;
@@ -53,6 +58,8 @@ export interface CommercialFilters {
   referenceIds?: number[];
   lineIds?: number[];
   statuses?: OrderStatus[];
+  /** Incluir los pedidos de mínimos de stock (por defecto no). */
+  includeStock?: boolean;
 }
 
 export interface Measures {
@@ -148,6 +155,7 @@ export function filterFacts(facts: CommercialFact[], f: CommercialFilters): Comm
   return facts.filter(
     (x) =>
       statuses.includes(x.status) &&
+      (f.includeStock || !x.forStock) &&
       inList(f.clientIds, x.clientId) &&
       inList(f.brandIds, x.brandId) &&
       inList(f.referenceIds, x.referenceId) &&

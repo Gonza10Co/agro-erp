@@ -7,7 +7,7 @@ const pc = (refId: number, brandId: number, brandLine: { id: number; nombre: str
 });
 
 const order = (p: Partial<OrderRow>): OrderRow => ({
-  id: 1, estado: 'CONFIRMADA', fecha: new Date('2026-10-10T15:00:00Z'), fechaPedidoCliente: null,
+  id: 1, estado: 'CONFIRMADA', paraStock: false, fecha: new Date('2026-10-10T15:00:00Z'), fechaPedidoCliente: null,
   clienteId: 7, cliente: { nombre: 'Vozincol' }, linea: { id: 1, nombre: 'Basarili' },
   lineas: [], ordenProduccion: null, ...p,
 });
@@ -29,7 +29,7 @@ describe('CommercialReportService', () => {
       }),
     ]);
     expect(facts).toHaveLength(2);
-    expect(facts[0]).toMatchObject({ month: '2026-10', pairs: 30, dispatched: 15, value: 1_500_000, unpricedPairs: 0, lineName: 'Basarili' });
+    expect(facts[0]).toMatchObject({ forStock: false, month: '2026-10', pairs: 30, dispatched: 15, value: 1_500_000, unpricedPairs: 0, lineName: 'Basarili' });
     expect(facts[1]).toMatchObject({ pairs: 4, dispatched: 4, value: 0, unpricedPairs: 4 });
   });
 

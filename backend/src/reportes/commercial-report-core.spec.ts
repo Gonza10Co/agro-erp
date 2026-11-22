@@ -1,7 +1,7 @@
 import { CommercialFact, buildCommercialReport, filterFacts, monthRange, orderMonth } from './commercial-report-core';
 
 const fact = (p: Partial<CommercialFact>): CommercialFact => ({
-  orderId: 1, month: '2026-10', status: 'CONFIRMADA',
+  orderId: 1, month: '2026-10', status: 'CONFIRMADA', forStock: false,
   clientId: 1, clientName: 'Alfa', brandId: 10, brandName: 'AGRO',
   referenceId: 101, referenceName: '101', lineId: 1, lineName: 'Basarili',
   pairs: 0, dispatched: 0, value: 0, unpricedPairs: 0, ...p,
@@ -18,10 +18,16 @@ describe('commercial-report-core', () => {
     expect(orderMonth(null, new Date('2026-11-01T02:00:00Z'))).toBe('2026-10');
   });
 
-  it('sin filtro de estado deja fuera las anuladas; con filtro respeta la lista', () => {
-    const fs = [fact({ status: 'ANULADA' }), fact({ status: 'BORRADOR', orderId: 2 })];
-    expect(filterFacts(fs, {}).map((f) => f.orderId)).toEqual([2]);
-    expect(filterFacts(fs, { statuses: ['ANULADA'] }).map((f) => f.status)).toEqual(['ANULADA']);
+  it('sin filtro de estado deja fuera borradores y anuladas; con filtro respeta la lista', () => {
+    const fs = [fact({ status: 'ANULADA' }), fact({ status: 'BORRADOR', orderId: 2 }), fact({ status: 'CERRADA', orderId: 3 })];
+    expect(filterFacts(fs, {}).map((f) => f.orderId)).toEqual([3]);
+    expect(filterFacts(fs, { statuses: ['BORRADOR', 'ANULADA'] }).map((f) => f.orderId)).toEqual([1, 2]);
+  });
+
+  it('los mínimos de stock quedan fuera salvo includeStock', () => {
+    const fs = [fact({ orderId: 1 }), fact({ orderId: 2, forStock: true })];
+    expect(filterFacts(fs, {}).map((f) => f.orderId)).toEqual([1]);
+    expect(filterFacts(fs, { includeStock: true }).map((f) => f.orderId)).toEqual([1, 2]);
   });
 
   it('el filtro de línea usa 0 para "sin línea"', () => {

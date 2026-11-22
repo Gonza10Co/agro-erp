@@ -38,11 +38,12 @@ describe('CommercialReportComponent', () => {
 
   afterEach(() => http.verify());
 
-  it('pide el reporte sin anuladas, pinta KPIs y la tabla dinámica ordenada', () => {
+  it('pide solo ventas en firme y sin mínimos, pinta KPIs y la tabla dinámica ordenada', () => {
     const f = setup();
     const req = http.expectOne((r) => r.url === 'http://localhost:3001/reports/commercial');
     expect(req.request.params.get('rows')).toBe('client');
-    expect(req.request.params.get('statuses')).toBe('BORRADOR,CONFIRMADA,EN_PRODUCCION,CERRADA');
+    expect(req.request.params.get('statuses')).toBe('CONFIRMADA,EN_PRODUCCION,CERRADA');
+    expect(req.request.params.has('includeStock')).toBeFalse();
     req.flush(REPORT);
     f.detectChanges();
     const el: HTMLElement = f.nativeElement;
@@ -65,6 +66,15 @@ describe('CommercialReportComponent', () => {
     req.flush(REPORT);
     f.detectChanges();
     expect(f.componentInstance.activeChips()[0].label).toBe('Cliente: Beta');
+  });
+
+  it('el toggle de mínimos de stock manda includeStock', () => {
+    const f = setup();
+    http.expectOne((r) => r.url.endsWith('/reports/commercial')).flush(REPORT);
+    f.componentInstance.toggleStock();
+    const req = http.expectOne((r) => r.url.endsWith('/reports/commercial'));
+    expect(req.request.params.get('includeStock')).toBe('true');
+    req.flush(REPORT);
   });
 
   it('la medida valor cambia la tabla sin volver a pedir', () => {

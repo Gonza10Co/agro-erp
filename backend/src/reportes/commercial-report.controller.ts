@@ -39,6 +39,7 @@ export class CommercialReportController {
     @Query('referenceIds') referenceIds?: string,
     @Query('lineIds') lineIds?: string,
     @Query('statuses') statuses?: string,
+    @Query('includeStock') includeStock?: string,
   ) {
     const def = defaultRange();
     const f = from || def.from;
@@ -59,6 +60,7 @@ export class CommercialReportController {
         referenceIds: parseIds(referenceIds),
         lineIds: parseIds(lineIds),
         statuses: st as OrderStatus[] | undefined,
+        includeStock: includeStock === 'true',
       },
     });
   }

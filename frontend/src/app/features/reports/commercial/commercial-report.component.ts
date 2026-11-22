@@ -22,7 +22,8 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   CERRADA: 'Cerrada',
   ANULADA: 'Anulada',
 };
-const DEFAULT_STATUSES: OrderStatus[] = ['BORRADOR', 'CONFIRMADA', 'EN_PRODUCCION', 'CERRADA'];
+// Ventas en firme: borradores y anuladas solo si se marcan a mano.
+const DEFAULT_STATUSES: OrderStatus[] = ['CONFIRMADA', 'EN_PRODUCCION', 'CERRADA'];
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFractionDigits: 1 });
@@ -71,6 +72,7 @@ const compact = new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFra
           @for (s of statusList; track s) {
             <button type="button" class="chip" [class.on]="statuses().includes(s)" (click)="toggleStatus(s)">{{ statusLabel[s] }}</button>
           }
+          <button type="button" class="chip" [class.on]="includeStock()" (click)="toggleStock()" title="Los pedidos de mínimos de stock no son ventas: por defecto no suman">Incluir mínimos de stock</button>
           @for (c of activeChips(); track c.key + c.id) {
             <button type="button" class="chip on filtro" (click)="removeFilter(c.key, c.id)" [title]="'Quitar ' + c.label">{{ c.label }} ×</button>
           }
@@ -223,6 +225,7 @@ export class CommercialReportComponent implements OnInit {
   readonly statuses = signal<OrderStatus[]>([...DEFAULT_STATUSES]);
   readonly selected = signal<Record<FilterKey, number[]>>({ clientIds: [], brandIds: [], referenceIds: [], lineIds: [] });
   readonly search = signal('');
+  readonly includeStock = signal(false);
   readonly topBy = signal<'client' | 'reference'>('client');
 
   readonly report = signal<CommercialReport | null>(null);
@@ -314,7 +317,7 @@ export class CommercialReportComponent implements OnInit {
     this.error.set(null);
     const sel = this.selected();
     this.api
-      .commercial({ from: this.from(), to: this.to(), rows: this.rows(), statuses: this.statuses(), ...sel })
+      .commercial({ from: this.from(), to: this.to(), rows: this.rows(), statuses: this.statuses(), includeStock: this.includeStock(), ...sel })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (r) => { if (id === this.seq) { this.report.set(r); this.loading.set(false); } },
@@ -338,6 +341,11 @@ export class CommercialReportComponent implements OnInit {
     const next = cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s];
     // Sin ninguno el backend vuelve al defecto; mejor no dejar la lista vacía.
     this.statuses.set(next.length ? next : [...DEFAULT_STATUSES]);
+    this.load();
+  }
+
+  toggleStock(): void {
+    this.includeStock.update((v) => !v);
     this.load();
   }
 
