@@ -1,4 +1,4 @@
-import { buildInvoicePdf, INVOICE_FOOTER } from './invoice-pdf.util';
+import { buildInvoicePdf, fechaColombia, INVOICE_FOOTER } from './invoice-pdf.util';
 import { renderInvoicePdf, resolvePdfLibs } from './invoice-pdf';
 import { Factura } from '../../core/api/models/pedidos.models';
 
@@ -144,5 +144,19 @@ describe('renderInvoicePdf', () => {
     expect(pdf).toContain('FACTURA DE SERVICIO');
     expect(pdf).toContain('ANULADA');
     expect(pdf).not.toContain('Despacho parcial');
+  });
+});
+
+describe('fechaColombia', () => {
+  it('una factura de las 23:30 hora Colombia imprime ese día, no el siguiente en UTC', () => {
+    const noche = new Date('2026-11-20T23:30:00-05:00'); // 2026-11-21T04:30Z
+    expect(fechaColombia(noche)).toBe('20/11/2026');
+  });
+
+  it('el PDF de una factura emitida a las 23:30 lleva la fecha de Colombia', async () => {
+    const f = { ...producto(), fecha: '2026-11-21T04:30:00.000Z', fechaVencimiento: null } as Factura;
+    const pdf: string = (await renderInvoicePdf(buildInvoicePdf(f))).output();
+    expect(pdf).toContain('Fecha: 20/11/2026');
+    expect(pdf).not.toContain('21/11/2026');
   });
 });

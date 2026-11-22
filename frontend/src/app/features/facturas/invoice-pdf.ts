@@ -1,4 +1,4 @@
-import { InvoicePdf, moneda } from './invoice-pdf.util';
+import { InvoicePdf, fechaColombia, moneda } from './invoice-pdf.util';
 
 /**
  * Render de la factura a PDF, con el mismo formato de la proforma de la OC
@@ -36,9 +36,7 @@ export function resolvePdfLibs(jspdfMod: unknown, autoTableMod: unknown): { jsPD
   return { jsPDF, autoTable };
 }
 
-function fecha(d: Date): string {
-  return d.toLocaleDateString('es-CO');
-}
+const fecha = fechaColombia;
 
 export async function downloadInvoicePdf(f: InvoicePdf): Promise<void> {
   const doc = await renderInvoicePdf(f);

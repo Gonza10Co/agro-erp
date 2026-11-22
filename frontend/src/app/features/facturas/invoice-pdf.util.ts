@@ -57,6 +57,14 @@ export function moneda(n: number): string {
   return '$' + Math.round(n).toLocaleString('es-CO');
 }
 
+/**
+ * Fecha impresa en hora de Colombia (UTC-5), sin importar la zona del navegador:
+ * una factura de las 23:30 en Ibagué llega en UTC como el día siguiente.
+ */
+export function fechaColombia(d: Date): string {
+  return d.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function num(v: string | number | null | undefined): number {
   return Number(v ?? 0);
 }
