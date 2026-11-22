@@ -354,7 +354,8 @@ export class OcCrearComponent implements OnInit {
         this.estimando.set(false);
         this.estimacion.set(e);
         if (e) this.errorEstimacion.set(false);
-        if (e?.suggestedDate && !this.fechaManual()) this.fechaEntrega.set(e.suggestedDate);
+        // Sin cupo (suggestedDate null) no se deja la sugerencia vieja en el campo.
+        if (e && !this.fechaManual()) this.fechaEntrega.set(e.suggestedDate ?? '');
       });
   }
 

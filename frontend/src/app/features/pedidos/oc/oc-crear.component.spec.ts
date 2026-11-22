@@ -202,6 +202,30 @@ describe('OcCrearComponent', () => {
       http.verify();
     }));
 
+    it('si el recálculo queda sin cupo, vacía la sugerencia vieja (y respeta la manual)', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion());
+      expect(c.fechaEntrega()).toBe('2026-12-12');
+
+      c.setValores(7, { 1: 90000 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion({ suggestedDate: null, noCapacity: 500 }));
+      expect(c.fechaEntrega()).toBe('');
+
+      c.editarFechaEntrega('2026-12-20');
+      c.setValores(7, { 1: 95000 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion({ suggestedDate: null, noCapacity: 900 }));
+      expect(c.fechaEntrega()).toBe('2026-12-20');
+      http.verify();
+    }));
+
     it('cuando el usuario la escribe a mano, el recálculo ya no la pisa', fakeAsync(() => {
       const { fixture, http } = setup();
       const c = fixture.componentInstance;
