@@ -13,6 +13,7 @@ import { estadoDemora } from './oc-demora';
 import { resolverDestinoOC } from './oc-destino';
 import { elegirSedePorDefecto } from '../../clientes/sedes-core';
 import { aplanarPedidos, PedidosExport } from './oc-export';
+import { ORDER_LIST_SUMMARY_SELECT, orderListSummary } from './oc-list-summary';
 
 /** 'YYYY-MM-DD' → día calendario (medianoche UTC, como guarda @db.Date). undefined no toca. */
 function aFecha(s: string | null | undefined): Date | null | undefined {
@@ -265,6 +266,8 @@ export class OcService {
       include: {
         cliente: { select: { id: true, nit: true, nombre: true, estadoCartera: true } },
         linea: { select: { id: true, codigo: true, nombre: true } },
+        // Solo marca, referencia y cantidades: alimentan los filtros y totales de la lista.
+        lineas: ORDER_LIST_SUMMARY_SELECT,
         ordenProduccion: {
           // Conteo de despachos y tallas en la misma consulta: el chip "Despacho
           // parcial" de la lista sale de acá sin una consulta por pedido.
@@ -278,8 +281,10 @@ export class OcService {
     return ocs.map((oc) => {
       const demora = estadoDemora(oc.fechaConfirmacion, ahora, oc.cliente.estadoCartera, oc.estado);
       const op = oc.ordenProduccion;
+      const { lineas, ...cabecera } = oc;
       return {
-        ...oc,
+        ...cabecera,
+        summary: orderListSummary(lineas),
         // Las tallas solo sirven para el resumen: no viajan a la lista.
         ordenProduccion: op ? { id: op.id, consecutivo: op.consecutivo, estado: op.estado } : null,
         dispatch: op ? dispatchSummary(op) : null,
