@@ -4,7 +4,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } fro
 import { filter } from 'rxjs';
 import { ThemeToggleComponent } from '../../shared/ui/theme-toggle/theme-toggle.component';
 import { AuthService } from '../../core/auth/auth.service';
-import { Modulo, Seccion, puedeVerModulo, puedeVerRuta, puedeVerSeccion, rutaInicial } from '../../core/auth/modulos';
+import { Modulo, Seccion, canSeeCommercialReport, puedeVerModulo, puedeVerRuta, puedeVerSeccion, rutaInicial } from '../../core/auth/modulos';
 
 const SIDEBAR_KEY = 'agro-sidebar';
 const GRUPOS_KEY = 'agro-nav-grupos';
@@ -22,7 +22,7 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
   ['/fabricacion/ordenes', 'produccion'], ['/fabricacion/estacion', 'planta'],
   ['/fabricacion', 'produccion'], ['/calidad', 'planta'],
   ['/compras', 'compras'], ['/proveedores', 'compras'], ['/inventario', 'compras'],
-  ['/reportes', 'reportes'], ['/indicadores', 'reportes'],
+  ['/reportes', 'reportes'], ['/reports', 'reportes'], ['/indicadores', 'reportes'],
   ['/catalog', 'configuracion'], ['/administracion', 'configuracion'],
 ];
 
@@ -227,6 +227,12 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
             <span class="nav-label">Reporte diario</span>
           </a>
           }
+          @if (puedeVer('reportes') && canSeeCommercial()) {
+          <a class="nav-item" routerLink="/reports/commercial" routerLinkActive="is-active" title="Reporte comercial: pedidos por cliente y por mes">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
+            <span class="nav-label">Reporte comercial</span>
+          </a>
+          }
           @if (puedeVer('indicadores')) {
           <a class="nav-item" routerLink="/indicadores" routerLinkActive="is-active" title="Indicadores">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg></span>
@@ -338,6 +344,10 @@ export class ShellComponent {
   /** Ítems que viven dentro de un módulo ya liberado pero aún no van al cliente. */
   puedeVerSec(seccion: Seccion): boolean {
     return puedeVerSeccion(this.usuario?.role ?? null, seccion);
+  }
+
+  canSeeCommercial(): boolean {
+    return canSeeCommercialReport(this.usuario?.role ?? null);
   }
 
   /** Para los roles acotados por URL (la tablet de estación): ¿este enlace es suyo? */

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { MetaItem, ReporteDiario } from './models/reporte-diario.models';
+import { CommercialQuery, CommercialReport } from './models/commercial-report.models';
 
 @Injectable({ providedIn: 'root' })
 export class ReportesApi {
@@ -25,5 +26,17 @@ export class ReportesApi {
     return this.http.put<MetaItem[]>(`${this.base}/metas`, { items }, {
       params: { anio, mes, ...(lineaId != null ? { lineaId } : {}) },
     });
+  }
+
+  /** Reporte comercial (pedidos por cliente y mes). Listas como '1,2,3'; vacías no viajan. */
+  commercial(q: CommercialQuery) {
+    const params: Record<string, string> = { from: q.from, to: q.to, rows: q.rows };
+    const list = (k: string, v?: (string | number)[]) => { if (v?.length) params[k] = v.join(','); };
+    list('clientIds', q.clientIds);
+    list('brandIds', q.brandIds);
+    list('referenceIds', q.referenceIds);
+    list('lineIds', q.lineIds);
+    list('statuses', q.statuses);
+    return this.http.get<CommercialReport>(`${environment.apiUrl}/reports/commercial`, { params });
   }
 }
