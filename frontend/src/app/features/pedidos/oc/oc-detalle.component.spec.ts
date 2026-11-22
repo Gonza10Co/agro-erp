@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { OcDetalleComponent } from './oc-detalle.component';
 import { PedidosApi } from '../../../core/api/pedidos.api';
+import { AuthService } from '../../../core/auth/auth.service';
 
 const OC_BORRADOR = {
   id: 7, consecutivo: 12, clienteId: 1, fecha: '2026-06-01T00:00:00.000Z', estado: 'BORRADOR',
@@ -17,9 +18,10 @@ const OC_BORRADOR = {
 };
 
 describe('OcDetalleComponent', () => {
-  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy; cambiarFechaEntregaOC: jasmine.Spy; cambiarFechaPedidoClienteOC: jasmine.Spy };
-  function setup(ocId = 7) {
+  let apiMock: { obtenerOC: jasmine.Spy; obtenerCosteoOC: jasmine.Spy; confirmarOC: jasmine.Spy; generarOP: jasmine.Spy; cambiarFechaEntregaOC: jasmine.Spy; cambiarFechaPedidoClienteOC: jasmine.Spy; unconfirmOC: jasmine.Spy };
+  function setup(ocId = 7, rol: string | null = 'ADMIN') {
     apiMock = {
+      unconfirmOC: jasmine.createSpy('unconfirmOC').and.returnValue(of({ id: 7, estado: 'BORRADOR' })),
       obtenerOC: jasmine.createSpy('obtenerOC').and.returnValue(of(OC_BORRADOR)),
       obtenerCosteoOC: jasmine.createSpy('obtenerCosteoOC').and.returnValue(of(null)),
       confirmarOC: jasmine.createSpy('confirmarOC').and.returnValue(of({ id: 7, estado: 'CONFIRMADA' })),
@@ -29,7 +31,7 @@ describe('OcDetalleComponent', () => {
     };
     TestBed.configureTestingModule({
       imports: [OcDetalleComponent],
-      providers: [{ provide: PedidosApi, useValue: apiMock }, provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+      providers: [{ provide: PedidosApi, useValue: apiMock }, { provide: AuthService, useValue: { rol: () => rol } }, provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(OcDetalleComponent);
     fixture.componentRef.setInput('ocId', ocId);
@@ -128,5 +130,80 @@ describe('OcDetalleComponent', () => {
     const anchor: HTMLAnchorElement = fixture.nativeElement.querySelector('a[href]');
     expect(anchor).withContext('debe existir un enlace <a> a la OP').toBeTruthy();
     expect(anchor.getAttribute('href')).toContain('/pedidos/op/7');
+  });
+
+  describe('Devolver a borrador', () => {
+    const OC_PROD = { ...OC_BORRADOR, estado: 'EN_PRODUCCION', ordenProduccion: { id: 50, consecutivo: 18, estado: 'AMARRADA' } };
+    const btn = (f: any, sel: string) => (f.nativeElement as HTMLElement).querySelector(sel) as HTMLButtonElement | null;
+
+    it('sale en un pedido confirmado o en producción, no en borrador', () => {
+      let f = setup();
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      f.detectChanges();
+      expect(btn(f, '.btn-devolver-borrador')).toBeTruthy();
+      TestBed.resetTestingModule();
+      f = setup();
+      apiMock.obtenerOC.and.returnValue(of({ ...OC_BORRADOR, estado: 'CONFIRMADA' }));
+      f.detectChanges();
+      expect(btn(f, '.btn-devolver-borrador')).toBeTruthy();
+      TestBed.resetTestingModule();
+      f = setup();
+      f.detectChanges();
+      expect(btn(f, '.btn-devolver-borrador')).toBeNull();
+    });
+
+    it('sale para quien confirma pedidos (CLIENTE) y no para un rol acotado de planta', () => {
+      let f = setup(7, 'CLIENTE');
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      f.detectChanges();
+      expect(btn(f, '.btn-devolver-borrador')).toBeTruthy();
+      TestBed.resetTestingModule();
+      f = setup(7, 'JEFE_CORTE');
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      f.detectChanges();
+      expect(btn(f, '.btn-devolver-borrador')).toBeNull();
+    });
+
+    it('pide confirmación en la app (sin window.confirm), explica qué se libera y llama al back', () => {
+      spyOn(window, 'confirm');
+      const f = setup();
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      f.detectChanges();
+      btn(f, '.btn-devolver-borrador')!.click();
+      f.detectChanges();
+      const texto = (f.nativeElement as HTMLElement).querySelector('.confirm-devolver')!.textContent!;
+      expect(texto).toContain('OP #18');
+      expect(texto).toContain('se libera lo que estaba apartado');
+      expect(apiMock.unconfirmOC).not.toHaveBeenCalled();
+      btn(f, '.btn-si-devolver')!.click();
+      expect(window.confirm).not.toHaveBeenCalled();
+      expect(apiMock.unconfirmOC).toHaveBeenCalledWith(7);
+      // Recarga el pedido (ya en borrador) y avisa a la lista.
+      expect(apiMock.obtenerOC).toHaveBeenCalledTimes(2);
+    });
+
+    it('cancelar cierra el diálogo sin llamar al back', () => {
+      const f = setup();
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      f.detectChanges();
+      btn(f, '.btn-devolver-borrador')!.click();
+      f.detectChanges();
+      (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.confirm-devolver .btn-ghost')!.click();
+      f.detectChanges();
+      expect((f.nativeElement as HTMLElement).querySelector('.confirm-devolver')).toBeNull();
+      expect(apiMock.unconfirmOC).not.toHaveBeenCalled();
+    });
+
+    it('muestra el motivo del bloqueo que manda el back', () => {
+      const f = setup();
+      apiMock.obtenerOC.and.returnValue(of(OC_PROD));
+      apiMock.unconfirmOC.and.returnValue(throwError(() => ({ error: { message: 'No se puede devolver a borrador: Ya hay 40 pares nacidos en la OF-23.' } })));
+      f.detectChanges();
+      f.componentInstance.pedirDevolverBorrador();
+      f.componentInstance.devolverBorrador();
+      f.detectChanges();
+      expect((f.nativeElement as HTMLElement).textContent).toContain('Ya hay 40 pares nacidos en la OF-23');
+      expect(f.componentInstance.confirmandoDevolver()).toBeFalse();
+    });
   });
 });

@@ -14,6 +14,17 @@
 > + 15 días, al siguiente hábil y nunca antes de entrar a PT. Se recalcula sola mientras el
 > usuario no la escriba a mano ("Usar la sugerida" la recupera). Sección `fecha-entrega-sugerida`.
 >
+> **↩️ DEVOLVER UN PEDIDO A BORRADOR (2026-11-21), sin desplegar.** Para el pedido que se
+> confirmó con un error (cantidad, talla, referencia, cliente). En el detalle de la OC confirmada o
+> en producción (sección `devolver-borrador-oc`, ENTREGADO, mismo permiso que confirmar):
+> `POST /pedidos/oc/:id/unconfirm`. En una transacción suelta el amarre de PT y de insumos, borra
+> el requerimiento automático, las OF vacías y la OP (se BORRA: `OrdenProduccion.ocId` es único) y
+> deja la OC en BORRADOR sin `fechaConfirmacion`. Se bloquea (409 con el motivo) si hay pares
+> nacidos, etiquetas impresas, consumo de MP, OF en una orden de corte, despachos, facturas, pases
+> de pares o un requerimiento convertido en OCP. Rastro: `unconfirmedAt`, `unconfirmedById`,
+> `unconfirmedOpNumber` (migración `20261121180000_oc_unconfirm`) + log. E2E en
+> `backend/test/oc-unconfirm.e2e-spec.ts` (reconfirmar amarra igual, sin reservas fantasma).
+>
 > **🔁 PASAR PARES RESERVADOS ENTRE PEDIDOS (2026-11-19), sin desplegar.** Pedido de JP: un pedido
 > listo que no se despacha (Guantes Terry) y otro que sí hay que despachar (Vozincol). En el
 > detalle de la OP, solo ADMIN/GERENTE (sección `reasignar-pares`, ENTREGADO): **"Pasar pares a

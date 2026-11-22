@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DISPATCH_SUMMARY_SELECT, dispatchSummary } from '../../despachos/dispatch-summary';
@@ -14,6 +16,9 @@ import { resolverDestinoOC } from './oc-destino';
 import { elegirSedePorDefecto } from '../../clientes/sedes-core';
 import { aplanarPedidos, PedidosExport } from './oc-export';
 import { ORDER_LIST_SUMMARY_SELECT, orderListSummary } from './oc-list-summary';
+import { OC_UNCONFIRMABLE_STATES, unconfirmBlockers } from './oc-unconfirm';
+import { liberarReservasDeOp } from '../../compras/reserva-insumos';
+import { PtHold, releasePtHolds } from '../op/release-pt-holds';
 
 /** 'YYYY-MM-DD' → día calendario (medianoche UTC, como guarda @db.Date). undefined no toca. */
 function aFecha(s: string | null | undefined): Date | null | undefined {
@@ -35,6 +40,7 @@ function aFechaPedidoCliente(s: string | null | undefined, ahora = new Date()): 
 
 @Injectable()
 export class OcService {
+  private readonly logger = new Logger(OcService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(dto: CrearOCDto) {
@@ -258,6 +264,115 @@ export class OcService {
       // Se sella la fecha de confirmación: desde acá corre el reloj de demora.
       data: { estado: 'CONFIRMADA', fechaConfirmacion: new Date() },
     });
+  }
+
+  /**
+   * Devolver a borrador una OC confirmada (se confirmó con un error). Deshace en UNA
+   * transacción lo que hicieron confirmar + generar OP: suelta el amarre de PT y de
+   * insumos, borra el requerimiento automático, las OF vacías y la OP, y deja la OC
+   * en BORRADOR sin fecha de confirmación (al reconfirmar el reloj arranca de nuevo).
+   *
+   * La OP se BORRA y no se anula: `OrdenProduccion.ocId` es único, así que una OP
+   * anulada impediría generar la nueva al reconfirmar. Por eso solo se permite si
+   * nada arrancó físicamente (ver unconfirmBlockers): sin pares, etiquetas, consumo,
+   * corte, despachos, facturas, pases de pares ni OCP, no hay historia que perder.
+   * Ninguna reserva es movimiento de kardex: soltarlas no toca el kardex.
+   */
+  async unconfirm(id: number, userId: number | null) {
+    const cambio = 'El pedido cambió mientras se devolvía a borrador, vuelve a intentar';
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Mismo orden de locks que el despacho y el pase de pares: OP antes que inventario.
+      await tx.$queryRaw`SELECT id FROM "OrdenCompra" WHERE id = ${id} FOR UPDATE`;
+      const oc = await tx.ordenCompra.findUnique({ where: { id } });
+      if (!oc) throw new NotFoundException(`OC ${id} no existe`);
+      if (!(OC_UNCONFIRMABLE_STATES as readonly string[]).includes(oc.estado)) {
+        throw new BadRequestException(
+          oc.estado === 'BORRADOR'
+            ? 'El pedido ya está en borrador'
+            : 'Solo un pedido confirmado o en producción se puede devolver a borrador',
+        );
+      }
+
+      const opRow = await tx.ordenProduccion.findUnique({ where: { ocId: id }, select: { id: true } });
+      let opNumber: number | null = null;
+      if (opRow) {
+        await tx.$queryRaw`SELECT id FROM "OrdenProduccion" WHERE id = ${opRow.id} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "OrdenFabricacion" WHERE "opId" = ${opRow.id} ORDER BY id FOR UPDATE`;
+        const op = await tx.ordenProduccion.findUnique({
+          where: { id: opRow.id },
+          include: {
+            lineas: { include: { tallas: { include: { reservas: true } } } },
+            despachos: { select: { consecutivo: true, factura: { select: { consecutivo: true } } } },
+            ordenesFabricacion: {
+              select: {
+                id: true,
+                consecutivo: true,
+                estado: true,
+                lineasCorte: { select: { ordenCorte: { select: { codigo: true } } } },
+                _count: { select: { pares: true, etiquetasReservadas: true, movimientos: true } },
+              },
+            },
+            requerimientos: { select: { id: true, consecutivo: true, ordenesCompra: { select: { consecutivo: true } } } },
+            _count: { select: { ptReassignmentsOut: true, ptReassignmentsIn: true } },
+          },
+        });
+        if (!op) throw new ConflictException(cambio);
+        const tallas = op.lineas.flatMap((l) => l.tallas);
+        const motivos = unconfirmBlockers({
+          despachos: op.despachos,
+          ofs: op.ordenesFabricacion.map((f) => ({
+            consecutivo: f.consecutivo,
+            estado: f.estado,
+            pares: f._count.pares,
+            etiquetasReservadas: f._count.etiquetasReservadas,
+            movimientos: f._count.movimientos,
+            ordenesCorte: [...new Set(f.lineasCorte.map((c) => c.ordenCorte.codigo))],
+          })),
+          ptReassignmentsOut: op._count.ptReassignmentsOut,
+          ptReassignmentsIn: op._count.ptReassignmentsIn,
+          tallas,
+          requerimientos: op.requerimientos,
+        });
+        if (motivos.length > 0) {
+          throw new ConflictException(`No se puede devolver a borrador: ${motivos.join('. ')}.`);
+        }
+
+        // 1) Amarre de PT: vuelve al disponible de cada fila de bodega.
+        const holds: PtHold[] = tallas.flatMap((t) => t.reservas);
+        await releasePtHolds(tx, holds, tallas.map((t) => t.id), cambio);
+        // 2) Amarre de insumos (MP): vuelve al neto disponible, y el requerimiento
+        //    automático (y los recalculados, ya liberados) se borra: nunca llegó a OCP.
+        await liberarReservasDeOp(tx, op.id);
+        const reqIds = op.requerimientos.map((r) => r.id);
+        if (reqIds.length > 0) {
+          await tx.requerimientoCompraLinea.deleteMany({ where: { requerimientoId: { in: reqIds } } });
+          await tx.requerimientoCompra.deleteMany({ where: { id: { in: reqIds } } });
+        }
+        // 3) OF vacías (sin pares, etiquetas, consumo ni corte) y la OP con sus líneas.
+        await tx.ordenFabricacion.deleteMany({ where: { opId: op.id } });
+        await tx.ordenProduccionLineaTalla.deleteMany({ where: { opLinea: { opId: op.id } } });
+        await tx.ordenProduccionLinea.deleteMany({ where: { opId: op.id } });
+        await tx.ordenProduccion.delete({ where: { id: op.id } });
+        opNumber = op.consecutivo;
+      }
+
+      const updated = await tx.ordenCompra.update({
+        where: { id },
+        data: {
+          estado: 'BORRADOR',
+          fechaConfirmacion: null,
+          unconfirmedAt: new Date(),
+          unconfirmedById: userId,
+          unconfirmedOpNumber: opNumber,
+        },
+      });
+      return { updated, opNumber };
+    });
+    this.logger.log(
+      `OC-${result.updated.consecutivo} devuelta a borrador por el usuario ${userId ?? '?'}` +
+        (result.opNumber != null ? ` (se borró la OP-${result.opNumber})` : ''),
+    );
+    return result.updated;
   }
 
   async listar() {

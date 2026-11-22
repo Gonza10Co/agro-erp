@@ -23,6 +23,8 @@ export class PedidosApi {
   /** El día en que el cliente puso el pedido (no futuro); null la borra. */
   cambiarFechaPedidoClienteOC(id: number, fechaPedidoCliente: string | null) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}/fecha-pedido-cliente`, { fechaPedidoCliente }); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
+  /** Devuelve a borrador una OC confirmada si nada arrancó en planta (borra su OP y suelta lo apartado). */
+  unconfirmOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/unconfirm`, {}); }
   eliminarOC(id: number) { return this.http.delete<void>(`${this.oc}/${id}`); }
 
   generarOP(ocId: number) { return this.http.post<OrdenProduccion>(`${this.op}/desde-oc/${ocId}`, {}); }
