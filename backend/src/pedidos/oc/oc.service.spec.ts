@@ -352,6 +352,22 @@ describe('OcService', () => {
     expect(r[1].dispatch).toBeNull();
   });
 
+  it('listar adjunta el resumen de pares, marcas y referencias y no manda las líneas', async () => {
+    prisma.ordenCompra.findMany.mockResolvedValue([
+      {
+        id: 1, estado: 'CONFIRMADA', fechaConfirmacion: null, cliente: { estadoCartera: 'AL_DIA' }, ordenProduccion: null,
+        lineas: [
+          { productoConfigurado: { marca: { id: 3, nombre: 'Agro' }, referencia: { id: 5, codigo: '101' } }, tallas: [{ cantidad: 12 }, { cantidad: 8 }] },
+        ],
+      },
+    ]);
+    const r: any[] = await service.listar();
+    const args = prisma.ordenCompra.findMany.mock.calls.at(-1)[0];
+    expect(args.include.lineas.select.tallas).toEqual({ select: { cantidad: true } });
+    expect(r[0].summary).toEqual({ pairs: 20, brands: [{ id: 3, nombre: 'Agro' }], references: [{ id: 5, codigo: '101' }] });
+    expect(r[0].lineas).toBeUndefined();
+  });
+
   it('obtener lanza NotFound si la OC no existe', async () => {
     prisma.ordenCompra.findUnique.mockResolvedValue(null);
     await expect(service.obtener(99)).rejects.toThrow('OC 99 no existe');

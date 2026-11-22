@@ -77,6 +77,8 @@ export interface OrdenCompra {
   fechaPedidoCliente?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
+  /** Solo en la lista: pares pedidos y marcas/referencias de sus líneas (para filtros y totales). */
+  summary?: OrderListSummary;
   /** Solo en la lista: cómo va el despacho de su OP (null si no tiene OP). */
   dispatch?: DispatchSummary | null;
   // Semáforo de demora calculado por el backend en el listado (no se persiste).
@@ -134,6 +136,12 @@ export interface OrdenProduccion {
 }
 
 /** Resumen del despacho de una OP para las listas de pedidos. */
+export interface OrderListSummary {
+  pairs: number;
+  brands: { id: number; nombre: string }[];
+  references: { id: number; codigo: string }[];
+}
+
 export interface DispatchSummary {
   deliveries: number;
   dispatchedPairs: number;
