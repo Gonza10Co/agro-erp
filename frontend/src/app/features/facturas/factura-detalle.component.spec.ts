@@ -70,4 +70,28 @@ describe('FacturaDetalleComponent', () => {
     expect(el.textContent).toContain('Entrega 1');
     expect(el.textContent).not.toContain('(final)');
   });
+
+  it('una entrega que no cerró el pedido muestra "Despacho parcial" y el botón del PDF', () => {
+    const el = setup({
+      id: 1, consecutivo: 1, fecha: '2026-10-13T00:00:00.000Z', estado: 'EMITIDA',
+      subtotal: '1000', ivaPct: '19', iva: '190', total: '1190',
+      cliente: { id: 5, nombre: 'CALZATODO SA', nit: '890.300.123-4' },
+      despacho: { consecutivo: 8, deliveryNumber: 2, isFinal: false, op: { consecutivo: 3, oc: { consecutivo: 21 } } },
+      lineas: [],
+    });
+    expect(el.textContent).toContain('Despacho parcial');
+    expect(el.textContent).toContain('Descargar PDF');
+  });
+
+  it('la factura de servicio no muestra un despacho vacío y nombra el servicio en la línea', () => {
+    const el = setup({
+      id: 2, consecutivo: 14, tipo: 'SERVICIO', fecha: '2026-08-04T00:00:00.000Z', estado: 'EMITIDA',
+      subtotal: '1000', ivaPct: '19', iva: '190', total: '1190',
+      cliente: { id: 9, nombre: 'CAPELLADAS BOGOTÁ', nit: '901.000.000-1' },
+      despacho: null,
+      lineas: [{ id: 1, cantidad: 10, precioUnitario: '100', subtotal: '1000', servicio: { codigo: 'INY', nombre: 'Inyección de suela', unidad: 'PAR' } }],
+    });
+    expect(el.textContent).not.toContain('DSP-');
+    expect(el.textContent).toContain('Inyección de suela');
+  });
 });

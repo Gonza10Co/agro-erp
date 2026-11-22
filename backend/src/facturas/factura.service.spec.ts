@@ -218,5 +218,15 @@ describe('FacturaService', () => {
       const lista = prisma.factura.findMany.mock.calls[0][0].select.despacho.select;
       for (const sel of [det, lista]) expect(sel).toEqual(expect.objectContaining({ deliveryNumber: true, isFinal: true }));
     });
+
+    it('el detalle trae el emisor (línea de la factura o de la OP) para el PDF', async () => {
+      prisma.factura.findUnique.mockResolvedValue({ id: 1 });
+      await service.obtener(1);
+      const inc = prisma.factura.findUnique.mock.calls[0][0].include;
+      const emisor = expect.objectContaining({ razonSocial: true, nit: true });
+      expect(inc.linea.select).toEqual(emisor);
+      expect(inc.despacho.select.op.select.linea.select).toEqual(emisor);
+      expect(inc.despacho.select).toEqual(expect.objectContaining({ fecha: true, direccionEntrega: true }));
+    });
   });
 });
