@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsISO8601, IsInt, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import { AutorizacionDto } from '../../calidad/dto/autorizacion.dto';
 
 export class AvanzarDto {
@@ -48,4 +48,26 @@ export class AvanzarDto {
   @ValidateNested()
   @Type(() => AutorizacionDto)
   autorizacion?: AutorizacionDto;
+
+  /**
+   * Modo sin internet: hora REAL del pistolazo en la tablet (ISO 8601). Si viene,
+   * el evento queda con esa hora y no con la de llegada. Se rechaza si está más
+   * de 5 minutos en el futuro o tiene más de 7 días.
+   */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  // Con zona explícita: una hora "suelta" se leería en la zona del servidor.
+  @Matches(/(Z|[+-]\d{2}:\d{2})$/, { message: 'scannedAt debe traer zona horaria (Z o ±hh:mm)' })
+  scannedAt?: string;
+
+  /**
+   * Modo sin internet: id único que la tablet le pone a cada pistolazo. Si el
+   * mismo id llega dos veces (la cola reintenta), se responde lo ya registrado
+   * sin duplicar el evento.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  clientScanId?: string;
 }

@@ -441,3 +441,26 @@ export function normalizarCodigoPar(crudo: string): string {
   if (!m) return limpio;
   return `OF${Number(m[1])}-${m[2].padStart(4, '0')}`;
 }
+
+/** Un pistolazo guardado sin señal puede llegar hasta 7 días tarde (un puente festivo con la red caída). */
+export const MAX_ATRASO_ESCANEO_MS = 7 * 24 * 60 * 60 * 1000;
+/** El reloj de la tablet puede ir algo adelantado: más de 5 minutos ya no es creíble. */
+export const MAX_ADELANTO_ESCANEO_MS = 5 * 60 * 1000;
+
+/**
+ * Hora real de un pistolazo que llega tarde (modo sin internet): la que trae la
+ * tablet, validada contra el reloj del servidor. `undefined` = sin hora (el
+ * evento queda con la hora de la base, como siempre). Un adelanto pequeño
+ * (reloj de la tablet corrido) se recorta a `ahora` para que la TV no cuente
+ * eventos "del futuro". Lanza un mensaje legible si la hora no sirve.
+ */
+export function horaDelEscaneo(scannedAt: string | undefined, ahora: Date): Date | undefined {
+  if (scannedAt == null || scannedAt === '') return undefined;
+  const t = new Date(scannedAt);
+  if (Number.isNaN(t.getTime())) throw new Error('La hora del pistolazo no es válida');
+  if (t.getTime() - ahora.getTime() > MAX_ADELANTO_ESCANEO_MS)
+    throw new Error('La hora del pistolazo está en el futuro: revisa la hora de la tablet');
+  if (ahora.getTime() - t.getTime() > MAX_ATRASO_ESCANEO_MS)
+    throw new Error('El pistolazo tiene más de 7 días: ya no se puede registrar');
+  return t.getTime() > ahora.getTime() ? new Date(ahora) : t;
+}
