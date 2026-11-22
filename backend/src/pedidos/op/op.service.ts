@@ -31,6 +31,15 @@ export class OpService {
     }
 
     const creada = await this.prisma.$transaction(async (tx) => {
+      // Bloquea la OC y revalida: un "devolver a borrador" en paralelo no puede
+      // dejar una OP colgada de una OC en BORRADOR.
+      const [locked] = await tx.$queryRaw<{ estado: string }[]>`
+        SELECT estado FROM "OrdenCompra" WHERE id = ${ocId} FOR UPDATE`;
+      if (locked && locked.estado !== 'CONFIRMADA') {
+        throw new BadRequestException(
+          'Solo se puede generar OP de una OC CONFIRMADA',
+        );
+      }
       const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
         // La línea del pedido baja de la OC: fabricación la lee de la OP.
