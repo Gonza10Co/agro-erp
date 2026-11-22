@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { OrdenCompra, OrdenProduccion, CrearOCDto, ResumenCosteoOC, PedidosExport } from './models/pedidos.models';
-import { Proyeccion } from './models/proyeccion.models';
+import { DeliveryEstimate, DeliveryEstimateBody, Proyeccion } from './models/proyeccion.models';
 import { PtReassignment, ReassignPtBody, ReassignmentOption, ReleasePtBody } from './models/pt-reassignment.models';
 
 @Injectable({ providedIn: 'root' })
@@ -41,4 +41,6 @@ export class PedidosApi {
 
   /** Pedidos vivos contra la capacidad de la planta (solo lectura). */
   proyeccion() { return this.http.get<Proyeccion>(`${environment.apiUrl}/pedidos/proyeccion`); }
+  /** Fecha de entrega sugerida para el pedido que se está montando (solo lectura). */
+  deliveryEstimate(body: DeliveryEstimateBody) { return this.http.post<DeliveryEstimate>(`${environment.apiUrl}/orders/delivery-estimate`, body); }
 }

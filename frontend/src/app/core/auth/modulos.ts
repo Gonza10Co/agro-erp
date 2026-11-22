@@ -100,6 +100,8 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
 export type Seccion =
   // Proyección de pedidos contra la capacidad de la planta (2026-11-12).
   | 'proyeccion-pedidos'
+  // Fecha de entrega sugerida al crear la OC, según la carga de planta (2026-11-21).
+  | 'fecha-entrega-sugerida'
   // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
   // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
   | 'calidad-en-planta'
@@ -140,6 +142,10 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // trabajo, qué pedido no llega y desde cuándo hay cupo para vender. Solo lectura.
   // Liberada de una: el cliente ya opera en real y JP la pidió para programar.
   'proyeccion-pedidos': 'ENTREGADO',
+  // Fecha de entrega sugerida (2026-11-21): al crear la OC se propone la fecha con la
+  // misma proyección (el pedido nuevo de último en la cola). Promesa a JP; liberada de
+  // una, como todo desde el 2026-09-11 (Gonza: no se sigue escondiendo el avance).
+  'fecha-entrega-sugerida': 'ENTREGADO',
   // Quincena de calidad en planta (2026-09-11): la puerta desde la pantalla de
   // estación para marcar un par como segunda, darlo de baja o registrar un
   // reproceso sin salir de la línea. Liberada el mismo día que se construyó:

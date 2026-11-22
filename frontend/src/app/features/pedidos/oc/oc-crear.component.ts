@@ -1,7 +1,9 @@
 import { Component, OnInit, computed, inject, signal, DestroyRef } from '@angular/core';
+import { of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ClientesApi } from '../../../core/api/clientes.api';
 import { PedidosApi } from '../../../core/api/pedidos.api';
 import { CatalogoApi } from '../../../core/api/catalogo.api';
@@ -12,7 +14,8 @@ import { Cliente, SedeCliente, Talla } from '../../../core/api/models/pedidos.mo
 import { MarcaOpt, ProductoConfiguradoFull, ReferenciaConfig, ReferenciaListItem } from '../../../core/api/models/catalogo.models';
 import { BuscadorSelectComponent } from '../../../shared/ui/buscador-select/buscador-select.component';
 import { TallaGridComponent } from '../../../shared/ui/talla-grid/talla-grid.component';
-import { LineaWizard, tallasDeProducto, construirDto, seleccionInicialEjes, hoyColombia } from './oc-crear.util';
+import { LineaWizard, tallasDeProducto, construirDto, seleccionInicialEjes, hoyColombia, cuerpoEstimacion, textoSugerencia } from './oc-crear.util';
+import { DeliveryEstimate } from '../../../core/api/models/proyeccion.models';
 import { obligatoriosFaltantes, opcionIdsSel } from '../../catalog/configurador/configurador.util';
 import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
 
@@ -49,10 +52,13 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             <div><label class="label">OC del cliente (opcional)</label><input class="input" [ngModel]="ocCliente()" (ngModelChange)="ocCliente.set($event)" /></div>
             <div><label class="label">Observaciones (opcional)</label><input class="input" [ngModel]="observaciones()" (ngModelChange)="observaciones.set($event)" /></div>
           </div>
-          <div style="margin-top:var(--sp-4);max-width:240px">
-            <label class="label">Fecha de entrega (opcional)</label>
-            <input class="input" type="date" [ngModel]="fechaEntrega()" (ngModelChange)="fechaEntrega.set($event)" />
-          </div>
+          <!-- Con la fecha sugerida el campo pasa a Revisar: ahí ya están las tallas. -->
+          @if (!sugiereFecha) {
+            <div style="margin-top:var(--sp-4);max-width:240px">
+              <label class="label">Fecha de entrega (opcional)</label>
+              <input class="input" type="date" [ngModel]="fechaEntrega()" (ngModelChange)="fechaEntrega.set($event)" />
+            </div>
+          }
           <div style="margin-top:var(--sp-4);max-width:240px">
             <label class="label">Fecha del pedido del cliente</label>
             <input class="input" type="date" [max]="hoy" [ngModel]="fechaPedidoCliente()" (ngModelChange)="fechaPedidoCliente.set($event)" />
@@ -200,6 +206,25 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
             <span>Total general: {{ totalGeneral() }} pares</span>
             <span class="cell-mono">{{ moneda(totalPesos()) }}</span>
           </div>
+          @if (sugiereFecha) {
+            <div class="fecha-entrega">
+              <label class="label">Fecha de entrega</label>
+              <input class="input" type="date" style="max-width:240px" [ngModel]="fechaEntrega()" (ngModelChange)="editarFechaEntrega($event)" />
+              @if (estimando()) {
+                <p class="cell-sub sugerencia">Calculando con la carga de planta…</p>
+              } @else if (errorEstimacion()) {
+                <p class="cell-sub sugerencia">No se pudo calcular la fecha sugerida; escríbela a mano.</p>
+              } @else {
+                @if (estimacion(); as e) {
+                  <p class="cell-sub sugerencia">{{ textoSugerencia(e) }}</p>
+                  <p class="cell-sub">{{ e.explanation }}</p>
+                  @if (fechaManual() && e.suggestedDate && fechaEntrega() !== e.suggestedDate) {
+                    <button class="btn btn-ghost btn-sm" type="button" (click)="usarSugerida()">Usar la sugerida</button>
+                  }
+                }
+              }
+            </div>
+          }
           @if (error()) { <p style="color:var(--error);font-size:var(--text-sm);margin-top:var(--sp-3)">{{ error() }}</p> }
         }
       </div></div>
@@ -234,6 +259,8 @@ import { totalCurva } from '../../../shared/ui/talla-grid/curva.util';
     .armar-title{font-weight:var(--fw-semibold);margin-bottom:var(--sp-3)}
     .armar-ejes{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--sp-3);margin-top:var(--sp-3)}
     .armar-foot{display:flex;align-items:center;gap:var(--sp-3);margin-top:var(--sp-4);flex-wrap:wrap}
+    .fecha-entrega{margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:var(--bw) solid var(--border)}
+    .sugerencia{margin-top:var(--sp-2);color:var(--text-muted)}
     .nota-seg{font-size:var(--text-caption);color:var(--warn,#d97706);margin-top:var(--sp-1);max-width:220px}
   `],
 })
@@ -250,6 +277,8 @@ export class OcCrearComponent implements OnInit {
   readonly puedeElegirLinea = puedeVerSeccion(this.auth.rol(), 'linea-pedido');
   // Venta de segundas (Entrega 5): elegir el grado al pedir.
   readonly puedeVenderSegundas = puedeVerSeccion(this.auth.rol(), 'venta-segundas');
+  // Fecha de entrega sugerida según la carga de planta (2026-11-21).
+  readonly sugiereFecha = puedeVerSeccion(this.auth.rol(), 'fecha-entrega-sugerida');
 
   pasosLabels = ['Cliente', 'Productos', 'Curva de tallas', 'Revisar'];
 
@@ -294,6 +323,52 @@ export class OcCrearComponent implements OnInit {
   });
   enviando = signal(false);
   error = signal('');
+
+  // --- Fecha de entrega sugerida (paso 3) ---
+  estimacion = signal<DeliveryEstimate | null>(null);
+  estimando = signal(false);
+  errorEstimacion = signal(false);
+  /** true en cuanto el usuario escribe la fecha: desde ahí la sugerencia no la pisa. */
+  fechaManual = signal(false);
+  readonly textoSugerencia = textoSugerencia;
+  /** Lo que mueve la sugerencia: productos, tallas, cantidades, calidad y mínimos. */
+  private readonly cuerpoEstimacion = computed(() => cuerpoEstimacion(this.lineas(), this.paraStock()));
+
+  constructor() {
+    if (!this.sugiereFecha) return;
+    toObservable(this.cuerpoEstimacion)
+      .pipe(
+        map((b) => (b ? JSON.stringify(b) : '')),
+        distinctUntilChanged(),
+        debounceTime(400),
+        switchMap((k) => {
+          if (!k) return of(null);
+          this.estimando.set(true);
+          return this.pedidosApi.deliveryEstimate(JSON.parse(k)).pipe(
+            catchError(() => { this.errorEstimacion.set(true); return of(null); }),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((e) => {
+        this.estimando.set(false);
+        this.estimacion.set(e);
+        if (e) this.errorEstimacion.set(false);
+        if (e?.suggestedDate && !this.fechaManual()) this.fechaEntrega.set(e.suggestedDate);
+      });
+  }
+
+  editarFechaEntrega(fecha: string) {
+    this.fechaManual.set(true);
+    this.fechaEntrega.set(fecha ?? '');
+  }
+
+  usarSugerida() {
+    const f = this.estimacion()?.suggestedDate;
+    if (!f) return;
+    this.fechaManual.set(false);
+    this.fechaEntrega.set(f);
+  }
 
   onClienteSel(c: Cliente) {
     this.clienteSel.set(c);
