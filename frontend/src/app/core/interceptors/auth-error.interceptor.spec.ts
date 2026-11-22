@@ -50,6 +50,16 @@ describe('authErrorInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('si la renovación no llega por falta de red, NO cierra la sesión (la tablet sigue logueada)', () => {
+    auth.renovar.and.returnValue(throwError(() => ({ status: 0 })));
+    let err: any;
+    http.get('http://localhost:3001/fabricacion/estaciones').subscribe({ error: (e) => (err = e) });
+    httpMock.expectOne('http://localhost:3001/fabricacion/estaciones').flush('no', { status: 401, statusText: 'Unauthorized' });
+    expect(err.status).toBe(0);
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('si el reintento vuelve a dar 401, va al login', () => {
     auth.renovar.and.returnValue(of('token.nuevo'));
     http.get('http://localhost:3001/pedidos/oc').subscribe({ next: () => {}, error: () => {} });

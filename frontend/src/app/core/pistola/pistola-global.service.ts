@@ -2,12 +2,12 @@ import { Injectable, NgZone, inject } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
-import { FabricacionApi } from '../api/fabricacion.api';
 import { AvanceResultado } from '../api/models/fabricacion.models';
 import { ToastService } from '../notificaciones/toast.service';
 import { leerConfig } from '../../features/fabricacion/config-estacion';
 import { DetectorPistola } from './detector-pistola';
 import { sonar } from './sonido-pistola';
+import { OfflineScanQueueService } from '../offline/offline-scan-queue.service';
 
 /**
  * La pistola funciona desde CUALQUIER pantalla de la app (no solo la de estación):
@@ -23,15 +23,22 @@ import { sonar } from './sonido-pistola';
 export class PistolaGlobalService {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
-  private readonly api = inject(FabricacionApi);
   private readonly toast = inject(ToastService);
   private readonly zone = inject(NgZone);
+  private readonly cola = inject(OfflineScanQueueService);
   private readonly detector = new DetectorPistola();
   private iniciado = false;
 
   iniciar(doc: Document = document): void {
     if (this.iniciado) return;
     this.iniciado = true;
+    // Un pistolazo guardado sin señal que el servidor rechazó después: que se vea y se oiga
+    // (la pantalla de estación lo muestra ella misma).
+    this.cola.rechazo$.subscribe((r) => {
+      if (this.router.url.startsWith('/fabricacion/estacion')) return;
+      sonar('error');
+      this.toast.mostrar('error', `${r.codigo} no quedó al sincronizar`, { detalle: r.motivo, fijo: true, grande: true });
+    });
     this.zone.runOutsideAngular(() => doc.addEventListener('keydown', (ev) => this.alTeclear(ev, doc), true));
   }
 
@@ -59,8 +66,23 @@ export class PistolaGlobalService {
       });
       return;
     }
-    this.api.avanzar(cod, c.operarioId, c.maquinaId, c.estacion, undefined, true).subscribe({
-      next: (r) => {
+    this.cola.registrar({ codigo: cod, operarioId: c.operarioId, maquinaId: c.maquinaId, estacion: c.estacion }, { encolable: true }).subscribe({
+      next: (reg) => {
+        if (reg.tipo === 'repetido-en-cola') {
+          sonar('alerta');
+          this.toast.mostrar('alerta', `${cod} ya estaba guardado`, { detalle: 'Ya está en la cola de esta tablet: no se guarda dos veces.', grande: true });
+          return;
+        }
+        if (reg.tipo === 'encolado') {
+          sonar('ok');
+          const n = `${reg.pendientes} ${reg.pendientes === 1 ? 'pendiente' : 'pendientes'}`;
+          this.toast.mostrar('alerta', `${cod} guardado`, {
+            detalle: reg.porque === 'sin-red' ? `Sin señal: se envía solo cuando vuelva (${n})` : `Se envía en segundo plano (${n})`,
+            grande: true,
+          });
+          return;
+        }
+        const r = reg.resultado;
         // Entró, pero se saltó alguna estación: quedó anotado y alguien debe mirarlo.
         const saltadas = r.avance.saltadas ?? [];
         if (saltadas.length) {

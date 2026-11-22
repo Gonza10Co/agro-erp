@@ -6,11 +6,12 @@ import { routes } from './app.routes';
 import { jwtInterceptor } from './core/interceptors/jwt.interceptor';
 import { authErrorInterceptor } from './core/interceptors/auth-error.interceptor';
 import { errorToastInterceptor } from './core/interceptors/error-toast.interceptor';
+import { relojInterceptor } from './core/offline/reloj-servidor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([jwtInterceptor, authErrorInterceptor, errorToastInterceptor])),
+    provideHttpClient(withInterceptors([jwtInterceptor, authErrorInterceptor, errorToastInterceptor, relojInterceptor])),
   ],
 };

@@ -1216,6 +1216,9 @@ model EventoTrazabilidad {
   maquinaId        Int?
   maquina          Maquina?           @relation(fields: [maquinaId], references: [id])
   timestamp        DateTime           @default(now())
+  // Id que pone la tablet a cada pistolazo (modo sin internet): si el mismo
+  // pistolazo llega dos veces (reintento de la cola), el segundo no duplica.
+  clientScanId     String?            @unique
 
   @@index([parId])
   @@index([celula])

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors, HttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ToastService } from '../notificaciones/toast.service';
-import { errorToastInterceptor } from './error-toast.interceptor';
+import { errorToastInterceptor, reiniciarAvisoSinRed } from './error-toast.interceptor';
 
 describe('errorToastInterceptor', () => {
   let http: HttpClient;
@@ -19,6 +19,7 @@ describe('errorToastInterceptor', () => {
       ],
     });
     http = TestBed.inject(HttpClient);
+    reiniciarAvisoSinRed();
     httpMock = TestBed.inject(HttpTestingController);
   });
 
@@ -57,6 +58,15 @@ describe('errorToastInterceptor', () => {
     httpMock
       .expectOne('http://localhost:3001/x')
       .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+    expect(toast.error).toHaveBeenCalledWith('Sin conexión con el servidor.');
+  });
+
+  it('sin red, una ráfaga de lecturas fallidas da UN solo aviso', () => {
+    for (const u of ['estaciones', 'operarios', 'maquinas', 'hoy']) {
+      http.get(`http://localhost:3001/fabricacion/${u}`).subscribe({ next: () => {}, error: () => {} });
+      httpMock.expectOne(`http://localhost:3001/fabricacion/${u}`).error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+    }
+    expect(toast.error).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenCalledWith('Sin conexión con el servidor.');
   });
 });

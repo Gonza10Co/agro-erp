@@ -25,7 +25,16 @@ export class FabricacionApi {
    * Un pistolazo. La máquina es opcional (en Bodega o PT no hay) y la estación,
    * si se manda, hace que el backend rechace el escaneo si el par se saltó una.
    */
-  avanzar(codigo: string, operarioId: number, maquinaId?: number, estacion?: string, dano?: DanoEscaneo, sinToastError = false) {
+  avanzar(
+    codigo: string,
+    operarioId: number,
+    maquinaId?: number,
+    estacion?: string,
+    dano?: DanoEscaneo,
+    sinToastError = false,
+    /** Modo sin internet: hora real del escaneo e id para que un reintento no duplique. */
+    sello?: { scannedAt?: string; clientScanId?: string },
+  ) {
     const nota = dano?.descripcion?.trim();
     return this.http.post<AvanceResultado>(
       `${this.base}/fabricacion/par/${codigo}/avanzar`,
@@ -41,6 +50,8 @@ export class FabricacionApi {
               ...(dano.autorizacion ? { autorizacion: dano.autorizacion } : {}),
             }
           : {}),
+        ...(sello?.scannedAt ? { scannedAt: sello.scannedAt } : {}),
+        ...(sello?.clientScanId ? { clientScanId: sello.clientScanId } : {}),
       },
       { context: new HttpContext().set(SIN_TOAST_ERROR, sinToastError) },
     );

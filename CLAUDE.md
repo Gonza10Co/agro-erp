@@ -32,6 +32,24 @@ termina el par. Si `AvanzarDto.estacion` viene, se rechaza el escaneo fuera de o
 `/fabricacion/estacion`, `/tv`, `/fabricacion/ordenes` (sección `piloto`). `seed:piloto` siembra
 la orden de prueba sin tocar inventario.
 
+**Modo sin internet (2026-11-21):** el pistolazo pasa por `OfflineScanQueueService`
+(`frontend/src/app/core/offline/`): espera al servidor máx. 2 s; sin red o lento queda en
+localStorage con `clientScanId` + `scannedAt` y se sincroniza solo (online + cada 30 s, en orden
+de hora real; rechazos de negocio a una lista visible). El backend sella el evento con
+`scannedAt` (máx. 5 min futuro / 7 días atrás) y es idempotente por `EventoTrazabilidad.clientScanId`.
+Segunda/baja (firma) y nacer necesitan red. El primer envío va sin hora (la pone el servidor);
+desde la cola va con la hora de la tablet corregida por el desfase de reloj (header `Date`,
+expuesto por CORS). Varias pestañas: localStorage manda y un candado (`navigator.locks`) deja
+sincronizar a una sola. `frontend/public/sw.js` (propio, sin dependencias) guarda el app shell
+para abrir sin señal, SOLO en tablets (rol ESTACION, `/fabricacion/estacion`, `/tv`; en oficina se
+desregistra); NUNCA cachea la API. Si cambia su lógica, subir `VERSION`.
+
+> **Apagar el service worker (kill switch):** 1) `cp frontend/sw-kill.js frontend/public/sw.js`,
+> 2) `SERVICE_WORKER_HABILITADO = false` en `frontend/src/app/core/offline/offline-config.ts`,
+> 3) desplegar. Cada tablet baja el worker asesino, borra las cachés `agro-shell-*`, se
+> desregistra y recarga. **NUNCA borrar `public/sw.js`**: con un 404 el navegador deja el
+> worker viejo instalado sirviendo su caché.
+
 **Líneas de producción:** cada par pertenece a una `Linea` (vía `productoConfigurado.marca.linea`) que define su `celulaInicial`. El orden de células es forward-only (`siguienteCelula` en `fabricacion-core.ts`), pero el **punto de arranque varía por línea**: la línea **Feroz** (capellada de Bogotá; hoy solo servicio de inyección) arranca en INYECCIÓN, no en CORTE. La línea EXTERNA del kickoff quedó **desactivada** (cliente 2026-07-06: esos cortes no vuelven; Feroz la reemplaza). `Par.lineaId` se denormaliza al crear el par (reportes `?lineaId`). **El mapeo marca→línea NO es fijo** (cliente 2026-07-06): la línea se decide **por pedido** — implementado 2026-07-12: la OC captura `lineaId` (selector EN_STAGE en el wizard), la OP lo hereda y cada par nace con la línea del pedido; `Marca.lineaId` es solo fallback histórico. El reporte diario acepta `?lineaId` y las metas se segmentan con `Meta.lineaId` (NULL = global). El kardex de bodega PT también se corta por línea: cada movimiento PT sella `MovimientoInventario.lineaId` al escribirse (producción/despacho); los históricos con NULL suman solo en "Todas las líneas".
 
 ## Workflow

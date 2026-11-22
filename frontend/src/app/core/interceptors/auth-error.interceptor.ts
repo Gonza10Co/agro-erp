@@ -24,7 +24,9 @@ export const authErrorInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err: HttpErrorResponse) => {
       if (err.status !== 401 || esAuth) return throwError(() => err);
       return auth.renovar().pipe(
-        catchError(() => alLogin(err)),
+        // Sin señal la renovación no llega: eso no es una sesión vencida. La tablet
+        // sigue logueada y lo intenta otra vez cuando vuelva la red.
+        catchError((e: HttpErrorResponse) => (e?.status === 0 ? throwError(() => e) : alLogin(err))),
         switchMap((token) =>
           next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })).pipe(
             catchError((err2: HttpErrorResponse) =>

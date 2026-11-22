@@ -27,6 +27,7 @@ import {
   OFFSET_BOGOTA_HORAS,
   conNombreDeEstacion,
   normalizarCodigoPar,
+  horaDelEscaneo,
 } from './fabricacion-core';
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
@@ -52,6 +53,9 @@ const num = (d: DecimalLike): number =>
 export const OTRAS_ESTACIONES = 'OTROS';
 /** Columna del tablero para lo programado que todavía no nació: sus piezas están en corte. */
 export const CORTE_PENDIENTE = 'CORTE_PENDIENTE';
+
+/** Hora real e id del pistolazo (modo sin internet); vacío = como siempre. */
+type SelloEscaneo = { timestamp?: Date; clientScanId?: string };
 
 @Injectable()
 export class FabricacionService {
@@ -233,6 +237,7 @@ export class FabricacionService {
     nac: EstacionDef,
     operarioId: number,
     maquinaId: number | null | undefined,
+    sello: SelloEscaneo = {},
   ) {
     await tx.par.createMany({
       data: pares.map((p) => ({
@@ -277,6 +282,7 @@ export class FabricacionService {
         celulaDestino: nac.celula,
         operarioId,
         maquinaId: maquinaId ?? null,
+        ...sello,
       })),
     });
     if (of.estado === 'ABIERTA')
@@ -378,6 +384,7 @@ export class FabricacionService {
   private async nacerDesdeReserva(
     reserva: { id: number; codigo: string; ofId: number; productoConfiguradoId: number; tallaId: number; parId: number | null; anulada: boolean },
     dto: AvanzarDto,
+    sello: SelloEscaneo = {},
   ) {
     if (reserva.anulada) throw new ConflictException(`La etiqueta ${reserva.codigo} fue anulada: no se usa`);
     const { of, lineaId, nac } = await this.contextoNacimiento(
@@ -409,6 +416,7 @@ export class FabricacionService {
           nac,
           dto.operarioId,
           dto.maquinaId,
+          sello,
         );
         await tx.etiquetaReservada.update({ where: { id: reserva.id }, data: { parId: nuevo.id } });
         return nuevo;
@@ -446,6 +454,73 @@ export class FabricacionService {
 
   async avanzar(codigoLeido: string, dto: AvanzarDto, user?: Usuario) {
     const codigo = normalizarCodigoPar(codigoLeido);
+    // Modo sin internet: la cola de la tablet reintenta con el mismo id. Si ya
+    // quedó (la petición original sí llegó), se responde lo registrado y nada más.
+    if (dto.clientScanId) {
+      const previo = await this.respuestaDeEscaneoPrevio(dto.clientScanId);
+      if (previo) return previo;
+    }
+    let hora: Date | undefined;
+    try {
+      hora = horaDelEscaneo(dto.scannedAt, new Date());
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    const sello: SelloEscaneo = {
+      ...(hora ? { timestamp: hora } : {}),
+      ...(dto.clientScanId ? { clientScanId: dto.clientScanId } : {}),
+    };
+    try {
+      return await this.registrarAvance(codigo, dto, user, sello);
+    } catch (e: unknown) {
+      // Dos envíos del mismo pistolazo a la vez: el segundo choca con el índice
+      // único y responde lo que dejó el primero.
+      if (dto.clientScanId && (e as { code?: string })?.code === 'P2002') {
+        const previo = await this.respuestaDeEscaneoPrevio(dto.clientScanId);
+        if (previo) return previo;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Lo que ya quedó registrado con ese id de pistolazo, con la misma forma que
+   * la respuesta de un avance (`repetido: true`). null si nunca llegó.
+   */
+  private async respuestaDeEscaneoPrevio(clientScanId: string) {
+    const ev = await this.prisma.eventoTrazabilidad.findUnique({
+      where: { clientScanId },
+      include: { par: { select: { id: true, codigo: true, celulaActual: true, estado: true, calidad: true } } },
+    });
+    if (!ev) return null;
+    const estacionCodigo = ev.estacionDestino ?? 'PT';
+    const [estaciones, anteriores, hoy] = await Promise.all([
+      this.estaciones(),
+      this.prisma.eventoTrazabilidad.count({ where: { parId: ev.parId, id: { lt: ev.id } } }),
+      this.hoyEnEstacion(estacionCodigo),
+    ]);
+    const est = estaciones.find((x) => x.codigo === estacionCodigo) ?? null;
+    return {
+      id: ev.par.id,
+      codigo: ev.par.codigo,
+      celulaActual: ev.par.celulaActual,
+      estado: ev.par.estado,
+      avance: {
+        estacion: estacionCodigo,
+        nombre: est?.nombre ?? 'Producto terminado',
+        terminado: esEstacionTerminal(est) && ev.par.estado === 'TERMINADO',
+        hoy,
+        calidad: ev.par.calidad,
+        incidencia: null,
+        parReposicion: null,
+        saltadas: [],
+        ...(anteriores === 0 ? { nacio: true } : {}),
+        repetido: true,
+      },
+    };
+  }
+
+  private async registrarAvance(codigo: string, dto: AvanzarDto, user: Usuario | undefined, sello: SelloEscaneo) {
     const par = await this.prisma.par.findUnique({
       where: { codigo },
       // La línea decide dónde nace la reposición de una segunda (Feroz → Montaje).
@@ -458,7 +533,7 @@ export class FabricacionService {
     if (!par) {
       // ¿Es una etiqueta impresa por adelantado? Nace en este pistolazo.
       const reserva = await this.prisma.etiquetaReservada.findUnique({ where: { codigo } });
-      if (reserva) return this.nacerDesdeReserva(reserva, dto);
+      if (reserva) return this.nacerDesdeReserva(reserva, dto, sello);
       throw new NotFoundException(`Par ${codigo} no existe`);
     }
     if (par.estado !== 'EN_PROCESO') {
@@ -548,6 +623,8 @@ export class FabricacionService {
               estacionDestino: t.hacia.codigo,
               celulaDestino: t.hacia.celula,
               inferido: true,
+              // Los saltos quedan con la hora del pistolazo que los destapó.
+              ...(sello.timestamp ? { timestamp: sello.timestamp } : {}),
             },
           });
         }
@@ -561,6 +638,7 @@ export class FabricacionService {
             ...destino,
             operarioId: dto.operarioId,
             maquinaId: dto.maquinaId ?? null,
+            ...sello,
           },
         });
 

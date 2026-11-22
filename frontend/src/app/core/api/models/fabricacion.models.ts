@@ -294,6 +294,8 @@ export interface AvanceResultado {
     nacio?: boolean;
     /** Estaciones por las que pasó sin pistolazo: quedaron como inferidas. */
     saltadas?: { codigo: string; nombre: string }[];
+    /** Ya estaba registrado con ese id de pistolazo (reintento de la cola sin internet). */
+    repetido?: boolean;
   };
 }
 
