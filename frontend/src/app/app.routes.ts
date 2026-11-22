@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { moduloGuard } from './core/auth/modulo.guard';
 import { programarCorteGuard } from './core/auth/programar-corte.guard';
+import { commercialReportGuard } from './core/auth/commercial-report.guard';
 
 export const routes: Routes = [
   {
@@ -68,6 +69,8 @@ export const routes: Routes = [
       { path: 'calidad', data: { modulo: 'calidad' }, loadComponent: () => import('./features/calidad/dashboard-calidad.component').then(m => m.DashboardCalidadComponent) },
       { path: 'indicadores', data: { modulo: 'indicadores' }, loadComponent: () => import('./features/indicadores/dashboard-indicadores.component').then(m => m.DashboardIndicadoresComponent) },
       { path: 'reportes/diario', data: { modulo: 'reportes' }, loadComponent: () => import('./features/reportes/reporte-diario.component').then(m => m.ReporteDiarioComponent) },
+      // Reporte comercial (2026-11-21): solo gerencia y comercial; la sección lo gatea por nivel.
+      { path: 'reports/commercial', canActivate: [commercialReportGuard], data: { modulo: 'reportes', seccion: 'commercial-report' }, loadComponent: () => import('./features/reports/commercial/commercial-report.component').then(m => m.CommercialReportComponent) },
       // Administración. El `data.modulo` no es decorativo: sin él el cliente
       // entraría tecleando la URL aunque el menú esté oculto — el backend no
       // gatea por nivel de liberación (pasó con /compras/ordenes/nueva).

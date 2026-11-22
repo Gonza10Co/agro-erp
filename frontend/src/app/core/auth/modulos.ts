@@ -134,7 +134,9 @@ export type Seccion =
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
   | 'piloto'
   // Exportar los inventarios a Excel (reunión del 2026-11-21).
-  | 'exportar-inventario';
+  | 'exportar-inventario'
+  // Reporte comercial (reunión del 2026-11-21): pedidos por cliente y mes, tabla dinámica.
+  | 'commercial-report';
 
 /**
  * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
@@ -219,6 +221,11 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // Exportar inventarios a Excel (PT, materia prima y en proceso): lo pidieron JP,
   // Valentina y Juan José en la reunión del 2026-11-21. Solo lectura.
   'exportar-inventario': 'ENTREGADO',
+  // Reporte comercial para Alejandra y gerencia (reunión del 2026-11-21): pedidos por
+  // cliente y mes con gráfico y tabla dinámica. Liberado de una: lo pidió el cliente y
+  // desde el 2026-09-11 no se le esconde el avance. Solo lectura; el rol lo acota
+  // `ROLES_COMMERCIAL_REPORT` (abajo), no el nivel.
+  'commercial-report': 'ENTREGADO',
 };
 
 /**
@@ -356,4 +363,15 @@ export const ROLES_REASIGNAN_PARES: readonly string[] = ['ADMIN', 'GERENTE'];
 
 export function puedeReasignarPares(rol: string | null | undefined): boolean {
   return !!rol && ROLES_REASIGNAN_PARES.includes(rol) && puedeVerSeccion(rol, 'reasignar-pares');
+}
+
+/**
+ * Quién ve el reporte comercial: gerencia, comercial (usuarios de la fábrica) y la demo.
+ * Espejo de `ROLES_COMMERCIAL_REPORT` en `backend/src/reportes/commercial-report.service.ts`,
+ * que es el que de verdad manda (403 al resto).
+ */
+export const ROLES_COMMERCIAL_REPORT: readonly string[] = ['ADMIN', 'GERENTE', 'CLIENTE', 'STAGE'];
+
+export function canSeeCommercialReport(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_COMMERCIAL_REPORT.includes(rol) && puedeVerSeccion(rol, 'commercial-report');
 }
