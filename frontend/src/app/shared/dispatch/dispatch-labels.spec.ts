@@ -1,4 +1,4 @@
-import { deliveryLabel, dispatchDetail, partialDispatch } from './dispatch-labels';
+import { deliveryLabel, dispatchDetail, partialDispatch, partialDispatchLabel } from './dispatch-labels';
 
 describe('dispatch-labels', () => {
   it('nombra la entrega y marca la final', () => {
@@ -18,5 +18,13 @@ describe('dispatch-labels', () => {
     expect(partialDispatch(null)).toBeNull();
     expect(partialDispatch({ deliveries: 3, dispatchedPairs: 20, neededPairs: 20, partial: false })).toBeNull();
     expect(partialDispatch({ deliveries: 1, dispatchedPairs: 5, neededPairs: 20, partial: true })?.deliveries).toBe(1);
+  });
+
+  it('la factura de un despacho que no cerró el pedido dice "Despacho parcial"', () => {
+    expect(partialDispatchLabel(1, false)).toBe('Despacho parcial');
+    expect(partialDispatchLabel(2, false)).toBe('Despacho parcial');
+    expect(partialDispatchLabel(3, true)).toBeNull();
+    expect(partialDispatchLabel(1, true)).toBeNull();
+    expect(partialDispatchLabel(undefined, false)).toBeNull();
   });
 });

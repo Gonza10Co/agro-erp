@@ -98,6 +98,8 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
  * (pedidos, compras) y quedaría a la vista apenas se despliega.
  */
 export type Seccion =
+  // PDF de la factura (2026-11-21): imprimir/descargar la factura con su entrega.
+  | 'factura-pdf'
   // Proyección de pedidos contra la capacidad de la planta (2026-11-12).
   | 'proyeccion-pedidos'
   // Fecha de entrega sugerida al crear la OC, según la carga de planta (2026-11-21).
@@ -138,6 +140,9 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // PDF de la factura (2026-11-21): solo lectura, imprime lo que ya se ve en pantalla
+  // (incluida la entrega y el despacho parcial que pidió JP el 20-nov). Liberado de una.
+  'factura-pdf': 'ENTREGADO',
   // Proyección de pedidos (2026-11-12): lo que Gabriel le pide a JP, hasta cuándo hay
   // trabajo, qué pedido no llega y desde cuándo hay cupo para vender. Solo lectura.
   // Liberada de una: el cliente ya opera en real y JP la pidió para programar.

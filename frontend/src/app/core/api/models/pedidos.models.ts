@@ -206,9 +206,22 @@ export interface FacturaLinea {
   productoConfigurado?: ProductoConfigurado;
   tallaId: number;
   talla?: Talla;
+  /** Solo en facturas de servicio (maquila): no hay producto ni talla. */
+  servicio?: { codigo: string; nombre: string; unidad: string } | null;
+  descripcion?: string | null;
+  calidad?: CalidadPT;
   cantidad: number;
   precioUnitario: string;
   subtotal: string;
+}
+
+/** Emisor que imprime el PDF: la línea de la factura (servicio) o la de la OP (producto). */
+export interface LineaEmisor {
+  codigo: string;
+  nombre: string;
+  razonSocial?: string | null;
+  nit?: string | null;
+  datosPago?: string | null;
 }
 
 export interface Factura {
@@ -222,9 +235,18 @@ export interface Factura {
   iva: string;
   total: string;
   estado: EstadoFactura;
+  tipo?: TipoFactura;
   /** El detalle trae el cliente en la factura misma (las de servicio no tienen despacho). */
-  cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'>;
-  despacho?: { consecutivo: number; deliveryNumber?: number; isFinal?: boolean; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
+  cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'> & Partial<Pick<Cliente, 'ciudad' | 'telefono' | 'direccion'>>;
+  linea?: LineaEmisor | null;
+  despacho?: {
+    consecutivo: number;
+    fecha?: string;
+    direccionEntrega?: string | null;
+    deliveryNumber?: number;
+    isFinal?: boolean;
+    op: { consecutivo: number; linea?: LineaEmisor | null; oc: { consecutivo: number; cliente?: Cliente } };
+  } | null;
   lineas?: FacturaLinea[];
 }
 

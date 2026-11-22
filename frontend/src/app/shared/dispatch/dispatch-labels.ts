@@ -23,3 +23,11 @@ export function dispatchDetail(s: DispatchSummary): string {
 export function partialDispatch(s: DispatchSummary | null | undefined): DispatchSummary | null {
   return s?.partial ? s : null;
 }
+
+/**
+ * Etiqueta de la factura cuando el despacho no cerró el pedido: salió solo una parte
+ * y la OP sigue abierta. La entrega final (aunque sea la 3) ya dice "(final)".
+ */
+export function partialDispatchLabel(n: number | null | undefined, isFinal?: boolean | null): string | null {
+  return n && !isFinal ? 'Despacho parcial' : null;
+}
