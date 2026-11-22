@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ORDEN_CELULAS } from '../fabricacion/fabricacion-core';
 import { validarMovimientoMaterial } from './inventario-core';
+import { WipGroup, buildWipDetailRows } from './wip-detail-core';
 import { CrearBodegaDto } from './dto/crear-bodega.dto';
 import { RegistrarStockDto } from './dto/registrar-stock.dto';
 import { MovimientoMaterialDto } from './dto/movimiento-material.dto';
@@ -101,7 +102,10 @@ export class InventarioService {
       this.prisma.inventarioMaterial.findMany({
         include: {
           material: {
-            include: { unidadMedida: { select: { codigo: true } } },
+            include: {
+              unidadMedida: { select: { codigo: true } },
+              categoria: { select: { nombre: true } },
+            },
           },
         },
         orderBy: { material: { codigo: 'asc' } },
@@ -114,7 +118,16 @@ export class InventarioService {
       this.prisma.inventarioPT.findMany({
         where: { OR: [{ cantDisponible: { gt: 0 } }, { cantReservada: { gt: 0 } }] },
         include: {
-          productoConfigurado: { select: { codigo: true, nombreComercial: true } },
+          productoConfigurado: {
+            select: {
+              codigo: true,
+              nombreComercial: true,
+              referencia: { select: { codigo: true } },
+              // La línea de la bodega PT sale de la marca (fallback histórico): el
+              // saldo no guarda línea, solo los movimientos del kardex.
+              marca: { select: { nombre: true, linea: { select: { id: true, nombre: true } } } },
+            },
+          },
           talla: { select: { valor: true } },
           bodega: { select: { codigo: true, nombre: true } },
         },
@@ -136,7 +149,9 @@ export class InventarioService {
         codigo: m.material.codigo,
         nombre: m.material.nombreCanonico,
         unidad: m.material.unidadMedida.codigo,
+        categoria: m.material.categoria?.nombre ?? null,
         cantDisponible: Number(m.cantDisponible),
+        cantReservada: Number(m.cantReservada ?? 0),
       })),
       wip: ORDEN_CELULAS.map((celula) => ({
         celula,
@@ -145,6 +160,10 @@ export class InventarioService {
       pt: pt.map((i) => ({
         producto: i.productoConfigurado.nombreComercial,
         codigo: i.productoConfigurado.codigo,
+        referencia: i.productoConfigurado.referencia?.codigo ?? null,
+        marca: i.productoConfigurado.marca?.nombre ?? null,
+        lineaId: i.productoConfigurado.marca?.linea?.id ?? null,
+        linea: i.productoConfigurado.marca?.linea?.nombre ?? null,
         talla: i.talla.valor,
         bodega: i.bodega.nombre,
         calidad: i.calidad,
@@ -152,6 +171,50 @@ export class InventarioService {
         cantReservada: i.cantReservada,
       })),
     };
+  }
+
+  /**
+   * Inventario en proceso al detalle (célula × OF × producto × talla) para el Excel
+   * de inventarios. Mismo filtro de línea que el WIP del consolidado.
+   */
+  async wipDetail(lineaId?: number) {
+    const groups = (await this.prisma.par.groupBy({
+      by: ['celulaActual', 'productoConfiguradoId', 'tallaId', 'lineaId', 'ofId', 'calidad'],
+      where: { estado: 'EN_PROCESO', ...(lineaId ? { lineaId } : {}) },
+      _count: { _all: true },
+    })) as unknown as WipGroup[];
+    if (!groups.length) return [];
+    const ids = (k: 'productoConfiguradoId' | 'tallaId' | 'ofId') => [...new Set(groups.map((g) => g[k]))];
+    const lineaIds = [...new Set(groups.map((g) => g.lineaId).filter((x): x is number => x != null))];
+    const [productos, tallas, lineas, ofs] = await Promise.all([
+      this.prisma.productoConfigurado.findMany({
+        where: { id: { in: ids('productoConfiguradoId') } },
+        select: {
+          id: true,
+          codigo: true,
+          nombreComercial: true,
+          referencia: { select: { codigo: true } },
+          marca: { select: { nombre: true } },
+        },
+      }),
+      this.prisma.talla.findMany({ where: { id: { in: ids('tallaId') } } }),
+      this.prisma.linea.findMany({ where: { id: { in: lineaIds } } }),
+      this.prisma.ordenFabricacion.findMany({
+        where: { id: { in: ids('ofId') } },
+        select: { id: true, consecutivo: true },
+      }),
+    ]);
+    return buildWipDetailRows(groups, {
+      productos: new Map(
+        productos.map((p) => [
+          p.id,
+          { codigo: p.codigo, nombre: p.nombreComercial, referencia: p.referencia.codigo, marca: p.marca.nombre },
+        ]),
+      ),
+      tallas: new Map(tallas.map((t) => [t.id, t.valor])),
+      lineas: new Map(lineas.map((l) => [l.id, l.nombre])),
+      ofs: new Map(ofs.map((o) => [o.id, o.consecutivo])),
+    });
   }
 
   kardex(limit = 50) {

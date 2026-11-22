@@ -5,7 +5,11 @@ export interface MaterialStock {
   codigo: string;
   nombre: string;
   unidad: string;
+  categoria?: string | null;
+  /** Existencia física (incluye lo amarrado a pedidos). */
   cantDisponible: number;
+  /** Amarrado a requerimientos de pedidos; libre = cantDisponible − cantReservada. */
+  cantReservada?: number;
 }
 
 export interface WipCelula {
@@ -19,6 +23,11 @@ export type CalidadPT = 'PRIMERA' | 'SEGUNDA';
 export interface PtStock {
   producto: string;
   codigo: string;
+  referencia?: string | null;
+  marca?: string | null;
+  /** Línea de la marca (fallback histórico: el saldo PT no guarda línea propia). */
+  lineaId?: number | null;
+  linea?: string | null;
   talla: number;
   bodega: string;
   calidad: CalidadPT;
@@ -30,6 +39,20 @@ export interface InventarioConsolidado {
   materiales: MaterialStock[];
   wip: WipCelula[];
   pt: PtStock[];
+}
+
+/** Fila del detalle de inventario en proceso (GET /inventario/wip-detail). */
+export interface WipDetailRow {
+  celula: Celula;
+  of: number | null;
+  linea: string | null;
+  referencia: string;
+  marca: string;
+  producto: string;
+  codigo: string;
+  talla: number | null;
+  calidad: CalidadPT;
+  pares: number;
 }
 
 /** Registro escalar de Bodega devuelto por POST /inventario/bodegas. */

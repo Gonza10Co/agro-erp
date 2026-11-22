@@ -11,6 +11,9 @@ import { clavePrecio, lineasDeFactura, lineasDeServicio, totales } from './factu
 import { diasCredito } from '../cartera/cartera-core';
 import { recalcularEstadoCartera } from '../cartera/recalcular-cartera';
 
+/** Lo que el PDF de la factura imprime del emisor (los mismos datos de la proforma). */
+const LINEA_EMISOR = { codigo: true, nombre: true, razonSocial: true, nit: true, datosPago: true } as const;
+
 @Injectable()
 export class FacturaService {
   constructor(private readonly prisma: PrismaService) {}
@@ -224,14 +227,23 @@ export class FacturaService {
       where: { id },
       include: {
         cliente: true,
-        linea: { select: { codigo: true, nombre: true } },
+        // Razón social/NIT de la línea: el emisor que sale en el PDF de la factura.
+        linea: { select: LINEA_EMISOR },
         despacho: {
           select: {
             consecutivo: true,
+            fecha: true,
+            direccionEntrega: true,
             // Número de entrega dentro del pedido ("Entrega 2", "Entrega 3 (final)").
             deliveryNumber: true,
             isFinal: true,
-            op: { select: { consecutivo: true, oc: { select: { consecutivo: true } } } },
+            op: {
+              select: {
+                consecutivo: true,
+                linea: { select: LINEA_EMISOR },
+                oc: { select: { consecutivo: true } },
+              },
+            },
           },
         },
         lineas: { include: { productoConfigurado: true, talla: true, servicio: true } },

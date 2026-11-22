@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { OrdenCompra, OrdenProduccion, CrearOCDto, ResumenCosteoOC, PedidosExport } from './models/pedidos.models';
-import { Proyeccion } from './models/proyeccion.models';
+import { DeliveryEstimate, DeliveryEstimateBody, Proyeccion } from './models/proyeccion.models';
 import { PtReassignment, ReassignPtBody, ReassignmentOption, ReleasePtBody } from './models/pt-reassignment.models';
 
 @Injectable({ providedIn: 'root' })
@@ -23,6 +23,8 @@ export class PedidosApi {
   /** El día en que el cliente puso el pedido (no futuro); null la borra. */
   cambiarFechaPedidoClienteOC(id: number, fechaPedidoCliente: string | null) { return this.http.patch<OrdenCompra>(`${this.oc}/${id}/fecha-pedido-cliente`, { fechaPedidoCliente }); }
   confirmarOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/confirmar`, {}); }
+  /** Devuelve a borrador una OC confirmada si nada arrancó en planta (borra su OP y suelta lo apartado). */
+  unconfirmOC(id: number) { return this.http.post<OrdenCompra>(`${this.oc}/${id}/unconfirm`, {}); }
   eliminarOC(id: number) { return this.http.delete<void>(`${this.oc}/${id}`); }
 
   generarOP(ocId: number) { return this.http.post<OrdenProduccion>(`${this.op}/desde-oc/${ocId}`, {}); }
@@ -41,4 +43,6 @@ export class PedidosApi {
 
   /** Pedidos vivos contra la capacidad de la planta (solo lectura). */
   proyeccion() { return this.http.get<Proyeccion>(`${environment.apiUrl}/pedidos/proyeccion`); }
+  /** Fecha de entrega sugerida para el pedido que se está montando (solo lectura). */
+  deliveryEstimate(body: DeliveryEstimateBody) { return this.http.post<DeliveryEstimate>(`${environment.apiUrl}/orders/delivery-estimate`, body); }
 }

@@ -83,3 +83,19 @@ describe('ProyeccionService: lo pendiente de una OP sale de sus reservas', () =>
     expect(r.pedidos[0].aProducir).toBe(0);
   });
 });
+
+describe('ProyeccionService.estimarEntrega', () => {
+  it('traduce tallaId a la talla y pone el borrador detrás de la cola viva', async () => {
+    const prisma = prismaCon([oc(1, [{ tallaId: 3, cantAmarrada: 0, cantAProducir: 20, reassignedOut: 0, reservas: [] }])]);
+    const r = await new ProyeccionService(prisma as any).estimarEntrega(
+      { lineas: [{ productoConfiguradoId: 7, tallas: [{ tallaId: 3, cantidad: 30 }] }] },
+      AHORA,
+    );
+    expect(r.ordersAhead).toBe(1);
+    expect(r.queuePosition).toBe(2);
+    expect(r.toProduce).toBe(30);
+    // Hoy jueves 19-nov, mismo día de producción: 19 + 15 = 4-dic (viernes).
+    expect(r.productionStart).toBe('2026-11-19');
+    expect(r.suggestedDate).toBe('2026-12-04');
+  });
+});

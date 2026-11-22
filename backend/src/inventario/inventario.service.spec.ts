@@ -96,9 +96,11 @@ describe('InventarioService.consolidado', () => {
     prisma.inventarioMaterial.findMany.mockResolvedValue([
       {
         cantDisponible: 120,
+        cantReservada: 20,
         material: {
           id: 1, codigo: 'CUERO-NEG', nombreCanonico: 'Cuero negro',
           unidadMedida: { codigo: 'M2' },
+          categoria: { nombre: 'Cueros' },
         },
       },
     ]);
@@ -108,8 +110,12 @@ describe('InventarioService.consolidado', () => {
     ]);
     prisma.inventarioPT.findMany.mockResolvedValue([
       {
-        id: 9, cantDisponible: 35, cantReservada: 5,
-        productoConfigurado: { codigo: 'BOTA-X', nombreComercial: 'Bota X' },
+        id: 9, cantDisponible: 35, cantReservada: 5, calidad: 'PRIMERA',
+        productoConfigurado: {
+          codigo: 'BOTA-X', nombreComercial: 'Bota X',
+          referencia: { codigo: '101' },
+          marca: { nombre: 'PODEROSA', linea: { id: 4, nombre: 'Basarili' } },
+        },
         talla: { valor: 40 },
         bodega: { codigo: 'IBG', nombre: 'Ibagué' },
       },
@@ -120,7 +126,7 @@ describe('InventarioService.consolidado', () => {
     expect(r.materiales).toEqual([
       {
         materialId: 1, codigo: 'CUERO-NEG', nombre: 'Cuero negro',
-        unidad: 'M2', cantDisponible: 120,
+        unidad: 'M2', categoria: 'Cueros', cantDisponible: 120, cantReservada: 20,
       },
     ]);
     // WIP siempre devuelve las 5 células en orden de flujo, aun sin pares (en 0)
@@ -133,7 +139,8 @@ describe('InventarioService.consolidado', () => {
     ]);
     expect(r.pt).toEqual([
       {
-        producto: 'Bota X', codigo: 'BOTA-X', talla: 40,
+        producto: 'Bota X', codigo: 'BOTA-X', referencia: '101', marca: 'PODEROSA',
+        lineaId: 4, linea: 'Basarili', talla: 40, calidad: 'PRIMERA',
         bodega: 'Ibagué', cantDisponible: 35, cantReservada: 5,
       },
     ]);
@@ -151,6 +158,51 @@ describe('InventarioService.consolidado', () => {
     expect(prisma.par.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({ where: { estado: 'EN_PROCESO', lineaId: 4 } }),
     );
+  });
+});
+
+describe('InventarioService.wipDetail', () => {
+  const prisma = {
+    par: { groupBy: jest.fn() },
+    productoConfigurado: { findMany: jest.fn() },
+    talla: { findMany: jest.fn() },
+    linea: { findMany: jest.fn() },
+    ordenFabricacion: { findMany: jest.fn() },
+  } as any;
+  const service = new InventarioService(prisma);
+  beforeEach(() => jest.clearAllMocks());
+
+  it('sin pares en proceso no consulta catálogos', async () => {
+    prisma.par.groupBy.mockResolvedValue([]);
+    expect(await service.wipDetail()).toEqual([]);
+    expect(prisma.productoConfigurado.findMany).not.toHaveBeenCalled();
+    expect(prisma.par.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { estado: 'EN_PROCESO' } }),
+    );
+  });
+
+  it('agrupa por célula, OF, producto y talla, y filtra por línea', async () => {
+    prisma.par.groupBy.mockResolvedValue([
+      { celulaActual: 'INYECCION', productoConfiguradoId: 7, tallaId: 3, lineaId: 4, ofId: 2, calidad: 'PRIMERA', _count: { _all: 12 } },
+    ]);
+    prisma.productoConfigurado.findMany.mockResolvedValue([
+      { id: 7, codigo: 'PC-7', nombreComercial: 'PODEROSA · Con puntera', referencia: { codigo: '101' }, marca: { nombre: 'PODEROSA' } },
+    ]);
+    prisma.talla.findMany.mockResolvedValue([{ id: 3, valor: 40 }]);
+    prisma.linea.findMany.mockResolvedValue([{ id: 4, nombre: 'Basarili' }]);
+    prisma.ordenFabricacion.findMany.mockResolvedValue([{ id: 2, consecutivo: 21 }]);
+
+    const r = await service.wipDetail(4);
+
+    expect(prisma.par.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { estado: 'EN_PROCESO', lineaId: 4 } }),
+    );
+    expect(r).toEqual([
+      {
+        celula: 'INYECCION', of: 21, linea: 'Basarili', referencia: '101', marca: 'PODEROSA',
+        producto: 'PODEROSA · Con puntera', codigo: 'PC-7', talla: 40, calidad: 'PRIMERA', pares: 12,
+      },
+    ]);
   });
 });
 

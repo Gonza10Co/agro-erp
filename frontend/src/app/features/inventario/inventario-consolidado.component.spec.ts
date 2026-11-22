@@ -91,4 +91,34 @@ describe('InventarioConsolidadoComponent · kardex', () => {
       'Devolución parcial autorizada por gerencia',
     );
   });
+
+  it('Exportar a Excel pide el detalle en proceso y baja inventarios AAAA-MM-DD.xlsx', () => {
+    const fixture = montar([]);
+    const boton = (Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[])
+      .find((b) => b.textContent?.includes('Exportar a Excel'));
+    expect(boton).toBeTruthy();
+    const click = spyOn(HTMLAnchorElement.prototype, 'click');
+    let nombre = '';
+    click.and.callFake(function (this: HTMLAnchorElement) { nombre = this.download; });
+    boton!.click();
+    http.expectOne((r) => r.url === `${API}/wip-detail`).flush([]);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(nombre).toMatch(/^inventarios \d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(fixture.componentInstance.exportando()).toBe(false);
+  });
+
+  it('la búsqueda filtra la tabla de producto terminado', () => {
+    const fixture = montar([]);
+    const cmp = fixture.componentInstance;
+    cmp.data.set({
+      materiales: [],
+      wip: [],
+      pt: [
+        { producto: 'Bota 101', codigo: 'PC-1', referencia: '101', marca: 'AGRO', talla: 40, bodega: 'Ibagué', calidad: 'PRIMERA', cantDisponible: 5, cantReservada: 0 },
+        { producto: 'Bota 102', codigo: 'PC-2', referencia: '102', marca: 'FEROZ', talla: 41, bodega: 'Ibagué', calidad: 'PRIMERA', cantDisponible: 3, cantReservada: 0 },
+      ],
+    });
+    cmp.fTexto.set('feroz');
+    expect(cmp.ptFiltrado().map((p) => p.codigo)).toEqual(['PC-2']);
+  });
 });

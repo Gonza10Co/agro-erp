@@ -1,4 +1,4 @@
-import { tallasDeProducto, construirDto, destinoAlEditar, seleccionInicialEjes, hoyColombia, LineaWizard } from './oc-crear.util';
+import { tallasDeProducto, construirDto, destinoAlEditar, seleccionInicialEjes, hoyColombia, LineaWizard, textoSugerencia, cuerpoEstimacion } from './oc-crear.util';
 import { Talla } from '../../../core/api/models/pedidos.models';
 import { ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
 
@@ -135,5 +135,35 @@ describe('seleccionInicialEjes', () => {
         opciones: [{ id: 20, codigo: 'EST', nombre: 'Estándar' }] },
     ]);
     expect([...sel.entries()]).toEqual([[1, null], [2, 20]]);
+  });
+});
+
+describe('textoSugerencia', () => {
+  const e = (over: any = {}) => ({
+    suggestedDate: '2026-12-12', queuePosition: 5, ordersAhead: 4, pairs: 10, fromStock: 0, toProduce: 10,
+    noCapacity: 0, productionStart: null, productionEnd: null, readyDate: null, leadDays: 15, processDays: 10,
+    explanation: '', ...over,
+  });
+  it('dice la fecha y el puesto en la cola', () => {
+    expect(textoSugerencia(e())).toBe('Sugerida según la carga de planta: sáb 12 dic (quedaría de 5.º en la cola)');
+  });
+  it('si sale de bodega no habla de cola', () => {
+    expect(textoSugerencia(e({ toProduce: 0 }))).toBe('Sugerida: sáb 12 dic (sale todo de bodega)');
+  });
+  it('sin cupo pide acordarla a mano', () => {
+    expect(textoSugerencia(e({ suggestedDate: null }))).toContain('acuerda la fecha a mano');
+  });
+});
+
+describe('cuerpoEstimacion', () => {
+  const prod = { id: 7 } as any;
+  it('solo manda tallas con pares y marca segundas y mínimos', () => {
+    expect(cuerpoEstimacion([{ producto: prod, precio: 0, calidad: 'SEGUNDA', valores: { 1: 3, 2: 0 } }], true)).toEqual({
+      paraStock: true,
+      lineas: [{ productoConfiguradoId: 7, calidad: 'SEGUNDA', tallas: [{ tallaId: 1, cantidad: 3 }] }],
+    });
+  });
+  it('sin pares devuelve null', () => {
+    expect(cuerpoEstimacion([{ producto: prod, precio: 0, valores: {} }], false)).toBeNull();
   });
 });

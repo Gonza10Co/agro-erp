@@ -98,8 +98,12 @@ export const NIVEL_MODULO: Record<Modulo, NivelLiberacion> = {
  * (pedidos, compras) y quedaría a la vista apenas se despliega.
  */
 export type Seccion =
+  // PDF de la factura (2026-11-21): imprimir/descargar la factura con su entrega.
+  | 'factura-pdf'
   // Proyección de pedidos contra la capacidad de la planta (2026-11-12).
   | 'proyeccion-pedidos'
+  // Fecha de entrega sugerida al crear la OC, según la carga de planta (2026-11-21).
+  | 'fecha-entrega-sugerida'
   // Quincena de calidad en planta (2026-09-11): "algo pasó con este par" desde
   // la pantalla de estación (segunda / baja / reproceso) y la inspección en PT.
   | 'calidad-en-planta'
@@ -125,10 +129,16 @@ export type Seccion =
   | 'factura-servicio'
   | 'venta-segundas'
   | 'reasignar-pares'
+  // Devolver a borrador una OC confirmada con un error, si nada arrancó en planta (2026-11-21).
+  | 'devolver-borrador-oc'
   // Quincena 1 del rediseño lote↔par — programación y control de corte.
   | 'programacion-corte'
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
-  | 'piloto';
+  | 'piloto'
+  // Exportar los inventarios a Excel (reunión del 2026-11-21).
+  | 'exportar-inventario'
+  // Reporte comercial (reunión del 2026-11-21): pedidos por cliente y mes, tabla dinámica.
+  | 'commercial-report';
 
 /**
  * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
@@ -136,10 +146,17 @@ export type Seccion =
  * perseguir gates dispersos por los componentes.
  */
 export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
+  // PDF de la factura (2026-11-21): solo lectura, imprime lo que ya se ve en pantalla
+  // (incluida la entrega y el despacho parcial que pidió JP el 20-nov). Liberado de una.
+  'factura-pdf': 'ENTREGADO',
   // Proyección de pedidos (2026-11-12): lo que Gabriel le pide a JP, hasta cuándo hay
   // trabajo, qué pedido no llega y desde cuándo hay cupo para vender. Solo lectura.
   // Liberada de una: el cliente ya opera en real y JP la pidió para programar.
   'proyeccion-pedidos': 'ENTREGADO',
+  // Fecha de entrega sugerida (2026-11-21): al crear la OC se propone la fecha con la
+  // misma proyección (el pedido nuevo de último en la cola). Promesa a JP; liberada de
+  // una, como todo desde el 2026-09-11 (Gonza: no se sigue escondiendo el avance).
+  'fecha-entrega-sugerida': 'ENTREGADO',
   // Quincena de calidad en planta (2026-09-11): la puerta desde la pantalla de
   // estación para marcar un par como segunda, darlo de baja o registrar un
   // reproceso sin salir de la línea. Liberada el mismo día que se construyó:
@@ -203,6 +220,17 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'venta-segundas': 'ENTREGADO',
   // Pasar pares reservados de un pedido a otro (JP, 2026-11-19): lo pidió el cliente.
   'reasignar-pares': 'ENTREGADO',
+  // Exportar inventarios a Excel (PT, materia prima y en proceso): lo pidieron JP,
+  // Valentina y Juan José en la reunión del 2026-11-21. Solo lectura.
+  'exportar-inventario': 'ENTREGADO',
+  // Reporte comercial para Alejandra y gerencia (reunión del 2026-11-21): pedidos por
+  // cliente y mes con gráfico y tabla dinámica. Liberado de una: lo pidió el cliente y
+  // desde el 2026-09-11 no se le esconde el avance. Solo lectura; el rol lo acota
+  // `ROLES_COMMERCIAL_REPORT` (abajo), no el nivel.
+  'commercial-report': 'ENTREGADO',
+  // Devolver a borrador una OC confirmada (2026-11-21): lo pidió el cliente y desde el
+  // 2026-09-11 no se esconde el avance. Mismo permiso que confirmar el pedido.
+  'devolver-borrador-oc': 'ENTREGADO',
 };
 
 /**
@@ -340,4 +368,15 @@ export const ROLES_REASIGNAN_PARES: readonly string[] = ['ADMIN', 'GERENTE'];
 
 export function puedeReasignarPares(rol: string | null | undefined): boolean {
   return !!rol && ROLES_REASIGNAN_PARES.includes(rol) && puedeVerSeccion(rol, 'reasignar-pares');
+}
+
+/**
+ * Quién ve el reporte comercial: gerencia, comercial (usuarios de la fábrica) y la demo.
+ * Espejo de `ROLES_COMMERCIAL_REPORT` en `backend/src/reportes/commercial-report.service.ts`,
+ * que es el que de verdad manda (403 al resto).
+ */
+export const ROLES_COMMERCIAL_REPORT: readonly string[] = ['ADMIN', 'GERENTE', 'CLIENTE', 'STAGE'];
+
+export function canSeeCommercialReport(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_COMMERCIAL_REPORT.includes(rol) && puedeVerSeccion(rol, 'commercial-report');
 }

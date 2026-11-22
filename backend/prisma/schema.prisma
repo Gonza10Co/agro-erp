@@ -33,6 +33,7 @@ model User {
   devolucionesProveedor  DevolucionProveedor[]
   eventosRegistrados     EventoTrazabilidad[]
   ptReassignments        PtReassignment[]
+  ocsUnconfirmed         OrdenCompra[]          @relation("OcUnconfirmedBy")
 }
 
 model RefreshToken {
@@ -509,36 +510,42 @@ model Bodega {
 }
 
 model OrdenCompra {
-  id                 Int          @id @default(autoincrement())
-  consecutivo        Int          @unique
-  ocCliente          String?
-  clienteId          Int
-  cliente            Cliente      @relation(fields: [clienteId], references: [id])
-  fecha              DateTime     @default(now())
-  fechaConfirmacion  DateTime? // se sella al confirmar; el reloj de demora corre desde acá
-  estado             EstadoOC     @default(BORRADOR)
-  observaciones      String?
+  id                  Int          @id @default(autoincrement())
+  consecutivo         Int          @unique
+  ocCliente           String?
+  clienteId           Int
+  cliente             Cliente      @relation(fields: [clienteId], references: [id])
+  fecha               DateTime     @default(now())
+  fechaConfirmacion   DateTime? // se sella al confirmar; el reloj de demora corre desde acá
+  estado              EstadoOC     @default(BORRADOR)
+  observaciones       String?
   // A qué sede va este pedido (trazabilidad y filtros). Si se omite, la sede principal.
-  sedeEntregaId      Int?
-  sedeEntrega        SedeCliente? @relation(fields: [sedeEntregaId], references: [id])
+  sedeEntregaId       Int?
+  sedeEntrega         SedeCliente? @relation(fields: [sedeEntregaId], references: [id])
   // Copia congelada de la dirección al momento de crear la OC: si mañana el cliente
   // corrige la dirección de la sede, los remitos ya despachados NO deben cambiar.
-  direccionDespacho  String?
+  direccionDespacho   String?
   // La línea de producción se decide POR PEDIDO (cliente 2026-07-06: el mapeo
   // marca→línea NO es fijo). De acá se hereda a la OP y a cada Par.
-  lineaId            Int?
-  linea              Linea?       @relation(fields: [lineaId], references: [id])
+  lineaId             Int?
+  linea               Linea?       @relation(fields: [lineaId], references: [id])
   // Pedido para STOCK (orden de mínimos, JP 2026-11-12): se fabrica para reponer la
   // bodega, así que su OP NO amarra PT y lo que produce entra libre para vender.
-  paraStock          Boolean      @default(false)
+  paraStock           Boolean      @default(false)
   // Fecha prometida al cliente (día calendario). Sin ella, la proyección estima
   // confirmación + 15 días. Se puede cambiar en cualquier estado del pedido.
-  fechaEntrega       DateTime?    @db.Date
+  fechaEntrega        DateTime?    @db.Date
   // Día en que el cliente puso el pedido (JP 2026-11-19). Distinta de `fecha`, que es
   // cuando se subió al ERP: así se mide cuánto tarda en cargarse. No puede ser futura.
-  fechaPedidoCliente DateTime?    @db.Date
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  fechaPedidoCliente  DateTime?    @db.Date
+  // Rastro del último "Devolver a borrador" (pedido confirmado con un error que nada
+  // físico alcanzó a tocar): quién, cuándo y qué OP se borró al deshacer la confirmación.
+  unconfirmedAt       DateTime?
+  unconfirmedById     Int?
+  unconfirmedBy       User?        @relation("OcUnconfirmedBy", fields: [unconfirmedById], references: [id])
+  unconfirmedOpNumber Int?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   lineas          OrdenCompraLinea[]
   ordenProduccion OrdenProduccion?

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { OcListComponent } from './oc-list.component';
 import { PedidosApi } from '../../../core/api/pedidos.api';
@@ -11,7 +11,7 @@ const OC_FILA = {
 
 describe('OcListComponent', () => {
   let apiMock: { listarOC: jasmine.Spy; obtenerOC: jasmine.Spy; exportarOC: jasmine.Spy };
-  function setup(filas: any[] = [OC_FILA]) {
+  function setup(filas: any[] = [OC_FILA], query: Record<string, string> = {}) {
     apiMock = {
       listarOC: jasmine.createSpy('listarOC').and.returnValue(of(filas)),
       obtenerOC: jasmine.createSpy('obtenerOC').and.returnValue(of(OC_FILA)),
@@ -22,6 +22,7 @@ describe('OcListComponent', () => {
       providers: [
         { provide: PedidosApi, useValue: apiMock },
         provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
       ],
     });
     return TestBed.createComponent(OcListComponent);
@@ -102,10 +103,65 @@ describe('OcListComponent', () => {
       const fixture = setupCon([PARCIAL, CERRADA, OC_FILA]);
       const cmp = fixture.componentInstance;
       expect(cmp.parciales()).toBe(1);
-      cmp.soloParciales.set(true);
+      cmp.setFilters({ partial: true });
       fixture.detectChanges();
       expect(cmp.ocsVista().map((o) => o.id)).toEqual([8]);
       expect((fixture.nativeElement as HTMLElement).textContent).toContain('Con despacho parcial (1)');
+    });
+  });
+
+  describe('filtros, totales y exportes', () => {
+    const A = { ...OC_FILA, id: 1, consecutivo: 1, estado: 'CONFIRMADA', fechaEntrega: '2026-12-01T00:00:00.000Z',
+      cliente: { id: 1, nit: '900', nombre: 'ACME' }, linea: { id: 4, codigo: 'FEROZ', nombre: 'Feroz' },
+      summary: { pairs: 100, brands: [{ id: 2, nombre: 'Agro' }], references: [{ id: 5, codigo: '101' }] },
+      dispatch: { deliveries: 1, dispatchedPairs: 40, neededPairs: 100, partial: true } };
+    const B = { ...OC_FILA, id: 2, consecutivo: 2, estado: 'BORRADOR',
+      cliente: { id: 2, nit: '800', nombre: 'Botas García' }, linea: null,
+      summary: { pairs: 30, brands: [{ id: 3, nombre: 'Basarili' }], references: [{ id: 6, codigo: '105' }] }, dispatch: null };
+
+    it('lee los filtros de la URL al abrir y muestra totales de lo filtrado', () => {
+      const fixture = setup([A, B], { brand: '2' });
+      fixture.detectChanges();
+      const cmp = fixture.componentInstance;
+      expect(cmp.ocsVista().map((o) => o.id)).toEqual([1]);
+      expect(cmp.totals()).toEqual({ orders: 1, pairs: 100, dispatched: 40, pending: 60 });
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Marca: Agro');
+    });
+
+    it('setFilters escribe los query params y limpiar los borra', () => {
+      const fixture = setup([A, B]);
+      fixture.detectChanges();
+      const nav = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+      const cmp = fixture.componentInstance;
+      cmp.setFilters({ client: 'garcia', status: 'BORRADOR' });
+      expect(cmp.ocsVista().map((o) => o.id)).toEqual([2]);
+      expect(nav.calls.mostRecent().args[1]?.queryParams).toEqual(jasmine.objectContaining({ client: 'garcia', status: 'BORRADOR', brand: null }));
+      cmp.clearFilters();
+      expect(cmp.ocsVista().length).toBe(2);
+      expect(nav.calls.mostRecent().args[1]?.queryParams?.['client']).toBeNull();
+    });
+
+    it('el Excel lleva solo los pedidos filtrados', () => {
+      const fixture = setup([A, B], { client: 'acme' });
+      fixture.detectChanges();
+      const d: any = { pedidos: [{ consecutivo: 1 }, { consecutivo: 2 }], tallas: [{ consecutivo: 1 }, { consecutivo: 2 }, { consecutivo: 2 }] };
+      const r = fixture.componentInstance.soloVisibles(d);
+      expect(r.pedidos.map((p) => p.consecutivo)).toEqual([1]);
+      expect(r.tallas.map((t) => t.consecutivo)).toEqual([1]);
+    });
+
+    it('sin filtros el Excel va completo', () => {
+      const fixture = setup([A, B]);
+      fixture.detectChanges();
+      const d: any = { pedidos: [{ consecutivo: 1 }, { consecutivo: 2 }], tallas: [] };
+      expect(fixture.componentInstance.soloVisibles(d)).toBe(d);
+    });
+
+    it('trae el botón Imprimir pedidos', () => {
+      const fixture = setup([A, B]);
+      fixture.detectChanges();
+      const botones = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+      expect(botones.some((b) => b.textContent?.includes('Imprimir pedidos'))).toBe(true);
     });
   });
 });

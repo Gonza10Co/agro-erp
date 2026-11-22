@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -152,5 +152,117 @@ describe('OcCrearComponent', () => {
       expect(c.errorArmar()).toBe('Falta elegir Puntera (obligatorio)');
       http.verify();
     });
+  });
+
+  describe('fecha de entrega sugerida (carga de planta)', () => {
+    const URL = 'http://localhost:3001/orders/delivery-estimate';
+    const estimacion = (over: any = {}) => ({
+      suggestedDate: '2026-12-12', queuePosition: 5, ordersAhead: 4, pairs: 12, fromStock: 0, toProduce: 12,
+      noCapacity: 0, productionStart: '2026-11-25', productionEnd: '2026-11-27', readyDate: '2026-12-09',
+      leadDays: 15, processDays: 10, explanation: 'Se produciría del 25 nov al 27 nov, después de 4 pedidos en cola; más 15 días de plazo estándar.',
+      ...over,
+    });
+
+    it('con tallas pide la estimación y llena la fecha con la sugerida', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
+      fixture.detectChanges();
+      tick(400);
+      const req = http.expectOne(URL);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ lineas: [{ productoConfiguradoId: 7, tallas: [{ tallaId: 1, cantidad: 12 }] }] });
+      req.flush(estimacion());
+      expect(c.fechaEntrega()).toBe('2026-12-12');
+
+      c.paso.set(3);
+      fixture.detectChanges();
+      const txt = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(txt).toContain('Sugerida según la carga de planta: sáb 12 dic (quedaría de 5.º en la cola)');
+      const bloque = (fixture.nativeElement as HTMLElement).querySelector('.fecha-entrega')?.textContent ?? '';
+      expect(bloque).not.toMatch(/[\u2013\u2014]/);
+      http.verify();
+    }));
+
+    it('si cambian las cantidades se recalcula y la fecha se actualiza sola', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion());
+
+      c.setValores(7, { 1: 12, 2: 500 });
+      fixture.detectChanges();
+      tick(400);
+      const req = http.expectOne(URL);
+      expect(req.request.body.lineas[0].tallas.length).toBe(2);
+      req.flush(estimacion({ suggestedDate: '2026-12-15' }));
+      expect(c.fechaEntrega()).toBe('2026-12-15');
+      http.verify();
+    }));
+
+    it('si el recálculo queda sin cupo, vacía la sugerencia vieja (y respeta la manual)', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion());
+      expect(c.fechaEntrega()).toBe('2026-12-12');
+
+      c.setValores(7, { 1: 90000 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion({ suggestedDate: null, noCapacity: 500 }));
+      expect(c.fechaEntrega()).toBe('');
+
+      c.editarFechaEntrega('2026-12-20');
+      c.setValores(7, { 1: 95000 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion({ suggestedDate: null, noCapacity: 900 }));
+      expect(c.fechaEntrega()).toBe('2026-12-20');
+      http.verify();
+    }));
+
+    it('cuando el usuario la escribe a mano, el recálculo ya no la pisa', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: { 1: 12 } }]);
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion());
+
+      c.editarFechaEntrega('2026-12-20');
+      c.setValores(7, { 1: 40 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush(estimacion({ suggestedDate: '2026-12-15' }));
+      expect(c.fechaEntrega()).toBe('2026-12-20');
+
+      // "Usar la sugerida" vuelve a la fecha calculada y reactiva el recálculo.
+      c.usarSugerida();
+      expect(c.fechaEntrega()).toBe('2026-12-15');
+      expect(c.fechaManual()).toBe(false);
+      http.verify();
+    }));
+
+    it('sin pares no consulta nada, y un error deja escribir la fecha a mano', fakeAsync(() => {
+      const { fixture, http } = setup();
+      const c = fixture.componentInstance;
+      c.lineas.set([{ producto: c.productos()[0], precio: 85000, valores: {} }]);
+      fixture.detectChanges();
+      tick(400);
+      http.expectNone(URL);
+
+      c.setValores(7, { 1: 5 });
+      fixture.detectChanges();
+      tick(400);
+      http.expectOne(URL).flush({ message: 'boom' }, { status: 500, statusText: 'Error' });
+      expect(c.errorEstimacion()).toBe(true);
+      expect(c.fechaEntrega()).toBe('');
+      http.verify();
+    }));
   });
 });

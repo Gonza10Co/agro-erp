@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CAPACIDAD_AGRO, PLAZO_ENTREGA_DIAS } from './capacidad-planta';
-import { PedidoEntrada, Proyeccion, proyectarPedidos } from './proyeccion-core';
+import { EntradaProyeccion, PedidoEntrada, Proyeccion, proyectarPedidos } from './proyeccion-core';
+import { DeliveryEstimate, estimateDelivery } from './delivery-estimate';
+import { DeliveryEstimateDto } from './dto/delivery-estimate.dto';
 import { pendingToProduce } from '../op/op-need';
 
 /** 'YYYY-MM-DD' en hora Colombia (UTC-5, sin horario de verano). */
@@ -18,6 +20,34 @@ export class ProyeccionService {
    * de la planta. Solo lee: no reserva ni programa nada.
    */
   async proyectar(ahora: Date = new Date()): Promise<Proyeccion> {
+    const { entrada } = await this.cargarEntrada(ahora);
+    return proyectarPedidos(entrada);
+  }
+
+  /**
+   * Fecha de entrega sugerida para un pedido que se está montando: la misma
+   * proyección con el borrador de último en la cola. Solo lee.
+   */
+  async estimarEntrega(dto: DeliveryEstimateDto, ahora: Date = new Date()): Promise<DeliveryEstimate> {
+    const { entrada, valorTalla } = await this.cargarEntrada(ahora);
+    return estimateDelivery(entrada, {
+      paraStock: !!dto.paraStock,
+      renglones: dto.lineas.flatMap((l) =>
+        l.tallas.map((t) => ({
+          productoConfiguradoId: l.productoConfiguradoId,
+          producto: `Producto ${l.productoConfiguradoId}`,
+          referencia: null,
+          marca: null,
+          talla: valorTalla.get(t.tallaId) ?? 0,
+          calidad: l.calidad ?? 'PRIMERA',
+          pedida: t.cantidad,
+        })),
+      ),
+    });
+  }
+
+  /** Pedidos vivos, bodega, calendario y capacidad: la entrada de la proyección. */
+  private async cargarEntrada(ahora: Date): Promise<{ entrada: EntradaProyeccion; valorTalla: Map<number, number> }> {
     const hoy = claveColombia(ahora);
     const [ocs, stock, calLaboral, noHabiles] = await Promise.all([
       this.prisma.ordenCompra.findMany({
@@ -140,7 +170,7 @@ export class ProyeccionService {
       });
     }
 
-    return proyectarPedidos({
+    const entrada: EntradaProyeccion = {
       hoy,
       // Sin calendario configurado: lunes a sábado (la planta trabaja sábados).
       calendario: {
@@ -161,6 +191,7 @@ export class ProyeccionService {
         calidad: s.calidad,
         libre: (s._sum.cantDisponible ?? 0) - (s._sum.cantReservada ?? 0),
       })),
-    });
+    };
+    return { entrada, valorTalla };
   }
 }

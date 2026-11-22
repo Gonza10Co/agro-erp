@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +9,7 @@ import { siguienteConsecutivo } from '../../prisma/consecutivo';
 import { ComprasService } from '../../compras/compras.service';
 import { liberarReservasDeOp } from '../../compras/reserva-insumos';
 import { amarrarTalla, DisponibilidadBodega } from './amarre';
+import { PtHold, releasePtHolds } from './release-pt-holds';
 
 @Injectable()
 export class OpService {
@@ -31,6 +31,15 @@ export class OpService {
     }
 
     const creada = await this.prisma.$transaction(async (tx) => {
+      // Bloquea la OC y revalida: un "devolver a borrador" en paralelo no puede
+      // dejar una OP colgada de una OC en BORRADOR.
+      const [locked] = await tx.$queryRaw<{ estado: string }[]>`
+        SELECT estado FROM "OrdenCompra" WHERE id = ${ocId} FOR UPDATE`;
+      if (locked && locked.estado !== 'CONFIRMADA') {
+        throw new BadRequestException(
+          'Solo se puede generar OP de una OC CONFIRMADA',
+        );
+      }
       const consecutivo = await siguienteConsecutivo(tx, 'op');
       const op = await tx.ordenProduccion.create({
         // La línea del pedido baja de la OC: fabricación la lee de la OP.
@@ -160,29 +169,13 @@ export class OpService {
     if (op.estado === 'DESPACHADA')
       throw new BadRequestException('La OP ya fue despachada: no se puede anular');
 
-    // Orden canónico de locks (por fila de inventario), igual que el despacho.
-    const reservas = op.lineas
-      .flatMap((l: any) => l.tallas.flatMap((t: any) => t.reservas ?? []))
-      .sort((a: any, b: any) => a.inventarioPTId - b.inventarioPTId || a.id - b.id);
+    const reservas: PtHold[] = op.lineas.flatMap((l: any) => l.tallas.flatMap((t: any) => t.reservas ?? []));
     const tallaIds: number[] = op.lineas.flatMap((l: any) => l.tallas.map((t: any) => t.id));
-    const cambio = 'El pedido cambió mientras se anulaba, vuelve a intentar';
 
     return this.prisma.$transaction(async (tx) => {
-      // Las reservas se leyeron fuera de la transacción: cada una se borra solo si
-      // sigue como se leyó (una reasignación de pares en paralelo la pudo cambiar),
-      // y si apareció una nueva tampoco se anula: quedaría ocupando stock.
-      for (const r of reservas) {
-        const borrada = await tx.reservaInventarioPT.deleteMany({ where: { id: r.id, cantidad: r.cantidad } });
-        if (borrada.count === 0) throw new ConflictException(cambio);
-        await tx.inventarioPT.update({
-          where: { id: r.inventarioPTId },
-          data: { cantReservada: { decrement: r.cantidad } },
-        });
-      }
-      if (tallaIds.length > 0) {
-        const quedan = await tx.reservaInventarioPT.count({ where: { opLineaTallaId: { in: tallaIds } } });
-        if (quedan > 0) throw new ConflictException(cambio);
-      }
+      // Las reservas se leyeron fuera de la transacción: se sueltan solo si siguen
+      // como se leyeron (ver releasePtHolds).
+      await releasePtHolds(tx, reservas, tallaIds, 'El pedido cambió mientras se anulaba, vuelve a intentar');
       // Una OP anulada no puede seguir fabricándose: se cancelan pares y OFs vivas.
       // Decisión de negocio: las OF TERMINADAS no se tocan — lo ya producido
       // quedó cargado en InventarioPT y puede amarrarse a otra OP.

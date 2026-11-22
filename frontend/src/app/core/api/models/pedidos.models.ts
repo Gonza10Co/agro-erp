@@ -60,6 +60,9 @@ export interface OrdenCompra {
   cliente?: Cliente;
   fecha: string;
   fechaConfirmacion?: string | null;
+  /** Último "Devolver a borrador": cuándo y qué OP se borró al deshacer la confirmación. */
+  unconfirmedAt?: string | null;
+  unconfirmedOpNumber?: number | null;
   estado: EstadoOC;
   observaciones?: string | null;
   sedeEntregaId?: number | null;
@@ -77,6 +80,8 @@ export interface OrdenCompra {
   fechaPedidoCliente?: string | null;
   lineas?: OCLinea[];
   ordenProduccion?: { id: number; consecutivo: number; estado: EstadoOP } | null;
+  /** Solo en la lista: pares pedidos y marcas/referencias de sus líneas (para filtros y totales). */
+  summary?: OrderListSummary;
   /** Solo en la lista: cómo va el despacho de su OP (null si no tiene OP). */
   dispatch?: DispatchSummary | null;
   // Semáforo de demora calculado por el backend en el listado (no se persiste).
@@ -134,6 +139,12 @@ export interface OrdenProduccion {
 }
 
 /** Resumen del despacho de una OP para las listas de pedidos. */
+export interface OrderListSummary {
+  pairs: number;
+  brands: { id: number; nombre: string }[];
+  references: { id: number; codigo: string }[];
+}
+
 export interface DispatchSummary {
   deliveries: number;
   dispatchedPairs: number;
@@ -206,9 +217,22 @@ export interface FacturaLinea {
   productoConfigurado?: ProductoConfigurado;
   tallaId: number;
   talla?: Talla;
+  /** Solo en facturas de servicio (maquila): no hay producto ni talla. */
+  servicio?: { codigo: string; nombre: string; unidad: string } | null;
+  descripcion?: string | null;
+  calidad?: CalidadPT;
   cantidad: number;
   precioUnitario: string;
   subtotal: string;
+}
+
+/** Emisor que imprime el PDF: la línea de la factura (servicio) o la de la OP (producto). */
+export interface LineaEmisor {
+  codigo: string;
+  nombre: string;
+  razonSocial?: string | null;
+  nit?: string | null;
+  datosPago?: string | null;
 }
 
 export interface Factura {
@@ -222,9 +246,18 @@ export interface Factura {
   iva: string;
   total: string;
   estado: EstadoFactura;
+  tipo?: TipoFactura;
   /** El detalle trae el cliente en la factura misma (las de servicio no tienen despacho). */
-  cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'>;
-  despacho?: { consecutivo: number; deliveryNumber?: number; isFinal?: boolean; op: { consecutivo: number; oc: { consecutivo: number; cliente: Cliente } } };
+  cliente?: Pick<Cliente, 'id' | 'nombre' | 'nit'> & Partial<Pick<Cliente, 'ciudad' | 'telefono' | 'direccion'>>;
+  linea?: LineaEmisor | null;
+  despacho?: {
+    consecutivo: number;
+    fecha?: string;
+    direccionEntrega?: string | null;
+    deliveryNumber?: number;
+    isFinal?: boolean;
+    op: { consecutivo: number; linea?: LineaEmisor | null; oc: { consecutivo: number; cliente?: Cliente } };
+  } | null;
   lineas?: FacturaLinea[];
 }
 
