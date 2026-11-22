@@ -1,5 +1,7 @@
 import { Talla, CrearOCDto } from '../../../core/api/models/pedidos.models';
 import { EjeConfig, ProductoConfiguradoFull } from '../../../core/api/models/catalogo.models';
+import { DeliveryEstimate, DeliveryEstimateBody } from '../../../core/api/models/proyeccion.models';
+import { fechaCorta } from '../proyeccion/proyeccion.util';
 
 export interface LineaWizard {
   producto: ProductoConfiguradoFull;
@@ -88,4 +90,26 @@ export function seleccionInicialEjes(ejes: EjeConfig[]): Map<number, number | nu
 /** Hoy 'YYYY-MM-DD' en hora Colombia (UTC-5): tope de la fecha del pedido del cliente. */
 export function hoyColombia(ahora: Date = new Date()): string {
   return new Date(ahora.getTime() - 5 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** Lo que se le manda a la estimación de entrega; null si todavía no hay pares. */
+export function cuerpoEstimacion(lineas: LineaWizard[], paraStock: boolean): DeliveryEstimateBody | null {
+  const ls = lineas
+    .map((l) => ({
+      productoConfiguradoId: l.producto.id,
+      ...(l.calidad === 'SEGUNDA' ? { calidad: 'SEGUNDA' as const } : {}),
+      tallas: Object.entries(l.valores)
+        .map(([tallaId, cantidad]) => ({ tallaId: Number(tallaId), cantidad: Number(cantidad) || 0 }))
+        .filter((t) => t.cantidad > 0),
+    }))
+    .filter((l) => l.tallas.length > 0);
+  if (!ls.length) return null;
+  return { ...(paraStock ? { paraStock: true } : {}), lineas: ls };
+}
+
+/** "Sugerida según la carga de planta: vie 12 dic (quedaría de 5.º en la cola)". */
+export function textoSugerencia(e: DeliveryEstimate): string {
+  if (!e.suggestedDate) return 'La planta no tiene cupo para este pedido en el horizonte proyectado: acuerda la fecha a mano.';
+  if (e.toProduce === 0) return `Sugerida: ${fechaCorta(e.suggestedDate)} (sale todo de bodega)`;
+  return `Sugerida según la carga de planta: ${fechaCorta(e.suggestedDate)} (quedaría de ${e.queuePosition}.º en la cola)`;
 }

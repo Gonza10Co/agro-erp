@@ -101,3 +101,26 @@ export interface Proyeccion {
     paresEntranParaVender: number;
   };
 }
+
+/** Lo que se manda para estimar: las líneas del pedido que se está montando. */
+export interface DeliveryEstimateBody {
+  paraStock?: boolean;
+  lineas: { productoConfiguradoId: number; calidad?: 'PRIMERA' | 'SEGUNDA'; tallas: { tallaId: number; cantidad: number }[] }[];
+}
+
+/** Espejo de backend/src/pedidos/proyeccion/delivery-estimate.ts */
+export interface DeliveryEstimate {
+  suggestedDate: string | null;
+  queuePosition: number;
+  ordersAhead: number;
+  pairs: number;
+  fromStock: number;
+  toProduce: number;
+  noCapacity: number;
+  productionStart: string | null;
+  productionEnd: string | null;
+  readyDate: string | null;
+  leadDays: number;
+  processDays: number;
+  explanation: string;
+}

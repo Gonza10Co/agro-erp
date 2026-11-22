@@ -7,6 +7,13 @@
 > Última actualización: **2026-10-05** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
+> **📅 FECHA DE ENTREGA SUGERIDA (2026-11-21), sin desplegar.** Promesa a JP: en Revisar de la
+> nueva OC el campo fecha de entrega se llena solo con `POST /orders/delivery-estimate`, que corre
+> la MISMA proyección (`proyectarPedidos`) con el borrador de último en la cola (`alFinal`): lote
+> diario, moldes por talla, sábados y festivos, bodega libre. Sugerida = último día de producción
+> + 15 días, al siguiente hábil y nunca antes de entrar a PT. Se recalcula sola mientras el
+> usuario no la escriba a mano ("Usar la sugerida" la recupera). Sección `fecha-entrega-sugerida`.
+>
 > **🔁 PASAR PARES RESERVADOS ENTRE PEDIDOS (2026-11-19), sin desplegar.** Pedido de JP: un pedido
 > listo que no se despacha (Guantes Terry) y otro que sí hay que despachar (Vozincol). En el
 > detalle de la OP, solo ADMIN/GERENTE (sección `reasignar-pares`, ENTREGADO): **"Pasar pares a

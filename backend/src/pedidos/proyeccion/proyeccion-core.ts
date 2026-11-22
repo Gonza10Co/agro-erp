@@ -50,6 +50,11 @@ export interface PedidoEntrada {
   tieneOP: boolean;
   /** Orden de mínimos: se fabrica para reponer la bodega, no para un cliente. */
   paraStock?: boolean;
+  /**
+   * Va de último en la cola, sin importar su fecha: es el pedido que todavía no
+   * existe y se simula para sugerirle fecha de entrega (no desplaza a nadie).
+   */
+  alFinal?: boolean;
   renglones: RenglonPedido[];
 }
 
@@ -284,7 +289,12 @@ export function proyectarPedidos(e: EntradaProyeccion): Proyeccion {
     compromiso: p.fechaEntrega || sumarDias(p.fechaBase, e.plazoDias),
     estimado: !p.fechaEntrega,
   }));
-  conCompromiso.sort((a, b) => a.compromiso.localeCompare(b.compromiso) || a.p.consecutivo - b.p.consecutivo);
+  conCompromiso.sort(
+    (a, b) =>
+      Number(!!a.p.alFinal) - Number(!!b.p.alFinal) ||
+      a.compromiso.localeCompare(b.compromiso) ||
+      a.p.consecutivo - b.p.consecutivo,
+  );
 
   const uniq = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x))];
   const pedidos: PedidoProyectado[] = [];
