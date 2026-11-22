@@ -132,7 +132,9 @@ export type Seccion =
   // Quincena 1 del rediseño lote↔par — programación y control de corte.
   | 'programacion-corte'
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
-  | 'piloto';
+  | 'piloto'
+  // Exportar los inventarios a Excel (reunión del 2026-11-21).
+  | 'exportar-inventario';
 
 /**
  * ESTE MAPA ES EL TABLERO DE LA DEMO. El día que se muestra una entrega, sus
@@ -214,6 +216,9 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'venta-segundas': 'ENTREGADO',
   // Pasar pares reservados de un pedido a otro (JP, 2026-11-19): lo pidió el cliente.
   'reasignar-pares': 'ENTREGADO',
+  // Exportar inventarios a Excel (PT, materia prima y en proceso): lo pidieron JP,
+  // Valentina y Juan José en la reunión del 2026-11-21. Solo lectura.
+  'exportar-inventario': 'ENTREGADO',
 };
 
 /**

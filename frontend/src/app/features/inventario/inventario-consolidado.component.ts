@@ -5,6 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { InventarioApi } from '../../core/api/inventario.api';
 import { LineasApi, Linea } from '../../core/api/lineas.api';
 import {
+  CalidadPT,
   InventarioConsolidado,
   LABEL_MOTIVO,
   MOTIVOS_MANUALES,
@@ -15,6 +16,14 @@ import { LABEL_CELULA } from '../../core/api/models/fabricacion.models';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { puedeVerSeccion } from '../../core/auth/modulos';
+import { descargarXlsx } from '../../shared/xlsx/xlsx-mini';
+import {
+  InventoryFilters,
+  filterMaterials,
+  filterPt,
+  inventoryFileName,
+  inventorySheets,
+} from './inventory-export.util';
 
 @Component({
   selector: 'app-inventario-consolidado',
@@ -25,13 +34,24 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
       <div class="page-header">
         <div class="ph-title">Inventario consolidado</div>
         <div class="ph-actions">
-          <select class="btn" [ngModel]="lineaSeleccionada()" (ngModelChange)="cambiarLinea($event)" title="Filtrar WIP por línea">
+          <select class="btn" [ngModel]="lineaSeleccionada()" (ngModelChange)="cambiarLinea($event)" title="Filtra lo que está en proceso y las botas en bodega (por la línea de su marca)">
             <option [ngValue]="null">Todas las líneas</option>
             @for (l of lineas(); track l.id) {
               <option [ngValue]="l.id">{{ l.nombre }}</option>
             }
           </select>
           <button class="btn" (click)="cargar()">Actualizar</button>
+          @if (puedeExportar) {
+            <button
+              class="btn"
+              type="button"
+              [disabled]="exportando() || !data()"
+              (click)="exportarExcel()"
+              title="Baja el inventario con los filtros puestos: botas por talla, botas en detalle, materia prima y en proceso"
+            >
+              {{ exportando() ? 'Preparando…' : 'Exportar a Excel' }}
+            </button>
+          }
           @if (puedeAjustarPt) {
             <a class="btn" routerLink="/inventario/ajuste-pt">Carga y ajuste de botas</a>
           }
@@ -43,6 +63,31 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
           </button>
         </div>
       </div>
+
+      <div class="filtros">
+        <input
+          class="input filtro-texto"
+          type="search"
+          placeholder="Buscar código, referencia, marca o material"
+          [ngModel]="fTexto()"
+          (ngModelChange)="fTexto.set($event)"
+        />
+        <select class="input filtro-sel" [ngModel]="fBodega()" (ngModelChange)="fBodega.set($event)" title="Bodega de producto terminado">
+          <option [ngValue]="null">Todas las bodegas</option>
+          @for (b of bodegas(); track b) {
+            <option [ngValue]="b">{{ b }}</option>
+          }
+        </select>
+        <select class="input filtro-sel" [ngModel]="fCalidad()" (ngModelChange)="fCalidad.set($event)" title="Calidad de producto terminado">
+          <option [ngValue]="null">Primeras y segundas</option>
+          <option value="PRIMERA">Primeras</option>
+          <option value="SEGUNDA">Segundas</option>
+        </select>
+      </div>
+
+      @if (errorExport()) {
+        <p class="form-error">{{ errorExport() }}</p>
+      }
 
       @if (error()) {
         <div class="empty"><h4>No se pudo cargar el inventario</h4><p class="cell-sub">{{ error() }}</p></div>
@@ -115,11 +160,11 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
         <div class="grid-2">
           <div class="card"><div class="card-body">
             <h4>Materia prima</h4>
-            @if (d.materiales.length) {
+            @if (materialesFiltrados().length) {
               <table class="tabla">
                 <thead><tr><th>Código</th><th>Material</th><th class="num">Disponible</th><th>Unidad</th></tr></thead>
                 <tbody>
-                  @for (m of d.materiales; track m.materialId) {
+                  @for (m of materialesFiltrados(); track m.materialId) {
                     <tr>
                       <td class="cell-mono">{{ m.codigo }}</td>
                       <td>{{ m.nombre }}</td>
@@ -130,17 +175,17 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
                 </tbody>
               </table>
             } @else {
-              <p class="cell-sub">Sin stock de materiales registrado.</p>
+              <p class="cell-sub">{{ d.materiales.length ? 'Ningún material coincide con los filtros.' : 'Sin stock de materiales registrado.' }}</p>
             }
           </div></div>
 
           <div class="card"><div class="card-body">
             <h4>Producto terminado</h4>
-            @if (d.pt.length) {
+            @if (ptFiltrado().length) {
               <table class="tabla">
                 <thead><tr><th>Producto</th><th class="num">Talla</th><th>Bodega</th><th>Calidad</th><th class="num">Disponible</th><th class="num">Reservado</th></tr></thead>
                 <tbody>
-                  @for (p of d.pt; track p.codigo + '-' + p.talla + '-' + p.bodega + '-' + p.calidad) {
+                  @for (p of ptFiltrado(); track p.codigo + '-' + p.talla + '-' + p.bodega + '-' + p.calidad) {
                     <tr>
                       <td>{{ p.producto }} <span class="cell-sub cell-mono">{{ p.codigo }}</span></td>
                       <td class="num">{{ p.talla }}</td>
@@ -159,7 +204,7 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
                 </tbody>
               </table>
             } @else {
-              <p class="cell-sub">Sin stock de producto terminado.</p>
+              <p class="cell-sub">{{ d.pt.length ? 'Ninguna bota coincide con los filtros.' : 'Sin stock de producto terminado.' }}</p>
             }
           </div></div>
         </div>
@@ -195,7 +240,10 @@ import { puedeVerSeccion } from '../../core/auth/modulos';
     </div>
   `,
   styles: [`
-    .ph-actions{display:flex;gap:var(--sp-2)}
+    .ph-actions{display:flex;gap:var(--sp-2);flex-wrap:wrap}
+    .filtros{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin-bottom:var(--sp-4)}
+    .filtros .filtro-texto{flex:1 1 280px;width:auto}
+    .filtros .filtro-sel{flex:0 0 auto;width:auto}
     .card{margin-top:var(--sp-4)}
     .card:first-of-type{margin-top:0}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);margin-top:var(--sp-4)}
@@ -233,12 +281,34 @@ export class InventarioConsolidadoComponent implements OnInit {
 
   readonly puedeAjustarPt = puedeVerSeccion(this.auth.rol(), 'ajuste-pt');
   readonly puedeAjustarMp = puedeVerSeccion(this.auth.rol(), 'ajuste-mp');
+  readonly puedeExportar = puedeVerSeccion(this.auth.rol(), 'exportar-inventario');
 
   data = signal<InventarioConsolidado | null>(null);
   kardex = signal<MovimientoKardex[]>([]);
   error = signal<string | null>(null);
   lineas = signal<Linea[]>([]);
   lineaSeleccionada = signal<number | null>(null);
+
+  // Filtros de pantalla: los mismos viajan al Excel.
+  fTexto = signal('');
+  fBodega = signal<string | null>(null);
+  fCalidad = signal<CalidadPT | null>(null);
+  exportando = signal(false);
+  errorExport = signal<string | null>(null);
+
+  filtros = computed<InventoryFilters>(() => {
+    const id = this.lineaSeleccionada();
+    return {
+      lineaId: id,
+      lineaNombre: this.lineas().find((l) => l.id === id)?.nombre ?? null,
+      texto: this.fTexto(),
+      bodega: this.fBodega(),
+      calidad: this.fCalidad(),
+    };
+  });
+  bodegas = computed(() => [...new Set((this.data()?.pt ?? []).map((p) => p.bodega))].sort());
+  materialesFiltrados = computed(() => filterMaterials(this.data()?.materiales ?? [], this.filtros()));
+  ptFiltrado = computed(() => filterPt(this.data()?.pt ?? [], this.filtros()));
 
   // Form de movimiento manual de MP
   formAbierto = signal(false);
@@ -277,6 +347,26 @@ export class InventarioConsolidadoComponent implements OnInit {
     this.api.movimientos().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (k) => this.kardex.set(k),
       error: () => {},
+    });
+  }
+
+  /** El detalle de lo que está en proceso se pide al momento; el resto ya está en pantalla. */
+  exportarExcel(): void {
+    const d = this.data();
+    if (!d || this.exportando()) return;
+    const filtros = this.filtros();
+    this.exportando.set(true);
+    this.errorExport.set(null);
+    this.api.wipDetail(filtros.lineaId ?? undefined).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (wip) => {
+        const ahora = new Date();
+        descargarXlsx(inventoryFileName(ahora), inventorySheets({ data: d, wip, filtros, ahora }));
+        this.exportando.set(false);
+      },
+      error: () => {
+        this.errorExport.set('No se pudo bajar el Excel de inventarios. Intenta de nuevo.');
+        this.exportando.set(false);
+      },
     });
   }
 
