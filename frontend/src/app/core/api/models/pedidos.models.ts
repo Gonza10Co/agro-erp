@@ -60,6 +60,9 @@ export interface OrdenCompra {
   cliente?: Cliente;
   fecha: string;
   fechaConfirmacion?: string | null;
+  /** Último "Devolver a borrador": cuándo y qué OP se borró al deshacer la confirmación. */
+  unconfirmedAt?: string | null;
+  unconfirmedOpNumber?: number | null;
   estado: EstadoOC;
   observaciones?: string | null;
   sedeEntregaId?: number | null;

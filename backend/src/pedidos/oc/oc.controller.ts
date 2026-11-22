@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -61,6 +62,10 @@ export class OcController {
   }
   @Post(':id/confirmar') confirmar(@Param('id', ParseIntPipe) id: number) {
     return this.oc.confirmar(id);
+  }
+  /** Deshace la confirmación si nada arrancó en planta (mismos permisos que confirmar). */
+  @Post(':id/unconfirm') unconfirm(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.oc.unconfirm(id, req.user?.sub ?? null);
   }
   @Delete(':id') eliminar(@Param('id', ParseIntPipe) id: number) {
     return this.oc.eliminar(id);

@@ -125,6 +125,8 @@ export type Seccion =
   | 'factura-servicio'
   | 'venta-segundas'
   | 'reasignar-pares'
+  // Devolver a borrador una OC confirmada con un error, si nada arrancó en planta (2026-11-21).
+  | 'devolver-borrador-oc'
   // Quincena 1 del rediseño lote↔par — programación y control de corte.
   | 'programacion-corte'
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
@@ -203,6 +205,9 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'venta-segundas': 'ENTREGADO',
   // Pasar pares reservados de un pedido a otro (JP, 2026-11-19): lo pidió el cliente.
   'reasignar-pares': 'ENTREGADO',
+  // Devolver a borrador una OC confirmada (2026-11-21): lo pidió el cliente y desde el
+  // 2026-09-11 no se esconde el avance. Mismo permiso que confirmar el pedido.
+  'devolver-borrador-oc': 'ENTREGADO',
 };
 
 /**

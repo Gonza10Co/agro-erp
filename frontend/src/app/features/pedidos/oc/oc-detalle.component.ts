@@ -174,6 +174,29 @@ interface LineaEdit {
         </div>
       }
 
+      @if (puedeDevolverBorrador && (o.estado === 'CONFIRMADA' || o.estado === 'EN_PRODUCCION')) {
+        @if (!confirmandoDevolver()) {
+          <div class="drawer-foot">
+            <button class="btn btn-ghost btn-devolver-borrador" type="button" [disabled]="accion()" (click)="pedirDevolverBorrador()">Devolver a borrador</button>
+          </div>
+        } @else {
+          <div class="confirm-devolver" role="alertdialog" aria-labelledby="devolver-titulo">
+            <p id="devolver-titulo" style="font-weight:var(--fw-semibold);margin:0 0 var(--sp-2)">¿Devolver este pedido a borrador?</p>
+            <p class="cell-sub" style="margin:0 0 var(--sp-2)">
+              Sirve para corregir un pedido que se confirmó con un error (cantidad, talla, referencia o cliente).
+              @if (o.ordenProduccion; as op) { Se anula y se borra la OP #{{ op.consecutivo }}, }
+              se libera lo que estaba apartado en bodega (botas e insumos) y se quita el requerimiento de compra automático.
+              Después se edita y se vuelve a confirmar.
+            </p>
+            <p class="cell-sub" style="margin:0">Solo se puede si nada arrancó en planta: sin pares nacidos, etiquetas, consumo, despachos ni facturas.</p>
+            <div class="confirm-acc">
+              <button class="btn btn-ghost" type="button" [disabled]="accion()" (click)="confirmandoDevolver.set(false)">Cancelar</button>
+              <button class="btn btn-primary btn-si-devolver" type="button" [class.is-loading]="accion()" [disabled]="accion()" (click)="devolverBorrador()">Sí, devolver a borrador</button>
+            </div>
+          </div>
+        }
+      }
+
       @if (o.ordenProduccion; as op) {
         <div class="drawer-foot">
           <a class="btn btn-primary btn-block" [routerLink]="['/pedidos/op', op.id]">Ver orden de producción · OP #{{ op.consecutivo }}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -183,6 +206,8 @@ interface LineaEdit {
   `,
   styles: [`
     .obs-oc{white-space:pre-wrap}
+    .confirm-devolver{margin-top:var(--sp-4);padding:var(--sp-3);border:var(--bw) solid var(--border);border-radius:var(--r-sm);background:var(--surface)}
+    .confirm-acc{display:flex;gap:var(--sp-2);justify-content:flex-end;margin-top:var(--sp-3)}
     /* El grado tiene que verse en el pedido: una segunda va a otro precio. */
     .badge-seg{display:inline-block;margin-left:var(--sp-2);padding:1px 8px;border-radius:99px;font-size:var(--text-caption);font-weight:var(--fw-semibold);color:var(--warn,#d97706);border:var(--bw) solid currentColor}
   `],
@@ -203,6 +228,9 @@ export class OcDetalleComponent implements OnInit {
   readonly puedeVerCosteo = puedeVerSeccion(this.auth.rol(), 'costo-utilidad-oc');
   readonly puedeVerProforma = puedeVerSeccion(this.auth.rol(), 'proforma-oc');
   readonly puedeVerLinea = puedeVerSeccion(this.auth.rol(), 'linea-pedido');
+  // Mismo permiso que confirmar (cualquiera con acceso a pedidos); el nivel lo da la sección.
+  readonly puedeDevolverBorrador = puedeVerSeccion(this.auth.rol(), 'devolver-borrador-oc');
+  confirmandoDevolver = signal(false);
   cargando = signal(true);
   accion = signal(false);
   error = signal('');
@@ -378,6 +406,26 @@ export class OcDetalleComponent implements OnInit {
       .subscribe({
         next: () => { this.accion.set(false); this.cargar(); this.changed.emit(); },
         error: (e) => { this.accion.set(false); this.error.set(this.msg(e)); },
+      });
+  }
+
+  pedirDevolverBorrador(): void { this.error.set(''); this.confirmandoDevolver.set(true); }
+
+  devolverBorrador(): void {
+    if (this.accion()) return;
+    this.accion.set(true); this.error.set('');
+    this.api.unconfirmOC(this.ocId())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.accion.set(false);
+          this.confirmandoDevolver.set(false);
+          this.toast.exito('Pedido devuelto a borrador: ya se puede editar');
+          this.cargar();
+          this.changed.emit();
+        },
+        // El back dice qué lo bloquea ("Ya hay 40 pares nacidos en la OF-23"...).
+        error: (e) => { this.accion.set(false); this.confirmandoDevolver.set(false); this.error.set(this.msg(e)); },
       });
   }
 
