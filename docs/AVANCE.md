@@ -7,7 +7,7 @@
 > Última actualización: **2026-10-05** · Stack: Angular 19 + signals · NestJS + Prisma · PostgreSQL
 > Deploy: front → Vercel · back → Railway (ver memoria `urls-produccion`).
 >
-> **📆 PRODUCCIÓN POR DÍA (2026-11-25), sin desplegar.** `/fabricacion/production-by-day` (menú
+> **📆 PRODUCCIÓN POR DÍA (2026-11-25), en prod.** `/fabricacion/production-by-day` (menú
 > Planta): pares distintos que ENTRARON a cada estación en un día cualquiera (civil de Bogotá),
 > con inferidos aparte, primera y última hora, y desglose por OF, producto y talla.
 > `GET /fabricacion/production-by-day?date=AAAA-MM-DD`. Sección `production-by-day` (ENTREGADO);

@@ -208,7 +208,7 @@ describe('ShellComponent', () => {
     localStorage.setItem('accessToken', `x.${payload}.y`);
     const { host } = crear();
     const items = [...host.querySelectorAll('.nav-item .nav-label')].map((e) => e.textContent?.trim());
-    expect(items).toEqual(['Tablero por estaciones', 'Tablero por órdenes', 'Estación', 'TV de planta']);
+    expect(items).toEqual(['Tablero por estaciones', 'Tablero por órdenes', 'Estación', 'Producción por día', 'TV de planta']);
     expect(host.textContent).toContain('Estación');
     expect(host.querySelector('a.brand')?.getAttribute('href')).toBe('/fabricacion/estacion');
   });
