@@ -123,6 +123,12 @@ export class FabricacionController {
     return this.service.hoy();
   }
 
+  /** Producción de un día por estación (por defecto hoy en Bogotá), con desglose. */
+  @Get('production-by-day')
+  productionByDay(@Query('date') date?: string) {
+    return this.service.productionByDay(date);
+  }
+
   /** Tablero por órdenes: cuántos pares de cada OF ya pasaron por cada estación. */
   @Get('tablero-ordenes')
   tableroOrdenes() {

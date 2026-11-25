@@ -20,6 +20,7 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
   ['/facturas', 'ventas'], ['/cartera', 'ventas'],
   ['/pedidos/op', 'produccion'], ['/pedidos/proyeccion', 'produccion'], ['/corte', 'produccion'], ['/fabricacion/tablero', 'produccion'],
   ['/fabricacion/ordenes', 'produccion'], ['/fabricacion/estacion', 'planta'],
+  ['/fabricacion/production-by-day', 'planta'],
   ['/fabricacion', 'produccion'], ['/calidad', 'planta'],
   ['/compras', 'compras'], ['/proveedores', 'compras'], ['/inventario', 'compras'],
   ['/reportes', 'reportes'], ['/reports', 'reportes'], ['/indicadores', 'reportes'],
@@ -157,6 +158,12 @@ const GRUPO_POR_RUTA: [string, GrupoNav][] = [
           <a class="nav-item" routerLink="/fabricacion/estacion" routerLinkActive="is-active" title="Estación (piloto)">
             <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/><path d="M9 7h6M9 10h6M9 13h3"/></svg></span>
             <span class="nav-label">Estación</span>
+          </a>
+          }
+          @if (puedeVer('fabricacion') && puedeVerSec('production-by-day')) {
+          <a class="nav-item" routerLink="/fabricacion/production-by-day" routerLinkActive="is-active" title="Producción por día: pares que entraron a cada estación">
+            <span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 17v-3M12 17v-4M16 17v-2"/></svg></span>
+            <span class="nav-label">Producción por día</span>
           </a>
           }
           @if (puedeVer('calidad')) {
