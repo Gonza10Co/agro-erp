@@ -360,6 +360,42 @@ export interface HoyPlanta {
   estaciones: HoyEstacion[];
 }
 
+/** Producción de un día por estación: pares distintos que entraron. */
+export interface ProductionDaySize {
+  sizeId: number;
+  size: number;
+  pairs: number;
+  inferred: number;
+}
+export interface ProductionDayOrder {
+  ofId: number;
+  ofNumber: number;
+  productId: number;
+  product: string;
+  pairs: number;
+  inferred: number;
+  sizes: ProductionDaySize[];
+}
+export interface ProductionDayStation {
+  code: string;
+  name: string;
+  active: boolean;
+  /** Incluye los inferidos. */
+  pairs: number;
+  /** De esos, los que entraron sin pistolazo. */
+  inferred: number;
+  firstAt: string | null;
+  lastAt: string | null;
+  orders: ProductionDayOrder[];
+}
+export interface ProductionByDay {
+  date: string;
+  /** Hoy en Bogotá según el servidor. */
+  today: string;
+  updatedAt: string;
+  stations: ProductionDayStation[];
+}
+
 /** Tablero por órdenes: una fila por OF viva, una columna por estación activa. */
 export interface OrdenTablero {
   id: number;

@@ -60,6 +60,7 @@ export const routes: Routes = [
       // tablero por órdenes. `seccion` en data: el guard bloquea la URL tecleada.
       { path: 'fabricacion/estacion', data: { modulo: 'fabricacion', seccion: 'piloto' }, loadComponent: () => import('./features/fabricacion/estacion.component').then(m => m.EstacionComponent) },
       { path: 'fabricacion/ordenes', data: { modulo: 'fabricacion', seccion: 'piloto' }, loadComponent: () => import('./features/fabricacion/tablero-ordenes.component').then(m => m.TableroOrdenesComponent) },
+      { path: 'fabricacion/production-by-day', data: { modulo: 'fabricacion', seccion: 'production-by-day' }, loadComponent: () => import('./features/fabricacion/production-by-day.component').then(m => m.ProductionByDayComponent) },
       // Quincena 1 del rediseño lote↔par: el tramo previo a que el par exista.
       // La sección va en data para que modulo.guard bloquee la URL tecleada.
       { path: 'corte', data: { modulo: 'corte', seccion: 'programacion-corte' }, loadComponent: () => import('./features/corte/corte-tablero.component').then(m => m.CorteTableroComponent) },

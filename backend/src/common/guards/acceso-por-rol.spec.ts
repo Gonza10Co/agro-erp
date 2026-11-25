@@ -97,6 +97,9 @@ describe('ESTACION (la tablet de la estación)', () => {
     expect(rolPuedeLlamar('ESTACION', 'POST', '/fabricacion/of/:id/consumo')).toBe(false);
     expect(rolPuedeLlamar('ESTACION', 'POST', '/calidad/pares/:codigo/incidencias')).toBe(false);
     expect(rolPuedeLlamar('ESTACION', 'GET', '/calidad/indicadores')).toBe(false);
+    // Producción por día: es de oficina, la tablet no la abre.
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/production-by-day')).toBe(false);
+    expect(rolPuedeLlamar('ESTACION', 'GET', '/fabricacion/production-by-day?date=2026-11-21')).toBe(false);
   });
 
   it('niega todo lo demás (deny by default)', () => {

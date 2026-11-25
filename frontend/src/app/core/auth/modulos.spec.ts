@@ -247,7 +247,7 @@ describe('rol acotado ESTACION (la tablet de planta)', () => {
     for (const url of ['/fabricacion/estacion', '/fabricacion/ordenes', '/fabricacion/tablero', '/fabricacion/par/OF19-0001', '/tv', '/tv?x=1']) {
       expect(puedeVerRuta('ESTACION', url)).withContext(url).toBeTrue();
     }
-    for (const url of ['/fabricacion', '/fabricacion/operario', '/fabricacion/guarnicion', '/fabricacion/of/3/consumo', '/pedidos/oc']) {
+    for (const url of ['/fabricacion', '/fabricacion/production-by-day', '/fabricacion/operario', '/fabricacion/guarnicion', '/fabricacion/of/3/consumo', '/pedidos/oc']) {
       expect(puedeVerRuta('ESTACION', url)).withContext(url).toBeFalse();
     }
   });
@@ -256,6 +256,14 @@ describe('rol acotado ESTACION (la tablet de planta)', () => {
     expect(puedeVerSeccion('ESTACION', 'piloto')).toBeTrue();
     expect(puedeVerSeccion('ESTACION', 'calidad-en-planta')).toBeTrue();
     expect(puedeVerSeccion('ESTACION', 'programacion-corte')).toBeFalse();
+    expect(puedeVerSeccion('ESTACION', 'production-by-day')).toBeFalse();
+  });
+
+  it('los roles de oficina sí ven la producción por día; el jefe de corte no', () => {
+    for (const rol of ['ADMIN', 'GERENTE', 'CLIENTE', 'STAGE', 'CALIDAD', 'OPERARIO']) {
+      expect(puedeVerSeccion(rol, 'production-by-day')).withContext(rol).toBeTrue();
+    }
+    expect(puedeVerSeccion('JEFE_CORTE', 'production-by-day')).toBeFalse();
   });
 
   it('aterriza en la estación', () => {

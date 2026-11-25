@@ -4,7 +4,7 @@ import { SIN_TOAST_ERROR } from '../interceptors/error-toast.interceptor';
 import { environment } from '../../../environments/environment';
 import {
   OFGenerada, OFListItem, OFDetalle, ParTablero, ParDetalle, Operario, Maquina,
-  ConsumoOf, Estacion, AvanceResultado, NacerResultado, EtiquetasReservadas, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo, LoteResultado,
+  ConsumoOf, Estacion, AvanceResultado, NacerResultado, EtiquetasReservadas, HoyPlanta, TableroOrdenes, TableroResumen, DanoEscaneo, LoteResultado, ProductionByDay,
 } from './models/fabricacion.models';
 
 @Injectable({ providedIn: 'root' })
@@ -84,6 +84,16 @@ export class FabricacionApi {
   }
   hoy() {
     return this.http.get<HoyPlanta>(`${this.base}/fabricacion/hoy`);
+  }
+  /** Pares que entraron a cada estación ese día (sin fecha: hoy en Bogotá). */
+  productionByDay(date?: string) {
+    let params = new HttpParams();
+    if (date) params = params.set('date', date);
+    // La pantalla ya muestra el error en su sitio: sin aviso doble.
+    return this.http.get<ProductionByDay>(`${this.base}/fabricacion/production-by-day`, {
+      params,
+      context: new HttpContext().set(SIN_TOAST_ERROR, true),
+    });
   }
   tableroOrdenes() {
     return this.http.get<TableroOrdenes>(`${this.base}/fabricacion/tablero-ordenes`);

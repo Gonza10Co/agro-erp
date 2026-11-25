@@ -135,6 +135,8 @@ export type Seccion =
   | 'programacion-corte'
   // Piloto de planta (2026-09-09): estaciones, nacimiento del par, TV y tablero por órdenes.
   | 'piloto'
+  // Producción por día y estación, con días pasados (2026-11-25).
+  | 'production-by-day'
   // Exportar los inventarios a Excel (reunión del 2026-11-21).
   | 'exportar-inventario'
   // Reporte comercial (reunión del 2026-11-21): pedidos por cliente y mes, tabla dinámica.
@@ -187,6 +189,10 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   // (nacimiento del par + pistolazo), la TV de planta y el tablero por órdenes.
   // Ver agro/visita-2026-09-09/HALLAZGOS-VISITA-2026-09-09.md
   'piloto': 'ENTREGADO',
+  // Producción por día (2026-11-25): la pidieron Valen y Jefferson para ver cuántos pares
+  // se registraron en cada estación, también en días pasados. Solo lectura, liberada de
+  // una. La tablet (ESTACION) no la ve: no está en su lista blanca.
+  'production-by-day': 'ENTREGADO',
   // Liberadas en la demo de la Entrega 2 (2026-07-17).
   'costo-utilidad-oc': 'ENTREGADO',
   'proforma-oc': 'ENTREGADO',

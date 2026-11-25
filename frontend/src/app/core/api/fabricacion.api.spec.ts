@@ -58,6 +58,13 @@ describe('FabricacionApi', () => {
     req.flush({ estacion: { codigo: 'PREPARACION' }, hoy: 1, pares: [] });
   });
 
+  it('productionByDay manda la fecha solo si se pide', () => {
+    api.productionByDay().subscribe();
+    httpMock.expectOne(`${base}/fabricacion/production-by-day`).flush({ stations: [] });
+    api.productionByDay('2026-11-21').subscribe();
+    httpMock.expectOne(`${base}/fabricacion/production-by-day?date=2026-11-21`).flush({ stations: [] });
+  });
+
   it('estaciones, hoy y tablero-ordenes son GET; activarEstacion es PATCH', () => {
     api.estaciones().subscribe();
     httpMock.expectOne(`${base}/fabricacion/estaciones`).flush([]);

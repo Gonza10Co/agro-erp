@@ -45,6 +45,12 @@ describe('ShellComponent', () => {
     expect(rutas.slice(i, i + 3)).toEqual(['/inventario', '/inventario/ajuste-pt', '/inventario/ajuste-mp']);
   });
 
+  it('la producción por día va en Planta, debajo de Estación', () => {
+    const { host } = crear();
+    const rutas = [...host.querySelectorAll('a.nav-item')].map((a) => a.getAttribute('href'));
+    expect(rutas[rutas.indexOf('/fabricacion/estacion') + 1]).toBe('/fabricacion/production-by-day');
+  });
+
   it('retiró del menú el puesto de operario (lo reemplazó Estación)', () => {
     const text = crear().host.textContent ?? '';
     expect(text).not.toContain('Puesto de operario');
