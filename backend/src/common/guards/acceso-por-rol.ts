@@ -39,8 +39,8 @@ export const LISTA_BLANCA_ROL: Readonly<Record<string, readonly ReglaAcceso[]>> 
     { metodos: ['GET'], ruta: /^\/fabricacion\/par\/[^/]+$/ },
     // Lo que carga la pantalla de estación: estaciones, operarios y máquinas de su célula.
     { metodos: ['GET'], ruta: /^\/fabricacion\/(estaciones|operarios|maquinas)\/?$/ },
-    // TV de planta y tableros (por estación y por órdenes).
-    { metodos: ['GET'], ruta: /^\/fabricacion\/(hoy|tablero|tablero-resumen|tablero-ordenes)\/?$/ },
+    // TV de planta, tableros (por estación y por órdenes) y producción por día.
+    { metodos: ['GET'], ruta: /^\/fabricacion\/(hoy|tablero|tablero-resumen|tablero-ordenes|production-by-day)\/?$/ },
     // Preparación: elige la OF, nace la tanda e imprime etiquetas por adelantado.
     { metodos: ['GET'], ruta: /^\/fabricacion\/of\/?$/ },
     { metodos: ['GET'], ruta: /^\/fabricacion\/of\/[^/]+$/ },

@@ -191,7 +191,7 @@ export const NIVEL_SECCION: Record<Seccion, NivelLiberacion> = {
   'piloto': 'ENTREGADO',
   // Producción por día (2026-11-25): la pidieron Valen y Jefferson para ver cuántos pares
   // se registraron en cada estación, también en días pasados. Solo lectura, liberada de
-  // una. La tablet (ESTACION) no la ve: no está en su lista blanca.
+  // una. La tablet (ESTACION) también la ve: Jefferson trabaja con esos usuarios.
   'production-by-day': 'ENTREGADO',
   // Liberadas en la demo de la Entrega 2 (2026-07-17).
   'costo-utilidad-oc': 'ENTREGADO',
@@ -286,8 +286,8 @@ const ACCESO_ROL: Record<string, AccesoRol> = {
   // Espejo de la lista ESTACION en `acceso-por-rol.ts`.
   ESTACION: {
     modulos: ['fabricacion'],
-    secciones: ['piloto', 'calidad-en-planta'],
-    rutas: [/^\/fabricacion\/estacion$/, /^\/fabricacion\/ordenes$/, /^\/fabricacion\/tablero$/, /^\/fabricacion\/par\/[^/]+$/, /^\/tv$/],
+    secciones: ['piloto', 'calidad-en-planta', 'production-by-day'],
+    rutas: [/^\/fabricacion\/estacion$/, /^\/fabricacion\/ordenes$/, /^\/fabricacion\/tablero$/, /^\/fabricacion\/production-by-day$/, /^\/fabricacion\/par\/[^/]+$/, /^\/tv$/],
     rutaInicial: '/fabricacion/estacion',
   },
 };

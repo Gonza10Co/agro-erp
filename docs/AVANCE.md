@@ -11,7 +11,7 @@
 > Planta): pares distintos que ENTRARON a cada estación en un día cualquiera (civil de Bogotá),
 > con inferidos aparte, primera y última hora, y desglose por OF, producto y talla.
 > `GET /fabricacion/production-by-day?date=AAAA-MM-DD`. Sección `production-by-day` (ENTREGADO);
-> la tablet (ESTACION) y JEFE_CORTE no la abren.
+> la tablet (ESTACION) también la abre, solo lectura; JEFE_CORTE no.
 >
 > **📅 FECHA DE ENTREGA SUGERIDA (2026-11-21), sin desplegar.** Promesa a JP: en Revisar de la
 > nueva OC el campo fecha de entrega se llena solo con `POST /orders/delivery-estimate`, que corre
