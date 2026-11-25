@@ -45,6 +45,12 @@ describe('ShellComponent', () => {
     expect(rutas.slice(i, i + 3)).toEqual(['/inventario', '/inventario/ajuste-pt', '/inventario/ajuste-mp']);
   });
 
+  it('la producción por día va en Planta, debajo de Estación', () => {
+    const { host } = crear();
+    const rutas = [...host.querySelectorAll('a.nav-item')].map((a) => a.getAttribute('href'));
+    expect(rutas[rutas.indexOf('/fabricacion/estacion') + 1]).toBe('/fabricacion/production-by-day');
+  });
+
   it('retiró del menú el puesto de operario (lo reemplazó Estación)', () => {
     const text = crear().host.textContent ?? '';
     expect(text).not.toContain('Puesto de operario');
@@ -202,7 +208,7 @@ describe('ShellComponent', () => {
     localStorage.setItem('accessToken', `x.${payload}.y`);
     const { host } = crear();
     const items = [...host.querySelectorAll('.nav-item .nav-label')].map((e) => e.textContent?.trim());
-    expect(items).toEqual(['Tablero por estaciones', 'Tablero por órdenes', 'Estación', 'TV de planta']);
+    expect(items).toEqual(['Tablero por estaciones', 'Tablero por órdenes', 'Estación', 'Producción por día', 'TV de planta']);
     expect(host.textContent).toContain('Estación');
     expect(host.querySelector('a.brand')?.getAttribute('href')).toBe('/fabricacion/estacion');
   });

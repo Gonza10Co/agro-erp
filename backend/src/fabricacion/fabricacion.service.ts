@@ -29,6 +29,7 @@ import {
   normalizarCodigoPar,
   horaDelEscaneo,
 } from './fabricacion-core';
+import { bogotaDate, bogotaDayRange, productionByDay } from './production-by-day-core';
 import { diasHabilesDelMes, metaDiaria } from '../reportes/calendario-habil';
 import { AvanzarDto } from './dto/avanzar.dto';
 import { CerrarLoteDto, MoverLoteDto } from './dto/lote-pares.dto';
@@ -1598,6 +1599,51 @@ export class FabricacionService {
       actualizado: ahora.toISOString(),
       estaciones: filas.map((f) => ({ ...f, meta: metas.get(f.celula) ?? META_DIARIA_DEFAULT })),
     };
+  }
+
+  /**
+   * Producción de un día (hoy o pasado) por estación, con desglose por OF, producto y
+   * talla. Aparte de `hoy()`: esa la refrescan las TV cada 5 s y no debe pesar más.
+   */
+  async productionByDay(date?: string) {
+    const now = new Date();
+    const today = bogotaDate(now);
+    const day = date ?? today;
+    const range = bogotaDayRange(day);
+    if (!range) throw new BadRequestException('La fecha no es válida: use el formato AAAA-MM-DD');
+    const [stations, events] = await Promise.all([
+      this.estaciones(),
+      this.prisma.eventoTrazabilidad.findMany({
+        where: { timestamp: { gte: range.start, lt: range.end }, estacionDestino: { not: null } },
+        select: {
+          parId: true,
+          estacionDestino: true,
+          timestamp: true,
+          inferido: true,
+          par: {
+            select: {
+              of: { select: { id: true, consecutivo: true } },
+              productoConfigurado: { select: { id: true, nombreComercial: true } },
+              talla: { select: { id: true, valor: true, orden: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    const entries = events.map((e) => ({
+      parId: e.parId,
+      station: e.estacionDestino,
+      timestamp: e.timestamp,
+      inferred: e.inferido,
+      ofId: e.par.of.id,
+      ofNumber: e.par.of.consecutivo,
+      productId: e.par.productoConfigurado.id,
+      product: e.par.productoConfigurado.nombreComercial,
+      sizeId: e.par.talla.id,
+      size: e.par.talla.valor,
+      sizeOrder: e.par.talla.orden,
+    }));
+    return { date: day, today, updatedAt: now.toISOString(), stations: productionByDay(entries, stations, range, now) };
   }
 
   /**
